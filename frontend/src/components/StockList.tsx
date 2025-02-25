@@ -155,15 +155,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
       <div className="floating-buttons">
         <Button
           className="report-button"
-          icon={<BarChartOutlined />}
-          onClick={() => message.info('生成报告功能开发中')}
-          title="生成并查看报告"
-        >
-          查看报告
-        </Button>
-        <Button
-          className="test-button"
-          icon={<PlusOutlined rotate={45} />}
+          icon={<PlusOutlined />}
           onClick={generateRandomStock}
           title="生成测试数据"
         >
