@@ -95,7 +95,7 @@ docker run -d --name trae-backend --network trae-network -p 8080:8080 -e DB_HOST
 ```
 
 ```shell
-docker run -d --name trae-backend --network trae-network -p 8080:8080 -e DB_HOST=postgres -e DB_USER=postgres -e DB_PASSWORD=123456 -e DB_NAME=postgres i-do-docker.pkg.coding.net/github/trae-demo/backend:2025022601
+docker run -d --name trae-backend --network trae-network -p 8080:8080 -e DB_HOST=postgres -e DB_USER=postgres -e DB_PASSWORD=123456 -e DB_NAME=postgres i-do-docker.pkg.coding.net/github/trae-demo/backend
 ```
 
 ### 前端部署
@@ -119,7 +119,7 @@ docker run -d --name trae-frontend --network trae-network -p 5173:80 trae-fronte
 ```
 
 ```shell
-docker run -d --name trae-frontend --network trae-network -p 5173:80 i-do-docker.pkg.coding.net/github/trae-demo/frontend:2025022602
+docker run -d --name trae-frontend --network trae-network -p 5173:80 i-do-docker.pkg.coding.net/github/trae-demo/frontend
 ```
 
 ## 开发指南

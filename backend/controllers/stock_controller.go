@@ -38,18 +38,16 @@ func GetStocks(c *gin.Context) {
 
 // CreateStock 添加新股票
 func CreateStock(c *gin.Context) {
-	var input struct {
-		Market string `json:"market" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(400, gin.H{"error": "无效的请求数据"})
+	market := c.Query("market")
+	if market == "" {
+		c.JSON(400, gin.H{"error": "市场参数不能为空"})
 		return
 	}
 
 	// 如果是沪深页面的请求，随机选择一个市场
-	if input.Market == "A" {
+	if market == "A" {
 		markets := []string{"SH", "SZ", "BJ"}
-		input.Market = markets[rand.Intn(len(markets))]
+		market = markets[rand.Intn(len(markets))]
 	}
 
 	// 生成UUID作为股票ID
@@ -63,16 +61,16 @@ func CreateStock(c *gin.Context) {
 	// 使用工具函数生成股票数据
 	stock := models.Stock{
 		ID:     stockID,
-		Market: input.Market,
-		Code:   utils.GenerateStockCode(input.Market),
-		Name:   utils.GenerateStockName(input.Market),
+		Market: market,
+		Code:   utils.GenerateStockCode(market),
+		Name:   utils.GenerateStockName(market),
 	}
 
 	// 生成价格相关数据
-	stock.Price, stock.Change, stock.ChangePercent = utils.GenerateStockPrice(input.Market)
+	stock.Price, stock.Change, stock.ChangePercent = utils.GenerateStockPrice(market)
 
 	// 生成历史价格数据
-	priceHistory := utils.GeneratePriceHistory(stock.ID, stock.Price, input.Market)
+	priceHistory := utils.GeneratePriceHistory(stock.ID, stock.Price, market)
 
 	// 开启事务
 	tx := database.DB.Begin()
@@ -107,16 +105,31 @@ func CreateStock(c *gin.Context) {
 // UpdateStock 更新股票信息
 func UpdateStock(c *gin.Context) {
 	id := c.Param("id")
-	var stock models.Stock
-	if err := c.ShouldBindJSON(&stock); err != nil {
-		c.JSON(400, gin.H{"error": "无效的请求数据"})
-		return
+	name := c.Query("name")
+	code := c.Query("code")
+	price := c.Query("price")
+	change := c.Query("change")
+	changePercent := c.Query("changePercent")
+
+	// 构建更新数据
+	updates := make(map[string]interface{})
+	if name != "" {
+		updates["name"] = name
+	}
+	if code != "" {
+		updates["code"] = code
+	}
+	if price != "" {
+		updates["price"] = price
+	}
+	if change != "" {
+		updates["change"] = change
+	}
+	if changePercent != "" {
+		updates["change_percent"] = changePercent
 	}
 
-	// 确保 market 字段不被更新
-	stock.Market = ""
-
-	result := database.DB.Model(&models.Stock{}).Where("id = ?", id).Updates(stock)
+	result := database.DB.Model(&models.Stock{}).Where("id = ?", id).Updates(updates)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": "更新股票失败"})
 		return
