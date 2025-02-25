@@ -94,6 +94,10 @@ docker build -t trae-backend .
 docker run -d --name trae-backend --network trae-network -p 8080:8080 -e DB_HOST=postgres -e DB_USER=postgres -e DB_PASSWORD=123456 -e DB_NAME=postgres trae-backend
 ```
 
+```shell
+docker run -d --name trae-backend --network trae-network -p 8080:8080 -e DB_HOST=postgres -e DB_USER=postgres -e DB_PASSWORD=123456 -e DB_NAME=postgres i-do-docker.pkg.coding.net/github/trae-demo/backend:2025022601
+```
+
 ### 前端部署
 
 1. 进入前端目录：
@@ -112,6 +116,10 @@ docker build -t trae-frontend .
 
 ```shell
 docker run -d --name trae-frontend --network trae-network -p 5173:80 trae-frontend
+```
+
+```shell
+docker run -d --name trae-frontend --network trae-network -p 5173:80 i-do-docker.pkg.coding.net/github/trae-demo/frontend:2025022602
 ```
 
 ## 开发指南
@@ -156,3 +164,29 @@ npm run dev
 - 后端通过 Gin 的日志中间件记录所有请求和响应
 - 前端在开发环境下会打印 API 通信日志
 - 数据库操作通过 GORM 的日志功能记录
+
+## 生产部署的注意事项
+
+> 如何调整前端代码，我不想浏览器直接访问服务器地址，生产环境，全部都走 Nginx 的代理
+
+我将帮助你配置前端代理。我看到项目中已经有了 Nginx 配置文件，我们需要修改前端的环境配置文件和 Nginx 配置，将所有的 API 请求通过 Nginx 转发到后端服务。这样可以统一请求入口，提高安全性，并且便于后期维护和扩展。
+
+让我们先查看前端的环境配置文件，了解当前的 API 请求配置。
+
+frontend\.env
+
+frontend\.env.production
+
+修改生产环境配置文件，将 API 请求地址改为相对路径，这样所有请求都会通过 Nginx 代理转发。
+
+frontend\.env.production
+
+已完成前端代理配置的调整：
+
+- 修改了生产环境配置文件`.env.production` ，将 API 基础 URL 从`http://test-backend:8080` 改为`/api`
+- 现有的 Nginx 配置已经正确设置了代理规则，将`/api` 路径的请求转发到后端服务
+- 这样的配置确保了：
+  - 所有 API 请求都通过 Nginx 代理转发
+  - 提高了系统安全性，隐藏了后端服务器的真实地址
+  - 统一了请求入口，便于后期维护和扩展
+  - 支持了跨域请求处理
