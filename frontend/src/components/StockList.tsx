@@ -202,7 +202,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
   ];
 
   const generateRandomStock = () => {
-    addMutation.mutate({ market });
+    addMutation.mutate({});
   };
 
   return (
