@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, Space, message, Dropdown, Tooltip } from 'antd';
+import { Button, Modal, Form, Input, Space, message, Dropdown, Tooltip } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, MoreOutlined, BarChartOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import { useMutation, useQueryClient } from 'react-query';
@@ -111,11 +111,11 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
     }
   );
 
-  const handleAdd = () => {
-    setEditingStock(null);
-    form.resetFields();
-    setIsModalVisible(true);
-  };
+//   const handleAdd = () => {
+//     setEditingStock(null);
+//     form.resetFields();
+//     setIsModalVisible(true);
+//   };
 
   const handleEdit = (record: Stock) => {
     setEditingStock(record);
@@ -138,68 +138,6 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
       addMutation.mutate(values);
     }
   };
-
-  const columns = [
-    {
-      title: '代码',
-      dataIndex: 'code',
-      key: 'code',
-    },
-    {
-      title: '名称',
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: '最新价',
-      dataIndex: 'price',
-      key: 'price',
-      render: (price: number) => price.toFixed(2),
-    },
-    {
-      title: '涨跌',
-      dataIndex: 'change',
-      key: 'change',
-      render: (change: number) => (
-        <span style={{ color: change > 0 ? '#f5222d' : change < 0 ? '#52c41a' : 'inherit' }}>
-          {change.toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      title: '涨跌幅',
-      dataIndex: 'changePercent',
-      key: 'changePercent',
-      render: (percent: number) => (
-        <span style={{ color: percent > 0 ? '#f5222d' : percent < 0 ? '#52c41a' : 'inherit' }}>
-          {percent.toFixed(2)}%
-        </span>
-      ),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      render: (_: any, record: Stock) => (
-        <Space>
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            编辑
-          </Button>
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
-          >
-            删除
-          </Button>
-        </Space>
-      ),
-    },
-  ];
 
   const generateRandomStock = () => {
     addMutation.mutate({});

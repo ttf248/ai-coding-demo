@@ -111,7 +111,7 @@ docker build -t trae-frontend .
 3. 运行容器：
 
 ```shell
-docker run -d --name trae-frontend -p 5173:80 trae-frontend
+docker run -d --name trae-frontend --network trae-network -p 5173:80 trae-frontend
 ```
 
 ## 开发指南
