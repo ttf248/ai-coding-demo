@@ -40,20 +40,47 @@ var (
 			changeRange:   [2]float64{-3.0, 3.0},
 			changePctRange: [2]float64{-12.0, 12.0},
 		},
+		"HK": {
+			codePrefix:    "",
+			codeLength:    4,
+			namePrefix:    []string{"港", "香港", "恒", "九龙"},
+			priceRange:    [2]float64{1.0, 500.0},
+			changeRange:   [2]float64{-5.0, 5.0},
+			changePctRange: [2]float64{-15.0, 15.0},
+		},
+		"US": {
+			codePrefix:    "",
+			codeLength:    4,
+			namePrefix:    []string{"American", "US", "United", "Global"},
+			priceRange:    [2]float64{10.0, 1000.0},
+			changeRange:   [2]float64{-10.0, 10.0},
+			changePctRange: [2]float64{-20.0, 20.0},
+		},
 	}
 
 	// 行业名称列表
-	industries = []string{"科技", "医药", "金融", "能源", "消费", "制造", "地产", "农业", "教育", "物流"}
+	industries = []string{"科技", "医药", "金融", "能源", "消费", "制造", "地产", "农业", "教育", "物流", "互联网", "半导体", "新能源", "人工智能", "区块链"}
 	
 	// 公司类型后缀
-	companySuffixes = []string{"股份", "科技", "集团", "生物", "电子"}
+	companySuffixes = []string{"股份", "科技", "集团", "生物", "电子", "控股", "国际", "数字", "智能", "未来"}
 )
 
 // GenerateStockCode 生成指定市场的股票代码
 func GenerateStockCode(market string) string {
-	rule, ok := marketRules[strings.ToUpper(market)]
+	market = strings.ToUpper(market)
+	rule, ok := marketRules[market]
 	if !ok {
 		return ""
+	}
+
+	// 特殊处理美股代码（2-4位字母）
+	if market == "US" {
+		length := rand.Intn(3) + 2 // 2-4位
+		letters := make([]byte, length)
+		for i := 0; i < length; i++ {
+			letters[i] = byte('A' + rand.Intn(26))
+		}
+		return string(letters)
 	}
 
 	// 生成剩余数字部分
