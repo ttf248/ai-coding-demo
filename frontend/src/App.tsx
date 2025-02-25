@@ -30,7 +30,7 @@ const App: React.FC = () => {
     ['stocks', activeMarket],
     async () => {
       try {
-        const response = await axios.get(`http://localhost:8080/api/stocks`, {
+        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/stocks`, {
           params: { market: activeMarket }
         });
         console.log('获取股票数据成功:', response.data);

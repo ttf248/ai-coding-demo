@@ -60,7 +60,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
 
   const addMutation = useMutation(
     (values: Partial<Stock>) =>
-      axios.post(`http://localhost:8080/api/stocks`, { ...values, market }),
+      axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/stocks`, { ...values, market }),
     {
       onSuccess: () => {
         message.success('添加成功');
@@ -77,7 +77,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
 
   const updateMutation = useMutation(
     (values: Partial<Stock>) =>
-      axios.put(`http://localhost:8080/api/stocks/${values.id}`, { ...values, market }, {
+      axios.put(`${import.meta.env.VITE_API_BASE_URL}/api/stocks/${values.id}`, { ...values, market }, {
         params: { market }
       }),
     {
@@ -96,7 +96,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
   );
 
   const deleteMutation = useMutation(
-    (stock: Stock) => axios.delete(`http://localhost:8080/api/stocks`, {
+    (stock: Stock) => axios.delete(`${import.meta.env.VITE_API_BASE_URL}/api/stocks`, {
       params: { id: stock.id, market }
     }),
     {
