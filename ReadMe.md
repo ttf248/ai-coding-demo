@@ -119,7 +119,7 @@ docker run -d --name trae-frontend --network trae-network -p 5173:80 trae-fronte
 ```
 
 ```shell
-docker run -d --name trae-frontend --network trae-network -p 5173:80 i-do-docker.pkg.coding.net/github/trae-demo/frontend
+docker run -d --name trae-frontend --network trae-network -p 8888:80 i-do-docker.pkg.coding.net/github/trae-demo/frontend
 ```
 
 ## 开发指南
