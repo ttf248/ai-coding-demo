@@ -10,8 +10,8 @@ import (
 )
 
 func main() {
-	// 初始化随机数种子
-	rand.Seed(time.Now().UnixNano())
+	// 初始化随机数生成器
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	// 初始化数据库连接
 	database.InitDB()
