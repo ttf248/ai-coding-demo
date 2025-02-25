@@ -18,8 +18,17 @@ func GetStocks(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "市场参数不能为空"})
 		return
 	}
+
+	// 如果是沪深页面的请求，查询 SH、SZ、BJ 三个市场的数据
+	var markets []string
+	if market == "A" {
+		markets = []string{"SH", "SZ", "BJ"}
+	} else {
+		markets = []string{market}
+	}
+
 	var stocks []models.Stock
-	result := database.DB.Preload("PriceHistory").Where("market = ?", market).Find(&stocks)
+	result := database.DB.Preload("PriceHistory").Where("market IN ?", markets).Find(&stocks)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": "获取股票列表失败"})
 		return
@@ -35,6 +44,12 @@ func CreateStock(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(400, gin.H{"error": "无效的请求数据"})
 		return
+	}
+
+	// 如果是沪深页面的请求，随机选择一个市场
+	if input.Market == "A" {
+		markets := []string{"SH", "SZ", "BJ"}
+		input.Market = markets[rand.Intn(len(markets))]
 	}
 
 	// 生成UUID作为股票ID
