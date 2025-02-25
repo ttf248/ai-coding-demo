@@ -30,9 +30,9 @@ func SetupRouter() *gin.Engine {
 	{
 		// 股票相关路由
 		api.GET("/stocks", controllers.GetStocks)
-		api.POST("/stocks", controllers.CreateStock)
-		api.PUT("/stocks/:id", controllers.UpdateStock)
-		api.DELETE("/stocks", controllers.DeleteStock)
+		api.GET("/stocks/create", controllers.CreateStock)
+		api.GET("/stocks/update/:id", controllers.UpdateStock)
+		api.GET("/stocks/delete", controllers.DeleteStock)
 	}
 
 	return r
