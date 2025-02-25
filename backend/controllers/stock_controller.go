@@ -72,7 +72,7 @@ func CreateStock(c *gin.Context) {
 	stock.Price, stock.Change, stock.ChangePercent = utils.GenerateStockPrice(input.Market)
 
 	// 生成历史价格数据
-	priceHistory := utils.GeneratePriceHistory(stock.ID, stock.Price)
+	priceHistory := utils.GeneratePriceHistory(stock.ID, stock.Price, input.Market)
 
 	// 开启事务
 	tx := database.DB.Begin()
