@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/shopspring/decimal"
+
+	"trae/models"
 )
 
 // MarketConfig 定义不同市场的特征配置
@@ -114,6 +117,67 @@ func GenerateStockName(market string) string {
 	default:
 		return gofakeit.Company()
 	}
+}
+
+// GeneratePriceHistory 生成股票历史价格数据
+func GeneratePriceHistory(stockID string, basePrice float64, market string) []models.PriceHistory {
+	config := getMarketConfig(market)
+	var history []models.PriceHistory
+	baseTime := time.Now().Add(-30 * 24 * time.Hour)
+	currentPrice := basePrice
+
+	// 生成市场波动趋势（-1到1之间的随机数，用于模拟整体市场趋势）
+	marketTrend := rand.Float64()*2 - 1
+
+	// 每天生成数据点数量根据市场特征调整
+	dataPointsPerDay := 4
+	if market == "US" {
+		dataPointsPerDay = 6 // 美股交易时间更长
+	} else if market == "HK" {
+		dataPointsPerDay = 5 // 港股交易时间适中
+	}
+
+	// 生成历史数据
+	for i := 0; i < 30*dataPointsPerDay; i++ {
+		// 基础波动：根据市场特征调整波动范围
+		baseChange := (rand.Float64()*0.04 - 0.02) * config.VolatilityFactor
+
+		// 市场趋势影响：根据市场趋势调整波动方向
+		trendEffect := marketTrend * (rand.Float64() * 0.01) * config.VolatilityFactor
+
+		// 随机波动性：根据市场特征调整大波动概率
+		volatility := 1.0
+		if rand.Float64() < 0.1*config.VolatilityFactor/2 { // 波动率越高，出现大波动的概率越大
+			volatility = 1.5 + rand.Float64()*config.VolatilityFactor // 波动范围也随市场特征调整
+		}
+
+		// 组合所有因素
+		priceChange := currentPrice * (baseChange + trendEffect) * volatility
+		currentPrice += priceChange
+
+		// 确保价格在市场允许范围内
+		if currentPrice < config.MinPrice {
+			currentPrice = config.MinPrice
+		} else if currentPrice > config.MaxPrice {
+			currentPrice = config.MaxPrice
+		}
+
+		// 根据市场特征调整时间间隔
+		baseHours := 24 / dataPointsPerDay
+		timeOffset := time.Duration(baseHours*3600+rand.Intn(1800)) * time.Second // 添加最多30分钟的随机偏移
+		timestamp := baseTime.Add(time.Duration(i) * time.Duration(baseHours) * time.Hour).Add(timeOffset)
+
+		// 确保价格符合最小变动单位
+		currentPrice = decimal.NewFromFloat(currentPrice).Round(3).InexactFloat64()
+
+		history = append(history, models.PriceHistory{
+			StockID:   stockID,
+			Price:     currentPrice,
+			Timestamp: timestamp,
+		})
+	}
+
+	return history
 }
 
 // GenerateStockPrice 生成更真实的股票价格和变动
