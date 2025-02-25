@@ -90,14 +90,30 @@ func GenerateStockCode(market string) string {
 
 // GenerateStockName 生成更真实的股票名称
 func GenerateStockName(market string) string {
-	// 使用 gofakeit 生成更真实的公司名称
-	companyName := gofakeit.Company()
-	// 移除括号内容并限制长度
-	name := strings.Split(companyName, "(")[0]
-	if len(name) > 8 {
-		name = name[:8]
+	switch strings.ToUpper(market) {
+	case "SH", "SZ", "BJ":
+		// A股市场使用中文特征的公司名称
+		industries := []string{"科技", "医药", "电子", "新能源", "金融", "地产", "汽车", "农业"}
+		prefixes := []string{"中国", "国际", "东方", "西部", "北方", "南方", "华夏", "龙"}
+		suffixes := []string{"股份", "科技", "集团", "控股", "发展", "实业"}
+		return prefixes[rand.Intn(len(prefixes))] + industries[rand.Intn(len(industries))] + suffixes[rand.Intn(len(suffixes))]
+	case "HK":
+		// 港股使用双语特征的公司名称
+		prefixes := []string{"香港", "恒", "长江", "粤海", "中华", "港"}
+		industries := []string{"投资", "地产", "银行", "保险", "能源", "建设"}
+		suffixes := []string{"企业", "集团", "实业", "控股"}
+		return prefixes[rand.Intn(len(prefixes))] + industries[rand.Intn(len(industries))] + suffixes[rand.Intn(len(suffixes))]
+	case "US":
+		// 美股保持使用英文公司名称
+		companyName := gofakeit.Company()
+		name := strings.Split(companyName, "(")[0]
+		if len(name) > 8 {
+			name = name[:8]
+		}
+		return name
+	default:
+		return gofakeit.Company()
 	}
-	return name
 }
 
 // GenerateStockPrice 生成更真实的股票价格和变动
