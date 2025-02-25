@@ -29,23 +29,32 @@ func GetStocks(c *gin.Context) {
 
 // CreateStock 添加新股票
 func CreateStock(c *gin.Context) {
-	var stock models.Stock
-	if err := c.ShouldBindJSON(&stock); err != nil {
-		c.JSON(400, gin.H{"error": "无效的请求数据"})
-		return
+	var input struct {
+		Market string `json:"market" binding:"required"`
 	}
-	if stock.Market == "" {
-		c.JSON(400, gin.H{"error": "市场参数不能为空"})
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(400, gin.H{"error": "无效的请求数据"})
 		return
 	}
 
 	// 生成UUID作为股票ID
-	stock.ID = fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+	stockID := fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
 		rand.Int31n(0x10000),
 		rand.Int31n(0x10000),
 		0x4000|rand.Int31n(0x1000),
 		0x8000|rand.Int31n(0x4000),
 		rand.Int63n(0x1000000000000))
+
+	// 使用工具函数生成股票数据
+	stock := models.Stock{
+		ID:     stockID,
+		Market: input.Market,
+		Code:   utils.GenerateStockCode(input.Market),
+		Name:   utils.GenerateStockName(input.Market),
+	}
+
+	// 生成价格相关数据
+	stock.Price, stock.Change, stock.ChangePercent = utils.GenerateStockPrice(input.Market)
 
 	// 生成历史价格数据
 	priceHistory := utils.GeneratePriceHistory(stock.ID, stock.Price)
