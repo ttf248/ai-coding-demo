@@ -19,12 +19,12 @@ func InitDB() {
 	host := getEnvOrDefault("DB_HOST", "localhost")
 	user := getEnvOrDefault("DB_USER", "postgres")
 	password := getEnvOrDefault("DB_PASSWORD", "123456")
-	dbname := getEnvOrDefault("DB_NAME", "stockdb")
+	dbname := getEnvOrDefault("DB_NAME", "postgres")
 	port := getEnvOrDefault("DB_PORT", "5432")
 	sslmode := getEnvOrDefault("DB_SSLMODE", "disable")
 
 	// 构建数据库连接字符串
-	dsn := "host=" + host + " user=" + user + " password=" + password + 
+	dsn := "host=" + host + " user=" + user + " password=" + password +
 		" dbname=" + dbname + " port=" + port + " sslmode=" + sslmode
 
 	// 连接数据库
