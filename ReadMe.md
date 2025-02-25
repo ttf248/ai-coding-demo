@@ -4,7 +4,9 @@
 
 本项目是一个基于 React + Golang 的股票自选系统，支持股票的增删改查操作，并提供基础行情数据展示功能。系统采用前后端分离架构，具有良好的可扩展性和维护性。
 
-Prompt:
+### Prompt
+
+项目是从零开始创建，下面是项目的 Prompt：
 
 ```shell
 基于项目原型图，开发功能：自选股，需要支持合约的新增、删除、修改、查询。自选股界面需要展示基础的行情数据。支持多个不同的市场切换。
@@ -17,6 +19,10 @@ Prompt:
 
 后端需要展示请求和应答的日志；前端也打印通讯的日志，方便排查问题。
 ```
+
+### UI优化
+
+
 
 ### 技术栈
 
@@ -67,7 +73,7 @@ Prompt:
 docker run -d --name postgres \
     -e POSTGRES_PASSWORD=123456 \
     -p 5432:5432 \
-    postgres:17
+    i-do-docker.pkg.coding.net/github/trae-demo/postgres:17
 ```
 
 ### 后端部署
@@ -87,14 +93,7 @@ docker build -t trae-backend .
 3. 运行容器：
 
 ```shell
-docker run -d \
-    --name trae-backend \
-    -p 8080:8080 \
-    -e DB_HOST=postgres \
-    -e DB_USER=postgres \
-    -e DB_PASSWORD=123456 \
-    -e DB_NAME=stockdb \
-    trae-backend
+docker run -d --name trae-backend -p 8080:8080 -e DB_HOST=postgres -e DB_USER=postgres -e DB_PASSWORD=123456 -e DB_NAME=stockdb trae-backend
 ```
 
 ### 前端部署
@@ -114,10 +113,7 @@ docker build -t trae-frontend .
 3. 运行容器：
 
 ```shell
-docker run -d \
-    --name trae-frontend \
-    -p 3000:80 \
-    trae-frontend
+docker run -d --name trae-frontend -p 5173:80 trae-frontend
 ```
 
 ## 开发指南
