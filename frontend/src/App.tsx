@@ -15,13 +15,13 @@ interface Market {
 }
 
 const markets: Market[] = [
-  { key: 'SH', name: '沪深' },
+  { key: 'A', name: '沪深京' },
   { key: 'HK', name: '港股' },
   { key: 'US', name: '美股' },
 ];
 
 const App: React.FC = () => {
-  const [activeMarket, setActiveMarket] = useState<string>('SH');
+  const [activeMarket, setActiveMarket] = useState<string>('A');
   const [isSearchVisible, setIsSearchVisible] = useState<boolean>(false);
   const [searchText, setSearchText] = useState<string>('');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
