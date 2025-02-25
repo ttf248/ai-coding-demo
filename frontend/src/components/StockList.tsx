@@ -206,16 +206,20 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
     
     // 根据市场生成对应的股票代码和名称
     let randomCode, randomName;
-    if (market === 'sh') {
-      // 上海市场：6开头
-      randomCode = '6' + Math.floor(Math.random() * 100000).toString().padStart(5, '0');
-      randomName = `上海${randomCode}`;
-    } else if (market === 'sz') {
-      // 深圳市场：000或300开头
-      const prefixes = ['000', '300'];
-      const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-      randomCode = prefix + Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      randomName = `${prefix === '300' ? '创业' : '深圳'}${randomCode}`;
+    if (market === 'sh' || market === 'sz') {
+      // 沪深市场：随机选择上海或深圳
+      const actualMarket = Math.random() < 0.5 ? 'sh' : 'sz';
+      if (actualMarket === 'sh') {
+        // 上海市场：6开头
+        randomCode = '6' + Math.floor(Math.random() * 100000).toString().padStart(5, '0');
+        randomName = `上海${randomCode}`;
+      } else {
+        // 深圳市场：000或300开头
+        const prefixes = ['000', '300'];
+        const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+        randomCode = prefix + Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        randomName = `${prefix === '300' ? '创业' : '深圳'}${randomCode}`;
+      }
     } else if (market === 'hk') {
       // 港股市场：4位或5位数字
       randomCode = Math.floor(Math.random() * 10000 + 1).toString().padStart(4, '0');
