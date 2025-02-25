@@ -112,11 +112,8 @@ func UpdateStock(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "无效的请求数据"})
 		return
 	}
-	if stock.Market == "" {
-		c.JSON(400, gin.H{"error": "市场参数不能为空"})
-		return
-	}
-	result := database.DB.Model(&models.Stock{}).Where("id = ? AND market = ?", id, stock.Market).Updates(stock)
+
+	result := database.DB.Model(&models.Stock{}).Where("id = ?", id).Updates(stock)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": "更新股票失败"})
 		return
@@ -131,11 +128,6 @@ func UpdateStock(c *gin.Context) {
 // DeleteStock 删除股票
 func DeleteStock(c *gin.Context) {
 	id := c.Query("id")
-	market := c.Query("market")
-	if market == "" {
-		c.JSON(400, gin.H{"error": "市场参数不能为空"})
-		return
-	}
 
 	// 开启事务
 	tx := database.DB.Begin()
@@ -152,7 +144,7 @@ func DeleteStock(c *gin.Context) {
 	}
 
 	// 再删除股票记录
-	result := tx.Where("id = ? AND market = ?", id, market).Delete(&models.Stock{})
+	result := tx.Where("id = ?", id).Delete(&models.Stock{})
 	if result.Error != nil {
 		tx.Rollback()
 		c.JSON(500, gin.H{"error": "删除股票失败"})
