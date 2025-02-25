@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/montanaflynn/stats"
 	"github.com/shopspring/decimal"
 )
 
@@ -108,26 +107,17 @@ func GenerateStockPrice(market string) (price float64, change float64, changePer
 	// 生成基础价格，考虑市场特定范围
 	basePrice := decimal.NewFromFloat(config.MinPrice + rand.Float64()*(config.MaxPrice-config.MinPrice))
 
-	// 生成符合正态分布的价格变动，考虑市场特定波动率
-	data := make([]float64, 100)
-	for i := range data {
-		data[i] = rand.NormFloat64() * config.VolatilityFactor
-	}
+	// 生成基础波动比例（-3%到3%之间）
+	baseChangePercent := (rand.Float64()*0.06 - 0.03) * config.VolatilityFactor
 
-	// 使用 stats 包计算统计数据
-	mean, _ := stats.Mean(data)
-	stdDev, _ := stats.StandardDeviation(data)
-
-	// 生成基于统计特征的价格变动
-	// 增加基准变动比例到 0.5，使价格波动更明显
-	baseVolatility := 0.5
-	changeValue := decimal.NewFromFloat(mean * stdDev * baseVolatility)
-
-	// 随机增加额外波动
-	if rand.Float64() < 0.2 { // 20%的概率出现更大波动
+	// 随机增加额外波动（20%概率）
+	if rand.Float64() < 0.2 {
 		extraVolatility := 2.0 + rand.Float64()*3.0 // 2-5倍额外波动
-		changeValue = changeValue.Mul(decimal.NewFromFloat(extraVolatility))
+		baseChangePercent *= extraVolatility
 	}
+
+	// 计算价格变动值
+	changeValue := basePrice.Mul(decimal.NewFromFloat(baseChangePercent))
 
 	// 计算最终价格，确保在市场允许范围内
 	finalPrice := basePrice.Add(changeValue)
