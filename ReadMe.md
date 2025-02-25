@@ -70,10 +70,8 @@
 ### 数据库部署
 
 ```shell
-docker run -d --name postgres \
-    -e POSTGRES_PASSWORD=123456 \
-    -p 5432:5432 \
-    i-do-docker.pkg.coding.net/github/trae-demo/postgres:17
+docker network create trae-network
+docker run -d --name postgres -e POSTGRES_PASSWORD=123456 -p 5432:5432 --network trae-network i-do-docker.pkg.coding.net/github/trae-demo/postgres:17
 ```
 
 ### 后端部署
@@ -93,7 +91,7 @@ docker build -t trae-backend .
 3. 运行容器：
 
 ```shell
-docker run -d --name trae-backend -p 8080:8080 -e DB_HOST=postgres -e DB_USER=postgres -e DB_PASSWORD=123456 -e DB_NAME=stockdb trae-backend
+docker run -d --name trae-backend --network trae-network -p 8080:8080 -e DB_HOST=postgres -e DB_USER=postgres -e DB_PASSWORD=123456 -e DB_NAME=postgres trae-backend
 ```
 
 ### 前端部署
