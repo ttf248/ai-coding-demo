@@ -203,11 +203,48 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
 
   const generateRandomStock = () => {
     const randomId = crypto.randomUUID();
-    const randomCode = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
-    const randomName = `测试股票${randomCode}`;
-    const randomPrice = +(Math.random() * 100 + 10).toFixed(2);
-    const randomChange = +(Math.random() * 4 - 2).toFixed(2);
-    const randomChangePercent = +((randomChange / randomPrice) * 100).toFixed(2);
+    
+    // 根据市场生成对应的股票代码和名称
+    let randomCode, randomName;
+    if (market === 'sh') {
+      // 上海市场：6开头
+      randomCode = '6' + Math.floor(Math.random() * 100000).toString().padStart(5, '0');
+      randomName = `上海${randomCode}`;
+    } else if (market === 'sz') {
+      // 深圳市场：000或300开头
+      const prefixes = ['000', '300'];
+      const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+      randomCode = prefix + Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      randomName = `${prefix === '300' ? '创业' : '深圳'}${randomCode}`;
+    } else if (market === 'hk') {
+      // 港股市场：4位或5位数字
+      randomCode = Math.floor(Math.random() * 10000 + 1).toString().padStart(4, '0');
+      randomName = `港股${randomCode}`;
+    } else {
+      // 美股市场：2-4个字母
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const length = Math.floor(Math.random() * 3) + 2; // 2-4位字母
+      randomCode = Array.from({length}, () => letters[Math.floor(Math.random() * letters.length)]).join('');
+      randomName = `${randomCode} Inc.`;
+    }
+
+    // 生成更真实的价格和波动
+    let basePrice, maxChange;
+    if (market === 'HK') {
+      basePrice = +(Math.random() * 200 + 1).toFixed(3); // 港股价格范围更大，精确到3位小数
+      maxChange = 0.1; // 最大10%波动
+    } else if (market === 'US') {
+      basePrice = +(Math.random() * 500 + 1).toFixed(2); // 美股价格范围最大
+      maxChange = 0.15; // 最大15%波动
+    } else {
+      basePrice = +(Math.random() * 100 + 1).toFixed(2); // A股价格范围
+      maxChange = 0.1; // 最大10%波动，符合涨跌停规则
+    }
+
+    const randomPrice = basePrice;
+    const changePercent = (Math.random() * maxChange * 2 - maxChange); // 在最大波动范围内随机
+    const randomChange = +(basePrice * changePercent).toFixed(2);
+    const randomChangePercent = +(changePercent * 100).toFixed(2);
 
     const newStock = {
       id: randomId,
