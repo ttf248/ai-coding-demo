@@ -113,6 +113,9 @@ func UpdateStock(c *gin.Context) {
 		return
 	}
 
+	// 确保 market 字段不被更新
+	stock.Market = ""
+
 	result := database.DB.Model(&models.Stock{}).Where("id = ?", id).Updates(stock)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": "更新股票失败"})
