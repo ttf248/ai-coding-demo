@@ -17,7 +17,7 @@ COPY . .
 RUN npm run build
 
 # 运行阶段
-FROM nginx:alpine
+FROM nginx:stable-alpine3.20-perl
 
 # 复制 nginx 配置文件
 COPY nginx.conf /etc/nginx/conf.d/default.conf
