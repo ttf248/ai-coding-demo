@@ -26,7 +26,7 @@ const App: React.FC = () => {
   const [searchText, setSearchText] = useState<string>('');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const savedTheme = localStorage.getItem('theme');
-    return savedTheme ? savedTheme === 'dark' : true;
+    return savedTheme ? savedTheme === 'dark' : false;
   });
 
   const [currentPage, setCurrentPage] = useState<number>(1);
