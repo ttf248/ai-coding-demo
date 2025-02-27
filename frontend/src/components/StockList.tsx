@@ -9,12 +9,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 
 dayjs.extend(relativeTime);
 
-interface PriceHistory {
-  id: number;
-  stockId: string;
-  price: number;
-  timestamp: string;
-}
+import { PriceHistory } from '../types/stock';
 
 interface Stock {
   id: string;
@@ -264,7 +259,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
                   title={<div>
                     {stock.priceHistory?.map((history) => (
                       <div key={history.id}>
-                        {new Date(history.timestamp).toLocaleString()}: ¥{history.price.toFixed(2)}
+                        {new Date(history.timestamp).toLocaleString()}: ¥{history.closePrice.toFixed(2)}
                       </div>
                     ))}
                   </div>}
@@ -276,7 +271,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
                         <YAxis domain={['dataMin', 'dataMax']} hide />
                         <Line
                           type="monotone"
-                          dataKey="price"
+                          dataKey="closePrice"
                           stroke={stock.change >= 0 ? '#4CAF50' : '#F44336'}
                           strokeWidth={1}
                           dot={false}
