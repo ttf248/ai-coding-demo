@@ -33,6 +33,8 @@ func SetupRouter() *gin.Engine {
 		api.GET("/stocks/create", controllers.CreateStock)
 		api.GET("/stocks/update/:id", controllers.UpdateStock)
 		api.GET("/stocks/delete", controllers.DeleteStock)
+		api.GET("/stocks/delete-all", controllers.DeleteAllStocks)
+		api.GET("/stocks/delete-market", controllers.DeleteMarketStocks)
 	}
 
 	return r
