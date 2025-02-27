@@ -216,7 +216,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
           删除当前市场
         </Button>
         <Button
-          className="report-button"
+          className="report-button ant-btn-dangerous"
           danger
           icon={<DeleteOutlined />}
           onClick={handleDeleteAll}
