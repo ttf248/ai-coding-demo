@@ -24,7 +24,10 @@ const App: React.FC = () => {
   const [activeMarket, setActiveMarket] = useState<string>('A');
   const [isSearchVisible, setIsSearchVisible] = useState<boolean>(false);
   const [searchText, setSearchText] = useState<string>('');
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const savedTheme = localStorage.getItem('theme');
+    return savedTheme ? savedTheme === 'dark' : true;
+  });
 
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(5);
@@ -59,7 +62,9 @@ const App: React.FC = () => {
   };
 
   const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    localStorage.setItem('theme', newTheme ? 'dark' : 'light');
   };
 
   return (
