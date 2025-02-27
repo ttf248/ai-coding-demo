@@ -145,6 +145,52 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
     addMutation.mutate({});
   };
 
+  const deleteAllMutation = useMutation(
+    () => axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/stocks/delete-all`),
+    {
+      onSuccess: () => {
+        message.success('删除成功');
+        queryClient.invalidateQueries(['stocks', market]);
+      },
+      onError: (error) => {
+        console.error('删除失败:', error);
+        message.error('删除失败，请重试');
+      },
+    }
+  );
+
+  const deleteMarketMutation = useMutation(
+    () => axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/stocks/delete-market`, {
+      params: { market }
+    }),
+    {
+      onSuccess: () => {
+        message.success('删除成功');
+        queryClient.invalidateQueries(['stocks', market]);
+      },
+      onError: (error) => {
+        console.error('删除失败:', error);
+        message.error('删除失败，请重试');
+      },
+    }
+  );
+
+  const handleDeleteAll = () => {
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除所有数据吗？',
+      onOk: () => deleteAllMutation.mutate(),
+    });
+  };
+
+  const handleDeleteMarket = () => {
+    Modal.confirm({
+      title: '确认删除',
+      content: `确定要删除${market === 'A' ? '沪深北交所' : market}市场的所有数据吗？`,
+      onOk: () => deleteMarketMutation.mutate(),
+    });
+  };
+
   return (
     <div className="stock-list">
       <div style={{ marginBottom: 16 }}>
@@ -160,6 +206,23 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
           title="生成测试数据"
         >
           测试数据
+        </Button>
+        <Button
+          className="report-button"
+          icon={<DeleteOutlined />}
+          onClick={handleDeleteMarket}
+          title="删除当前市场数据"
+        >
+          删除当前市场
+        </Button>
+        <Button
+          className="report-button"
+          danger
+          icon={<DeleteOutlined />}
+          onClick={handleDeleteAll}
+          title="删除所有数据"
+        >
+          删除全部
         </Button>
       </div>
 
