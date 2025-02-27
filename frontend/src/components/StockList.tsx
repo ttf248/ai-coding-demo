@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Button, Modal, Form, Input, Space, message, Dropdown, Tooltip, Pagination } from 'antd';
-import { DeleteOutlined, EditOutlined, PlusOutlined, MoreOutlined, BarChartOutlined, ClockCircleOutlined } from '@ant-design/icons';
-import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
+import { Button, Modal, Form, Input, message, Pagination } from 'antd';
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from 'react-query';
-import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -42,7 +40,6 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
   const [editingStock, setEditingStock] = useState<Stock | null>(null);
   const [highlightedStocks, setHighlightedStocks] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   // 处理价格变化的高亮效果
   useEffect(() => {
     const oldStocks = queryClient.getQueryData<Stock[]>(['stocks', market]) || [];
@@ -261,7 +258,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
           pageSize={pageSize}
           total={total}
           onChange={onPageChange}
-          onShowSizeChange={(current, size) => onPageSizeChange(size)}
+          onShowSizeChange={(size) => onPageSizeChange(size)}
           showSizeChanger
           showQuickJumper
           showTotal={(total) => `共 ${total} 条记录`}

@@ -1,5 +1,4 @@
 import React from 'react';
-import { useParams } from 'react-router-dom';
 import { Card } from 'antd';
 import {
   AreaChart,
@@ -17,8 +16,6 @@ interface StockDetailProps {
 }
 
 const StockDetail: React.FC<StockDetailProps> = ({ priceHistory }) => {
-  const { stockId } = useParams<{ stockId: string }>();
-
   return (
     <div className="stock-detail">
       <Card title="价格走势" className="stock-detail-card">
