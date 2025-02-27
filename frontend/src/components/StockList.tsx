@@ -199,21 +199,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
 
   return (
     <div className="stock-list">
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Pagination
-          current={currentPage}
-          pageSize={pageSize}
-          total={total}
-          onChange={onPageChange}
-          onShowSizeChange={(current, size) => onPageSizeChange(size)}
-          showSizeChanger
-          showQuickJumper
-          showTotal={(total) => `共 ${total} 条记录`}
-          disabled={isLoading}
-        />
-        <Space>
-        </Space>
-      </div>
+
 
       <div className="floating-buttons">
         <Button
@@ -245,7 +231,6 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
           删除全部
         </Button>
       </div>
-
       <div className="stock-list">
         {isError ? (
           <div style={{ textAlign: 'center', padding: '24px' }}>
@@ -343,6 +328,20 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
             <p>暂无数据</p>
           </div>
         )}
+      </div>
+
+      <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
+        <Pagination
+          current={currentPage}
+          pageSize={pageSize}
+          total={total}
+          onChange={onPageChange}
+          onShowSizeChange={(current, size) => onPageSizeChange(size)}
+          showSizeChanger
+          showQuickJumper
+          showTotal={(total) => `共 ${total} 条记录`}
+          disabled={isLoading}
+        />
       </div>
 
       <Modal
