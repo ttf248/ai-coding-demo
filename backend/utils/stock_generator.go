@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"strings"
 	"time"
@@ -124,7 +125,7 @@ func GeneratePriceHistory(stockID string, basePrice float64, market string) []mo
 	config := getMarketConfig(market)
 	var history []models.PriceHistory
 	baseTime := time.Now().Add(-30 * 24 * time.Hour)
-	currentPrice := basePrice
+	preClosePrice := basePrice
 
 	// 生成市场波动趋势（-1到1之间的随机数，用于模拟整体市场趋势）
 	marketTrend := rand.Float64()*2 - 1
@@ -151,30 +152,46 @@ func GeneratePriceHistory(stockID string, basePrice float64, market string) []mo
 			volatility = 1.5 + rand.Float64()*config.VolatilityFactor // 波动范围也随市场特征调整
 		}
 
-		// 组合所有因素
-		priceChange := currentPrice * (baseChange + trendEffect) * volatility
-		currentPrice += priceChange
+		// 生成开盘价（基于昨收价，并考虑基础波动、趋势影响和波动性）
+		openPriceChange := preClosePrice * ((rand.Float64()*0.02 - 0.01) * config.VolatilityFactor * volatility)
+		openPriceChange += preClosePrice * (baseChange + trendEffect)
+		openPrice := decimal.NewFromFloat(preClosePrice + openPriceChange).Round(3).InexactFloat64()
 
-		// 确保价格在市场允许范围内
-		if currentPrice < config.MinPrice {
-			currentPrice = config.MinPrice
-		} else if currentPrice > config.MaxPrice {
-			currentPrice = config.MaxPrice
+		// 生成当日最高价和最低价
+		priceRange := preClosePrice * 0.02 * config.VolatilityFactor
+		highPrice := decimal.NewFromFloat(openPrice + math.Abs(rand.Float64()*priceRange)).Round(3).InexactFloat64()
+		lowPrice := decimal.NewFromFloat(openPrice - math.Abs(rand.Float64()*priceRange)).Round(3).InexactFloat64()
+		if lowPrice > highPrice {
+			lowPrice, highPrice = highPrice, lowPrice
 		}
+
+		// 生成收盘价（位于最高价和最低价之间）
+		closePrice := decimal.NewFromFloat(lowPrice + rand.Float64()*(highPrice-lowPrice)).Round(3).InexactFloat64()
+
+		// 生成成交量和成交额
+		baseVolume := int64(1000000) // 基础成交量100万股
+		volume := baseVolume + int64(rand.Float64()*float64(baseVolume)*config.VolatilityFactor)
+		amount := decimal.NewFromFloat(float64(volume) * (highPrice+lowPrice+closePrice)/3).Round(2).InexactFloat64()
 
 		// 根据市场特征调整时间间隔
 		baseHours := 24 / dataPointsPerDay
 		timeOffset := time.Duration(baseHours*3600+rand.Intn(1800)) * time.Second // 添加最多30分钟的随机偏移
 		timestamp := baseTime.Add(time.Duration(i) * time.Duration(baseHours) * time.Hour).Add(timeOffset)
 
-		// 确保价格符合最小变动单位
-		currentPrice = decimal.NewFromFloat(currentPrice).Round(3).InexactFloat64()
-
 		history = append(history, models.PriceHistory{
-			StockID:   stockID,
-			Price:     currentPrice,
-			Timestamp: timestamp,
+			StockID:       stockID,
+			OpenPrice:     openPrice,
+			HighPrice:     highPrice,
+			LowPrice:      lowPrice,
+			ClosePrice:    closePrice,
+			PreClosePrice: preClosePrice,
+			Volume:        volume,
+			Amount:        amount,
+			Timestamp:     timestamp,
 		})
+
+		// 更新昨收价
+		preClosePrice = closePrice
 	}
 
 	return history
