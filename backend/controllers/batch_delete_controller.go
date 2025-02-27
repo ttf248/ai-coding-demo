@@ -17,14 +17,14 @@ func DeleteAllStocks(c *gin.Context) {
 	}
 
 	// 先删除所有历史价格数据
-	if err := tx.Unscoped().Delete(&models.PriceHistory{}, "").Error; err != nil {
+	if err := tx.Exec("DELETE FROM price_histories").Error; err != nil {
 		tx.Rollback()
 		c.JSON(500, gin.H{"error": "删除历史价格数据失败"})
 		return
 	}
 
 	// 再删除所有股票记录
-	if err := tx.Unscoped().Delete(&models.Stock{}, "").Error; err != nil {
+	if err := tx.Exec("DELETE FROM stocks").Error; err != nil {
 		tx.Rollback()
 		c.JSON(500, gin.H{"error": "删除股票数据失败"})
 		return
