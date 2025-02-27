@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"math/rand"
+	"strconv"
 
 	"trae/database"
 	"trae/models"
@@ -19,6 +20,20 @@ func GetStocks(c *gin.Context) {
 		return
 	}
 
+	// 获取分页参数
+	page := 1
+	pageSize := 10
+	if p := c.Query("page"); p != "" {
+		if pageNum, err := strconv.Atoi(p); err == nil && pageNum > 0 {
+			page = pageNum
+		}
+	}
+	if ps := c.Query("pageSize"); ps != "" {
+		if size, err := strconv.Atoi(ps); err == nil && size > 0 && size <= 100 {
+			pageSize = size
+		}
+	}
+
 	// 如果是沪深页面的请求，查询 SH、SZ、BJ 三个市场的数据
 	var markets []string
 	if market == "A" {
@@ -27,13 +42,28 @@ func GetStocks(c *gin.Context) {
 		markets = []string{market}
 	}
 
+	// 计算总记录数
+	var total int64
+	if err := database.DB.Model(&models.Stock{}).Where("market IN ?", markets).Count(&total).Error; err != nil {
+		c.JSON(500, gin.H{"error": "获取总记录数失败"})
+		return
+	}
+
+	// 获取分页数据
 	var stocks []models.Stock
-	result := database.DB.Preload("PriceHistory").Where("market IN ?", markets).Find(&stocks)
+	offset := (page - 1) * pageSize
+	result := database.DB.Preload("PriceHistory").Where("market IN ?", markets).Offset(offset).Limit(pageSize).Find(&stocks)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": "获取股票列表失败"})
 		return
 	}
-	c.JSON(200, stocks)
+
+	c.JSON(200, gin.H{
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+		"data":     stocks,
+	})
 }
 
 // CreateStock 添加新股票

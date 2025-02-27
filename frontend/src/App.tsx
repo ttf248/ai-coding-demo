@@ -26,12 +26,19 @@ const App: React.FC = () => {
   const [searchText, setSearchText] = useState<string>('');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
 
-  const { data: stocks, isError } = useQuery(
-    ['stocks', activeMarket],
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  const { data: stocksData, isError } = useQuery(
+    ['stocks', activeMarket, currentPage, pageSize],
     async () => {
       try {
         const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/stocks`, {
-          params: { market: activeMarket }
+          params: { 
+            market: activeMarket,
+            page: currentPage,
+            pageSize: pageSize
+          }
         });
         console.log('获取股票数据成功:', response.data);
         return response.data;
@@ -84,7 +91,16 @@ const App: React.FC = () => {
           items={markets.map((market) => ({
             key: market.key,
             label: market.name,
-            children: <StockList stocks={stocks || []} isError={isError} market={market.key} />,
+            children: <StockList 
+              stocks={stocksData?.data || []} 
+              isError={isError} 
+              market={market.key}
+              total={stocksData?.total || 0}
+              currentPage={currentPage}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+            />,
           }))}
         />
       </Content>

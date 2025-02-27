@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Modal, Form, Input, Space, message, Dropdown, Tooltip } from 'antd';
+import { Button, Modal, Form, Input, Space, message, Dropdown, Tooltip, Pagination } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, MoreOutlined, BarChartOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import { useMutation, useQueryClient } from 'react-query';
@@ -31,9 +31,15 @@ interface StockListProps {
   stocks: Stock[];
   isError: boolean;
   market: string;
+  total: number;
+  currentPage: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+  isLoading?: boolean;
 }
 
-const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
+const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, currentPage, pageSize, onPageChange, onPageSizeChange, isLoading }) => {
   const [form] = Form.useForm();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingStock, setEditingStock] = useState<Stock | null>(null);
@@ -193,7 +199,18 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
 
   return (
     <div className="stock-list">
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Pagination
+          current={currentPage}
+          pageSize={pageSize}
+          total={total}
+          onChange={onPageChange}
+          onShowSizeChange={(current, size) => onPageSizeChange(size)}
+          showSizeChanger
+          showQuickJumper
+          showTotal={(total) => `共 ${total} 条记录`}
+          disabled={isLoading}
+        />
         <Space>
         </Space>
       </div>
@@ -204,6 +221,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
           icon={<PlusOutlined />}
           onClick={generateRandomStock}
           title="生成测试数据"
+          disabled={isLoading}
         >
           测试数据
         </Button>
@@ -212,6 +230,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
           icon={<DeleteOutlined />}
           onClick={handleDeleteMarket}
           title="删除当前市场数据"
+          disabled={isLoading}
         >
           删除当前市场
         </Button>
@@ -221,6 +240,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
           icon={<DeleteOutlined />}
           onClick={handleDeleteAll}
           title="删除所有数据"
+          disabled={isLoading}
         >
           删除全部
         </Button>
@@ -231,6 +251,11 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market }) => {
           <div style={{ textAlign: 'center', padding: '24px' }}>
             <h3>数据加载失败</h3>
             <p>请检查网络连接后重试</p>
+          </div>
+        ) : isLoading ? (
+          <div style={{ textAlign: 'center', padding: '24px' }}>
+            <div className="loading-spinner" />
+            <p>数据加载中...</p>
           </div>
         ) : stocks && stocks.length > 0 ? (
           stocks.map((stock) => (
