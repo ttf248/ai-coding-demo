@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { ConfigProvider } from 'antd';
+import { BrowserRouter } from 'react-router-dom';
 import zhCN from 'antd/locale/zh_CN';
 import App from './App';
 import './index.css';
@@ -22,7 +23,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <ConfigProvider locale={zhCN}>
-        <App />
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
       </ConfigProvider>
     </QueryClientProvider>
   </React.StrictMode>,

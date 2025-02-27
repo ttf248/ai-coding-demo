@@ -1,8 +1,9 @@
 import React from 'react';
-import { Button, Dropdown, Tooltip } from 'antd';
+import { Button, Dropdown } from 'antd';
 import { EditOutlined, DeleteOutlined, MoreOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import dayjs from 'dayjs';
+import { useNavigate } from 'react-router-dom';
 import { Stock } from '../types/stock';
 import { formatPrice, formatChange, formatChangePercent, getChangeColor } from '../utils/stockUtils';
 
@@ -14,6 +15,11 @@ interface StockCardProps {
 }
 
 const StockCard: React.FC<StockCardProps> = ({ stock, isHighlighted, onEdit, onDelete }) => {
+  const navigate = useNavigate();
+
+  const handleChartClick = () => {
+    navigate(`/stock/${stock.id}`);
+  };
   return (
     <div key={stock.id} className="stock-card">
       <div className="stock-info">
@@ -32,31 +38,20 @@ const StockCard: React.FC<StockCardProps> = ({ stock, isHighlighted, onEdit, onD
             </span>
           </div>
         </div>
-        <Tooltip
-          title={<div>
-            {stock.priceHistory?.map((history) => (
-              <div key={history.id}>
-                {new Date(history.timestamp).toLocaleString()}: ¥{formatPrice(history.price)}
-              </div>
-            ))}
-          </div>}
-          placement="right"
-        >
-          <div className="stock-mini-chart">
-            <ResponsiveContainer width="100%" height={20}>
-              <LineChart data={stock.priceHistory || []}>
-                <YAxis domain={['dataMin', 'dataMax']} hide />
-                <Line
-                  type="monotone"
-                  dataKey="price"
-                  stroke={stock.change >= 0 ? '#4CAF50' : '#F44336'}
-                  strokeWidth={1}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Tooltip>
+        <div className="stock-mini-chart" onClick={handleChartClick} style={{ cursor: 'pointer' }}>
+          <ResponsiveContainer width="100%" height={20}>
+            <LineChart data={stock.priceHistory || []}>
+              <YAxis domain={['dataMin', 'dataMax']} hide />
+              <Line
+                type="monotone"
+                dataKey="closePrice"
+                stroke={stock.change >= 0 ? '#4CAF50' : '#F44336'}
+                strokeWidth={1}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
       <div className="stock-update-time">
         <ClockCircleOutlined spin />

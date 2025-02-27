@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button, Modal, Form, Input, Space, message, Dropdown, Tooltip, Pagination } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, MoreOutlined, BarChartOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import { useMutation, useQueryClient } from 'react-query';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -40,7 +41,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
   const [editingStock, setEditingStock] = useState<Stock | null>(null);
   const [highlightedStocks, setHighlightedStocks] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
-
+  const navigate = useNavigate();
   // 处理价格变化的高亮效果
   useEffect(() => {
     const oldStocks = queryClient.getQueryData<Stock[]>(['stocks', market]) || [];
@@ -194,8 +195,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
 
   return (
     <div className="stock-list">
-
-
+  
       <div className="floating-buttons">
         <Button
           className="report-button"
@@ -255,31 +255,20 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
                     </span>
                   </div>
                 </div>
-                <Tooltip
-                  title={<div>
-                    {stock.priceHistory?.map((history) => (
-                      <div key={history.id}>
-                        {new Date(history.timestamp).toLocaleString()}: ¥{history.closePrice.toFixed(2)}
-                      </div>
-                    ))}
-                  </div>}
-                  placement="right"
-                >
-                  <div className="stock-mini-chart">
-                    <ResponsiveContainer width="100%" height={20}>
-                      <LineChart data={stock.priceHistory || []}>
-                        <YAxis domain={['dataMin', 'dataMax']} hide />
-                        <Line
-                          type="monotone"
-                          dataKey="closePrice"
-                          stroke={stock.change >= 0 ? '#4CAF50' : '#F44336'}
-                          strokeWidth={1}
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </Tooltip>
+                <div className="stock-mini-chart" onClick={() => navigate(`/stock/${stock.id}`)} style={{ cursor: 'pointer' }}>
+                  <ResponsiveContainer width="100%" height={20}>
+                    <LineChart data={stock.priceHistory || []}>
+                      <YAxis domain={['dataMin', 'dataMax']} hide />
+                      <Line
+                        type="monotone"
+                        dataKey="closePrice"
+                        stroke={stock.change >= 0 ? '#4CAF50' : '#F44336'}
+                        strokeWidth={1}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
               <div className="stock-update-time">
                 <ClockCircleOutlined spin />
@@ -324,7 +313,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
           </div>
         )}
       </div>
-
+  
       <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
         <Pagination
           current={currentPage}
@@ -338,7 +327,7 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
           disabled={isLoading}
         />
       </div>
-
+  
       <Modal
         title={editingStock ? '编辑自选股' : '添加自选股'}
         open={isModalVisible}
