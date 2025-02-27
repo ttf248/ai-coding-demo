@@ -26,13 +26,15 @@
 
 通过将当前的界面截图，上传到 Grok 里面，然后让它帮我们优化 UI，可能一次性拿到很多的优化建议，我们人工评估，然后拷贝到 Trae 中执行，观察优化的效果。
 
+最初的版本，很有工程师的味道，功能都在，但是交互逻辑比较简单直观。
+
 ![最初版本](imgs/Snipaste_2025-02-25_17-50-08.png)
+
+优化后，我们更加贴近了用户的使用场景，实际部署，你会发现，交互上也多了很多细节，动画效果更加完善。
 
 ![优化版本-浅色主题](imgs/Snipaste_2025-02-27_22-56-22.png)
 
 ![优化版本-深色主题](imgs/Snipaste_2025-02-27_22-56-42.png)
-
-实际部署，你会发现，交互上也多了很多细节，动画效果更加完善。
 
 ### 技术栈
 
@@ -79,6 +81,8 @@
 
 ### 数据库部署
 
+方便后续的部署，我们先创建一个虚拟网络
+
 ```shell
 docker network create trae-network
 docker run -d --name postgres -e POSTGRES_PASSWORD=123456 -p 5432:5432 --network trae-network i-do-docker.pkg.coding.net/github/trae-demo/postgres:17
@@ -100,9 +104,13 @@ docker build -t trae-backend .
 
 3. 运行容器：
 
+本地构建镜像启动
+
 ```shell
 docker run -d --name trae-backend --network trae-network -p 8080:8080 -e DB_HOST=postgres -e DB_USER=postgres -e DB_PASSWORD=123456 -e DB_NAME=postgres trae-backend
 ```
+
+已经打包好的镜像启动
 
 ```shell
 docker run -d --name trae-backend --network trae-network -p 8080:8080 -e DB_HOST=postgres -e DB_USER=postgres -e DB_PASSWORD=123456 -e DB_NAME=postgres i-do-docker.pkg.coding.net/github/trae-demo/backend
@@ -124,12 +132,16 @@ docker build -t trae-frontend .
 
 3. 运行容器：
 
+本地构建镜像启动
+
 ```shell
 docker run -d --name trae-frontend --network trae-network -p 5173:80 trae-frontend
 ```
 
+已经打包好的镜像启动
+
 ```shell
-docker run -d --name trae-frontend --network trae-network -p 8888:80 i-do-docker.pkg.coding.net/github/trae-demo/frontend
+docker run -d --name trae-frontend --network trae-network -p 5173:80 i-do-docker.pkg.coding.net/github/trae-demo/frontend
 ```
 
 ## 开发指南
@@ -200,3 +212,4 @@ frontend\.env.production
   - 提高了系统安全性，隐藏了后端服务器的真实地址
   - 统一了请求入口，便于后期维护和扩展
   - 支持了跨域请求处理
+  
