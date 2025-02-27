@@ -3,9 +3,12 @@ import { Layout, Tabs, message, Input } from 'antd';
 import { useQuery } from 'react-query';
 import axios from 'axios';
 import { SearchOutlined } from '@ant-design/icons';
+import { Routes, Route } from 'react-router-dom';
 import StockList from './components/StockList';
+import StockDetail from './components/StockDetail';
 import './App.css';
 import ThemeSwitch from './components/ThemeSwitch';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const { Header, Content } = Layout;
 
@@ -90,24 +93,33 @@ const App: React.FC = () => {
         <ThemeSwitch isDarkMode={isDarkMode} onToggle={toggleTheme} />
       </Header>
       <Content className="app-content">
-        <Tabs
-          activeKey={activeMarket}
-          onChange={handleMarketChange}
-          items={markets.map((market) => ({
-            key: market.key,
-            label: market.name,
-            children: <StockList 
-              stocks={stocksData?.data || []} 
-              isError={isError} 
-              market={market.key}
-              total={stocksData?.total || 0}
-              currentPage={currentPage}
-              pageSize={pageSize}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={setPageSize}
-            />,
-          }))}
-        />
+        <Routes>
+          <Route path="/" element={
+            <Tabs
+              activeKey={activeMarket}
+              onChange={handleMarketChange}
+              items={markets.map((market) => ({
+                key: market.key,
+                label: market.name,
+                children: (
+                  <ErrorBoundary>
+                    <StockList 
+                      stocks={stocksData?.data || []} 
+                      isError={isError} 
+                      market={market.key}
+                      total={stocksData?.total || 0}
+                      currentPage={currentPage}
+                      pageSize={pageSize}
+                      onPageChange={setCurrentPage}
+                      onPageSizeChange={setPageSize}
+                    />
+                  </ErrorBoundary>
+                ),
+              }))}
+            />
+          } />
+          <Route path="/stock/:id" element={<StockDetail priceHistory={[]} />} />
+        </Routes>
       </Content>
     </Layout>
   );

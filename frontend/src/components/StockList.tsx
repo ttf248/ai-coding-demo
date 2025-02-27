@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import StockCard from './StockCard';
 
 dayjs.extend(relativeTime);
 
@@ -239,73 +240,13 @@ const StockList: React.FC<StockListProps> = ({ stocks, isError, market, total, c
           </div>
         ) : stocks && stocks.length > 0 ? (
           stocks.map((stock) => (
-            <div key={stock.id} className="stock-card">
-              <div className="stock-info">
-                <div className="stock-code">{stock.code}</div>
-                <div className="stock-name">{stock.name}</div>
-              </div>
-              <div className="stock-data">
-                <div className="stock-price-container">
-                  <div className="stock-price">{stock.price.toFixed(2)}</div>
-                  <div className="stock-change">
-                    <span
-                      className={`stock-change-value ${stock.change > 0 ? 'positive' : 'negative'} ${highlightedStocks.has(stock.id) ? 'highlight' : ''}`}
-                    >
-                      {stock.change > 0 ? '+' : ''}{stock.change.toFixed(2)} / {stock.changePercent > 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%
-                    </span>
-                  </div>
-                </div>
-                <div className="stock-mini-chart" onClick={() => navigate(`/stock/${stock.id}`)} style={{ cursor: 'pointer' }}>
-                  <ResponsiveContainer width="100%" height={20}>
-                    <LineChart data={stock.priceHistory || []}>
-                      <YAxis domain={['dataMin', 'dataMax']} hide />
-                      <Line
-                        type="monotone"
-                        dataKey="closePrice"
-                        stroke={stock.change >= 0 ? '#4CAF50' : '#F44336'}
-                        strokeWidth={1}
-                        dot={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div className="stock-update-time">
-                <ClockCircleOutlined spin />
-                <span>{dayjs(stock.updatedAt).fromNow()}</span>
-                <div className="time-detail">
-                  更新于 {dayjs(stock.updatedAt).format('YYYY-MM-DD HH:mm:ss')}
-                </div>
-              </div>
-              <div className="stock-actions">
-                <Dropdown
-                  menu={{
-                    items: [
-                      {
-                        key: 'edit',
-                        icon: <EditOutlined />,
-                        label: '编辑',
-                        onClick: () => handleEdit(stock)
-                      },
-                      {
-                        key: 'delete',
-                        icon: <DeleteOutlined />,
-                        label: '删除',
-                        danger: true,
-                        onClick: () => handleDelete(stock)
-                      }
-                    ]
-                  }}
-                  trigger={['click']}
-                >
-                  <Button
-                    type="text"
-                    className="stock-more-button"
-                    icon={<MoreOutlined />}
-                  />
-                </Dropdown>
-              </div>
-            </div>
+            <StockCard
+              key={stock.id}
+              stock={stock}
+              isHighlighted={highlightedStocks.has(stock.id)}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
           ))
         ) : (
           <div style={{ textAlign: 'center', padding: '24px' }}>
