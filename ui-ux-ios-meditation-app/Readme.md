@@ -51,7 +51,7 @@ This file will contain the complete prototype with all screens for the meditatio
 
 我将为您创建一个完整的冥想 iOS App 原型图，包含产品规划、用户场景分析和完整的 UI/UX 设计。
 
-解决方案步骤：
+#### 解决方案步骤
 
 1. 用户场景分析：定义目标用户和使用场景
 2. 产品功能规划：设计核心功能和页面架构
@@ -64,7 +64,7 @@ meditation-app-prototype.html+513-1
 
 这个冥想 App 原型包含了完整的用户体验流程：
 
-核心功能页面：
+#### 核心功能页面
 
 1. 启动页 - 品牌展示和加载
 2. 引导页 - 介绍产品价值和功能
@@ -73,7 +73,7 @@ meditation-app-prototype.html+513-1
 5. 播放页 - 沉浸式冥想体验
 6. 个人中心 - 数据统计和设置
 
-设计特色：
+#### 设计特色
 
 * iOS 风格的圆润设计语言
 * 渐变色彩营造平静氛围
@@ -81,7 +81,7 @@ meditation-app-prototype.html+513-1
 * 真实的 Unsplash 图片增强视觉效果
 * 响应式的交互反馈
 
-用户体验考虑：
+#### 用户体验考虑
 
 * 简化的导航结构
 * 清晰的信息层级
