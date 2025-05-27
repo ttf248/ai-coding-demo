@@ -24,7 +24,7 @@
 
 - **类型**: UI/UX 设计
 - **文档**: [项目详情](ui-ux-ios-meditation-app/Readme.md)
-- **预览**: [快速查看原型](ui-ux-ios-meditation-app/meditation-app-prototype.html)
+- **预览**: [快速查看原型](https://ttf248.github.io/ai-coding-demo/ui-ux-ios-meditation-app/meditation-app-prototype.html)
 
 ---
 
@@ -32,4 +32,4 @@
 
 - **类型**: UI/UX 设计
 - **文档**: [项目详情](ui-ux-ios-life-assistant-app/Readme.md)
-- **预览**: [快速查看原型](ui-ux-ios-life-assistant-app/canghe_app_prototype.html)
+- **预览**: [快速查看原型](https://ttf248.github.io/ai-coding-demo/ui-ux-ios-life-assistant-app/canghe_app_prototype.html)
