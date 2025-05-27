@@ -14,5 +14,5 @@ vscode 模型莫名就会出现模型卡主不应答。
 ## 项目记录
 
 1. [自选股实战 前端+后端](stock-watching-system/Readme.md)
-2. [冥想 iOS App](ui-ux-ios-meditation-app/Readme.md)
-3. [生活情绪日记](ui-ux-ios-life-assistant-app/Readme.md)
+2. [冥想 iOS App](ui-ux-ios-meditation-app/Readme.md): [快速预览](ui-ux-ios-meditation-app/meditation-app-prototype.html)
+3. [生活情绪日记](ui-ux-ios-life-assistant-app/Readme.md): [快速预览](ui-ux-ios-life-assistant-app/canghe_app_prototype.html)
