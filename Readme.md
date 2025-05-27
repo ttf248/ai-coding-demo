@@ -1,5 +1,7 @@
 # AI 大模型编码学习笔记
 
+[在线全局预览](https://ttf248.github.io/ai-coding-demo)
+
 ## 大模型选择与开发工具
 
 - **选择的大模型**: Claude 系列
