@@ -18,7 +18,7 @@
 ### 自选股实战
 
 - **类型**: 前端 + 后端
-- **文档**: [项目详情](stock-watching-system/Readme.md)
+- **文档**: [项目详情](stock-watching-system/ReadMe.md)
 
 ---
 
