@@ -15,19 +15,19 @@
 
 ## 📚 技术文档列表
 
-### 🎨 Tailwind CSS
+### Tailwind CSS
 
 - **类型**: CSS 框架
 - **文档**: [什么是 Tailwind CSS？](docs/tailwindcss/Readme.md)
 - **预览**: [快速查看示例](docs/tailwindcss/what-is-tailwindcss-demo.html)
 
-### 🔤 Lucide 图标库
+### Lucide 图标库
 
 - **类型**: 图标库
 - **文档**: [什么是 Lucide？](docs/lucide/Readme.md)
 - **预览**: [快速查看示例](docs/lucide/what-is-lucide-demo.html)
 
-### 📸 Unsplash 图片资源
+### Unsplash 图片资源
 
 - **类型**: 图片资源平台
 - **文档**: [什么是 Unsplash？](docs/unsplash/Readme.md)
@@ -42,7 +42,7 @@
 
 ---
 
-### 🧘 冥想 iOS App
+### 冥想 iOS App
 
 - **类型**: UI/UX 设计
 - **文档**: [项目详情](ui-ux-ios-meditation-app/Readme.md)
@@ -50,7 +50,7 @@
 
 ---
 
-### 📖 生活情绪日记
+### 生活情绪日记
 
 - **类型**: UI/UX 设计
 - **文档**: [项目详情](ui-ux-ios-life-assistant-app/Readme.md)
@@ -58,7 +58,7 @@
 
 ---
 
-### 📺 YouTube 视频分享应用
+### YouTube 视频分享应用
 
 提示词更加通用，按照不同模块分别设计页面。
 
