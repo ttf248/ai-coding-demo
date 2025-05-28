@@ -18,27 +18,27 @@
 ### Tailwind CSS
 
 - **类型**: CSS 框架
-- **文档**: [什么是 Tailwind CSS？](docs/demo.md)
-- **预览**: [快速查看示例](docs/what-is-tailwindcss-demo.html)
+- **文档**: [什么是 Tailwind CSS？](docs/tailwindcss/Readme.md)
+- **预览**: [快速查看示例](docs/tailwindcss/what-is-tailwindcss-demo.html)
 
 ### Lucide 图标库
 
 - **类型**: 图标库
-- **文档**: [什么是 Lucide？](docs/what-is-lucide.md)
-- **预览**: [快速查看示例](docs/what-is-lucide-demo.html)
+- **文档**: [什么是 Lucide？](docs/lucide/Readme.md)
+- **预览**: [快速查看示例](docs/lucide/what-is-lucide-demo.html)
 
 ### Unsplash 图片资源
 
 - **类型**: 图片资源平台
-- **文档**: [什么是 Unsplash？](docs/what-is-unsplash.md)
-- **预览**: [快速查看示例](docs/what-is-unsplash-demo.html)
+- **文档**: [什么是 Unsplash？](docs/unsplash/Readme.md)
+- **预览**: [快速查看示例](docs/unsplash/what-is-unsplash-demo.html)
 
 ## 项目记录
 
 ### 自选股实战
 
 - **类型**: 前端 + 后端
-- **文档**: [项目详情](stock-watching-system/ReadMe.md)
+- **文档**: [项目详情](stock-watching-system/Readme.md)
 
 ---
 
