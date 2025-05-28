@@ -18,7 +18,7 @@
 ### Tailwind CSS
 
 - **类型**: CSS 框架
-- **文档**: [什么是 Tailwind CSS？](docs/what-is-tailwindcss.md)
+- **文档**: [什么是 Tailwind CSS？](docs/demo.md)
 - **预览**: [快速查看示例](docs/what-is-tailwindcss-demo.html)
 
 ### Lucide 图标库
