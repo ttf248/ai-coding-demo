@@ -13,6 +13,26 @@
 
 最新消息显示，VSCode 已经将 GitHub Copilot 的代码开发功能集成到编辑器中，期待后续的优化和改进。
 
+## 📚 技术文档列表
+
+### Tailwind CSS
+
+- **类型**: CSS 框架
+- **文档**: [什么是 Tailwind CSS？](what-is-tailwindcss.md)
+- **预览**: [快速查看示例](what-is-tailwindcss.html)
+
+### Lucide 图标库
+
+- **类型**: 图标库
+- **文档**: [什么是 Lucide？](what-is-lucide.md)
+- **预览**: [快速查看示例](what-is-lucide.html)
+
+### Unsplash 图片资源
+
+- **类型**: 图片资源平台
+- **文档**: [什么是 Unsplash？](what-is-unsplash.md)
+- **预览**: [快速查看示例](what-is-unsplash.html)
+
 ## 项目记录
 
 ### 自选股实战
@@ -26,7 +46,7 @@
 
 - **类型**: UI/UX 设计
 - **文档**: [项目详情](ui-ux-ios-meditation-app/Readme.md)
-- **预览**: [快速查看原型](https://ttf248.github.io/ai-coding-demo/ui-ux-ios-meditation-app/meditation-app-prototype.html)
+- **预览**: [快速查看原型](ui-ux-ios-meditation-app/meditation-app-prototype.html)
 
 ---
 
@@ -34,4 +54,19 @@
 
 - **类型**: UI/UX 设计
 - **文档**: [项目详情](ui-ux-ios-life-assistant-app/Readme.md)
-- **预览**: [快速查看原型](https://ttf248.github.io/ai-coding-demo/ui-ux-ios-life-assistant-app/canghe_app_prototype.html)
+- **预览**: [快速查看原型](ui-ux-ios-life-assistant-app/canghe_app_prototype.html)
+
+---
+
+### YouTube 视频分享应用
+
+提示词更加通用，按照不同模块分别设计页面。
+
+- **类型**: UI/UX 设计
+- **文档**: [项目详情](ui-ux-common/Readme.md)
+- **预览**: 
+  - [首页推荐模块](ui-ux-common/youtube-app-homepage.html)
+  - [视频播放模块](ui-ux-common/youtube-app-player.html)
+  - [个人中心模块](ui-ux-common/youtube-app-profile.html)
+  - [发现页面模块](ui-ux-common/youtube-app-discover.html)
+  - [创作中心模块](ui-ux-common/youtube-app-creator.html)
