@@ -76,5 +76,5 @@
 ### 小蓝书 - 仿小红书瀑布流图片展示页面
 
 - **类型**: 前端开发
-- **文档**: [项目详情](ui-ux-redbook-waterfall-images/Readme.md)
+- **文档**: [项目详情](ui-ux-redbook-waterfall-images-1/Readme.md)
 - **预览**: [快速查看示例](ui-ux-redbook-waterfall-images/dist/index.html)
