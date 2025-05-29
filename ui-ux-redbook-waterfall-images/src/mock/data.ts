@@ -38,56 +38,12 @@ const titles = [
   '手机摄影技巧 📸 拍出大片感',
 ];
 
-// 图片缓存和速率限制管理
-const imageCache: Array<{ url: string; aspectRatio: number }> = [];
-let requestCount = 0;
-let lastResetTime = Date.now();
-const RATE_LIMIT = 50; // 每小时最多50张图片
-const HOUR_IN_MS = 60 * 60 * 1000; // 1小时的毫秒数
-const REQUEST_DELAY = 1000; // 请求延迟1秒
-
-// 检查并重置速率限制
-const checkRateLimit = (): boolean => {
-  const now = Date.now();
-  if (now - lastResetTime >= HOUR_IN_MS) {
-    // 重置计数器
-    requestCount = 0;
-    lastResetTime = now;
-  }
-  return requestCount < RATE_LIMIT;
-};
-
-// 从缓存中随机获取图片
-const getRandomCachedImage = (width: number, height: number): { url: string; aspectRatio: number } => {
-  if (imageCache.length === 0) {
-    // 如果缓存为空，返回备用图片
-    return {
-      url: `https://picsum.photos/${width}/${height}?random=${Math.random()}`,
-      aspectRatio: width / height
-    };
-  }
-  
-  const randomIndex = Math.floor(Math.random() * imageCache.length);
-  return imageCache[randomIndex];
-};
-
 // 生成随机高度的图片URL（使用 Pexels 作为图片源）
 const getRandomImageUrl = async (width: number = 400): Promise<{ url: string; aspectRatio: number }> => {
   const height = Math.floor(Math.random() * 300) + 300; // 300-600px height
   const aspectRatio = width / height;
 
-  // 检查速率限制
-  if (!checkRateLimit()) {
-    console.warn('Rate limit exceeded, using cached image');
-    return getRandomCachedImage(width, height);
-  }
-
-  // 添加请求延迟
-  await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY));
-
   try {
-    requestCount++; // 增加请求计数
-    
     const response = await fetch(`https://api.pexels.com/v1/curated?per_page=1&page=${Math.floor(Math.random() * 1000) + 1}`, {
       headers: {
         'Authorization': 'RrOoawBerAUZuB9TihcS2aOODRZ40xppHtsZtMHMXOpjiWNsFJHbg5cE'
@@ -103,34 +59,17 @@ const getRandomImageUrl = async (width: number = 400): Promise<{ url: string; as
         // 使用 Pexels 的自定义尺寸功能
         const customUrl = `${photo.src.original}?auto=compress&cs=tinysrgb&fit=crop&h=${height}&w=${width}`;
         console.debug('Generated custom URL:', customUrl); // 增加调试信息
-        
-        const result = {
+        return {
           url: customUrl,
           aspectRatio
         };
-        
-        // 缓存图片信息
-        imageCache.push(result);
-        
-        // 限制缓存大小，保持最近的200张图片
-        if (imageCache.length > 200) {
-          imageCache.shift();
-        }
-        
-        console.debug(`Rate limit: ${requestCount}/${RATE_LIMIT}, Cache size: ${imageCache.length}`);
-        
-        return result;
       }
     }
   } catch (error) {
-    console.warn('Failed to fetch from Pexels, falling back to cached/placeholder:', error);
+    console.warn('Failed to fetch from Pexels, falling back to placeholder:', error);
   }
 
-  // 备用方案：如果 Pexels API 失败，优先使用缓存，否则使用 picsum
-  if (imageCache.length > 0) {
-    return getRandomCachedImage(width, height);
-  }
-  
+  // 备用方案：如果 Pexels API 失败，使用 picsum 作为备用
   return {
     url: `https://picsum.photos/${width}/${height}?random=${Math.random()}`,
     aspectRatio
