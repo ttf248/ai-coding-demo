@@ -38,13 +38,40 @@ const titles = [
   '手机摄影技巧 📸 拍出大片感',
 ];
 
-// 生成随机高度的图片URL（使用 Unsplash 作为图片源）
+console.log('Authors data initialized:', authors);
+console.log('Titles data initialized:', titles);
+
+// 本地图片管理
+const LOCAL_IMAGE_COUNT = 35;
+let usedImages = new Set<number>();
+
+// 生成随机高度的图片URL（使用本地 images 文件夹）
 const getRandomImageUrl = (width: number = 400): { url: string; aspectRatio: number } => {
+  // 如果所有图片都用过了，重置使用记录
+  if (usedImages.size >= LOCAL_IMAGE_COUNT) {
+    usedImages.clear();
+    console.log('All images used, resetting rotation cycle');
+  }
+
+  // 获取未使用的图片索引
+  const availableImages = Array.from({ length: LOCAL_IMAGE_COUNT }, (_, i) => i + 1)
+    .filter(index => !usedImages.has(index));
+
+  // 随机选择一张未使用的图片
+  const randomIndex = Math.floor(Math.random() * availableImages.length);
+  const selectedImageIndex = availableImages[randomIndex];
+  
+  // 标记为已使用
+  usedImages.add(selectedImageIndex);
+
   const height = Math.floor(Math.random() * 300) + 300; // 300-600px height
   const aspectRatio = width / height;
 
+  const imageUrl = `./images/(${selectedImageIndex}).jpg`;
+  console.log('Generated local image URL:', { imageUrl, aspectRatio, usedCount: usedImages.size });
+
   return {
-    url: `https://picsum.photos/${width}/${height}?random=${Math.random()}`,
+    url: imageUrl,
     aspectRatio
   };
 };
@@ -55,8 +82,8 @@ const generatePost = (index: number): Post => {
   const title = titles[Math.floor(Math.random() * titles.length)];
   const likes = Math.floor(Math.random() * 10000) + 10;
   const { url, aspectRatio } = getRandomImageUrl();
-  
-  return {
+
+  const post = {
     id: `post-${Date.now()}-${index}`,
     title,
     imageUrl: url,
@@ -65,37 +92,49 @@ const generatePost = (index: number): Post => {
     isLiked: Math.random() > 0.7, // 30% 概率已点赞
     aspectRatio,
   };
+
+  console.log('Generated post:', post);
+  return post;
 };
 
 // Mock API 函数
 export const mockApi = {
   // 获取初始数据
   fetchPosts: async (page: number = 0, pageSize: number = 20): Promise<Post[]> => {
+    console.log(`Fetching posts for page ${page} with pageSize ${pageSize}`);
     // 模拟网络延迟
     await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 500));
     
-    return Array.from({ length: pageSize }, (_, i) => generatePost(page * pageSize + i));
+    const posts = Array.from({ length: pageSize }, (_, i) => generatePost(page * pageSize + i));
+    console.log('Fetched posts:', posts);
+    return posts;
   },
   // 切换点赞状态
   toggleLike: async (_postId: string): Promise<{ success: boolean; likes: number }> => {
+    console.log(`Toggling like for postId: ${_postId}`);
     // 模拟API调用
     await new Promise(resolve => setTimeout(resolve, 200));
     
-    return {
+    const result = {
       success: true,
       likes: Math.floor(Math.random() * 10000) + 10,
     };
+    console.log('Toggle like result:', result);
+    return result;
   },
 
   // 搜索相关的posts
   searchPosts: async (keyword: string, _page: number = 0): Promise<Post[]> => {
+    console.log(`Searching posts with keyword: ${keyword}`);
     await new Promise(resolve => setTimeout(resolve, 600));
     
     // 简单模拟搜索结果
     const searchResults = Array.from({ length: 15 }, (_, i) => generatePost(i));
-    return searchResults.map(post => ({
+    const modifiedResults = searchResults.map(post => ({
       ...post,
       title: post.title + ` (搜索: ${keyword})`,
     }));
+    console.log('Search results:', modifiedResults);
+    return modifiedResults;
   },
 };
