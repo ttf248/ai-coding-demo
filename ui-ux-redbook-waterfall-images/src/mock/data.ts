@@ -2,16 +2,16 @@ import { Post } from '../types';
 
 // Mock 作者数据
 const authors = [
-  { id: '1', name: '小仙女🧚‍♀️', avatar: 'https://i.pravatar.cc/48?img=1' },
-  { id: '2', name: '美食探索家', avatar: 'https://i.pravatar.cc/48?img=2' },
-  { id: '3', name: '摄影师Jerry', avatar: 'https://i.pravatar.cc/48?img=3' },
-  { id: '4', name: '旅行达人', avatar: 'https://i.pravatar.cc/48?img=4' },
-  { id: '5', name: '时尚博主Lisa', avatar: 'https://i.pravatar.cc/48?img=5' },
-  { id: '6', name: '健身教练', avatar: 'https://i.pravatar.cc/48?img=6' },
-  { id: '7', name: '甜品师小白', avatar: 'https://i.pravatar.cc/48?img=7' },
-  { id: '8', name: '宠物达人', avatar: 'https://i.pravatar.cc/48?img=8' },
-  { id: '9', name: '手工艺人', avatar: 'https://i.pravatar.cc/48?img=9' },
-  { id: '10', name: '家居设计师', avatar: 'https://i.pravatar.cc/48?img=10' },
+  { id: '1', name: '小仙女🧚‍♀️', avatar: 'https://picsum.photos/48?random=1' },
+  { id: '2', name: '美食探索家', avatar: 'https://picsum.photos/48?random=2' },
+  { id: '3', name: '摄影师Jerry', avatar: 'https://picsum.photos/48?random=3' },
+  { id: '4', name: '旅行达人', avatar: 'https://picsum.photos/48?random=4' },
+  { id: '5', name: '时尚博主Lisa', avatar: 'https://picsum.photos/48?random=5' },
+  { id: '6', name: '健身教练', avatar: 'https://picsum.photos/48?random=6' },
+  { id: '7', name: '甜品师小白', avatar: 'https://picsum.photos/48?random=7' },
+  { id: '8', name: '宠物达人', avatar: 'https://picsum.photos/48?random=8' },
+  { id: '9', name: '手工艺人', avatar: 'https://picsum.photos/48?random=9' },
+  { id: '10', name: '家居设计师', avatar: 'https://picsum.photos/48?random=10' },
 ];
 
 // Mock 标题数据
@@ -39,15 +39,12 @@ const titles = [
 ];
 
 // 生成随机高度的图片URL（使用 Unsplash 作为图片源）
-const categories = ['nature', 'food', 'fashion', 'travel', 'lifestyle', 'beauty', 'pets', 'home'];
-
 const getRandomImageUrl = (width: number = 400): { url: string; aspectRatio: number } => {
-  const category = categories[Math.floor(Math.random() * categories.length)];
   const height = Math.floor(Math.random() * 300) + 300; // 300-600px height
   const aspectRatio = width / height;
-  
+
   return {
-    url: `https://source.unsplash.com/${width}x${height}/?${category}&${Math.random()}`,
+    url: `https://picsum.photos/${width}/${height}?random=${Math.random()}`,
     aspectRatio
   };
 };
