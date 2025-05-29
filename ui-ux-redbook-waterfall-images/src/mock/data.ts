@@ -46,11 +46,11 @@ const LOCAL_IMAGE_COUNT = 35;
 let usedImages = new Set<number>();
 
 // 图片源配置
-// 七牛云测试域名，一个月后自动删除，已经申请 cloudflare，等待审核通过
+// 七牛云测试域名，一个月后自动删除，提供的还是 http 链接
+// cloudflare r2 需要配置信用卡，图片上传到了博客站点
 const IMAGE_SOURCES = [
-//   'http://sx12lsa7l.hd-bkt.clouddn.com/%20%28{index}%29.jpg',
-  'https://ttf248.life/ui-ux-redbook-waterfall-images/({index}).jpg',
-  'https://raw.githubusercontent.com/ttf248/ai-coding-demo/refs/heads/main/ui-ux-redbook-waterfall-images/images/%20({index}).jpg',
+  'https://ttf248.life/ui-ux-redbook-waterfall-images/{index}.jpg',
+  'https://raw.githubusercontent.com/ttf248/ai-coding-demo/refs/heads/main/ui-ux-redbook-waterfall-images/images/{index}.jpg',
 ];
 
 // 缓存最快的图片源
