@@ -45,8 +45,63 @@ console.log('Titles data initialized:', titles);
 const LOCAL_IMAGE_COUNT = 35;
 let usedImages = new Set<number>();
 
-// 生成随机高度的图片URL（使用本地 images 文件夹）
-const getRandomImageUrl = (width: number = 400): { url: string; aspectRatio: number } => {
+// 图片源配置
+// 七牛云测试域名，一个月后自动删除，已经申请 cloudflare，等待审核通过
+const IMAGE_SOURCES = [
+  'http://sx12lsa7l.hd-bkt.clouddn.com/%20%28{index}%29.jpg',
+  'https://raw.githubusercontent.com/ttf248/ai-coding-demo/refs/heads/main/ui-ux-redbook-waterfall-images/images/%20({index}).jpg',
+];
+
+// 缓存最快的图片源
+let fastestImageSource: string | null = null;
+let speedTestPromise: Promise<void> | null = null;
+
+// 测试图片源速度
+const testImageSourceSpeed = async (source: string): Promise<number> => {
+  const testUrl = source.replace('{index}', '1');
+  const startTime = Date.now();
+  
+  try {
+    const response = await fetch(testUrl, { method: 'HEAD' });
+    if (response.ok) {
+      return Date.now() - startTime;
+    }
+    return Infinity;
+  } catch {
+    return Infinity;
+  }
+};
+
+// 选择最快的图片源
+const selectFastestImageSource = async (): Promise<string> => {
+  if (fastestImageSource) {
+    return fastestImageSource;
+  }
+
+  if (!speedTestPromise) {
+    speedTestPromise = (async () => {
+      console.log('Testing image source speeds...');
+      const speedTests = IMAGE_SOURCES.map(async (source) => {
+        const speed = await testImageSourceSpeed(source);
+        return { source, speed };
+      });
+
+      const results = await Promise.all(speedTests);
+      const fastest = results.reduce((prev, current) => 
+        current.speed < prev.speed ? current : prev
+      );
+
+      fastestImageSource = fastest.source;
+      console.log('Fastest image source selected:', fastest);
+    })();
+  }
+
+  await speedTestPromise;
+  return fastestImageSource!;
+};
+
+// 生成随机高度的图片URL（使用最快的图片源）
+const getRandomImageUrl = async (width: number = 400): Promise<{ url: string; aspectRatio: number }> => {
   // 如果所有图片都用过了，重置使用记录
   if (usedImages.size >= LOCAL_IMAGE_COUNT) {
     usedImages.clear();
@@ -67,8 +122,11 @@ const getRandomImageUrl = (width: number = 400): { url: string; aspectRatio: num
   const height = Math.floor(Math.random() * 300) + 300; // 300-600px height
   const aspectRatio = width / height;
 
-  const imageUrl = `https://raw.githubusercontent.com/ttf248/ai-coding-demo/refs/heads/main/ui-ux-redbook-waterfall-images/images/%20(${selectedImageIndex}).jpg`;
-  console.log('Generated local image URL:', { imageUrl, aspectRatio, usedCount: usedImages.size });
+  // 获取最快的图片源并生成URL
+  const imageSource = await selectFastestImageSource();
+  const imageUrl = imageSource.replace('{index}', selectedImageIndex.toString());
+  
+  console.log('Generated image URL:', { imageUrl, aspectRatio, usedCount: usedImages.size });
 
   return {
     url: imageUrl,
@@ -77,11 +135,11 @@ const getRandomImageUrl = (width: number = 400): { url: string; aspectRatio: num
 };
 
 // 生成单个Post
-const generatePost = (index: number): Post => {
+const generatePost = async (index: number): Promise<Post> => {
   const author = authors[Math.floor(Math.random() * authors.length)];
   const title = titles[Math.floor(Math.random() * titles.length)];
   const likes = Math.floor(Math.random() * 10000) + 10;
-  const { url, aspectRatio } = getRandomImageUrl();
+  const { url, aspectRatio } = await getRandomImageUrl();
 
   const post = {
     id: `post-${Date.now()}-${index}`,
@@ -105,7 +163,9 @@ export const mockApi = {
     // 模拟网络延迟
     await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 500));
     
-    const posts = Array.from({ length: pageSize }, (_, i) => generatePost(page * pageSize + i));
+    const posts = await Promise.all(
+      Array.from({ length: pageSize }, (_, i) => generatePost(page * pageSize + i))
+    );
     console.log('Fetched posts:', posts);
     return posts;
   },
@@ -129,7 +189,9 @@ export const mockApi = {
     await new Promise(resolve => setTimeout(resolve, 600));
     
     // 简单模拟搜索结果
-    const searchResults = Array.from({ length: 15 }, (_, i) => generatePost(i));
+    const searchResults = await Promise.all(
+      Array.from({ length: 15 }, (_, i) => generatePost(i))
+    );
     const modifiedResults = searchResults.map(post => ({
       ...post,
       title: post.title + ` (搜索: ${keyword})`,
