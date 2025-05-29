@@ -67,7 +67,7 @@ const getRandomImageUrl = (width: number = 400): { url: string; aspectRatio: num
   const height = Math.floor(Math.random() * 300) + 300; // 300-600px height
   const aspectRatio = width / height;
 
-  const imageUrl = `./images/(${selectedImageIndex}).jpg`;
+  const imageUrl = `https://raw.githubusercontent.com/ttf248/ai-coding-demo/refs/heads/main/ui-ux-redbook-waterfall-images/images/%20(${selectedImageIndex}).jpg`;
   console.log('Generated local image URL:', { imageUrl, aspectRatio, usedCount: usedImages.size });
 
   return {
