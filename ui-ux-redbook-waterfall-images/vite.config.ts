@@ -7,5 +7,15 @@ export default defineConfig({
   server: {
     port: 5173,
     open: true
+  },
+  base: '/ai-coding-demo/ui-ux-redbook-waterfall-images/',
+  build: {
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/app.js',
+        chunkFileNames: 'assets/[name].js',
+        assetFileNames: 'assets/[name].[ext]'
+      }
+    }
   }
 })
