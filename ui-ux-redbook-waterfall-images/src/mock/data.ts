@@ -38,11 +38,38 @@ const titles = [
   '手机摄影技巧 📸 拍出大片感',
 ];
 
-// 生成随机高度的图片URL（使用 Unsplash 作为图片源）
-const getRandomImageUrl = (width: number = 400): { url: string; aspectRatio: number } => {
+// 生成随机高度的图片URL（使用 Pexels 作为图片源）
+const getRandomImageUrl = async (width: number = 400): Promise<{ url: string; aspectRatio: number }> => {
   const height = Math.floor(Math.random() * 300) + 300; // 300-600px height
   const aspectRatio = width / height;
 
+  try {
+    const response = await fetch(`https://api.pexels.com/v1/curated?per_page=1&page=${Math.floor(Math.random() * 1000) + 1}`, {
+      headers: {
+        'Authorization': 'RrOoawBerAUZuB9TihcS2aOODRZ40xppHtsZtMHMXOpjiWNsFJHbg5cE'
+      }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.debug('Pexels API response:', data); // 增加调试信息
+      if (data.photos && data.photos.length > 0) {
+        const photo = data.photos[0];
+        console.debug('Selected photo:', photo); // 增加调试信息
+        // 使用 Pexels 的自定义尺寸功能
+        const customUrl = `${photo.src.original}?auto=compress&cs=tinysrgb&fit=crop&h=${height}&w=${width}`;
+        console.debug('Generated custom URL:', customUrl); // 增加调试信息
+        return {
+          url: customUrl,
+          aspectRatio
+        };
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to fetch from Pexels, falling back to placeholder:', error);
+  }
+
+  // 备用方案：如果 Pexels API 失败，使用 picsum 作为备用
   return {
     url: `https://picsum.photos/${width}/${height}?random=${Math.random()}`,
     aspectRatio
@@ -50,11 +77,11 @@ const getRandomImageUrl = (width: number = 400): { url: string; aspectRatio: num
 };
 
 // 生成单个Post
-const generatePost = (index: number): Post => {
+const generatePost = async (index: number): Promise<Post> => {
   const author = authors[Math.floor(Math.random() * authors.length)];
   const title = titles[Math.floor(Math.random() * titles.length)];
   const likes = Math.floor(Math.random() * 10000) + 10;
-  const { url, aspectRatio } = getRandomImageUrl();
+  const { url, aspectRatio } = await getRandomImageUrl();
   
   return {
     id: `post-${Date.now()}-${index}`,
@@ -74,7 +101,11 @@ export const mockApi = {
     // 模拟网络延迟
     await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 500));
     
-    return Array.from({ length: pageSize }, (_, i) => generatePost(page * pageSize + i));
+    const posts = [];
+    for (let i = 0; i < pageSize; i++) {
+      posts.push(await generatePost(page * pageSize + i));
+    }
+    return posts;
   },
   // 切换点赞状态
   toggleLike: async (_postId: string): Promise<{ success: boolean; likes: number }> => {
@@ -92,7 +123,10 @@ export const mockApi = {
     await new Promise(resolve => setTimeout(resolve, 600));
     
     // 简单模拟搜索结果
-    const searchResults = Array.from({ length: 15 }, (_, i) => generatePost(i));
+    const searchResults = [];
+    for (let i = 0; i < 15; i++) {
+      searchResults.push(await generatePost(i));
+    }
     return searchResults.map(post => ({
       ...post,
       title: post.title + ` (搜索: ${keyword})`,
