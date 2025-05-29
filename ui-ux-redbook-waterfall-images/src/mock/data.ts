@@ -2,16 +2,16 @@ import { Post } from '../types';
 
 // Mock 作者数据
 const authors = [
-  { id: '1', name: '小仙女🧚‍♀️', avatar: 'https://picsum.photos/48?random=1' },
-  { id: '2', name: '美食探索家', avatar: 'https://picsum.photos/48?random=2' },
-  { id: '3', name: '摄影师Jerry', avatar: 'https://picsum.photos/48?random=3' },
-  { id: '4', name: '旅行达人', avatar: 'https://picsum.photos/48?random=4' },
-  { id: '5', name: '时尚博主Lisa', avatar: 'https://picsum.photos/48?random=5' },
-  { id: '6', name: '健身教练', avatar: 'https://picsum.photos/48?random=6' },
-  { id: '7', name: '甜品师小白', avatar: 'https://picsum.photos/48?random=7' },
-  { id: '8', name: '宠物达人', avatar: 'https://picsum.photos/48?random=8' },
-  { id: '9', name: '手工艺人', avatar: 'https://picsum.photos/48?random=9' },
-  { id: '10', name: '家居设计师', avatar: 'https://picsum.photos/48?random=10' },
+  { id: '1', name: '小仙女🧚‍♀️', avatar: '' },
+  { id: '2', name: '美食探索家', avatar: '' },
+  { id: '3', name: '摄影师Jerry', avatar: '' },
+  { id: '4', name: '旅行达人', avatar: '' },
+  { id: '5', name: '时尚博主Lisa', avatar: '' },
+  { id: '6', name: '健身教练', avatar: '' },
+  { id: '7', name: '甜品师小白', avatar: '' },
+  { id: '8', name: '宠物达人', avatar: '' },
+  { id: '9', name: '手工艺人', avatar: '' },
+  { id: '10', name: '家居设计师', avatar: '' },
 ];
 
 // Mock 标题数据
@@ -48,7 +48,8 @@ let usedImages = new Set<number>();
 // 图片源配置
 // 七牛云测试域名，一个月后自动删除，已经申请 cloudflare，等待审核通过
 const IMAGE_SOURCES = [
-  'http://sx12lsa7l.hd-bkt.clouddn.com/%20%28{index}%29.jpg',
+//   'http://sx12lsa7l.hd-bkt.clouddn.com/%20%28{index}%29.jpg',
+  'https://ttf248.life/ui-ux-redbook-waterfall-images/({index}).jpg',
   'https://raw.githubusercontent.com/ttf248/ai-coding-demo/refs/heads/main/ui-ux-redbook-waterfall-images/images/%20({index}).jpg',
 ];
 
