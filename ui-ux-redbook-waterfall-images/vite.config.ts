@@ -8,7 +8,7 @@ export default defineConfig({
     port: 5173,
     open: true
   },
-  base: '/ai-coding-demo/ui-ux-redbook-waterfall-images/',
+  base: '/ai-coding-demo/ui-ux-redbook-waterfall-images/dist',
   build: {
     rollupOptions: {
       output: {
