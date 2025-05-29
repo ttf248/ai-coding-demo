@@ -70,3 +70,11 @@
   - [个人中心模块](ui-ux-common/youtube-app-profile.html)
   - [发现页面模块](ui-ux-common/youtube-app-discover.html)
   - [创作中心模块](ui-ux-common/youtube-app-creator.html)
+
+---
+
+### 小蓝书 - 仿小红书瀑布流图片展示页面
+
+- **类型**: 前端开发
+- **文档**: [项目详情](ui-ux-redbook-waterfall-images/README.md)
+- **预览**: [快速查看示例](ui-ux-redbook-waterfall-images/dist/index.html)
