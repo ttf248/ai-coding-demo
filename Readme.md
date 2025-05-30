@@ -77,4 +77,4 @@
 
 - **类型**: 前端开发
 - **文档**: [项目详情](ui-ux-redbook-waterfall-images/docs/Readme.md)
-- **预览**: [快速查看示例](ui-ux-redbook-waterfall-images/dist/index.html)
+- **预览**: [快速查看示例](https://bluebook.ttf248.life/)  [备用地址](https://bluebook-eight.vercel.app/)
