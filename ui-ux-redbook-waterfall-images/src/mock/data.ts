@@ -49,7 +49,7 @@ let usedImages = new Set<number>();
 // 七牛云测试域名，一个月后自动删除，提供的还是 http 链接
 // cloudflare r2 需要配置信用卡，图片上传到了博客站点
 const IMAGE_SOURCES = [
-  'https://ttf248.life/ui-ux-redbook-waterfall-images/{index}.jpg',
+  'https://blog.ttf248.life/ui-ux-redbook-waterfall-images/{index}.jpg',
   'https://raw.githubusercontent.com/ttf248/ai-coding-demo/refs/heads/main/ui-ux-redbook-waterfall-images/images/{index}.jpg',
 ];
 
