@@ -48,8 +48,10 @@ let usedImages = new Set<number>();
 // 图片源配置
 // 七牛云测试域名，一个月后自动删除，提供的还是 http 链接
 // cloudflare r2 需要配置信用卡，图片上传到了博客站点
+// 添加本地 images 文件夹支持
 const IMAGE_SOURCES = [
-  'https://blog.ttf248.life/ui-ux-redbook-waterfall-images/{index}.jpg',
+  './images/{index}.jpg', // 本地 images 文件夹（构建后会在 dist/images）
+//   'https://blog.ttf248.life/ui-ux-redbook-waterfall-images/{index}.jpg',
   'https://raw.githubusercontent.com/ttf248/ai-coding-demo/refs/heads/main/ui-ux-redbook-waterfall-images/images/{index}.jpg',
 ];
 
