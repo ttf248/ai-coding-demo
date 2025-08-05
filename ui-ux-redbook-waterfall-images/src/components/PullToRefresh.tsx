@@ -49,19 +49,25 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children }) =>
     
     const shouldRefresh = pullDistance > PULL_THRESHOLD && !isRefreshing;
     
+    // 立即重置拖拽状态，但保持刷新状态
+    setIsPulling(false);
+    isActiveRef.current = false;
+    
     if (shouldRefresh) {
       setIsRefreshing(true);
+      // 保持一定的下拉距离直到刷新完成
+      setTimeout(() => setPullDistance(0), 200);
+      
       try {
         await onRefresh();
       } finally {
         setIsRefreshing(false);
+        setPullDistance(0);
       }
+    } else {
+      // 如果不需要刷新，立即重置距离
+      setPullDistance(0);
     }
-    
-    // 重置所有状态
-    setIsPulling(false);
-    setPullDistance(0);
-    isActiveRef.current = false;
   }, [pullDistance, isRefreshing, onRefresh]);
 
   // 处理触摸取消事件（比如快速滑动时系统可能取消触摸）
@@ -75,10 +81,19 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children }) =>
   useEffect(() => {
     if (isRefreshing) {
       setIsPulling(false);
-      setPullDistance(0);
       isActiveRef.current = false;
     }
   }, [isRefreshing]);
+
+  // 确保刷新完成后完全重置状态
+  useEffect(() => {
+    if (!isRefreshing && pullDistance > 0) {
+      const timer = setTimeout(() => {
+        setPullDistance(0);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isRefreshing, pullDistance]);
 
   const refreshIndicatorTransform = `translateY(${Math.max(0, pullDistance - 40)}px)`;
   const contentTransform = `translateY(${pullDistance}px)`;

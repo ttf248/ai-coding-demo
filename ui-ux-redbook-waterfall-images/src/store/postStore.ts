@@ -75,7 +75,9 @@ export const usePostStore = create<PostStore>((set, get) => ({
 
   refreshPosts: async () => {
     const { searchKeyword } = get();
-    set({ loading: true, posts: [] });
+    
+    // 重置所有状态
+    set({ loading: true, posts: [], hasMore: true });
     
     try {
       let posts;
@@ -84,10 +86,18 @@ export const usePostStore = create<PostStore>((set, get) => ({
       } else {
         posts = await mockApi.fetchPosts(0, 20);
       }
-      set({ posts, loading: false, hasMore: true });
+      
+      // 确保有足够的延迟让用户感知到刷新
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      set({ 
+        posts, 
+        loading: false, 
+        hasMore: posts.length >= 20 // 如果返回的数据少于20条，说明没有更多数据
+      });
     } catch (error) {
       console.error('Failed to refresh posts:', error);
-      set({ loading: false });
+      set({ loading: false, posts: [], hasMore: true });
     }
   },
 }));

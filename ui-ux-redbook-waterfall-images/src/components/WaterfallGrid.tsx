@@ -25,25 +25,25 @@ const WaterfallGrid: React.FC = () => {
     }
   }, [fetchPosts, posts.length]);
 
-  // 无限滚动
-  const lastPostElementRef = useCallback(
-    (node: HTMLDivElement) => {
-      if (loading) return;
-      if (observerRef.current) observerRef.current.disconnect();
-      
-      observerRef.current = new IntersectionObserver(
-        (entries) => {
-          if (entries[0].isIntersecting && hasMore) {
-            loadMorePosts();
-          }
-        },
-        { threshold: 0.1 }
-      );
-      
-      if (node) observerRef.current.observe(node);
-    },
-    [loading, hasMore, loadMorePosts]
-  );
+  // 无限滚动 - 使用底部加载指示器
+  useEffect(() => {
+    if (!loadMoreRef.current || loading || !hasMore) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          loadMorePosts();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+    
+    observer.observe(loadMoreRef.current);
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, [loading, hasMore, loadMorePosts, posts.length]);
   // 将posts分配到不同列
   const distributePostsToColumns = () => {
     const columns: typeof posts[] = [[], [], [], []];
@@ -83,21 +83,11 @@ const WaterfallGrid: React.FC = () => {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {columns.map((columnPosts, columnIndex) => (
           <div key={columnIndex} className="flex flex-col">
-            {columnPosts.map((post, postIndex) => {
-              const isLastPost = 
-                columnIndex === 0 && 
-                postIndex === columnPosts.length - 1 &&
-                posts.length > 0;
-              
-              return (
-                <div
-                  key={post.id}
-                  ref={isLastPost ? lastPostElementRef : undefined}
-                >
-                  <PostCard post={post} onLike={toggleLike} />
-                </div>
-              );
-            })}
+            {columnPosts.map((post, postIndex) => (
+              <div key={post.id}>
+                <PostCard post={post} onLike={toggleLike} />
+              </div>
+            ))}
           </div>
         ))}
       </div>
