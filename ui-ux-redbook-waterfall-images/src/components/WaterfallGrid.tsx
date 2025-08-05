@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { usePostStore } from '../store/postStore';
 import PostCard from './PostCard';
 import { WaterfallSkeleton } from './Skeleton';
@@ -15,7 +15,6 @@ const LoadingSpinner: React.FC = () => (
 
 const WaterfallGrid: React.FC = () => {
   const { posts, loading, hasMore, fetchPosts, loadMorePosts, toggleLike } = usePostStore();
-  const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // 初始化数据
@@ -83,7 +82,7 @@ const WaterfallGrid: React.FC = () => {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {columns.map((columnPosts, columnIndex) => (
           <div key={columnIndex} className="flex flex-col">
-            {columnPosts.map((post, postIndex) => (
+            {columnPosts.map((post) => (
               <div key={post.id}>
                 <PostCard post={post} onLike={toggleLike} />
               </div>
