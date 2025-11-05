@@ -20,6 +20,7 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
   const { toggleLike, setCurrentView } = useStore()
   const [imageError, setImageError] = useState(false)
   const [showHeartAnimation, setShowHeartAnimation] = useState(false)
+  const [isBookmarked, setIsBookmarked] = useState(false)
 
   const avatarColor = DEFAULT_AVATAR_COLORS[post.id % DEFAULT_AVATAR_COLORS.length]
   const avatarText = post.author.charAt(0)
@@ -51,6 +52,12 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
       alert('链接已复制到剪贴板')
     }
   }
+
+  const handleBookmark = () => {
+    setIsBookmarked(!isBookmarked)
+  }
+
+  const commentCount = post.comments?.length || 0
 
   return (
     <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
@@ -139,7 +146,7 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
             <div className="text-xs sm:text-sm text-gray-500">点赞</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-lg sm:text-2xl font-bold text-gray-800">128</div>
+            <div className="text-lg sm:text-2xl font-bold text-gray-800">{commentCount}</div>
             <div className="text-xs sm:text-sm text-gray-500">评论</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-center">
@@ -147,6 +154,53 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
             <div className="text-xs sm:text-sm text-gray-500">收藏</div>
           </div>
         </div>
+
+        {/* 评论列表 */}
+        {post.comments && post.comments.length > 0 && (
+          <div className="mb-4 sm:mb-6">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">
+              评论 ({commentCount})
+            </h3>
+            <div className="space-y-3">
+              {post.comments.slice(0, 5).map((comment) => {
+                const commentAvatarColor = DEFAULT_AVATAR_COLORS[comment.id % DEFAULT_AVATAR_COLORS.length]
+                const commentAvatarText = comment.author.charAt(0)
+
+                return (
+                  <div key={comment.id} className="bg-white border border-gray-100 rounded-lg p-3 sm:p-4">
+                    <div className="flex items-start gap-2 sm:gap-3">
+                      <div
+                        className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full ${commentAvatarColor} flex items-center justify-center text-xs sm:text-sm font-medium text-gray-700 flex-shrink-0`}
+                      >
+                        {commentAvatarText}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs sm:text-sm font-medium text-gray-700">
+                            {comment.author}
+                          </span>
+                          <span className="text-xs text-gray-400">{comment.createTime}</span>
+                        </div>
+                        <p className="text-xs sm:text-sm text-gray-600">{comment.content}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <button className="flex items-center gap-1 text-gray-400 hover:text-redbook transition-colors">
+                            <Heart className="w-3.5 h-3.5" />
+                            <span className="text-xs">{comment.likes}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {post.comments.length > 5 && (
+              <button className="w-full mt-3 py-2 text-center text-sm text-redbook hover:bg-redbook/5 rounded-lg transition-colors">
+                查看更多评论
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 底部操作栏 */}
@@ -154,14 +208,16 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <button
             onClick={handleLike}
-            className={`flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-full transition-all ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-full transition-all ${
               post.isLiked
                 ? 'bg-redbook text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             <Heart
-              className={`w-4 h-4 sm:w-5 sm:h-5 ${post.isLiked ? 'fill-white' : ''} ${
+              className={`w-4 h-4 sm:w-5 sm:h-5 ${
+                post.isLiked ? 'fill-white' : ''
+              } ${
                 showHeartAnimation ? 'animate-heart-beat' : ''
               }`}
             />
@@ -171,22 +227,32 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
             <span className="text-xs opacity-75">({post.likes})</span>
           </button>
 
-          <div className="flex items-center gap-3 sm:gap-4">
-            <button className="flex flex-col items-center gap-0.5 sm:gap-1">
-              <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+          <div className="flex items-center gap-6 sm:gap-8">
+            <button
+              onClick={() => {}}
+              className="flex flex-col items-center gap-1"
+            >
+              <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
               <span className="text-xs text-gray-500">评论</span>
             </button>
 
             <button
               onClick={handleShare}
-              className="flex flex-col items-center gap-0.5 sm:gap-1"
+              className="flex flex-col items-center gap-1"
             >
-              <Share className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+              <Share className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
               <span className="text-xs text-gray-500">分享</span>
             </button>
 
-            <button className="flex flex-col items-center gap-0.5 sm:gap-1">
-              <Bookmark className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+            <button
+              onClick={handleBookmark}
+              className="flex flex-col items-center gap-1"
+            >
+              <Bookmark
+                className={`w-5 h-5 sm:w-6 sm:h-6 ${
+                  isBookmarked ? 'fill-redbook text-redbook' : 'text-gray-700'
+                }`}
+              />
               <span className="text-xs text-gray-500">收藏</span>
             </button>
           </div>

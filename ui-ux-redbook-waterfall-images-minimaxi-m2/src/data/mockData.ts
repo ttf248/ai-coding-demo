@@ -1,4 +1,4 @@
-import { PostItem } from '../store/useStore'
+import { PostItem, CommentItem } from '../store/useStore'
 
 const NICKNAMES = [
   '小仙女', '时尚达人', '美食探索者', '旅行爱好者', '美妆博主',
@@ -8,6 +8,29 @@ const NICKNAMES = [
 ]
 
 const TAGS = ['美食', '旅行', '时尚', '生活', '摄影', '美妆', '穿搭', '居家', '艺术', '健身']
+
+const COMMENT_CONTENTS = [
+  '这张图片太美了！',
+  '好喜欢这种风格～',
+  '求同款滤镜！',
+  '拍照技术真好！',
+  '色调很舒服～',
+  '好有氛围感！',
+  '分享一下拍摄技巧吧',
+  '这个角度很赞！',
+  '色彩搭配绝了！',
+  '每一张都是大片！',
+  '看了心情都变好了',
+  '求教程！',
+  '这个构图很棒',
+  '太有创意了！',
+  '美学在线！',
+]
+
+const COMMENT_TIMES = [
+  '2分钟前', '5分钟前', '10分钟前', '15分钟前', '30分钟前',
+  '1小时前', '2小时前', '3小时前', '5小时前', '8小时前',
+]
 
 const TITLES = [
   '今日份的美好，请查收～',
@@ -60,6 +83,28 @@ const generateRandomTags = (postId: number): string[] => {
   return selectedTags
 }
 
+const generateComments = (postId: number): CommentItem[] => {
+  const commentCount = 3 + (postId % 5)
+  const comments: CommentItem[] = []
+
+  for (let i = 0; i < commentCount; i++) {
+    const authorIndex = (postId + i) % NICKNAMES.length
+    const contentIndex = (postId + i) % COMMENT_CONTENTS.length
+    const timeIndex = (postId + i) % COMMENT_TIMES.length
+
+    comments.push({
+      id: postId * 100 + i,
+      postId,
+      author: NICKNAMES[authorIndex],
+      content: COMMENT_CONTENTS[contentIndex],
+      likes: Math.floor(Math.random() * 200) + 5,
+      createTime: COMMENT_TIMES[timeIndex],
+    })
+  }
+
+  return comments
+}
+
 export const generateMockData = (startIndex: number, count: number): PostItem[] => {
   const items: PostItem[] = []
 
@@ -68,6 +113,7 @@ export const generateMockData = (startIndex: number, count: number): PostItem[] 
     const imageIndex = ((startIndex + i) % IMAGE_COUNT) + 1
     const randomType = POST_TYPES[Math.floor(Math.random() * POST_TYPES.length)]
     const tags = generateRandomTags(id)
+    const comments = generateComments(id)
 
     items.push({
       id,
@@ -78,6 +124,7 @@ export const generateMockData = (startIndex: number, count: number): PostItem[] 
       isLiked: false,
       type: randomType,
       tags,
+      comments,
     })
   }
 
