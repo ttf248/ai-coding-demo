@@ -22,6 +22,8 @@ const WaterfallGrid: React.FC = () => {
       if (post.author.toLowerCase().includes(query)) return true
       // 匹配类型（standard/tall/short/wide/full）
       if (post.type.toLowerCase().includes(query)) return true
+      // 匹配标签
+      if (post.tags.some(tag => tag.toLowerCase().includes(query))) return true
       return false
     })
   }, [posts, searchQuery])
