@@ -29,7 +29,7 @@ interface AppState {
   refreshPosts: () => void
 }
 
-export const useStore = create<AppState>((set) => ({
+export const useStore = create<AppState>((set, get) => ({
   posts: [],
   loading: false,
   hasMore: true,
@@ -63,4 +63,21 @@ export const useStore = create<AppState>((set) => ({
     })),
 
   refreshPosts: () => set({ page: 0, posts: [], hasMore: true }),
+
+  // 计算属性：根据搜索查询过滤帖子
+  getFilteredPosts: () => {
+    const { posts, searchQuery } = get()
+    if (!searchQuery.trim()) return posts
+
+    const query = searchQuery.toLowerCase().trim()
+    return posts.filter((post) => {
+      // 匹配标题
+      if (post.title.toLowerCase().includes(query)) return true
+      // 匹配作者
+      if (post.author.toLowerCase().includes(query)) return true
+      // 匹配类型（standard/tall/short/wide/full）
+      if (post.type.toLowerCase().includes(query)) return true
+      return false
+    })
+  },
 }))
