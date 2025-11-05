@@ -2,6 +2,16 @@ import { create } from 'zustand'
 
 export type PostType = 'standard' | 'tall' | 'short' | 'wide' | 'full'
 
+export interface CommentItem {
+  id: number
+  postId: number
+  author: string
+  content: string
+  likes: number
+  createTime: string
+  avatar?: string
+}
+
 export interface PostItem {
   id: number
   title: string
@@ -11,6 +21,7 @@ export interface PostItem {
   isLiked: boolean
   type: PostType
   tags: string[]
+  comments?: CommentItem[]
 }
 
 interface AppState {
