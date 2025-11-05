@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react'
+import Masonry from 'react-masonry-css'
 import { useStore } from '../store/useStore'
 import { loadPosts } from '../data/mockData'
 import PostCard from './PostCard'
@@ -7,6 +8,15 @@ import LoadingSpinner from './LoadingSpinner'
 const WaterfallGrid: React.FC = () => {
   const { posts, loading, hasMore, setLoading, appendPosts, setHasMore, page, setPage } = useStore()
   const loaderRef = useRef<HTMLDivElement>(null)
+
+  // 响应式断点配置
+  const breakpointColumnsObj = {
+    default: 4,  // 默认4列
+    1280: 4,     // 大屏幕4列
+    1024: 3,     // 平板3列
+    768: 2,      // 手机横屏2列
+    640: 2       // 手机竖屏2列
+  }
 
   useEffect(() => {
     loadInitialPosts()
@@ -56,11 +66,17 @@ const WaterfallGrid: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4">
-      <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
+      <Masonry
+        breakpointCols={breakpointColumnsObj}
+        className="flex w-auto -ml-3"
+        columnClassName="pl-3 bg-clip-padding"
+      >
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} />
+          <div key={post.id} className="mb-3">
+            <PostCard post={post} />
+          </div>
         ))}
-      </div>
+      </Masonry>
 
       {loading && <LoadingSpinner />}
 

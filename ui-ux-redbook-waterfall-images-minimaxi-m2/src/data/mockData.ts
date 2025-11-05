@@ -42,12 +42,15 @@ const TITLES = [
 
 const IMAGE_COUNT = 35
 
+const POST_TYPES: PostItem['type'][] = ['standard', 'tall', 'short', 'wide', 'full']
+
 export const generateMockData = (startIndex: number, count: number): PostItem[] => {
   const items: PostItem[] = []
 
   for (let i = 0; i < count; i++) {
     const id = startIndex + i + 1
     const imageIndex = ((startIndex + i) % IMAGE_COUNT) + 1
+    const randomType = POST_TYPES[Math.floor(Math.random() * POST_TYPES.length)]
 
     items.push({
       id,
@@ -56,6 +59,7 @@ export const generateMockData = (startIndex: number, count: number): PostItem[] 
       author: NICKNAMES[(startIndex + i) % NICKNAMES.length],
       likes: Math.floor(Math.random() * 5000) + 100,
       isLiked: false,
+      type: randomType,
     })
   }
 
