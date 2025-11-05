@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Heart, MessageCircle, Share, Bookmark, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import { PostItem, useStore } from '../store/useStore'
 
@@ -21,9 +21,26 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [showHeartAnimation, setShowHeartAnimation] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
+  const [isTransitioning, setIsTransitioning] = useState(false)
 
   const avatarColor = DEFAULT_AVATAR_COLORS[post.id % DEFAULT_AVATAR_COLORS.length]
   const avatarText = post.author.charAt(0)
+
+  // 键盘导航支持
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        handlePrevImage()
+      } else if (e.key === 'ArrowRight') {
+        handleNextImage()
+      } else if (e.key === 'Escape') {
+        handleBack()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [currentImageIndex, post.images.length])
 
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -58,11 +75,24 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
   }
 
   const handlePrevImage = () => {
+    if (isTransitioning) return
+    setIsTransitioning(true)
     setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : post.images.length - 1))
+    setTimeout(() => setIsTransitioning(false), 300)
   }
 
   const handleNextImage = () => {
+    if (isTransitioning) return
+    setIsTransitioning(true)
     setCurrentImageIndex((prev) => (prev < post.images.length - 1 ? prev + 1 : 0))
+    setTimeout(() => setIsTransitioning(false), 300)
+  }
+
+  const handleImageSelect = (index: number) => {
+    if (isTransitioning || index === currentImageIndex) return
+    setIsTransitioning(true)
+    setCurrentImageIndex(index)
+    setTimeout(() => setIsTransitioning(false), 300)
   }
 
   const commentCount = post.comments?.length || 0
@@ -87,12 +117,17 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
           {post.images && post.images.length > 0 && (
             <div className="relative">
               {/* 主图片 */}
-              <div className="relative bg-gray-100 rounded-lg overflow-hidden">
+              <div className="relative bg-gray-100 rounded-lg overflow-hidden group">
                 <img
                   src={post.images[currentImageIndex]}
                   alt={`${post.title} - ${currentImageIndex + 1}`}
-                  className="w-full h-auto object-contain"
-                  style={{ maxHeight: '400px' }}
+                  className={`w-full h-auto object-contain transition-opacity duration-300 ${
+                    isTransitioning ? 'opacity-50' : 'opacity-100'
+                  }`}
+                  style={{
+                    maxHeight: 'calc(100vh - 400px)',
+                    minHeight: '400px'
+                  }}
                 />
 
                 {/* 上一张/下一张按钮 */}
@@ -100,28 +135,38 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
                   <>
                     <button
                       onClick={handlePrevImage}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                      disabled={isTransitioning}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black/70 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full transition-all duration-200 transform hover:scale-110 active:scale-95"
                     >
-                      <ChevronLeft className="w-5 h-5" />
+                      <ChevronLeft className="w-6 h-6" />
                     </button>
                     <button
                       onClick={handleNextImage}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                      disabled={isTransitioning}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black/70 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full transition-all duration-200 transform hover:scale-110 active:scale-95"
                     >
-                      <ChevronRight className="w-5 h-5" />
+                      <ChevronRight className="w-6 h-6" />
                     </button>
                   </>
                 )}
 
+                {/* 图片计数器 */}
+                <div className="absolute top-4 right-4 px-3 py-1 bg-black/70 text-white text-sm rounded-full">
+                  {currentImageIndex + 1} / {post.images.length}
+                </div>
+
                 {/* 图片指示器 */}
                 {post.images.length > 1 && (
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
                     {post.images.map((_, index) => (
                       <button
                         key={index}
-                        onClick={() => setCurrentImageIndex(index)}
-                        className={`w-2 h-2 rounded-full transition-all ${
-                          index === currentImageIndex ? 'bg-white' : 'bg-white/50'
+                        onClick={() => handleImageSelect(index)}
+                        disabled={isTransitioning}
+                        className={`transition-all duration-300 ${
+                          index === currentImageIndex
+                            ? 'w-8 h-2 bg-white rounded-full'
+                            : 'w-2 h-2 bg-white/60 hover:bg-white/80 rounded-full'
                         }`}
                       />
                     ))}
@@ -131,14 +176,15 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
 
               {/* 缩略图列表 */}
               {post.images.length > 1 && (
-                <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
+                <div className="flex gap-2 mt-3 overflow-x-auto pb-2 px-1">
                   {post.images.map((image, index) => (
                     <button
                       key={index}
-                      onClick={() => setCurrentImageIndex(index)}
-                      className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                      onClick={() => handleImageSelect(index)}
+                      disabled={isTransitioning}
+                      className={`flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-105 ${
                         index === currentImageIndex
-                          ? 'border-redbook'
+                          ? 'border-redbook shadow-lg'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
