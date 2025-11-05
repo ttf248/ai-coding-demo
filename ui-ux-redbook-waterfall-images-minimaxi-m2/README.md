@@ -97,6 +97,30 @@ npm run preview
 - Safari (>=14)
 - Edge (>=88)
 
+## 图片资源管理
+
+**Q: 构建时图片文件是如何自动拷贝到 dist 目录的？**
+
+**A:** 通过 Vite 配置实现（vite.config.ts:6-17）：
+
+```typescript
+build: {
+  assetsInclude: ['**/*.jpg', '**/*.jpeg', '**/*.png', '**/*.gif'],
+  rollupOptions: {
+    output: {
+      assetFileNames: (assetInfo) => {
+        if (assetInfo.name && /\.(jpg|jpeg|png|gif)$/i.test(assetInfo.name)) {
+          return 'images/[name][extname]'  // 图片输出到 dist/images/
+        }
+        return 'assets/[name]-[hash][extname]'  // 其他资源带hash
+      }
+    }
+  }
+}
+```
+
+**效果：** `public/images/1.jpg` → `dist/images/1.jpg`（自动拷贝，保持原名）
+
 ## 许可证
 
 MIT
