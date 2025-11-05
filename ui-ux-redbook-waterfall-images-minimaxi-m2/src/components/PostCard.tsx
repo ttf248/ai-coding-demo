@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import LazyLoad from 'react-lazyload'
 import { Heart, MessageCircle, Share, Bookmark } from 'lucide-react'
 import { PostItem, useStore } from '../store/useStore'
