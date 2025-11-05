@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Heart, MessageCircle, Share, Bookmark, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import { PostItem, useStore } from '../store/useStore'
 import SkeletonLoader from './SkeletonLoader'
-import Toast, { ToastType } from './Toast'
+import Toast from './Toast'
 import { useToast } from '../hooks/useToast'
 
 interface DetailViewProps {
