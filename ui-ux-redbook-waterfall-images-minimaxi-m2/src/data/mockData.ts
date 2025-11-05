@@ -105,20 +105,36 @@ const generateComments = (postId: number): CommentItem[] => {
   return comments
 }
 
+const generateImageUrls = (postId: number): string[] => {
+  const imageCount = 2 + (postId % 4) // 2-5 张图片
+  const images: string[] = []
+
+  // 获取基础图片索引
+  const baseImageIndex = (postId % IMAGE_COUNT) + 1
+
+  // 生成连续的图片路径
+  for (let i = 0; i < imageCount; i++) {
+    const imageIndex = (baseImageIndex + i - 1) % IMAGE_COUNT + 1
+    images.push(`/images/${imageIndex}.jpg`)
+  }
+
+  return images
+}
+
 export const generateMockData = (startIndex: number, count: number): PostItem[] => {
   const items: PostItem[] = []
 
   for (let i = 0; i < count; i++) {
     const id = startIndex + i + 1
-    const imageIndex = ((startIndex + i) % IMAGE_COUNT) + 1
     const randomType = POST_TYPES[Math.floor(Math.random() * POST_TYPES.length)]
     const tags = generateRandomTags(id)
     const comments = generateComments(id)
+    const images = generateImageUrls(id)
 
     items.push({
       id,
       title: TITLES[(startIndex + i) % TITLES.length],
-      imageUrl: `/images/${imageIndex}.jpg`,
+      images,
       author: NICKNAMES[(startIndex + i) % NICKNAMES.length],
       likes: Math.floor(Math.random() * 5000) + 100,
       isLiked: false,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Heart, MessageCircle, Share, Bookmark, ArrowLeft } from 'lucide-react'
+import { Heart, MessageCircle, Share, Bookmark, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import { PostItem, useStore } from '../store/useStore'
 
 interface DetailViewProps {
@@ -18,7 +18,7 @@ const DEFAULT_AVATAR_COLORS = [
 
 const DetailView: React.FC<DetailViewProps> = ({ post }) => {
   const { toggleLike, setCurrentView } = useStore()
-  const [imageError, setImageError] = useState(false)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [showHeartAnimation, setShowHeartAnimation] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
 
@@ -57,6 +57,14 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
     setIsBookmarked(!isBookmarked)
   }
 
+  const handlePrevImage = () => {
+    setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : post.images.length - 1))
+  }
+
+  const handleNextImage = () => {
+    setCurrentImageIndex((prev) => (prev < post.images.length - 1 ? prev + 1 : 0))
+  }
+
   const commentCount = post.comments?.length || 0
 
   return (
@@ -74,18 +82,75 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
 
       {/* 主内容 */}
       <div className="max-w-7xl mx-auto px-2 sm:px-4 py-3 sm:py-4 pb-20 sm:pb-24">
-        {/* 图片区域 */}
+        {/* 图片区域 - 图集展示 */}
         <div className="mb-3 sm:mb-4">
-          {!imageError ? (
-            <img
-              src={post.imageUrl}
-              alt={post.title}
-              className="w-full h-auto object-cover rounded-lg"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <div className="w-full aspect-[3/4] bg-gray-200 rounded-lg flex items-center justify-center">
-              <span className="text-gray-400 text-sm">图片加载失败</span>
+          {post.images && post.images.length > 0 && (
+            <div className="relative">
+              {/* 主图片 */}
+              <div className="relative bg-gray-100 rounded-lg overflow-hidden">
+                <img
+                  src={post.images[currentImageIndex]}
+                  alt={`${post.title} - ${currentImageIndex + 1}`}
+                  className="w-full h-auto object-contain"
+                  style={{ maxHeight: '400px' }}
+                />
+
+                {/* 上一张/下一张按钮 */}
+                {post.images.length > 1 && (
+                  <>
+                    <button
+                      onClick={handlePrevImage}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={handleNextImage}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
+
+                {/* 图片指示器 */}
+                {post.images.length > 1 && (
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    {post.images.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setCurrentImageIndex(index)}
+                        className={`w-2 h-2 rounded-full transition-all ${
+                          index === currentImageIndex ? 'bg-white' : 'bg-white/50'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 缩略图列表 */}
+              {post.images.length > 1 && (
+                <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
+                  {post.images.map((image, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentImageIndex(index)}
+                      className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                        index === currentImageIndex
+                          ? 'border-redbook'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <img
+                        src={image}
+                        alt={`缩略图 ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -150,8 +215,8 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
             <div className="text-xs sm:text-sm text-gray-500">评论</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-lg sm:text-2xl font-bold text-gray-800">56</div>
-            <div className="text-xs sm:text-sm text-gray-500">收藏</div>
+            <div className="text-lg sm:text-2xl font-bold text-gray-800">{post.images.length}</div>
+            <div className="text-xs sm:text-sm text-gray-500">图片</div>
           </div>
         </div>
 

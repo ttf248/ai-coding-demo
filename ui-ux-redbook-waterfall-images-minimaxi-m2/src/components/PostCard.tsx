@@ -53,7 +53,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       <LazyLoad height={200} offset={100}>
         {!imageError ? (
           <img
-            src={post.imageUrl}
+            src={post.images[0]}
             alt={post.title}
             className="w-full h-auto object-cover"
             onError={() => setImageError(true)}
@@ -107,7 +107,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       <LazyLoad height={300} offset={100}>
         {!imageError ? (
           <img
-            src={post.imageUrl}
+            src={post.images[0]}
             alt={post.title}
             className="w-full h-auto object-cover"
             style={{ height: '350px' }}
@@ -174,7 +174,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       <LazyLoad height={150} offset={100}>
         {!imageError ? (
           <img
-            src={post.imageUrl}
+            src={post.images[0]}
             alt={post.title}
             className="w-full h-auto object-cover"
             style={{ height: '180px' }}
@@ -227,7 +227,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       <LazyLoad height={250} offset={100}>
         {!imageError ? (
           <img
-            src={post.imageUrl}
+            src={post.images[0]}
             alt={post.title}
             className="w-full h-auto object-cover"
             style={{ height: '280px' }}
@@ -299,7 +299,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       <LazyLoad height={200} offset={100}>
         {!imageError ? (
           <img
-            src={post.imageUrl}
+            src={post.images[0]}
             alt={post.title}
             className="w-full h-auto object-cover"
             onError={() => setImageError(true)}
