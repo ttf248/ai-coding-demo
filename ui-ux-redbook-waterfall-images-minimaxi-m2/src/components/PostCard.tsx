@@ -22,9 +22,62 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const [imageError, setImageError] = useState(false)
   const [isPressed, setIsPressed] = useState(false)
   const [showHeartAnimation, setShowHeartAnimation] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [showContent, setShowContent] = useState(false)
 
   const avatarColor = DEFAULT_AVATAR_COLORS[post.id % DEFAULT_AVATAR_COLORS.length]
   const avatarText = post.author.charAt(0)
+
+  // 模拟加载延迟并添加平滑过渡
+  useEffect(() => {
+    const loadingTimer = setTimeout(() => {
+      setIsLoading(false)
+      // 延迟显示内容以创建更平滑的过渡效果
+      setTimeout(() => setShowContent(true), 50)
+    }, 300)
+    return () => {
+      clearTimeout(loadingTimer)
+    }
+  }, [])
+
+  const renderSkeletonCard = (type: PostItem['type']) => {
+    const skeletonHeight = {
+      standard: 'h-80',
+      tall: 'h-96',
+      short: 'h-64',
+      wide: 'h-72',
+      full: 'h-80',
+    }
+
+    return (
+      <div
+        className={`bg-white rounded-lg shadow-sm overflow-hidden animate-fade-in ${skeletonHeight[type]}`}
+      >
+        <SkeletonLoader
+          rounded={false}
+          width="100%"
+          height={type === 'tall' ? '350px' : type === 'short' ? '180px' : type === 'wide' ? '280px' : '250px'}
+          className="!bg-gray-200"
+        />
+        <div className="p-3 sm:p-4">
+          {type !== 'standard' && type !== 'short' && (
+            <div className="flex gap-2 mb-3">
+              <SkeletonLoader width="40px" height="20px" rounded className="!bg-gray-200" />
+              <SkeletonLoader width="40px" height="20px" rounded className="!bg-gray-200" />
+            </div>
+          )}
+          <SkeletonLoader lines={2} className="!bg-gray-200 mb-3" />
+          {type === 'tall' && (
+            <SkeletonLoader lines={2} className="!bg-gray-200 mb-3" />
+          )}
+          <div className="flex items-center justify-between">
+            <SkeletonLoader avatar width="60px" height="24px" className="!bg-gray-200" />
+            <SkeletonLoader width="40px" height="20px" rounded className="!bg-gray-200" />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -368,6 +421,10 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   )
 
   const renderCard = () => {
+    if (isLoading) {
+      return renderSkeletonCard(post.type)
+    }
+
     switch (post.type) {
       case 'tall':
         return renderTallCard()
