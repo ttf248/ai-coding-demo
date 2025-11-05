@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 
+export type PostType = 'standard' | 'tall' | 'short' | 'wide' | 'full'
+
 export interface PostItem {
   id: number
   title: string
@@ -7,6 +9,7 @@ export interface PostItem {
   author: string
   likes: number
   isLiked: boolean
+  type: PostType
 }
 
 interface AppState {
