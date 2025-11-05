@@ -117,7 +117,7 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
           {post.images && post.images.length > 0 && (
             <div className="relative">
               {/* 主图片 */}
-              <div className="relative bg-gray-100 rounded-lg overflow-hidden group">
+              <div className="relative bg-white rounded-lg overflow-hidden group shadow-sm">
                 <img
                   src={post.images[currentImageIndex]}
                   alt={`${post.title} - ${currentImageIndex + 1}`}
