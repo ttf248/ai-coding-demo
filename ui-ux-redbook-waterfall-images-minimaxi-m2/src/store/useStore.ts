@@ -10,6 +10,7 @@ export interface PostItem {
   likes: number
   isLiked: boolean
   type: PostType
+  tags: string[]
 }
 
 interface AppState {
@@ -77,6 +78,8 @@ export const useStore = create<AppState>((set, get) => ({
       if (post.author.toLowerCase().includes(query)) return true
       // 匹配类型（standard/tall/short/wide/full）
       if (post.type.toLowerCase().includes(query)) return true
+      // 匹配标签
+      if (post.tags.some(tag => tag.toLowerCase().includes(query))) return true
       return false
     })
   },

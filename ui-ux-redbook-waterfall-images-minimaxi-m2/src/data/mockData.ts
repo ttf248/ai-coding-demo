@@ -7,6 +7,8 @@ const NICKNAMES = [
   '读书人', '画者', '音乐人', '舞者', '瑜伽教练',
 ]
 
+const TAGS = ['美食', '旅行', '时尚', '生活', '摄影', '美妆', '穿搭', '居家', '艺术', '健身']
+
 const TITLES = [
   '今日份的美好，请查收～',
   '分享一波超美的风景照',
@@ -44,6 +46,20 @@ const IMAGE_COUNT = 35
 
 const POST_TYPES: PostItem['type'][] = ['standard', 'tall', 'short', 'wide', 'full']
 
+const generateRandomTags = (postId: number): string[] => {
+  const tagCount = 2 + (postId % 3)
+  const selectedTags: string[] = []
+  const availableTags = [...TAGS]
+
+  for (let i = 0; i < tagCount && availableTags.length > 0; i++) {
+    const randomIndex = (postId + i) % availableTags.length
+    selectedTags.push(availableTags[randomIndex])
+    availableTags.splice(randomIndex, 1)
+  }
+
+  return selectedTags
+}
+
 export const generateMockData = (startIndex: number, count: number): PostItem[] => {
   const items: PostItem[] = []
 
@@ -51,6 +67,7 @@ export const generateMockData = (startIndex: number, count: number): PostItem[] 
     const id = startIndex + i + 1
     const imageIndex = ((startIndex + i) % IMAGE_COUNT) + 1
     const randomType = POST_TYPES[Math.floor(Math.random() * POST_TYPES.length)]
+    const tags = generateRandomTags(id)
 
     items.push({
       id,
@@ -60,6 +77,7 @@ export const generateMockData = (startIndex: number, count: number): PostItem[] 
       likes: Math.floor(Math.random() * 5000) + 100,
       isLiked: false,
       type: randomType,
+      tags,
     })
   }
 

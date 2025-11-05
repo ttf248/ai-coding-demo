@@ -25,7 +25,7 @@ const SearchBar: React.FC = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder="搜索标题、作者或类型（如：tall/short）"
+              placeholder="搜索标题、作者、类型或标签（如：美食/旅行）"
               className={`w-full pl-10 pr-10 py-2 bg-gray-100 rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-redbook/20 text-sm transition-all ${
                 isFocused ? 'bg-white shadow-md' : ''
               }`}

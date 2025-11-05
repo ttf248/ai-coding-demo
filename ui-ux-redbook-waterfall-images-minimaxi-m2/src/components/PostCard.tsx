@@ -7,8 +7,6 @@ interface PostCardProps {
   post: PostItem
 }
 
-const TAGS = ['美食', '旅行', '时尚', '生活', '摄影', '美妆', '穿搭', '居家', '艺术', '健身']
-
 const DEFAULT_AVATAR_COLORS = [
   'bg-red-100',
   'bg-blue-100',
@@ -27,7 +25,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
   const avatarColor = DEFAULT_AVATAR_COLORS[post.id % DEFAULT_AVATAR_COLORS.length]
   const avatarText = post.author.charAt(0)
-  const randomTags = TAGS.slice(0, 2 + (post.id % 3))
 
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -121,7 +118,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
       <div className="p-4">
         <div className="flex gap-2 mb-3">
-          {randomTags.map((tag, index) => (
+          {post.tags.map((tag, index) => (
             <span key={index} className="px-2 py-1 bg-redbook/10 text-redbook text-xs rounded-full">
               #{tag}
             </span>
@@ -241,7 +238,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
       <div className="p-4">
         <div className="flex gap-2 mb-3 flex-wrap">
-          {randomTags.map((tag, index) => (
+          {post.tags.map((tag, index) => (
             <span key={index} className="px-2 py-1 bg-redbook/10 text-redbook text-xs rounded-full">
               #{tag}
             </span>
@@ -312,7 +309,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
       <div className="p-4">
         <div className="flex gap-2 mb-3 flex-wrap">
-          {randomTags.map((tag, index) => (
+          {post.tags.map((tag, index) => (
             <span key={index} className="px-2 py-1 bg-redbook/10 text-redbook text-xs rounded-full">
               #{tag}
             </span>
