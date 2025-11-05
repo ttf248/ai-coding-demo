@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { Heart, MessageCircle, Share, Bookmark, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import { PostItem, useStore } from '../store/useStore'
 import SkeletonLoader from './SkeletonLoader'
+import Toast, { ToastType } from './Toast'
+import { useToast } from '../hooks/useToast'
 
 interface DetailViewProps {
   post: PostItem
@@ -19,6 +21,7 @@ const DEFAULT_AVATAR_COLORS = [
 
 const DetailView: React.FC<DetailViewProps> = ({ post }) => {
   const { toggleLike, setCurrentView } = useStore()
+  const { toast, showToast, hideToast } = useToast()
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [showHeartAnimation, setShowHeartAnimation] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
@@ -49,6 +52,15 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
     toggleLike(post.id)
     setShowHeartAnimation(true)
     setTimeout(() => setShowHeartAnimation(false), 600)
+    showToast(post.isLiked ? '已取消点赞' : '点赞成功！', 'success')
+  }
+
+  const handleButtonClick = (e: React.MouseEvent) => {
+    const button = e.currentTarget as HTMLElement
+    button.classList.add('animate-button-press')
+    setTimeout(() => {
+      button.classList.remove('animate-button-press')
+    }, 200)
   }
 
   const handleBack = () => {
@@ -63,17 +75,19 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
           text: `查看 "${post.title}" - by ${post.author}`,
           url: window.location.href,
         })
+        showToast('分享成功！', 'success')
       } catch (err) {
         console.log('分享取消')
       }
     } else {
       navigator.clipboard.writeText(window.location.href)
-      alert('链接已复制到剪贴板')
+      showToast('链接已复制到剪贴板！', 'success')
     }
   }
 
   const handleBookmark = () => {
     setIsBookmarked(!isBookmarked)
+    showToast(isBookmarked ? '已取消收藏' : '收藏成功！', 'success')
   }
 
   const handlePrevImage = () => {
@@ -109,6 +123,14 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
 
   return (
     <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
+      {/* Toast 通知 */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
+
       {/* 头部导航 */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-2 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3">
         <button
@@ -357,8 +379,11 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 sm:px-4 py-2 sm:py-3">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <button
-            onClick={handleLike}
-            className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-full transition-all ${
+            onClick={(e) => {
+              handleLike(e)
+              handleButtonClick(e)
+            }}
+            className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-full transition-all hover:scale-105 ${
               post.isLiked
                 ? 'bg-redbook text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

@@ -86,6 +86,14 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     setTimeout(() => setShowHeartAnimation(false), 600)
   }
 
+  const handleButtonClick = (e: React.MouseEvent) => {
+    const button = e.currentTarget as HTMLElement
+    button.classList.add('animate-button-press')
+    setTimeout(() => {
+      button.classList.remove('animate-button-press')
+    }, 200)
+  }
+
   const handleCardClick = () => {
     setIsPressed(true)
     setTimeout(() => {
@@ -108,7 +116,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           <img
             src={post.images[0]}
             alt={post.title}
-            className="w-full h-auto object-cover"
+            className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
             onError={() => setImageError(true)}
             loading="lazy"
           />
@@ -133,8 +141,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           </div>
 
           <button
-            onClick={handleLike}
-            className={`flex items-center gap-1 transition-colors ${
+            onClick={(e) => {
+              handleLike(e)
+              handleButtonClick(e)
+            }}
+            className={`flex items-center gap-1 transition-all duration-200 hover:scale-110 ${
               post.isLiked ? 'text-redbook' : 'text-gray-400'
             }`}
           >
@@ -162,7 +173,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           <img
             src={post.images[0]}
             alt={post.title}
-            className="w-full h-auto object-cover"
+            className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
             style={{ height: '350px' }}
             onError={() => setImageError(true)}
             loading="lazy"
@@ -200,8 +211,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           </div>
 
           <button
-            onClick={handleLike}
-            className={`flex items-center gap-1 transition-colors ${
+            onClick={(e) => {
+              handleLike(e)
+              handleButtonClick(e)
+            }}
+            className={`flex items-center gap-1 transition-all duration-200 hover:scale-110 ${
               post.isLiked ? 'text-redbook' : 'text-gray-400'
             }`}
           >
@@ -229,7 +243,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           <img
             src={post.images[0]}
             alt={post.title}
-            className="w-full h-auto object-cover"
+            className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
             style={{ height: '180px' }}
             onError={() => setImageError(true)}
             loading="lazy"
@@ -255,8 +269,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           </div>
 
           <button
-            onClick={handleLike}
-            className={`flex items-center gap-1 transition-colors ${
+            onClick={(e) => {
+              handleLike(e)
+              handleButtonClick(e)
+            }}
+            className={`flex items-center gap-1 transition-all duration-200 hover:scale-110 ${
               post.isLiked ? 'text-redbook' : 'text-gray-400'
             }`}
           >
@@ -282,7 +299,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           <img
             src={post.images[0]}
             alt={post.title}
-            className="w-full h-auto object-cover"
+            className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
             style={{ height: '280px' }}
             onError={() => setImageError(true)}
             loading="lazy"
@@ -324,8 +341,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={handleLike}
-              className={`flex items-center gap-1 transition-colors ${
+              onClick={(e) => {
+                handleLike(e)
+                handleButtonClick(e)
+              }}
+              className={`flex items-center gap-1 transition-all duration-200 hover:scale-110 ${
                 post.isLiked ? 'text-redbook' : 'text-gray-400'
               }`}
             >
@@ -354,7 +374,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           <img
             src={post.images[0]}
             alt={post.title}
-            className="w-full h-auto object-cover"
+            className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
             onError={() => setImageError(true)}
             loading="lazy"
           />
@@ -399,8 +419,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
         <div className="flex items-center justify-between pt-3 border-t border-gray-100">
           <div className="flex items-center gap-4">
             <button
-              onClick={handleLike}
-              className={`flex items-center gap-1 transition-colors ${
+              onClick={(e) => {
+                handleLike(e)
+                handleButtonClick(e)
+              }}
+              className={`flex items-center gap-1 transition-all duration-200 hover:scale-110 ${
                 post.isLiked ? 'text-redbook' : 'text-gray-400'
               }`}
             >
