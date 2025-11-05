@@ -33,6 +33,12 @@
 - **文档**: [什么是 Unsplash？](docs/unsplash/Readme.md)
 - **预览**: [快速查看示例](docs/unsplash/what-is-unsplash-demo.html)
 
+### 骨架屏 (Skeleton Screen)
+
+- **类型**: 加载占位符技术
+- **文档**: [什么是骨架屏？](docs/skeleton/Readme.md)
+- **预览**: [快速查看示例](docs/skeleton/what-is-skeleton-demo.html)
+
 ## 📸 项目记录
 
 ### 自选股实战
