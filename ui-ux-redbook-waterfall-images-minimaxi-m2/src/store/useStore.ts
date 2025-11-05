@@ -19,6 +19,8 @@ interface AppState {
   hasMore: boolean
   page: number
   searchQuery: string
+  currentView: 'list' | 'detail'
+  selectedPost: PostItem | null
 
   setPosts: (posts: PostItem[]) => void
   appendPosts: (posts: PostItem[]) => void
@@ -28,6 +30,8 @@ interface AppState {
   setSearchQuery: (query: string) => void
   toggleLike: (id: number) => void
   refreshPosts: () => void
+  setCurrentView: (view: 'list' | 'detail') => void
+  setSelectedPost: (post: PostItem | null) => void
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -36,6 +40,8 @@ export const useStore = create<AppState>((set, get) => ({
   hasMore: true,
   page: 0,
   searchQuery: '',
+  currentView: 'list',
+  selectedPost: null,
 
   setPosts: (posts) => set({ posts }),
 
@@ -64,6 +70,10 @@ export const useStore = create<AppState>((set, get) => ({
     })),
 
   refreshPosts: () => set({ page: 0, posts: [], hasMore: true }),
+
+  setCurrentView: (view) => set({ currentView: view }),
+
+  setSelectedPost: (post) => set({ selectedPost: post }),
 
   // 计算属性：根据搜索查询过滤帖子
   getFilteredPosts: () => {
