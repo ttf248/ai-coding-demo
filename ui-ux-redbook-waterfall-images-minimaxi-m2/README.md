@@ -121,6 +121,113 @@ build: {
 
 **效果：** `public/images/1.jpg` → `dist/images/1.jpg`（自动拷贝，保持原名）
 
+---
+
+**Q: 瀑布流布局是如何实现的？**
+
+**A:** 使用 CSS `columns` 属性（WaterfallGrid.tsx:59）：
+
+```jsx
+<div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
+  {posts.map((post) => (
+    <PostCard key={post.id} post={post} />
+  ))}
+</div>
+```
+
+**原理：** 响应式列数 - 移动端2列、平板3列、桌面4列，CSS自动排列内容。
+
+---
+
+**Q: 无限滚动是如何实现的？**
+
+**A:** 使用 `IntersectionObserver` 监听底部元素（WaterfallGrid.tsx:16-31）：
+
+```typescript
+useEffect(() => {
+  const observer = new IntersectionObserver(
+    (entries) => {
+      const firstEntry = entries[0]
+      if (firstEntry.isIntersecting && !loading && hasMore) {
+        loadMorePosts()
+      }
+    },
+    { threshold: 0.1 }
+  )
+
+  if (loaderRef.current) {
+    observer.observe(loaderRef.current)
+  }
+
+  return () => observer.disconnect()
+}, [loading, hasMore, page])
+```
+
+**效果：** 当底部加载指示器进入视口时自动加载下一页数据。
+
+---
+
+**Q: 文字头像是如何生成的？**
+
+**A:** 基于用户ID生成彩色圆形头像（PostCard.tsx:26-27）：
+
+```typescript
+const DEFAULT_AVATAR_COLORS = [
+  'bg-red-100', 'bg-blue-100', 'bg-yellow-100',
+  'bg-green-100', 'bg-purple-100', 'bg-pink-100',
+  'bg-indigo-100',
+]
+
+const avatarColor = DEFAULT_AVATAR_COLORS[post.id % DEFAULT_AVATAR_COLORS.length]
+const avatarText = post.author.charAt(0)  // 取用户名首字母
+```
+
+**效果：** 8种颜色循环 + 姓氏首字母，无需外部头像图片。
+
+---
+
+**Q: 点赞动画是如何实现的？**
+
+**A:** CSS Keyframes + 状态控制（tailwind.config.js:22-27 + PostCard.tsx:83-86）：
+
+```typescript
+// 1. 定义动画（tailwind.config.js）
+'heart-beat': 'heartBeat 0.6s ease-in-out'
+heartBeat: {
+  '0%': { transform: 'scale(1)' },
+  '25%': { transform: 'scale(1.3)' },  // 放大
+  '50%': { transform: 'scale(1)' },    // 还原
+  '100%': { transform: 'scale(1)' },
+}
+
+// 2. 应用动画（PostCard.tsx）
+<Heart className={`heart ${showHeartAnimation ? 'animate-heart-beat' : ''}`} />
+```
+
+**效果：** 点击红心 → 放大1.3倍 → 回到原大小，持续0.6秒。
+
+---
+
+**Q: 图片懒加载是如何实现的？**
+
+**A:** 使用 `react-lazyload` 库（PostCard.tsx:48-62）：
+
+```jsx
+<LazyLoad height={200} offset={100}>
+  {!imageError ? (
+    <img
+      src={post.imageUrl}
+      onError={() => setImageError(true)}
+      loading="lazy"
+    />
+  ) : (
+    <div className="fallback">图片加载失败</div>
+  )}
+</LazyLoad>
+```
+
+**配置：** 高度200px预加载，提前100px开始加载，失败时显示提示。
+
 ## 许可证
 
 MIT
