@@ -18,7 +18,7 @@ const DEFAULT_AVATAR_COLORS = [
 ]
 
 const PostCard: React.FC<PostCardProps> = ({ post }) => {
-  const { toggleLike } = useStore()
+  const { toggleLike, setCurrentView, setSelectedPost } = useStore()
   const [imageError, setImageError] = useState(false)
   const [isPressed, setIsPressed] = useState(false)
   const [showHeartAnimation, setShowHeartAnimation] = useState(false)
@@ -35,7 +35,12 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
   const handleCardClick = () => {
     setIsPressed(true)
-    setTimeout(() => setIsPressed(false), 150)
+    setTimeout(() => {
+      setIsPressed(false)
+      // 导航到详情页
+      setSelectedPost(post)
+      setCurrentView('detail')
+    }, 150)
   }
 
   const renderStandardCard = () => (
