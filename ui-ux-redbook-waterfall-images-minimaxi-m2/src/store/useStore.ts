@@ -15,7 +15,7 @@ export interface CommentItem {
 export interface PostItem {
   id: number
   title: string
-  imageUrl: string
+  images: string[]
   author: string
   likes: number
   isLiked: boolean
