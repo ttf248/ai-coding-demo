@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Heart, MessageCircle, Share, Bookmark, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import { PostItem, useStore } from '../store/useStore'
+import SkeletonLoader from './SkeletonLoader'
 
 interface DetailViewProps {
   post: PostItem
@@ -22,6 +23,7 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
   const [showHeartAnimation, setShowHeartAnimation] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [imageLoadingStates, setImageLoadingStates] = useState<Record<number, boolean>>({})
 
   const avatarColor = DEFAULT_AVATAR_COLORS[post.id % DEFAULT_AVATAR_COLORS.length]
   const avatarText = post.author.charAt(0)
@@ -95,6 +97,14 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
     setTimeout(() => setIsTransitioning(false), 300)
   }
 
+  const handleImageLoad = (index: number) => {
+    setImageLoadingStates(prev => ({ ...prev, [index]: false }))
+  }
+
+  const handleImageLoadStart = (index: number) => {
+    setImageLoadingStates(prev => ({ ...prev, [index]: true }))
+  }
+
   const commentCount = post.comments?.length || 0
 
   return (
@@ -118,16 +128,34 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
             <div className="relative">
               {/* 主图片 */}
               <div className="relative bg-white rounded-lg overflow-hidden group shadow-sm">
+                {imageLoadingStates[currentImageIndex] !== false && (
+                  <div
+                    className="w-full flex items-center justify-center"
+                    style={{
+                      maxHeight: 'calc(100vh - 400px)',
+                      minHeight: '400px'
+                    }}
+                  >
+                    <SkeletonLoader
+                      rounded
+                      width="100%"
+                      height="100%"
+                      className="!bg-gray-200"
+                    />
+                  </div>
+                )}
                 <img
                   src={post.images[currentImageIndex]}
                   alt={`${post.title} - ${currentImageIndex + 1}`}
                   className={`w-full h-auto object-contain transition-opacity duration-300 ${
                     isTransitioning ? 'opacity-50' : 'opacity-100'
-                  }`}
+                  } ${imageLoadingStates[currentImageIndex] !== false ? 'absolute inset-0' : ''}`}
                   style={{
                     maxHeight: 'calc(100vh - 400px)',
                     minHeight: '400px'
                   }}
+                  onLoadStart={() => handleImageLoadStart(currentImageIndex)}
+                  onLoad={() => handleImageLoad(currentImageIndex)}
                 />
 
                 {/* 上一张/下一张按钮 */}
@@ -188,11 +216,22 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      <img
-                        src={image}
-                        alt={`缩略图 ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
+                      {imageLoadingStates[index] !== false ? (
+                        <SkeletonLoader
+                          rounded
+                          width="100%"
+                          height="100%"
+                          className="!bg-gray-200"
+                        />
+                      ) : (
+                        <img
+                          src={image}
+                          alt={`缩略图 ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          onLoadStart={() => handleImageLoadStart(index)}
+                          onLoad={() => handleImageLoad(index)}
+                        />
+                      )}
                     </button>
                   ))}
                 </div>
