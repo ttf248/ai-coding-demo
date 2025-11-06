@@ -75,13 +75,13 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       </LazyLoad>
 
       <div className="p-3">
-        <h3 className="text-sm text-gray-800 line-clamp-2 mb-3">
+        <h3 className="text-xs sm:text-sm text-gray-800 line-clamp-2 mb-3">
           {post.title}
         </h3>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-full ${avatarColor} flex items-center justify-center text-xs font-medium text-gray-600`}>
+            <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full ${avatarColor} flex items-center justify-center text-xs font-medium text-gray-600`}>
               {avatarText}
             </div>
             <span className="text-xs text-gray-600">{post.author}</span>
@@ -97,7 +97,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             }`}
           >
             <Heart
-              className={`w-4 h-4 ${post.isLiked ? 'fill-redbook' : ''} ${
+              className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${post.isLiked ? 'fill-redbook' : ''} ${
                 showHeartAnimation ? 'animate-heart-beat' : ''
               }`}
             />
@@ -141,7 +141,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           ))}
         </div>
 
-        <h3 className="text-sm text-gray-800 line-clamp-2 mb-3">
+        <h3 className="text-xs sm:text-sm text-gray-800 line-clamp-2 mb-3">
           {post.title}
         </h3>
 
@@ -151,7 +151,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
           <div className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-full ${avatarColor} flex items-center justify-center text-xs font-medium text-gray-600`}>
+            <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full ${avatarColor} flex items-center justify-center text-xs font-medium text-gray-600`}>
               {avatarText}
             </div>
             <span className="text-xs text-gray-600">{post.author}</span>
@@ -167,7 +167,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             }`}
           >
             <Heart
-              className={`w-4 h-4 ${post.isLiked ? 'fill-redbook' : ''} ${
+              className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${post.isLiked ? 'fill-redbook' : ''} ${
                 showHeartAnimation ? 'animate-heart-beat' : ''
               }`}
             />
@@ -203,7 +203,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       </LazyLoad>
 
       <div className="p-3">
-        <h3 className="text-sm text-gray-800 line-clamp-2 mb-2">
+        <h3 className="text-xs sm:text-sm text-gray-800 line-clamp-2 mb-2">
           {post.title}
         </h3>
 
@@ -267,7 +267,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           ))}
         </div>
 
-        <h3 className="text-sm text-gray-800 line-clamp-2 mb-4">
+        <h3 className="text-xs sm:text-sm text-gray-800 line-clamp-2 mb-4">
           {post.title}
         </h3>
 
@@ -297,12 +297,12 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               }`}
             >
               <Heart
-                className={`w-4 h-4 ${post.isLiked ? 'fill-redbook' : ''}`}
+                className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${post.isLiked ? 'fill-redbook' : ''}`}
               />
               <span className="text-xs">{post.likes}</span>
             </button>
-            <MessageCircle className="w-4 h-4 text-gray-400" />
-            <Share className="w-4 h-4 text-gray-400" />
+            <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
+            <Share className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
           </div>
         </div>
       </div>
@@ -341,7 +341,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           ))}
         </div>
 
-        <h3 className="text-sm text-gray-800 line-clamp-2 mb-3">
+        <h3 className="text-xs sm:text-sm text-gray-800 line-clamp-2 mb-3">
           {post.title}
         </h3>
 
@@ -360,7 +360,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             </div>
           </div>
 
-          <Bookmark className="w-4 h-4 text-gray-400" />
+          <Bookmark className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
         </div>
 
         <div className="flex items-center justify-between pt-3 border-t border-gray-100">
@@ -375,14 +375,14 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               }`}
             >
               <Heart
-                className={`w-4 h-4 ${post.isLiked ? 'fill-redbook' : ''} ${
+                className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${post.isLiked ? 'fill-redbook' : ''} ${
                   showHeartAnimation ? 'animate-heart-beat' : ''
                 }`}
               />
               <span className="text-xs">{post.likes}</span>
             </button>
-            <MessageCircle className="w-4 h-4 text-gray-400" />
-            <Share className="w-4 h-4 text-gray-400" />
+            <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
+            <Share className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
           </div>
           <span className="text-xs text-gray-400">2小时前</span>
         </div>

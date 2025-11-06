@@ -34,7 +34,8 @@ const WaterfallGrid: React.FC = () => {
     1280: 4,     // 大屏幕4列
     1024: 3,     // 平板3列
     768: 2,      // 手机横屏2列
-    640: 2       // 手机竖屏2列
+    640: 2,      // 手机竖屏2列
+    480: 1       // 超小屏1列
   }
 
   useEffect(() => {
@@ -84,11 +85,11 @@ const WaterfallGrid: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4">
+    <div className="max-w-7xl mx-auto px-1 sm:px-4 py-3 sm:py-4">
       {/* 搜索结果提示 */}
       {searchQuery && (
-        <div className="mb-4 px-2">
-          <p className="text-sm text-gray-600">
+        <div className="mb-3 sm:mb-4 px-1 sm:px-2">
+          <p className="text-xs sm:text-sm text-gray-600">
             搜索 "<span className="font-semibold text-redbook">{searchQuery}</span>" 找到 {filteredPosts.length} 个结果
           </p>
         </div>
