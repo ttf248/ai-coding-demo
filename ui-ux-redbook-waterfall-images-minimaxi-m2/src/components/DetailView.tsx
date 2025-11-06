@@ -143,7 +143,7 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
       </div>
 
       {/* 主内容 */}
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-3 sm:py-4 pb-20 sm:pb-24">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4 pb-16 sm:pb-20">
         {/* 图片区域 - 图集展示 */}
         <div className="mb-3 sm:mb-4">
           {post.images && post.images.length > 0 && (
@@ -154,8 +154,8 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
                   <div
                     className="w-full flex items-center justify-center"
                     style={{
-                      maxHeight: 'calc(100vh - 400px)',
-                      minHeight: '400px'
+                      maxHeight: 'calc(50vh)',
+                      minHeight: '250px',
                     }}
                   >
                     <SkeletonLoader
@@ -173,8 +173,8 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
                     isTransitioning ? 'opacity-50' : 'opacity-100'
                   } ${imageLoadingStates[currentImageIndex] !== false ? 'absolute inset-0' : ''}`}
                   style={{
-                    maxHeight: 'calc(100vh - 400px)',
-                    minHeight: '400px'
+                    maxHeight: 'calc(50vh)',
+                    minHeight: '250px',
                   }}
                   onLoadStart={() => handleImageLoadStart(currentImageIndex)}
                   onLoad={() => handleImageLoad(currentImageIndex)}
@@ -232,7 +232,7 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
                       key={index}
                       onClick={() => handleImageSelect(index)}
                       disabled={isTransitioning}
-                      className={`flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-105 ${
+                      className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-105 ${
                         index === currentImageIndex
                           ? 'border-redbook shadow-lg'
                           : 'border-gray-200 hover:border-gray-300'
@@ -383,7 +383,7 @@ const DetailView: React.FC<DetailViewProps> = ({ post }) => {
               handleLike(e)
               handleButtonClick(e)
             }}
-            className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-full transition-all hover:scale-105 ${
+            className={`flex items-center gap-2 px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-full transition-all hover:scale-105 ${
               post.isLiked
                 ? 'bg-redbook text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

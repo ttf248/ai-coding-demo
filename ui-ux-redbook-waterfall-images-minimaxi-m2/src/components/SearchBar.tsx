@@ -12,9 +12,9 @@ const SearchBar: React.FC = () => {
 
   return (
     <div className="sticky top-0 z-50 bg-white shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 py-3">
+      <div className="max-w-7xl mx-auto px-3 py-2 sm:px-4 sm:py-3">
         <div className="flex items-center gap-3">
-          <div className="text-2xl font-bold text-redbook">
+          <div className="text-lg sm:text-2xl sm:font-bold text-redbook">
             小蓝书
           </div>
 
