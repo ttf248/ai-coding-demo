@@ -119,7 +119,14 @@ function createParticles(image) {
     const velocities = [];
     const randoms = [];
 
-    const sampleRate = Math.max(1, Math.floor(imgWidth / 200)); // Adjust sample rate for performance
+    // --- Optimization Start ---
+    const MAX_PARTICLES = 150000;
+    const totalPixels = imgWidth * imgHeight;
+    let sampleRate = 1;
+    if (totalPixels > MAX_PARTICLES) {
+        sampleRate = Math.ceil(Math.sqrt(totalPixels / MAX_PARTICLES));
+    }
+    // --- Optimization End ---
 
     for (let y = 0; y < imgHeight; y += sampleRate) {
         for (let x = 0; x < imgWidth; x += sampleRate) {
@@ -158,7 +165,7 @@ function createParticles(image) {
     geometry.setAttribute('random', new THREE.Float32BufferAttribute(randoms, 3));
 
     const material = new THREE.PointsMaterial({
-        size: sampleRate * 1.2,
+        size: sampleRate, // Adjusted size to reduce blockiness
         vertexColors: true,
         blending: THREE.AdditiveBlending,
         transparent: true,
