@@ -2,27 +2,25 @@
 let scene, camera, renderer, particles;
 let handLandmarks = [];
 
+// UI Elements
 const videoElement = document.getElementById('input-video');
 const canvasElement = document.getElementById('output-canvas');
 const imageUpload = document.getElementById('image-upload');
 const loadingElement = document.getElementById('loading');
-const infoText = document.getElementById('info-text');
+const welcomeContainer = document.getElementById('welcome-container');
+const gestureHint = document.getElementById('gesture-hint');
 
-// Particle state
+// Particle & Interaction state
 const particleState = {
-    isRestoring: false,
-    attractionForce: 0.05,
-    damping: 0.95,
-    noiseSpeed: 0.005,
-    noiseScale: 2,
+    attractionForce: 0.025, // Force pulling particles to their target
+    damping: 0.92,         // Friction to slow down particles
+    noiseSpeed: 0.004,     // How fast the idle particles drift
+    noiseScale: 1.5,       // How far the idle particles drift
+    brushRadius: 100,      // The radius of the 'magic brush'
 };
 
 function showLoading(show) {
     loadingElement.style.display = show ? 'flex' : 'none';
-}
-
-function setInfoText(text) {
-    infoText.textContent = text;
 }
 
 // 1. Initialize Three.js Scene
@@ -71,13 +69,10 @@ function initMediaPipe() {
 }
 
 function onHandResults(results) {
-    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        handLandmarks = results.multiHandLandmarks[0];
-        checkGesture(handLandmarks);
-    } else {
-        handLandmarks = [];
-        particleState.isRestoring = false;
-    }
+    // Store the latest hand landmarks
+    handLandmarks = results.multiHandLandmarks && results.multiHandLandmarks.length > 0
+        ? results.multiHandLandmarks[0]
+        : [];
 }
 
 // 3. Image Processing and Particle Creation
@@ -85,11 +80,13 @@ imageUpload.addEventListener('change', (event) => {
     if (event.target.files && event.target.files[0]) {
         const reader = new FileReader();
         reader.onload = (e) => {
+            // Hide welcome screen and show hints
+            welcomeContainer.classList.add('hidden');
+            gestureHint.classList.remove('hidden');
+            videoElement.classList.remove('hidden');
+
             const img = new Image();
-            img.onload = () => {
-                createParticles(img);
-                setInfoText('Make a fist to restore the image!');
-            };
+            img.onload = () => createParticles(img);
             img.src = e.target.result;
         };
         reader.readAsDataURL(event.target.files[0]);
@@ -113,46 +110,27 @@ function createParticles(image) {
     const imageData = ctx.getImageData(0, 0, imgWidth, imgHeight).data;
 
     const geometry = new THREE.BufferGeometry();
-    const positions = [];
-    const colors = [];
-    const originalPositions = [];
-    const velocities = [];
-    const randoms = [];
+    const positions = [], colors = [], originalPositions = [], velocities = [], randoms = [];
 
-    // --- Optimization Start ---
     const MAX_PARTICLES = 150000;
     const totalPixels = imgWidth * imgHeight;
     let sampleRate = 1;
     if (totalPixels > MAX_PARTICLES) {
         sampleRate = Math.ceil(Math.sqrt(totalPixels / MAX_PARTICLES));
     }
-    // --- Optimization End ---
 
     for (let y = 0; y < imgHeight; y += sampleRate) {
         for (let x = 0; x < imgWidth; x += sampleRate) {
             const i = (y * imgWidth + x) * 4;
-            if (imageData[i + 3] > 128) { // Only use non-transparent pixels
-                // Initial random position
+            if (imageData[i + 3] > 128) {
                 positions.push(
-                    (Math.random() - 0.5) * window.innerWidth,
-                    (Math.random() - 0.5) * window.innerHeight,
+                    (Math.random() - 0.5) * window.innerWidth * 1.2,
+                    (Math.random() - 0.5) * window.innerHeight * 1.2,
                     (Math.random() - 0.5) * 1000
                 );
-
-                // Original position (target)
-                originalPositions.push(
-                    x - imgWidth / 2,
-                    -(y - imgHeight / 2),
-                    0
-                );
-                
-                // Color
+                originalPositions.push(x - imgWidth / 2, -(y - imgHeight / 2), 0);
                 colors.push(imageData[i] / 255, imageData[i + 1] / 255, imageData[i + 2] / 255);
-
-                // Initial velocity
                 velocities.push(0, 0, 0);
-
-                // Random values for noise
                 randoms.push(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1);
             }
         }
@@ -165,11 +143,11 @@ function createParticles(image) {
     geometry.setAttribute('random', new THREE.Float32BufferAttribute(randoms, 3));
 
     const material = new THREE.PointsMaterial({
-        size: sampleRate, // Adjusted size to reduce blockiness
+        size: sampleRate,
         vertexColors: true,
         blending: THREE.AdditiveBlending,
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.9,
     });
 
     particles = new THREE.Points(geometry, material);
@@ -179,11 +157,9 @@ function createParticles(image) {
 // 4. Interaction and Animation Loop
 function animate() {
     requestAnimationFrame(animate);
-
     if (particles) {
         updateParticles();
     }
-
     renderer.render(scene, camera);
 }
 
@@ -194,12 +170,12 @@ function updateParticles() {
     const randoms = particles.geometry.attributes.random.array;
     const particleCount = positions.length / 3;
 
-    let handVec = null;
+    let brushVec = null;
     if (handLandmarks.length > 0) {
-        const palmCenter = handLandmarks[0]; // Using palm base as center
-        handVec = new THREE.Vector3(
-            (palmCenter.x - 0.5) * window.innerWidth,
-            -(palmCenter.y - 0.5) * window.innerHeight,
+        const indexFingerTip = handLandmarks[8]; // Landmark for the tip of the index finger
+        brushVec = new THREE.Vector3(
+            (indexFingerTip.x - 0.5) * window.innerWidth,
+            -(indexFingerTip.y - 0.5) * window.innerHeight,
             0
         );
     }
@@ -212,30 +188,27 @@ function updateParticles() {
         const op = new THREE.Vector3(originalPos[i3], originalPos[i3 + 1], originalPos[i3 + 2]);
         const v = new THREE.Vector3(velocities[i3], velocities[i3 + 1], velocities[i3 + 2]);
 
-        if (particleState.isRestoring) {
-            // Move towards original position
-            const attraction = op.clone().sub(p).multiplyScalar(particleState.attractionForce);
-            v.add(attraction);
-        } else {
-            // Dynamic floating behavior using noise
-            const noise = new THREE.Vector3(
-                (Math.sin(p.y * 0.01 + time + randoms[i3] * 5)) * particleState.noiseScale,
-                (Math.sin(p.x * 0.01 + time + randoms[i3+1] * 5)) * particleState.noiseScale,
-                (Math.sin(p.z * 0.01 + time + randoms[i3+2] * 5)) * particleState.noiseScale,
-            );
-            v.add(noise);
-        }
+        let force = new THREE.Vector3();
 
-        // Apply hand interaction "force field"
-        if (handVec) {
-            const dist = p.distanceTo(handVec);
-            if (dist < 150) { // Interaction radius
-                 const repel = p.clone().sub(handVec).normalize().multiplyScalar(150 / Math.max(20, dist));
-                 v.add(repel.multiplyScalar(0.5));
+        if (brushVec) {
+            const dist = p.distanceTo(brushVec);
+            if (dist < particleState.brushRadius) {
+                // If inside brush radius, attract to original position
+                const attraction = op.clone().sub(p).multiplyScalar(particleState.attractionForce);
+                force.add(attraction);
             }
         }
+
+        // Add gentle, random noise for idle floating
+        const noise = new THREE.Vector3(
+            (Math.sin(p.y * 0.01 + time + randoms[i3] * Math.PI)) * particleState.noiseScale,
+            (Math.sin(p.x * 0.01 + time + randoms[i3 + 1] * Math.PI)) * particleState.noiseScale,
+            (Math.sin(p.z * 0.01 + time + randoms[i3 + 2] * Math.PI)) * particleState.noiseScale
+        );
+        force.add(noise);
         
-        // Apply damping and update position
+        // Apply forces, damping, and update position
+        v.add(force);
         v.multiplyScalar(particleState.damping);
         p.add(v);
 
@@ -251,44 +224,9 @@ function updateParticles() {
     particles.geometry.attributes.velocity.needsUpdate = true;
 }
 
-// 5. Gesture Recognition
-function checkGesture(landmarks) {
-    // Simple "fist" gesture: check if fingertips are close to the palm.
-    const thumbTip = landmarks[4];
-    const indexTip = landmarks[8];
-    const middleTip = landmarks[12];
-    const ringTip = landmarks[16];
-    const pinkyTip = landmarks[20];
-    const wrist = landmarks[0];
-
-    const avgDist = (
-        getDistance(thumbTip, wrist) +
-        getDistance(indexTip, wrist) +
-        getDistance(middleTip, wrist) +
-        getDistance(ringTip, wrist) +
-        getDistance(pinkyTip, wrist)
-    ) / 5;
-    
-    // A smaller average distance suggests a closed fist.
-    // The threshold (0.25) might need tuning.
-    if (avgDist < 0.25) {
-        particleState.isRestoring = true;
-    } else {
-        particleState.isRestoring = false;
-    }
-}
-
-function getDistance(p1, p2) {
-    const dx = p1.x - p2.x;
-    const dy = p1.y - p2.y;
-    const dz = p1.z - p2.z;
-    return Math.sqrt(dx * dx + dy * dy + dz * dz);
-}
-
 // --- Main Execution ---
 showLoading(true);
 initThree();
 initMediaPipe();
 animate();
 showLoading(false);
-setInfoText('Upload an image to start!');
