@@ -1,6 +1,9 @@
+import { translations } from './translations.js';
+
 // Global variables
 let scene, camera, renderer, particles;
 let handLandmarks = [];
+let currentLang = 'zh';
 
 // UI Elements
 const videoElement = document.getElementById('input-video');
@@ -9,6 +12,8 @@ const imageUpload = document.getElementById('image-upload');
 const loadingElement = document.getElementById('loading');
 const welcomeContainer = document.getElementById('welcome-container');
 const gestureHint = document.getElementById('gesture-hint');
+const langZhButton = document.getElementById('lang-zh');
+const langEnButton = document.getElementById('lang-en');
 
 // Particle & Interaction state
 const particleState = {
@@ -21,6 +26,29 @@ const particleState = {
 
 function showLoading(show) {
     loadingElement.style.display = show ? 'flex' : 'none';
+}
+
+// --- I18n Language Function ---
+function setLanguage(lang) {
+    currentLang = lang;
+    const translationData = translations[lang];
+
+    document.querySelectorAll('[data-i18n]').forEach(element => {
+        const key = element.getAttribute('data-i18n');
+        if (translationData[key]) {
+            // Use innerHTML to support tags like <strong>
+            element.innerHTML = translationData[key];
+        }
+    });
+
+    // Update button active state
+    if (lang === 'zh') {
+        langZhButton.classList.add('active');
+        langEnButton.classList.remove('active');
+    } else {
+        langEnButton.classList.add('active');
+        langZhButton.classList.remove('active');
+    }
 }
 
 // 1. Initialize Three.js Scene
@@ -225,8 +253,19 @@ function updateParticles() {
 }
 
 // --- Main Execution ---
-showLoading(true);
-initThree();
-initMediaPipe();
-animate();
-showLoading(false);
+document.addEventListener('DOMContentLoaded', () => {
+    showLoading(true);
+
+    // Setup language switcher
+    langZhButton.addEventListener('click', () => setLanguage('zh'));
+    langEnButton.addEventListener('click', () => setLanguage('en'));
+
+    // Set default language
+    setLanguage('zh');
+
+    initThree();
+    initMediaPipe();
+    animate();
+
+    showLoading(false);
+});
