@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { SearchBar } from './components/SearchBar'
 import { Waterfall } from './components/Waterfall'
+import { BackToTop } from './components/BackToTop'
 import { useStore } from './store/useStore'
 
 function App() {
@@ -12,9 +13,10 @@ function App() {
   }, [refresh])
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50">
       <SearchBar />
       <Waterfall />
+      <BackToTop />
     </div>
   )
 }

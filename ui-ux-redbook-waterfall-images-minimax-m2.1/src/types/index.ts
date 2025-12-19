@@ -1,6 +1,7 @@
 export interface Post {
   id: number
   image: string
+  imageHeight?: number
   title: string
   author: {
     name: string

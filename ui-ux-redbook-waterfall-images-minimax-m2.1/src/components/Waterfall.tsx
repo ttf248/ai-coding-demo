@@ -1,15 +1,16 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useStore } from '../store/useStore'
 import { Card } from './Card'
 import { Loading } from './Loading'
-import { Post, Column } from '../types'
+import { Post } from '../types'
 
 export const Waterfall = () => {
-  const { posts, loading, hasMore, loadMore, refreshing, refresh } = useStore()
-  const [columns, setColumns] = useState<Column[]>([])
+  const { posts, loading, hasMore, loadMore, refresh } = useStore()
   const [columnCount, setColumnCount] = useState(2)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const touchStartRef = useRef<{ y: number; isAtTop: boolean } | null>(null)
 
   // 响应式列数
   useEffect(() => {
@@ -29,43 +30,23 @@ export const Waterfall = () => {
     return () => window.removeEventListener('resize', updateColumnCount)
   }, [])
 
-  // 分配帖子到列
-  const distributePosts = useCallback((postsToDistribute: Post[], currentColumns: Column[], count: number): Column[] => {
-    if (postsToDistribute.length === 0) return currentColumns
+  // 计算列高度分配
+  const columns = useMemo(() => {
+    if (posts.length === 0) return []
 
-    const newColumns: Column[] = currentColumns.length === count
-      ? currentColumns
-      : Array.from({ length: count }, () => ({ posts: [], height: 0 }))
+    const cols: Post[][] = Array.from({ length: columnCount }, () => [])
+    const colHeights: number[] = Array(columnCount).fill(0)
 
-    postsToDistribute.forEach((post, index) => {
+    posts.forEach((post) => {
       // 找到最短的列
-      let minHeight = Infinity
-      let minIndex = 0
-      newColumns.forEach((col, i) => {
-        if (col.height < minHeight) {
-          minHeight = col.height
-          minIndex = i
-        }
-      })
-
-      // 添加到最短的列
-      newColumns[minIndex] = {
-        posts: [...newColumns[minIndex].posts, post],
-        height: minHeight + 200, // 估算高度
-      }
+      const minHeightIndex = colHeights.indexOf(Math.min(...colHeights))
+      cols[minHeightIndex].push(post)
+      // 估算高度：图片高度 + 内容高度(约60px)
+      colHeights[minHeightIndex] += (post.imageHeight || 220) + 60
     })
 
-    return newColumns
-  }, [])
-
-  // 初始化和更新列
-  useEffect(() => {
-    if (posts.length === 0) {
-      setColumns(Array.from({ length: columnCount }, () => ({ posts: [], height: 0 })))
-    } else {
-      setColumns(prev => distributePosts(posts, prev, columnCount))
-    }
-  }, [posts, columnCount, distributePosts])
+    return cols
+  }, [posts, columnCount])
 
   // 无限滚动
   useEffect(() => {
@@ -75,7 +56,10 @@ export const Waterfall = () => {
           loadMore()
         }
       },
-      { threshold: 0.1 }
+      {
+        threshold: 0.1,
+        rootMargin: '100px',
+      }
     )
 
     if (loadMoreRef.current) {
@@ -87,52 +71,78 @@ export const Waterfall = () => {
 
   // 下拉刷新
   useEffect(() => {
-    let startY = 0
-    let isRefreshing = false
-
     const handleTouchStart = (e: TouchEvent) => {
-      startY = e.touches[0].pageY
+      if (window.scrollY === 0) {
+        touchStartRef.current = {
+          y: e.touches[0].pageY,
+          isAtTop: true,
+        }
+      }
     }
 
     const handleTouchMove = (e: TouchEvent) => {
+      if (!touchStartRef.current || !touchStartRef.current.isAtTop) return
+
       const currentY = e.touches[0].pageY
-      if (currentY - startY > 100 && !isRefreshing && window.scrollY === 0) {
-        isRefreshing = true
+      const diff = currentY - touchStartRef.current.y
+
+      if (diff > 80 && !isRefreshing && !loading) {
+        setIsRefreshing(true)
         refresh()
-        setTimeout(() => { isRefreshing = false }, 1000)
+        // 模拟刷新完成
+        setTimeout(() => {
+          setIsRefreshing(false)
+          touchStartRef.current = null
+        }, 1000)
       }
+    }
+
+    const handleTouchEnd = () => {
+      touchStartRef.current = null
     }
 
     const container = containerRef.current
     if (container) {
-      container.addEventListener('touchstart', handleTouchStart)
-      container.addEventListener('touchmove', handleTouchMove)
+      container.addEventListener('touchstart', handleTouchStart, { passive: true })
+      container.addEventListener('touchmove', handleTouchMove, { passive: true })
+      container.addEventListener('touchend', handleTouchEnd)
     }
 
     return () => {
       if (container) {
         container.removeEventListener('touchstart', handleTouchStart)
         container.removeEventListener('touchmove', handleTouchMove)
+        container.removeEventListener('touchend', handleTouchEnd)
       }
     }
-  }, [refresh])
+  }, [isRefreshing, loading, refresh])
+
+  // 初始加载
+  useEffect(() => {
+    if (posts.length === 0) {
+      refresh()
+    }
+  }, [])
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-gray-100">
+    <div ref={containerRef} className="min-h-screen bg-gray-50">
       {/* 下拉刷新指示器 */}
-      {refreshing && (
-        <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4">
-          <Loading />
+      {(isRefreshing || posts.length === 0) && (
+        <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4 pointer-events-none">
+          {isRefreshing && <Loading />}
         </div>
       )}
 
       {/* 瀑布流网格 */}
-      <div className="grid gap-3 px-3 py-3 page-enter" style={{
-        gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
-      }}>
-        {columns.map((column, colIndex) => (
+      <div
+        className="grid gap-3 px-3 py-3 page-enter"
+        style={{
+          gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+        }}
+      >
+        {columns.map((columnPosts, colIndex) => (
           <div key={colIndex} className="flex flex-col gap-3">
-            {column.posts.map((post) => (
+            {columnPosts.map((post) => (
               <Card key={post.id} post={post} />
             ))}
           </div>
@@ -140,10 +150,10 @@ export const Waterfall = () => {
       </div>
 
       {/* 加载更多 */}
-      <div ref={loadMoreRef} className="py-4">
+      <div ref={loadMoreRef} className="py-6">
         {loading && <Loading />}
         {!hasMore && posts.length > 0 && (
-          <p className="text-center text-gray-400 text-sm">没有更多了</p>
+          <p className="text-center text-gray-400 text-sm">— 没有更多了 —</p>
         )}
       </div>
     </div>

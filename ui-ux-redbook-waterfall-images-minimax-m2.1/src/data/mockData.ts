@@ -1,12 +1,5 @@
 import { Post } from '../types'
 
-// 生成文字头像的颜色
-const avatarColors = [
-  '#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff',
-  '#5f27cd', '#00d2d3', '#ff9f43', '#10ac84', '#ee5a24',
-  '#0abde3', '#9b59b6', '#1abc9c', '#e74c3c', '#3498db'
-]
-
 const nicknames = [
   '小仙女', '爱分享', '生活家', '美食控', '旅行达人',
   '美妆博主', '时尚精', '居家小能手', '摄影爱好者', '萌宠日记',
@@ -37,42 +30,34 @@ const titles = [
   '提高生活品质的居家好物'
 ]
 
-// 获取随机头像文字
+// 模拟不同比例的图片高度 (基于3:4基础，略有变化)
+const imageHeights = [200, 220, 180, 240, 200, 260, 190, 230, 210, 250]
+
 const getRandomNickname = () => nicknames[Math.floor(Math.random() * nicknames.length)]
-
-// 获取随机标题
 const getRandomTitle = () => titles[Math.floor(Math.random() * titles.length)]
-
-// 获取随机颜色用于文字头像
-const getRandomColor = () => avatarColors[Math.floor(Math.random() * avatarColors.length)]
-
-// 获取随机点赞数
 const getRandomLikes = () => Math.floor(Math.random() * 10000) + 100
+const getRandomHeight = () => imageHeights[Math.floor(Math.random() * imageHeights.length)]
 
-// 图片列表 (本地图片)
 const images = Array.from({ length: 35 }, (_, i) => `${i + 1}.jpg`)
 
-// 生成单条数据
-const generatePost = (id: number): Post => {
-  const imageIndex = (id - 1) % images.length
-  return {
-    id,
-    image: `/images/${images[imageIndex]}`,
-    title: getRandomTitle(),
-    author: {
-      name: getRandomNickname(),
-    },
-    likes: getRandomLikes(),
-    isLiked: false,
-  }
-}
-
-// 生成分页数据
 export const generateMockPosts = (page: number, pageSize: number = 20): Post[] => {
   const start = (page - 1) * pageSize + 1
   const end = start + pageSize - 1
-  return Array.from({ length: end - start + 1 }, (_, i) => generatePost(start + i))
+  return Array.from({ length: end - start + 1 }, (_, i) => {
+    const id = start + i
+    const imageIndex = (id - 1) % images.length
+    return {
+      id,
+      image: `/images/${images[imageIndex]}`,
+      title: getRandomTitle(),
+      author: {
+        name: getRandomNickname(),
+      },
+      likes: getRandomLikes(),
+      isLiked: false,
+      imageHeight: getRandomHeight(),
+    }
+  })
 }
 
-// 初始数据
 export const initialPosts = generateMockPosts(1, 20)
