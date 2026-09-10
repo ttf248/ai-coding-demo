@@ -7,8 +7,48 @@
    */
   var projectRecords = [
     {
-      id: "bluebook-m2-1",
+      id: "neo-gothic-tower-city-gpt-6-default",
       number: "01",
+      title: "雾隐之城 · GPT 6 Default",
+      kicker: "可漫游的 3D 新哥特式塔楼城市",
+      category: "frontend",
+      categoryLabel: "前端应用",
+      status: "SINGLE HTML",
+      year: "2026.09",
+      model: "GPT 6 Default",
+      description: "以单 HTML 文件重建一座海上塔楼城市，加入自由漫游、天气氛围、粒子火焰和实时环境控制。",
+      stack: ["HTML", "Three.js", "WebGL"],
+      tags: ["3D 漫游", "沉浸式场景"],
+      accent: "teal",
+      order: 10,
+      links: [
+        { label: "打开 HTML 预览", href: "./neo-gothic-tower-city-gpt-6-default/index.html" },
+        { label: "查看提示词", href: "./neo-gothic-tower-city-gpt-6-default/Readme.md" }
+      ]
+    },
+    {
+      id: "neo-gothic-tower-city-gpt-5-6-luna-max",
+      number: "02",
+      title: "塔城漫游 · GPT 5.6 Luna Max",
+      kicker: "真实比例的新哥特式城市动画",
+      category: "frontend",
+      categoryLabel: "前端应用",
+      status: "SINGLE HTML",
+      year: "2026.09",
+      model: "GPT 5.6 Luna Max",
+      description: "围绕镜头巡游、海浪、火焰、雾气和 fallback 预览，测试模型完成复杂单文件视觉页面的能力。",
+      stack: ["HTML", "Three.js", "WebGL"],
+      tags: ["模型对比", "粒子氛围"],
+      accent: "lavender",
+      order: 9,
+      links: [
+        { label: "打开 HTML 预览", href: "./neo-gothic-tower-city-gpt-5.6-luna-max/index.html" },
+        { label: "查看提示词", href: "./neo-gothic-tower-city-gpt-5.6-luna-max/Readme.md" }
+      ]
+    },
+    {
+      id: "bluebook-m2-1",
+      number: "03",
       title: "小蓝书 · MiniMax M2.1",
       kicker: "瀑布流图片展示 / 模型版本",
       category: "frontend",
@@ -28,7 +68,7 @@
     },
     {
       id: "bluebook-minimaxi-m2",
-      number: "02",
+      number: "04",
       title: "小蓝书 · MiniMaxi M2",
       kicker: "瀑布流图片展示 / 模型版本",
       category: "frontend",
@@ -48,7 +88,7 @@
     },
     {
       id: "pixel-flow",
-      number: "03",
+      number: "05",
       title: "Pixel Flow",
       kicker: "图片粒子化与手势还原",
       category: "prompt",
@@ -65,7 +105,7 @@
     },
     {
       id: "bluebook",
-      number: "04",
+      number: "06",
       title: "小蓝书",
       kicker: "仿小红书的瀑布流图片展示页面",
       category: "frontend",
@@ -85,7 +125,7 @@
     },
     {
       id: "ui-prototypes",
-      number: "05",
+      number: "07",
       title: "YouTube UI 模块",
       kicker: "从通用提示词拆出一组产品界面",
       category: "prototype",
@@ -105,7 +145,7 @@
     },
     {
       id: "stock-watching",
-      number: "06",
+      number: "08",
       title: "自选股实战",
       kicker: "前后端分离的股票自选系统",
       category: "fullstack",
@@ -122,7 +162,7 @@
     },
     {
       id: "life-diary",
-      number: "07",
+      number: "09",
       title: "生活情绪日记",
       kicker: "记录一天情绪的 iOS 风格应用",
       category: "prototype",
@@ -142,7 +182,7 @@
     },
     {
       id: "meditation",
-      number: "08",
+      number: "10",
       title: "冥想 iOS App",
       kicker: "专注于呼吸与陪伴感的交互稿",
       category: "prototype",
