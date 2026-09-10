@@ -40,6 +40,7 @@
 - **2025-05**：整理为 AI Demo 集合，增加 iOS 原型、YouTube 模块和第一批前端技术文档，并发布 GitHub Pages。
 - **2025-11**：扩充 React、TypeScript 等技术主题，同时持续迭代小蓝书的瀑布流、搜索、详情和加载体验。
 - **2025-12**：加入图片粒子化与手势交互测试，并记录小蓝书的 MiniMax M2 / M2.1 版本。
+- **2026-09**：新增 GPT 6 Default 与 GPT 5.6 Luna Max 的新哥特式塔楼城市单 HTML 对比实验，并将首页目录改为数据驱动。
 - **持续更新**：随着模型和开发工具变化，继续补充新的提示词测试。
 
 ## 📚 技术文档列表
@@ -82,6 +83,24 @@
 - **类型**: 前端 + 后端
 - **技术栈**: React / Golang
 - **文档**: [项目详情](stock-watching-system/)
+
+---
+
+### 🌌 沉浸式视觉实验
+
+#### 新哥特式塔楼城市 (GPT 6 Default)
+
+- **类型**: 单 HTML / 3D 前端视觉实验
+- **技术栈**: HTML / Three.js / WebGL
+- **提示词**: [原始提示词](neo-gothic-tower-city-gpt-6-default/Readme.md)
+- **预览**: [打开 HTML 页面](neo-gothic-tower-city-gpt-6-default/index.html)
+
+#### 新哥特式塔楼城市 (GPT 5.6 Luna Max)
+
+- **类型**: 单 HTML / 3D 前端视觉实验
+- **技术栈**: HTML / Three.js / WebGL
+- **提示词**: [原始提示词](neo-gothic-tower-city-gpt-5.6-luna-max/Readme.md)
+- **预览**: [打开 HTML 页面](neo-gothic-tower-city-gpt-5.6-luna-max/index.html)
 
 ---
 
@@ -133,6 +152,6 @@
 
 ### 📊 项目统计
 
-- **实验项目与模型版本**: 8 个
+- **实验项目与模型版本**: 10 个
 - **技术主题**: 14 个
-- **可直接打开的静态页面**: 20+ 个
+- **可直接打开的静态页面**: 22+ 个
