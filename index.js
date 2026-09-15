@@ -7,6 +7,26 @@
    */
   var projectRecords = [
     {
+      id: "voxel-construction-site-gpt-6-astra-low",
+      number: "14",
+      title: "筑间工地 · GPT 6 Astra Low",
+      kicker: "FIELDWORK / 高层与桥梁双场景沙盘",
+      category: "frontend",
+      categoryLabel: "前端应用",
+      status: "SINGLE HTML",
+      year: "2026.09",
+      model: "GPT 6 Astra Low",
+      description: "深色实木桌上的程序化体素工地，48 名工人与施工机械协同作业，支持高层、桥梁双场景和实体控制台、昼夜、尘土、暴雨交互。",
+      stack: ["HTML", "Three.js r160", "WebGL", "InstancedMesh"],
+      tags: ["体素沙盘", "双场景", "模型对比"],
+      accent: "lime",
+      order: 14,
+      links: [
+        { label: "打开 HTML 预览", href: "./voxel-construction-site-gpt-6-astra-low/index.html" },
+        { label: "查看提示词", href: "./voxel-construction-site-gpt-6-astra-low/Readme.md" }
+      ]
+    },
+    {
       id: "voxel-construction-site-gpt-5-6-sol-high",
       number: "13",
       title: "筑境工地 · GPT 5.6 Sol High",
