@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#11171b" />
+  <meta name="description" content="体素微缩建筑工地沙盘：程序化 Three.js r160 单 HTML 实验。" />
+  <title>YARD / 体素工地沙盘</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f2eadc;
+      --muted: #9aa7a7;
+      --dim: #657273;
+      --line: rgba(224, 232, 219, .16);
+      --panel: rgba(14, 22, 25, .78);
+      --panel-strong: rgba(11, 18, 21, .91);
+      --amber: #f4b65b;
+      --orange: #ef7642;
+      --cyan: #6fd4c3;
+      --lime: #b9dd72;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #101619; }
+    body {
+      color: var(--ink);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      letter-spacing: .04em;
+      user-select: none;
+    }
+    button { color: inherit; font: inherit; }
+    button:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }
+    #scene-root { position: fixed; inset: 0; touch-action: none; cursor: grab; }
+    #scene-root.dragging { cursor: grabbing; }
+    #scene-root canvas { display: block; width: 100%; height: 100%; }
+    .screen-vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, rgba(8, 13, 15, .86), rgba(8, 13, 15, .08) 30%, transparent 65%, rgba(7, 11, 13, .32)),
+        linear-gradient(0deg, rgba(5, 9, 11, .72), transparent 25%, transparent 78%, rgba(6, 10, 12, .36));
+      mix-blend-mode: multiply;
+    }
+    .hud { position: fixed; pointer-events: none; }
+    .topbar {
+      top: 25px;
+      left: 32px;
+      right: 32px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark { width: 28px; height: 35px; color: var(--amber); }
+    .brand-name { font: 700 18px/1 Georgia, serif; letter-spacing: .34em; }
+    .brand-sub { margin-top: 8px; color: var(--muted); font: 9px/1 monospace; letter-spacing: .18em; }
+    .top-metrics { display: flex; gap: 18px; text-align: right; }
+    .metric { min-width: 72px; }
+    .metric-label { color: var(--dim); font: 8px monospace; letter-spacing: .14em; }
+    .metric-value { display: block; margin-top: 7px; color: var(--ink); font: 700 14px/1 monospace; letter-spacing: .08em; }
+    .metric-value.live { color: var(--lime); }
+
+    .intro {
+      top: 19%;
+      left: 42px;
+      width: 285px;
+    }
+    .eyebrow { display: flex; align-items: center; gap: 9px; color: var(--amber); font: 9px monospace; letter-spacing: .22em; }
+    .eyebrow::before { width: 24px; height: 1px; background: var(--amber); content: ""; }
+    h1 { margin: 17px 0 0; font: 400 clamp(35px, 4vw, 58px)/1.04 "Songti SC", SimSun, serif; letter-spacing: .12em; }
+    .subtitle { margin-top: 13px; color: #d1c09e; font: italic 19px/1.2 Georgia, serif; letter-spacing: .04em; }
+    .intro-copy { margin: 20px 0 0; color: #b4c0b9; font-size: 11px; line-height: 2; letter-spacing: .1em; }
+    .state-line { display: flex; align-items: center; gap: 9px; margin-top: 22px; color: var(--muted); font: 9px monospace; letter-spacing: .12em; }
+    .state-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 14px var(--lime); }
+    .state-dot.storm { background: #6bc3ff; box-shadow: 0 0 14px #6bc3ff; }
+    .legend { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 21px; }
+    .legend span { padding: 6px 8px; border: 1px solid var(--line); color: #b5c1b8; font: 8px monospace; letter-spacing: .08em; background: rgba(15, 23, 25, .42); }
+    .legend i { display: inline-block; width: 5px; height: 5px; margin-right: 5px; border-radius: 50%; background: var(--amber); }
+    .legend span:nth-child(2) i { background: var(--cyan); }
+    .legend span:nth-child(3) i { background: var(--orange); }
+
+    .site-panel {
+      top: 19%;
+      right: 32px;
+      width: 236px;
+      padding: 18px 18px 16px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      backdrop-filter: blur(13px);
+    }
+    .panel-kicker { color: var(--amber); font: 8px monospace; letter-spacing: .2em; }
+    .panel-title { margin: 10px 0 14px; color: var(--ink); font: 14px/1 Georgia, serif; letter-spacing: .08em; }
+    .panel-row { display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid rgba(224, 232, 219, .1); color: var(--muted); font: 9px monospace; }
+    .panel-row strong { color: var(--ink); font-weight: 400; }
+    .panel-row strong.amber { color: var(--amber); }
+    .activity { margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid rgba(224, 232, 219, .1); }
+    .activity-label { color: var(--dim); font: 8px monospace; letter-spacing: .16em; }
+    .activity p { margin: 9px 0 0; color: #bac4bc; font-size: 9px; line-height: 1.8; }
+    .activity p::before { display: inline-block; width: 5px; height: 5px; margin: 0 8px 1px 0; background: var(--orange); content: ""; }
+
+    .bottom-left { left: 32px; bottom: 28px; }
+    .control-note { color: #c1c9bf; font: 9px monospace; letter-spacing: .08em; }
+    .control-note b { color: var(--amber); font-weight: 400; }
+    .key-hint { margin-top: 11px; color: var(--dim); font: 8px monospace; letter-spacing: .08em; }
+    kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 3px; color: var(--ink); background: rgba(11, 18, 21, .6); font: 8px monospace; }
+    .bottom-right { right: 32px; bottom: 28px; text-align: right; }
+    .boundary-lock { color: var(--lime); font: 8px monospace; letter-spacing: .14em; }
+    .boundary-copy { margin-top: 7px; color: var(--dim); font: 8px monospace; letter-spacing: .07em; }
+    .crosshair { position: fixed; left: 50%; top: 50%; width: 4px; height: 4px; border: 1px solid rgba(245, 221, 167, .5); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; opacity: .6; }
+
+    #toast {
+      left: 50%;
+      bottom: 84px;
+      padding: 11px 16px;
+      border: 1px solid var(--line);
+      color: #e9e4d5;
+      background: var(--panel-strong);
+      font: 9px monospace;
+      letter-spacing: .1em;
+      transform: translate(-50%, 12px);
+      opacity: 0;
+      transition: opacity .25s ease, transform .25s ease;
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; transform: translate(-50%, 0); }
+    #loading, #failure {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: #101619;
+      z-index: 10;
+    }
+    .loading-box { width: min(360px, calc(100% - 48px)); text-align: center; }
+    .loading-brand { color: var(--amber); font: 700 30px Georgia, serif; letter-spacing: .3em; }
+    .loading-copy { margin-top: 15px; color: var(--muted); font: 9px monospace; letter-spacing: .17em; }
+    .loading-line { height: 1px; margin: 22px auto 0; background: linear-gradient(90deg, transparent, var(--amber), transparent); animation: pulse 1.4s ease-in-out infinite; }
+    #loading.done { opacity: 0; pointer-events: none; transition: opacity .7s ease; }
+    #failure { display: none; padding: 30px; text-align: center; }
+    #failure.show { display: grid; }
+    #failure h2 { color: var(--amber); font: 22px Georgia, serif; }
+    #failure p { max-width: 460px; color: var(--muted); font-size: 12px; line-height: 1.9; }
+    @keyframes pulse { 50% { opacity: .25; } }
+    @media (max-width: 820px) {
+      .topbar { top: 18px; left: 20px; right: 20px; }
+      .top-metrics .metric:nth-child(2), .top-metrics .metric:nth-child(3) { display: none; }
+      .intro { top: auto; left: 20px; bottom: 116px; width: 250px; }
+      h1 { margin-top: 12px; font-size: 38px; }
+      .subtitle { font-size: 15px; }
+      .intro-copy { margin-top: 11px; font-size: 9px; line-height: 1.65; }
+      .legend { display: none; }
+      .site-panel { top: 83px; right: 20px; width: 180px; padding: 12px; }
+      .panel-title { margin: 7px 0 9px; font-size: 12px; }
+      .panel-row { padding: 7px 0; font-size: 8px; }
+      .activity { display: none; }
+      .bottom-left { left: 20px; bottom: 24px; }
+      .bottom-right { right: 20px; bottom: 24px; }
+      .key-hint { margin-top: 8px; }
+      #toast { bottom: 78px; max-width: calc(100% - 36px); overflow: hidden; text-overflow: ellipsis; }
+    }
+    @media (max-width: 480px) {
+      .site-panel { width: 154px; }
+      .intro { bottom: 105px; width: 215px; }
+      .intro-copy { max-width: 195px; }
+      .boundary-copy { display: none; }
+      .boundary-lock { font-size: 7px; }
+      .control-note { font-size: 8px; }
+      .key-hint { font-size: 7px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .loading-line { animation: none; }
+      #toast { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <main id="scene-root" tabindex="0" aria-label="体素微缩建筑工地沙盘。拖拽环视，滚轮缩放，点击桌面前方控制台，空格触发暴雨。"></main>
+  <div class="screen-vignette" aria-hidden="true"></div>
+
+  <header class="hud topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 28 36" fill="none" aria-hidden="true">
+        <path d="M2 31h24M5 31V10l9-6 9 6v21M9 31V17h10v14M3 10h22M14 4v-2M7 13h3M18 13h3" stroke="currentColor" stroke-width="1.25" />
+        <path d="M12 23h4M12 27h4" stroke="currentColor" stroke-width="1.25" />
+      </svg>
+      <div><div class="brand-name">YARD / 05.6</div><div class="brand-sub">VOXEL CONSTRUCTION STUDY</div></div>
+    </div>
+    <div class="top-metrics">
+      <div class="metric"><span class="metric-label">SITE CLOCK</span><strong class="metric-value" id="clock-readout">DUSK</strong></div>
+      <div class="metric"><span class="metric-label">RENDER</span><strong class="metric-value live" id="fps-readout">60 FPS</strong></div>
+      <div class="metric"><span class="metric-label">WEATHER</span><strong class="metric-value" id="weather-readout">CLEAR</strong></div>
+    </div>
+  </header>
+
+  <section class="hud intro" aria-label="场景信息">
+    <div class="eyebrow">MICRO SITE / 0012</div>
+    <h1>筑境<br />工地沙盘</h1>
+    <div class="subtitle">A SMALL YARD, ALWAYS IN MOTION.</div>
+    <p class="intro-copy">一张深色实木桌面上的完整施工切片。每个方块都在执行自己的工序，边界锁定，物料有序流动。</p>
+    <div class="state-line"><i class="state-dot" id="state-dot"></i><span id="state-readout">OPERATIONS LIVE / DUSK SHIFT</span></div>
+    <div class="legend" aria-hidden="true"><span><i></i>ACTIVE MACHINES</span><span><i></i>VOXEL CREW</span><span><i></i>LIGHTING GRID</span></div>
+  </section>
+
+  <aside class="hud site-panel" aria-label="施工现场数据">
+    <div class="panel-kicker">FIELD CONTROL / LIVE</div>
+    <div class="panel-title">现场运行面板</div>
+    <div class="panel-row"><span>设备联机</span><strong id="machine-readout">08 / 08</strong></div>
+    <div class="panel-row"><span>体素工人</span><strong id="crew-readout">28 人</strong></div>
+    <div class="panel-row"><span>施工速度</span><strong class="amber" id="speed-readout">STEADY</strong></div>
+    <div class="panel-row"><span>尘土强度</span><strong id="dust-readout">ACTIVE</strong></div>
+    <div class="activity">
+      <div class="activity-label">CURRENT LOG</div>
+      <p id="activity-readout">挖掘机 E-02 正在基坑西侧取土</p>
+    </div>
+  </aside>
+
+  <div class="hud bottom-left">
+    <div class="control-note"><b>桌面前沿控制台</b>　点击实体旋钮切换速度 / 日夜 / 尘土</div>
+    <div class="key-hint"><kbd>拖拽</kbd> 环视　<kbd>滚轮</kbd> 缩放　<kbd>SPACE</kbd> 暴雨天气</div>
+  </div>
+  <div class="hud bottom-right"><div class="boundary-lock">● SANDBOX BOUNDARY LOCKED</div><div class="boundary-copy">42 × 28 M / ALL ASSETS CONTAINED</div></div>
+  <div class="crosshair" aria-hidden="true"></div>
+  <div id="toast" class="hud" role="status" aria-live="polite"></div>
+
+  <div id="loading"><div class="loading-box"><div class="loading-brand">YARD</div><div class="loading-copy">ASSEMBLING PROCEDURAL SITE / THREE.JS R160</div><div class="loading-line"></div></div></div>
+  <div id="failure"><div><h2>场景引擎待确认</h2><p>Three.js r160 未能加载。请确认 Chrome 可以访问 jsDelivr CDN，然后重新打开此 HTML。页面没有使用图片、模型、字体或其他外部资源。</p></div></div>
+
+  <!-- The requested rendering dependency; every scene asset below is generated in this file. -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script>
+    (function () {
+      "use strict";
+
+      if (!window.THREE) {
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("failure").classList.add("show");
+        return;
+      }
+
+      var T = window.THREE;
+      var sceneRoot = document.getElementById("scene-root");
+      var loading = document.getElementById("loading");
+      var toast = document.getElementById("toast");
+      var clockReadout = document.getElementById("clock-readout");
+      var weatherReadout = document.getElementById("weather-readout");
+      var fpsReadout = document.getElementById("fps-readout");
+      var stateReadout = document.getElementById("state-readout");
+      var stateDot = document.getElementById("state-dot");
+      var machineReadout = document.getElementById("machine-readout");
+      var crewReadout = document.getElementById("crew-readout");
+      var speedReadout = document.getElementById("speed-readout");
+      var dustReadout = document.getElementById("dust-readout");
+      var activityReadout = document.getElementById("activity-readout");
+
+      var renderer = new T.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.65));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.outputColorSpace = T.SRGBColorSpace;
+      renderer.toneMapping = T.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.08;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = T.PCFSoftShadowMap;
+      sceneRoot.appendChild(renderer.domElement);
+
+      var scene = new T.Scene();
+      scene.background = new T.Color(0x614d5c);
+      scene.fog = new T.Fog(0x614d5c, 52, 105);
+      var camera = new T.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 150);
+      var cameraTarget = new T.Vector3(0, 4.3, 0);
+      var cameraYaw = 0.68;
+      var cameraPitch = 0.29;
+      var cameraDistance = 48;
+      var dragging = false;
+      var dragMoved = false;
+      var lastPointerX = 0;
+      var lastPointerY = 0;
+      var idleTime = 0;
+
+      var worldBounds = { minX: -20.8, maxX: 20.8, minZ: -13.1, maxZ: 13.1 };
+      var groundY = 1.68;
+      var collisionBoxes = [];
+      var dynamicBodies = [];
+      var animated = [];
+      var controlMeshes = [];
+      var haloLights = [];
+      var windowMaterials = [];
+      var beaconMaterials = [];
+      var lampMaterials = [];
+      var randomSeed = 43117;
+      var clock = new T.Clock();
+      var tempVector = new T.Vector3();
+      var tempVector2 = new T.Vector3();
+      var dummy = new T.Object3D();
+      var tempColor = new T.Color();
+      var toastTimer = 0;
+
+      function rand() {
+        randomSeed = (randomSeed * 1664525 + 1013904223) >>> 0;
+        return randomSeed / 4294967296;
+      }
+      function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+      function lerp(a, b, t) { return a + (b - a) * t; }
+      function color(value) { return new T.Color(value); }
+      function makeMaterial(hex, roughness, metalness, extra) {
+        var options = Object.assign({ color: hex, roughness: roughness === undefined ? .82 : roughness, metalness: metalness === undefined ? .04 : metalness }, extra || {});
+        return new T.MeshStandardMaterial(options);
+      }
+
+      var mats = {
+        desk: makeMaterial(0x241b16, .58, .08),
+        deskEdge: makeMaterial(0x120e0c, .8, .05),
+        frame: makeMaterial(0x41342a, .72, .05),
+        frameLight: makeMaterial(0x79614b, .66, .05),
+        earth: makeMaterial(0x70513a, 1, 0),
+        earthDark: makeMaterial(0x3b3029, 1, 0),
+        earthLight: makeMaterial(0xa27348, .98, 0),
+        road: makeMaterial(0x292f30, .92, .02),
+        roadEdge: makeMaterial(0x59605a, .92, .02),
+        concrete: makeMaterial(0x8c8a7b, .92, .02),
+        concreteDark: makeMaterial(0x535957, .92, .02),
+        safety: makeMaterial(0xee7d35, .74, .04),
+        safetyDark: makeMaterial(0xa44b2e, .82, .02),
+        steel: makeMaterial(0x71868a, .38, .72),
+        steelDark: makeMaterial(0x3f555c, .48, .65),
+        rebar: makeMaterial(0x9d5141, .5, .68),
+        wood: makeMaterial(0x8c5d36, .78, .04),
+        woodDark: makeMaterial(0x4b3224, .82, .02),
+        blue: makeMaterial(0x477f92, .65, .12),
+        blueDark: makeMaterial(0x1e4a5b, .78, .08),
+        yellow: makeMaterial(0xf3ae3f, .66, .08),
+        yellowDark: makeMaterial(0xb66a2d, .72, .05),
+        white: makeMaterial(0xd8d8c8, .86, 0),
+        black: makeMaterial(0x131a1d, .62, .16),
+        glass: makeMaterial(0x183c45, .18, .32),
+        window: makeMaterial(0x5c6c6b, .28, .1, { emissive: 0x101719, emissiveIntensity: .15 }),
+        warm: makeMaterial(0xf4ae54, .34, .05, { emissive: 0xd9782e, emissiveIntensity: .15 }),
+        red: makeMaterial(0xdc4939, .5, .02, { emissive: 0x50120c, emissiveIntensity: .2 }),
+        green: makeMaterial(0x7fa55b, .78, 0),
+        wet: makeMaterial(0x3c5960, .23, .58, { transparent: true, opacity: .56 }),
+        dirt: makeMaterial(0x6f4a32, 1, 0)
+      };
+      windowMaterials.push(mats.window);
+      lampMaterials.push(mats.warm);
+
+      var boxGeometry = new T.BoxGeometry(1, 1, 1);
+      var smallBoxGeometry = new T.BoxGeometry(1, 1, 1);
+      var cylinderGeometry = new T.CylinderGeometry(1, 1, 1, 8);
+      var lowCylinderGeometry = new T.CylinderGeometry(1, 1, 1, 10);
+      var torusGeometry = new T.TorusGeometry(.72, .08, 6, 12);
+
+      function addBox(parent, width, height, depth, material, x, y, z, rotationY, castShadow, receiveShadow) {
+        var mesh = new T.Mesh(boxGeometry, material);
+        mesh.position.set(x || 0, y || 0, z || 0);
+        mesh.scale.set(width, height, depth);
+        mesh.rotation.y = rotationY || 0;
+        mesh.castShadow = castShadow !== false;
+        mesh.receiveShadow = receiveShadow !== false;
+        (parent || scene).add(mesh);
+        return mesh;
+      }
+      function addCylinder(parent, radiusTop, radiusBottom, height, material, x, y, z, rotationX, rotationZ) {
+        var mesh = new T.Mesh(cylinderGeometry, material);
+        mesh.position.set(x || 0, y || 0, z || 0);
+        mesh.scale.set(radiusTop, height, radiusBottom);
+        mesh.rotation.x = rotationX || 0;
+        mesh.rotation.z = rotationZ || 0;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        (parent || scene).add(mesh);
+        return mesh;
+      }
+      function addLowCylinder(parent, radius, height, material, x, y, z, rotationX, rotationZ) {
+        var mesh = new T.Mesh(lowCylinderGeometry, material);
+        mesh.position.set(x || 0, y || 0, z || 0);
+        mesh.scale.set(radius, height, radius);
+        mesh.rotation.x = rotationX || 0;
+        mesh.rotation.z = rotationZ || 0;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        (parent || scene).add(mesh);
+        return mesh;
+      }
+      function addTorus(parent, radius, tube, material, x, y, z, rotationX) {
+        var mesh = new T.Mesh(torusGeometry, material);
+        mesh.position.set(x || 0, y || 0, z || 0);
+        mesh.scale.set(radius / .72, tube / .08, radius / .72);
+        mesh.rotation.x = rotationX || 0;
+        mesh.castShadow = true;
+        (parent || scene).add(mesh);
+        return mesh;
+      }
+      function registerCollision(x, y, z, width, height, depth, label) {
+        collisionBoxes.push({ x: x, y: y, z: z, w: width, h: height, d: depth, label: label || "asset" });
+      }
+      function addSolidBox(parent, width, height, depth, material, x, y, z, rotationY, label) {
+        var mesh = addBox(parent, width, height, depth, material, x, y, z, rotationY);
+        if (!parent || parent === scene) registerCollision(x, y, z, width, height, depth, label);
+        return mesh;
+      }
+
+      function Batch(name, geometry, material, capacity, dynamic) {
+        this.name = name;
+        this.mesh = new T.InstancedMesh(geometry, material, capacity);
+        this.mesh.name = name;
+        this.mesh.count = 0;
+        this.mesh.castShadow = true;
+        this.mesh.receiveShadow = true;
+        this.mesh.instanceMatrix.setUsage(dynamic ? T.DynamicDrawUsage : T.StaticDrawUsage);
+        this.index = 0;
+        this.capacity = capacity;
+        scene.add(this.mesh);
+      }
+      Batch.prototype.add = function (x, y, z, sx, sy, sz, ry, hex) {
+        if (this.index >= this.capacity) return -1;
+        dummy.position.set(x, y, z);
+        dummy.rotation.set(0, ry || 0, 0);
+        dummy.scale.set(sx, sy, sz);
+        dummy.updateMatrix();
+        this.mesh.setMatrixAt(this.index, dummy.matrix);
+        if (hex !== undefined) this.mesh.setColorAt(this.index, tempColor.set(hex));
+        this.index += 1;
+        this.mesh.count = this.index;
+        return this.index - 1;
+      };
+      Batch.prototype.update = function (index, x, y, z, sx, sy, sz, ry, rx, rz) {
+        dummy.position.set(x, y, z);
+        dummy.rotation.set(rx || 0, ry || 0, rz || 0);
+        dummy.scale.set(sx, sy, sz);
+        dummy.updateMatrix();
+        this.mesh.setMatrixAt(index, dummy.matrix);
+      };
+      Batch.prototype.finish = function () {
+        this.mesh.instanceMatrix.needsUpdate = true;
+        if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+      };
+
+      var voxelMaterial = makeMaterial(0xffffff, .86, .03, { vertexColors: true });
+      var metalVoxelMaterial = makeMaterial(0xffffff, .45, .5, { vertexColors: true });
+      var workerMaterial = makeMaterial(0xffffff, .78, .02, { vertexColors: true });
+      var darkVoxelMaterial = makeMaterial(0xffffff, .95, 0, { vertexColors: true });
+      var groundBatch = new Batch("sandbox-grid-voxels", boxGeometry, darkVoxelMaterial, 320, false);
+      var fenceBatch = new Batch("perimeter-fence-voxels", boxGeometry, voxelMaterial, 180, false);
+      var steelBatch = new Batch("steel-and-pallet-instances", boxGeometry, metalVoxelMaterial, 220, false);
+      var concreteBatch = new Batch("concrete-bag-instances", boxGeometry, voxelMaterial, 160, false);
+      var rebarBatch = new Batch("rebar-instances", cylinderGeometry, metalVoxelMaterial, 180, false);
+      var workerBodyBatch = new Batch("worker-body-instances", boxGeometry, workerMaterial, 48, true);
+      var workerHeadBatch = new Batch("worker-head-instances", boxGeometry, workerMaterial, 48, true);
+      var workerHelmetBatch = new Batch("worker-helmet-instances", boxGeometry, workerMaterial, 48, true);
+      var workerLegBatch = new Batch("worker-leg-instances", boxGeometry, workerMaterial, 96, true);
+      var workerArmBatch = new Batch("worker-arm-instances", boxGeometry, workerMaterial, 96, true);
+
+      function addVoxelWall(batch, x, y, z, width, height, depth, step, hex) {
+        var sx = width >= depth ? step : width;
+        var count = Math.max(1, Math.floor((width >= depth ? width : depth) / step));
+        for (var i = 0; i < count; i += 1) {
+          var ratio = count === 1 ? .5 : i / (count - 1);
+          var px = width >= depth ? x - width / 2 + step / 2 + ratio * (width - step) : x;
+          var pz = width >= depth ? z : z - depth / 2 + step / 2 + ratio * (depth - step);
+          batch.add(px, y, pz, width >= depth ? step * .88 : width, height, width >= depth ? depth : step * .88, 0, hex);
+        }
+      }
+      function addStack(batch, x, y, z, width, height, depth, colorA, colorB) {
+        var cols = Math.max(1, Math.floor(width / .6));
+        var rows = Math.max(1, Math.floor(depth / .6));
+        var layers = Math.max(1, Math.floor(height / .48));
+        for (var layer = 0; layer < layers; layer += 1) {
+          for (var col = 0; col < cols; col += 1) {
+            for (var row = 0; row < rows; row += 1) {
+              var stagger = layer % 2 ? .15 : 0;
+              var px = x - width / 2 + .3 + col * .6 + stagger;
+              var pz = z - depth / 2 + .3 + row * .6;
+              if (px > x + width / 2 || pz > z + depth / 2) continue;
+              batch.add(px, y + .24 + layer * .48, pz, .52, .4, .52, 0, (col + row + layer) % 3 ? colorA : colorB);
+            }
+          }
+        }
+      }
+      function addCylinderInstance(batch, x, y, z, radius, height, rotationY, hex) {
+        if (batch.index >= batch.capacity) return;
+        dummy.position.set(x, y, z);
+        dummy.rotation.set(0, rotationY || 0, 0);
+        dummy.scale.set(radius, height, radius);
+        dummy.updateMatrix();
+        batch.mesh.setMatrixAt(batch.index, dummy.matrix);
+        batch.mesh.setColorAt(batch.index, tempColor.set(hex));
+        batch.index += 1;
+        batch.mesh.count = batch.index;
+      }
+
+      function makeCanvasTexture(width, height, painter) {
+        var canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        var context = canvas.getContext("2d");
+        painter(context, width, height);
+        var texture = new T.CanvasTexture(canvas);
+        texture.colorSpace = T.SRGBColorSpace;
+        texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 4);
+        return texture;
+      }
+      function makeLabel(text, x, y, z, tint, scaleX, scaleY) {
+        var texture = makeCanvasTexture(512, 128, function (ctx, width, height) {
+          ctx.clearRect(0, 0, width, height);
+          ctx.fillStyle = "rgba(10,16,17,.78)";
+          ctx.fillRect(7, 17, width - 14, height - 34);
+          ctx.strokeStyle = tint;
+          ctx.lineWidth = 3;
+          ctx.strokeRect(8, 18, width - 16, height - 36);
+          ctx.fillStyle = tint;
+          ctx.font = "700 28px monospace";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(text, width / 2, height / 2 + 1);
+        });
+        var sprite = new T.Sprite(new T.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
+        sprite.position.set(x, y, z);
+        sprite.scale.set(scaleX || 4.5, scaleY || 1.1, 1);
+        sprite.renderOrder = 5;
+        scene.add(sprite);
+        return sprite;
+      }
+      function makeBlueprintTexture() {
+        return makeCanvasTexture(512, 360, function (ctx, width, height) {
+          ctx.fillStyle = "#d5d0bb";
+          ctx.fillRect(0, 0, width, height);
+          ctx.strokeStyle = "rgba(57,78,87,.22)";
+          ctx.lineWidth = 2;
+          for (var x = 0; x < width; x += 24) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
+          for (var y = 0; y < height; y += 24) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
+          ctx.strokeStyle = "#375d67";
+          ctx.lineWidth = 5;
+          ctx.strokeRect(40, 42, 270, 190);
+          ctx.beginPath(); ctx.moveTo(40, 150); ctx.lineTo(310, 150); ctx.moveTo(168, 42); ctx.lineTo(168, 232); ctx.stroke();
+          ctx.strokeStyle = "#cf7641";
+          ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.arc(365, 125, 56, 0, Math.PI * 2); ctx.stroke();
+          ctx.font = "700 22px monospace";
+          ctx.fillStyle = "#375d67";
+          ctx.fillText("FOUNDATION / 04", 40, 285);
+          ctx.fillText("SCALE 1:50", 40, 320);
+        });
+      }
+      function addBlueprint(x, y, z, rotationY, scaleX, scaleZ) {
+        var material = new T.MeshBasicMaterial({ map: makeBlueprintTexture(), side: T.DoubleSide, transparent: true });
+        var paper = new T.Mesh(new T.BoxGeometry(1, .035, 1), material);
+        paper.position.set(x, y, z);
+        paper.scale.set(scaleX || 5.2, 1, scaleZ || 3.5);
+        paper.rotation.y = rotationY || 0;
+        paper.castShadow = true;
+        scene.add(paper);
+        return paper;
+      }
+
+      // Desk, sandbox tray and a fully bounded working surface.
+      addBox(scene, 62, 1.45, 52, mats.desk, 0, -.2, 0, 0, true, true);
+      addBox(scene, 62.5, .22, 52.5, mats.deskEdge, 0, .62, 0, 0, false, true);
+      addBox(scene, 7, 5.8, 4, mats.desk, -25, -2.9, -18, 0, true, true);
+      addBox(scene, 7, 5.8, 4, mats.desk, 25, -2.9, -18, 0, true, true);
+      addBox(scene, 7, 5.8, 4, mats.desk, -25, -2.9, 18, 0, true, true);
+      addBox(scene, 7, 5.8, 4, mats.desk, 25, -2.9, 18, 0, true, true);
+      for (var woodLine = -28; woodLine <= 28; woodLine += 4.5) {
+        addBox(scene, 1.2, .028, 45, mats.woodDark, woodLine, .72, -1, 0, false, false);
+      }
+      for (var woodLineZ = -20; woodLineZ <= 20; woodLineZ += 7) addBox(scene, 55, .03, .65, mats.wood, 0, .735, woodLineZ, 0, false, false);
+
+      // Desk-edge study props: all paper marks and small objects are procedural.
+      addBlueprint(-15.2, .83, 19.6, -.08, 5.5, 3.65);
+      addBlueprint(16.1, .83, 21.0, .14, 4.25, 2.9);
+      addLowCylinder(scene, .74, .42, mats.yellow, -7.1, .98, 21.0, 0, 0);
+      addTorus(scene, .74, .075, mats.black, -7.1, 1.2, 21.0, 0);
+      addBox(scene, 2.65, .045, .42, mats.yellow, -5.7, .82, 21.0, -.08, false, false);
+      addBox(scene, 2.45, .045, .08, mats.black, -5.68, .85, 21.0, -.08, false, false);
+      var helmetMesh = new T.Mesh(new T.SphereGeometry(.78, 8, 5, 0, Math.PI * 2, 0, Math.PI * .62), mats.yellow);
+      helmetMesh.position.set(-1.6, 1.22, 21.4);
+      helmetMesh.scale.y = .62;
+      helmetMesh.castShadow = true;
+      scene.add(helmetMesh);
+      addLowCylinder(scene, .92, .12, mats.yellowDark, -1.6, .91, 21.4, 0, 0);
+      addBox(scene, 5.0, .18, .46, mats.steel, 16.4, .88, 23.0, -.1, true, true);
+      addBox(scene, 4.1, .1, .25, mats.steelDark, 16.4, 1.0, 23.0, -.1, false, false);
+      addLowCylinder(scene, .17, .16, mats.warm, 16.4, 1.03, 23.0, 0, 0);
+
+      addBox(scene, 48, .92, 34, mats.frame, 0, 1.09, 0, 0, true, true);
+      addBox(scene, 43.8, .18, 29.8, mats.earth, 0, 1.62, 0, 0, false, true);
+      addBox(scene, 43.2, .045, 29.2, mats.earthDark, 0, 1.735, 0, 0, false, true);
+      addBox(scene, 47.2, .48, 1.15, mats.frameLight, 0, 1.77, -15.6, 0, true, true);
+      addBox(scene, 47.2, .48, 1.15, mats.frameLight, 0, 1.77, 15.6, 0, true, true);
+      addBox(scene, 1.15, .48, 30.8, mats.frameLight, -22.9, 1.77, 0, 0, true, true);
+      addBox(scene, 1.15, .48, 30.8, mats.frameLight, 22.9, 1.77, 0, 0, true, true);
+
+      // Procedural ground blocks and roads.
+      for (var gx = -20; gx <= 20; gx += 2) {
+        for (var gz = -13; gz <= 13; gz += 2) {
+          if (Math.abs(gx) < 20 && Math.abs(gz) < 13) groundBatch.add(gx, 1.765, gz, 1.82, .035, 1.82, 0, (gx + gz) % 4 === 0 ? 0x72523a : 0x634934);
+        }
+      }
+      addBox(scene, 40, .08, 3.15, mats.road, 0, 1.83, 2.7, 0, false, true);
+      addBox(scene, 3.15, .08, 25.8, mats.road, 2.0, 1.835, -1.0, 0, false, true);
+      addBox(scene, 4.5, .08, 2.45, mats.road, -18, 1.84, -4.2, 0, false, true);
+      for (var laneX = -18; laneX <= 18; laneX += 4) addBox(scene, 1.65, .025, .11, mats.roadEdge, laneX, 1.91, 2.7, 0, false, false);
+      for (var laneZ = -11; laneZ <= 11; laneZ += 4) addBox(scene, .11, .025, 1.65, mats.roadEdge, 2.0, 1.915, laneZ, 0, false, false);
+      for (var marker = 0; marker < 18; marker += 1) addBox(scene, .12, .025, .55, mats.yellow, -18 + marker * 2, 1.91, -4.2, 0, false, false);
+
+      // Excavation zone: floor, retaining blocks and exposed reinforcement.
+      addSolidBox(scene, 12.6, .56, 8.5, mats.earthDark, -11, 1.35, -4, 0, "excavation pit");
+      addBox(scene, 11.8, .18, 7.7, mats.earthLight, -11, 1.67, -4, 0, false, true);
+      addVoxelWall(groundBatch, -11, 2.0, -8.05, 12.7, .75, .55, 1.1, 0x7f5a3d);
+      addVoxelWall(groundBatch, -11, 2.0, .05, 12.7, .75, .55, 1.1, 0x7f5a3d);
+      addVoxelWall(groundBatch, -17.05, 2.0, -4, .55, .75, 8.5, 1.1, 0x805c3e);
+      addVoxelWall(groundBatch, -4.95, 2.0, -4, .55, .75, 8.5, 1.1, 0x805c3e);
+      for (var rebX = -16; rebX <= -6; rebX += 1.1) {
+        for (var rebZ = -7; rebZ <= -1; rebZ += 1.3) addCylinderInstance(rebarBatch, rebX, 2.55, rebZ, .08, 1.7, 0, 0xc16b4d);
+      }
+      addBox(scene, 12.1, .12, .22, mats.rebar, -11, 2.2, -5.7, 0, true, false);
+      addBox(scene, 12.1, .12, .22, mats.rebar, -11, 2.2, -2.4, 0, true, false);
+      makeLabel("EXCAVATION / -04", -11, 3.7, -9.2, "#f3a653", 5.0, 1.02);
+
+      // Steel processing shed and material yard.
+      addBox(scene, 8.2, .18, 4.5, mats.concreteDark, -12, 1.86, 8.5, 0, false, true);
+      for (var shedX = -15.5; shedX <= -8.5; shedX += 3.5) {
+        addBox(scene, .28, 4.1, .28, mats.safety, shedX, 3.85, 6.55, 0, true, true);
+        addBox(scene, .28, 4.1, .28, mats.safety, shedX, 3.85, 10.45, 0, true, true);
+      }
+      addBox(scene, 8.4, .3, 4.5, mats.safetyDark, -12, 6.05, 8.5, 0, true, true);
+      addBox(scene, 7.8, .15, 4.2, mats.yellow, -12, 6.23, 8.5, 0, false, false);
+      addBox(scene, 7.4, .06, 3.9, mats.earthDark, -12, 1.98, 8.5, 0, false, true);
+      addBox(scene, 6.5, .34, 1.0, mats.wood, -12, 2.35, 8.5, 0, true, true);
+      for (var steel = 0; steel < 13; steel += 1) {
+        steelBatch.add(-15.1 + (steel % 5) * .78, 2.3 + Math.floor(steel / 5) * .32, 8.0 + (steel % 2) * .7, .18, .22, 3.2, Math.PI / 2, steel % 2 ? 0x96a8a5 : 0x698089);
+      }
+      addStack(concreteBatch, -5.2, 1.86, 8.7, 3.2, 1.6, 2.8, 0xd7d2bd, 0xa9aa9a);
+      makeLabel("STEEL SHOP", -12, 6.9, 8.5, "#71d0bf", 4.2, .9);
+      makeLabel("MATERIALS", -5, 4.0, 10.3, "#f1b04f", 4.1, .88);
+
+      // Partially built high-rise foundation.
+      addSolidBox(scene, 9.4, .55, 8.3, mats.concrete, 8.5, 2.03, -4.4, 0, "tower foundation");
+      addBox(scene, 8.8, .18, 7.7, mats.concreteDark, 8.5, 2.42, -4.4, 0, false, true);
+      for (var floor = 0; floor < 4; floor += 1) {
+        var floorY = 3.1 + floor * 2.05;
+        addBox(scene, 8.25, .22, 7.1, floor === 3 ? mats.concrete : mats.concreteDark, 8.5, floorY, -4.4, 0, true, true);
+        for (var colX = 5; colX <= 12; colX += 3.5) {
+          addBox(scene, .42, 2.0, .42, mats.concrete, colX, floorY + 1.0, -7.35, 0, true, true);
+          addBox(scene, .42, 2.0, .42, mats.concrete, colX, floorY + 1.0, -1.45, 0, true, true);
+        }
+        for (var colZ = -7.35; colZ <= -1.45; colZ += 2.95) {
+          addBox(scene, .42, 2.0, .42, mats.concrete, 4.45, floorY + 1.0, colZ, 0, true, true);
+          addBox(scene, .42, 2.0, .42, mats.concrete, 12.55, floorY + 1.0, colZ, 0, true, true);
+        }
+      }
+      addBox(scene, 2.6, 8.5, 2.3, mats.concreteDark, 8.5, 7.4, -4.4, 0, true, true);
+      for (var scaffoldX = 3.7; scaffoldX <= 13.3; scaffoldX += 1.6) {
+        addBox(scene, .12, 9.0, .12, mats.safety, scaffoldX, 6.2, -8.0, 0, true, false);
+        addBox(scene, .12, 9.0, .12, mats.safety, scaffoldX, 6.2, -.8, 0, true, false);
+      }
+      for (var scaffoldY = 3.4; scaffoldY <= 10.8; scaffoldY += 1.65) {
+        addBox(scene, 9.8, .11, .11, mats.safety, 8.5, scaffoldY, -8.0, 0, true, false);
+        addBox(scene, 9.8, .11, .11, mats.safety, 8.5, scaffoldY, -.8, 0, true, false);
+      }
+      for (var towerRebar = 0; towerRebar < 22; towerRebar += 1) addCylinderInstance(rebarBatch, 5.0 + (towerRebar % 6) * 1.25, 11.05 + (towerRebar % 3) * .25, -7.0 + Math.floor(towerRebar / 6) * 1.6, .065, 1.5, 0, 0xb65d47);
+      makeLabel("TOWER BASE / B-01", 8.5, 12.8, -4.4, "#f3a653", 5.5, 1.06);
+
+      // Temporary office cabins with generated warm windows.
+      function addOfficeCabin(x, z, number) {
+        addSolidBox(scene, 5.8, 2.25, 3.2, mats.blueDark, x, 2.9, z, 0, "temporary office");
+        addBox(scene, 5.55, .22, 3.0, mats.white, x, 4.12, z, 0, true, true);
+        addBox(scene, .2, 1.45, 2.4, mats.white, x - 2.85, 2.95, z, 0, true, true);
+        addBox(scene, .2, 1.45, 2.4, mats.white, x + 2.85, 2.95, z, 0, true, true);
+        for (var windowX = -1.7; windowX <= 1.7; windowX += 1.7) {
+          var window = addBox(scene, 1.18, .72, .05, mats.window, x + windowX, 3.1, z + 1.63, 0, false, false);
+          windowMaterials.push(window.material);
+        }
+        addBox(scene, .7, 1.55, .08, mats.woodDark, x - 1.9, 2.75, z + 1.64, 0, true, false);
+        addBox(scene, 1.2, .12, .2, mats.safety, x, 4.3, z + 1.55, 0, true, false);
+        makeLabel("OFFICE " + number, x, 4.8, z + 1.9, "#73c8bd", 3.8, .78);
+      }
+      addOfficeCabin(15.9, 8.6, "A");
+      addOfficeCabin(15.9, -1.0, "B");
+
+      // Spoil bank built as stepped voxel earth.
+      var spoilCenterX = 14.5;
+      var spoilCenterZ = -8.3;
+      for (var spoilLayer = 0; spoilLayer < 5; spoilLayer += 1) {
+        var spoilWidth = 6.3 - spoilLayer * 1.05;
+        var spoilDepth = 4.5 - spoilLayer * .7;
+        for (var spoilX = 0; spoilX < Math.floor(spoilWidth / .7); spoilX += 1) {
+          for (var spoilZ = 0; spoilZ < Math.floor(spoilDepth / .7); spoilZ += 1) {
+            concreteBatch.add(spoilCenterX - spoilWidth / 2 + .35 + spoilX * .7, 1.98 + spoilLayer * .56, spoilCenterZ - spoilDepth / 2 + .35 + spoilZ * .7, .64, .5, .64, 0, spoilLayer % 2 ? 0x855a37 : 0x9b6941);
+          }
+        }
+      }
+      makeLabel("SPOIL BANK", 14.5, 5.8, -8.2, "#d98b4f", 4.4, .9);
+
+      // Perimeter fence, gate and warning flags. Posts remain inside the tray frame.
+      for (var fenceX = -20; fenceX <= 20; fenceX += 2.4) {
+        fenceBatch.add(fenceX, 3.2, -13.2, .18, 2.8, .18, 0, fenceX % 4.8 === 0 ? 0xf0a340 : 0xd26936);
+        if (Math.abs(fenceX) > 3.2) fenceBatch.add(fenceX, 3.2, 13.2, .18, 2.8, .18, 0, fenceX % 4.8 === 0 ? 0xf0a340 : 0xd26936);
+      }
+      for (var fenceZ = -11; fenceZ <= 11; fenceZ += 2.4) {
+        fenceBatch.add(-20.2, 3.2, fenceZ, .18, 2.8, .18, 0, 0xd26936);
+        fenceBatch.add(20.2, 3.2, fenceZ, .18, 2.8, .18, 0, 0xd26936);
+      }
+      for (var panelX = -19; panelX <= 19; panelX += 2.4) {
+        if (Math.abs(panelX) > 3.3) {
+          fenceBatch.add(panelX, 3.0, -13.18, 2.2, 1.7, .08, 0, panelX % 4.8 === 0 ? 0x31545a : 0x263e45);
+          fenceBatch.add(panelX, 3.0, 13.18, 2.2, 1.7, .08, 0, panelX % 4.8 === 0 ? 0x31545a : 0x263e45);
+        }
+      }
+      for (var panelZ = -11; panelZ <= 11; panelZ += 2.4) {
+        fenceBatch.add(-20.18, 3.0, panelZ, .08, 1.7, 2.2, 0, 0x263e45);
+        fenceBatch.add(20.18, 3.0, panelZ, .08, 1.7, 2.2, 0, 0x263e45);
+      }
+      addBox(scene, 1.0, 3.3, 1.0, mats.concrete, -2.9, 3.2, 13.2, 0, true, true);
+      addBox(scene, 1.0, 3.3, 1.0, mats.concrete, 2.9, 3.2, 13.2, 0, true, true);
+      addBox(scene, 6.4, .42, .52, mats.safety, 0, 4.7, 13.2, 0, true, true);
+      for (var stripe = -2; stripe <= 2; stripe += 1) addBox(scene, .5, .45, .58, stripe % 2 ? mats.black : mats.yellow, stripe * 1.2, 4.7, 13.2, 0, true, false);
+      makeLabel("GATE / IN", 0, 5.9, 13.1, "#f1b04f", 3.2, .75);
+
+      function addFlag(x, z, flagColor, label) {
+        addBox(scene, .09, 3.2, .09, mats.steel, x, 3.5, z, 0, true, false);
+        var flagGeo = new T.BufferGeometry();
+        flagGeo.setAttribute("position", new T.Float32BufferAttribute([0, 0, 0, 1.25, -.28, 0, 0, -.58, 0], 3));
+        var flag = new T.Mesh(flagGeo, new T.MeshBasicMaterial({ color: flagColor, side: T.DoubleSide }));
+        flag.position.set(x, 5.1, z);
+        flag.scale.set(1.15, 1.15, 1.15);
+        scene.add(flag);
+        if (label) makeLabel(label, x, 6.1, z, "#e6a449", 2.7, .62);
+      }
+      addFlag(-19, 11.7, 0xef5f3b, "PPE");
+      addFlag(-4, -12.2, 0x4bb8b0, "ZONE");
+      addFlag(19, -11.8, 0xef5f3b, "STOP");
+      addFlag(19, 1.1, 0x4bb8b0, "SAFE");
+
+      // Repeated utilities, pallets, cement bags and aggregate detail.
+      for (var pallet = 0; pallet < 8; pallet += 1) {
+        var px = -1 + (pallet % 4) * .9;
+        var pz = 7.1 + Math.floor(pallet / 4) * 2.5;
+        steelBatch.add(px, 2.06, pz, 1.0, .18, 1.8, 0, 0x876344);
+        steelBatch.add(px - .3, 2.25, pz, .12, .2, 1.5, 0, 0xb28250);
+        steelBatch.add(px + .3, 2.25, pz, .12, .2, 1.5, 0, 0xb28250);
+      }
+      addStack(concreteBatch, -2.0, 1.86, 10.9, 3.4, 1.9, 1.9, 0xcac8b6, 0xa9aaa0);
+      addStack(concreteBatch, 5.0, 1.86, 10.5, 1.8, 1.2, 1.6, 0xcac8b6, 0xb1b0a1);
+      for (var aggregate = 0; aggregate < 18; aggregate += 1) {
+        var angle = aggregate / 18 * Math.PI * 2;
+        var radius = .5 + rand() * 2.0;
+        concreteBatch.add(-1.4 + Math.cos(angle) * radius, 1.96 + rand() * .65, -10.8 + Math.sin(angle) * radius * .62, .65, .45, .65, 0, aggregate % 2 ? 0x95704a : 0x826044);
+      }
+      makeLabel("AGGREGATE", -1.5, 4.1, -11.0, "#e0a455", 3.9, .8);
+
+      // Temporary water and power poles.
+      function addUtilityPole(x, z) {
+        addBox(scene, .2, 5.4, .2, mats.woodDark, x, 4.35, z, 0, true, true);
+        addBox(scene, 2.2, .16, .16, mats.steel, x, 6.7, z, 0, true, false);
+        addBox(scene, .12, .12, 8, mats.black, x - .7, 6.5, z - 2.4, .05, false, false);
+        addBox(scene, .12, .12, 8, mats.black, x + .7, 6.5, z + 2.4, .05, false, false);
+        addLowCylinder(scene, .12, .22, mats.red, x, 6.78, z, 0, 0);
+      }
+      addUtilityPole(-18.8, 6.0);
+      addUtilityPole(19, 6.0);
+      addUtilityPole(-19, -5.2);
+
+      // Generated warning sign boards.
+      function addSign(x, z, text, signColor) {
+        addBox(scene, .11, 2.2, .11, mats.steel, x, 2.9, z, 0, true, false);
+        var signTexture = makeCanvasTexture(256, 180, function (ctx, width, height) {
+          ctx.fillStyle = signColor;
+          ctx.fillRect(8, 8, width - 16, height - 16);
+          ctx.strokeStyle = "#201f1b";
+          ctx.lineWidth = 8;
+          ctx.strokeRect(12, 12, width - 24, height - 24);
+          ctx.fillStyle = "#201f1b";
+          ctx.font = "700 25px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText(text, width / 2, height / 2 + 9);
+        });
+        var board = new T.Mesh(new T.BoxGeometry(1, 1, .08), new T.MeshBasicMaterial({ map: signTexture }));
+        board.position.set(x, 4.25, z);
+        board.scale.set(1.5, 1.05, 1);
+        board.castShadow = true;
+        scene.add(board);
+      }
+      addSign(-18.8, 2.0, "PPE", "#f5bd4e");
+      addSign(-3.2, -12.0, "STOP", "#ed6b42");
+      addSign(19.2, 2.1, "SLOW", "#f5bd4e");
+
+      // Work lights and programmable shader halos.
+      var ambient = new T.AmbientLight(0x879894, 1.2);
+      scene.add(ambient);
+      var hemisphere = new T.HemisphereLight(0x9bbbc0, 0x30231c, 1.15);
+      scene.add(hemisphere);
+      var sun = new T.DirectionalLight(0xffd39b, 2.5);
+      sun.position.set(-20, 34, 18);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(1024, 1024);
+      sun.shadow.camera.left = -32;
+      sun.shadow.camera.right = 32;
+      sun.shadow.camera.top = 32;
+      sun.shadow.camera.bottom = -32;
+      sun.shadow.camera.near = 1;
+      sun.shadow.camera.far = 85;
+      scene.add(sun);
+      var fillLight = new T.DirectionalLight(0x84b8c7, .55);
+      fillLight.position.set(24, 18, -25);
+      scene.add(fillLight);
+
+      var haloVertexShader = "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
+      var haloFragmentShader = "uniform vec3 uColor; uniform float uIntensity; varying vec2 vUv; void main(){ float d = distance(vUv, vec2(.5)); float falloff = smoothstep(.5, .04, d); float core = smoothstep(.27, 0.0, d); float alpha = (falloff * .45 + core * .7) * uIntensity; gl_FragColor = vec4(uColor, alpha); }";
+      function addHalo(x, y, z, tint, size) {
+        var material = new T.ShaderMaterial({
+          uniforms: { uColor: { value: color(tint) }, uIntensity: { value: 0 } },
+          vertexShader: haloVertexShader,
+          fragmentShader: haloFragmentShader,
+          transparent: true,
+          depthWrite: false,
+          blending: T.AdditiveBlending,
+          side: T.DoubleSide
+        });
+        var halo = new T.Mesh(new T.PlaneGeometry(1, 1), material);
+        halo.rotation.x = -Math.PI / 2;
+        halo.position.set(x, y, z);
+        halo.scale.set(size, size, size);
+        halo.renderOrder = 2;
+        scene.add(halo);
+        haloLights.push({ halo: halo, material: material, base: 1 });
+        return halo;
+      }
+      function addLamp(x, z, height, tint) {
+        addBox(scene, .15, height, .15, mats.steelDark, x, groundY + height / 2, z, 0, true, false);
+        addBox(scene, .55, .18, .55, mats.warm, x, groundY + height, z, 0, false, false);
+        var point = new T.PointLight(tint || 0xffa14e, 0, 14, 2);
+        point.position.set(x, groundY + height, z);
+        scene.add(point);
+        var halo = addHalo(x, groundY + .025, z, tint || 0xffa14e, 4.4);
+        lampMaterials.push(mats.warm);
+        return { point: point, halo: halo };
+      }
+      var lamps = [addLamp(-18, 3.2, 4.8), addLamp(-2, 3.2, 4.8), addLamp(18, 3.2, 4.8), addLamp(1.8, -10.9, 4.5), addLamp(18.5, -1.4, 4.8), addLamp(7.0, -10.2, 4.2)];
+      for (var lampIndex = 0; lampIndex < lamps.length; lampIndex += 1) {
+        lamps[lampIndex].halo.userData.lamp = lamps[lampIndex].point;
+      }
+      var windowLight = addLamp(15.8, 8.5, 2.4, 0xffbd68);
+      windowLight.point.distance = 8;
+      windowLight.halo.scale.setScalar(2.2);
+
+      // Tower cranes: rotating jibs and constrained hook loads.
+      function makeCrane(x, z, length, index) {
+        var root = new T.Group();
+        root.name = "tower-crane-" + index;
+        root.position.set(x, groundY, z);
+        scene.add(root);
+        addBox(root, 1.1, .35, 1.1, mats.concreteDark, 0, .2, 0, 0, true, true);
+        addBox(root, .76, 10.4, .76, mats.safetyDark, 0, 5.55, 0, 0, true, true);
+        for (var mastLevel = 1; mastLevel < 6; mastLevel += 1) {
+          addBox(root, 1.05, .12, .12, mats.yellow, 0, 1.0 + mastLevel * 1.65, 0, 0, true, false);
+          addBox(root, .12, 1.45, .12, mats.yellow, -.42, 1.0 + mastLevel * 1.65, 0, 0, true, false);
+          addBox(root, .12, 1.45, .12, mats.yellow, .42, 1.0 + mastLevel * 1.65, 0, 0, true, false);
+        }
+        var top = new T.Group();
+        top.position.y = 10.95;
+        root.add(top);
+        addBox(top, .85, .42, .85, mats.steelDark, 0, 0, 0, 0, true, true);
+        addBox(top, .32, .3, length, mats.yellow, 0, .15, length / 2 - 1.1, 0, true, false);
+        addBox(top, .6, .52, 1.2, mats.concreteDark, 0, .05, -1.15, 0, true, true);
+        addBox(top, .11, .11, length, mats.safety, 0, .65, length / 2 - 1.1, 0, false, false);
+        var trolley = new T.Group();
+        top.add(trolley);
+        var rope = addBox(trolley, .055, 2.8, .055, mats.black, 0, -1.4, 0, 0, false, false);
+        var load = new T.Group();
+        trolley.add(load);
+        addBox(load, index === 1 ? 1.2 : .95, .75, index === 1 ? .85 : 1.35, index === 1 ? mats.concrete : mats.rebar, 0, -2.92, 0, 0, true, true);
+        addBox(load, .18, .18, 1.6, mats.safety, 0, -2.5, 0, 0, true, false);
+        var beacon = addLowCylinder(top, .16, .25, mats.red, 0, .8, 0, 0, 0);
+        beaconMaterials.push(mats.red);
+        var hookLight = new T.PointLight(0xff6842, 0, 8, 2);
+        hookLight.position.set(0, -2.9, 0);
+        trolley.add(hookLight);
+        addHalo(x, groundY + .05, z, 0xffa04e, 3.1);
+        var crane = { root: root, top: top, trolley: trolley, rope: rope, load: load, beacon: beacon, hookLight: hookLight, phase: index * 1.8, length: length, baseX: x, baseZ: z, type: "crane" };
+        animated.push({ type: "crane", item: crane });
+        return crane;
+      }
+      var cranes = [makeCrane(3.0, -2.2, 10.5, 0), makeCrane(14.2, -3.0, 7.0, 1)];
+
+      // Excavators with articulated voxel booms and in-pit bucket limits.
+      function makeExcavator(x, z, rotationY, index) {
+        var root = new T.Group();
+        root.name = "excavator-" + index;
+        root.position.set(x, groundY, z);
+        root.rotation.y = rotationY;
+        scene.add(root);
+        addBox(root, 1.05, .62, 3.7, mats.black, -1.0, .45, 0, 0, true, true);
+        addBox(root, 1.05, .62, 3.7, mats.black, 1.0, .45, 0, 0, true, true);
+        addBox(root, 2.45, .72, 2.25, mats.yellow, 0, 1.02, 0, 0, true, true);
+        addBox(root, 1.28, 1.25, 1.42, mats.yellowDark, .45, 1.93, .25, 0, true, true);
+        addBox(root, 1.08, .72, .08, mats.glass, .45, 2.02, .97, 0, false, false);
+        addBox(root, 1.05, .08, 1.12, mats.safety, .45, 2.62, .25, 0, false, false);
+        var boom = new T.Group();
+        boom.position.set(0, 1.28, .45);
+        root.add(boom);
+        addBox(boom, .58, .52, 3.7, mats.yellow, 0, 0, 1.65, 0, true, true);
+        var stick = new T.Group();
+        stick.position.set(0, 0, 3.42);
+        boom.add(stick);
+        addBox(stick, .45, .42, 2.7, mats.safety, 0, -.28, 1.25, 0, true, true);
+        var bucket = new T.Group();
+        bucket.position.set(0, -.42, 2.6);
+        stick.add(bucket);
+        addBox(bucket, .92, .55, .75, mats.yellowDark, 0, 0, .18, 0, true, true);
+        addBox(bucket, 1.06, .12, .12, mats.yellow, 0, -.27, .5, 0, true, false);
+        for (var tooth = -1; tooth <= 1; tooth += 1) addBox(bucket, .12, .18, .3, mats.black, tooth * .28, -.36, .65, 0, true, false);
+        var dirtLoad = new T.Group();
+        bucket.add(dirtLoad);
+        for (var loadIndex = 0; loadIndex < 3; loadIndex += 1) addBox(dirtLoad, .22, .22, .22, mats.earthLight, (loadIndex - 1) * .25, .12, .2, 0, true, true);
+        var item = { root: root, boom: boom, stick: stick, bucket: bucket, dirtLoad: dirtLoad, phase: index * 1.7, type: "excavator", index: index };
+        dynamicBodies.push({ root: root, halfX: 1.9, halfZ: 1.65, type: "excavator" });
+        animated.push({ type: "excavator", item: item });
+        return item;
+      }
+      var excavators = [makeExcavator(-16.1, -4.4, Math.PI / 2, 0), makeExcavator(-7.0, -7.2, 0, 1)];
+
+      // A small voxel dump truck, route points are intentionally clear of all registered solids.
+      var truckRoute = [
+        new T.Vector2(-18, 10.8), new T.Vector2(-18, 2.7), new T.Vector2(-19, 2.7), new T.Vector2(-19, -4.2),
+        new T.Vector2(-19, 2.7), new T.Vector2(-18, 2.7), new T.Vector2(2.0, 2.7),
+        new T.Vector2(2.0, -11.0), new T.Vector2(18.0, -11.0), new T.Vector2(18.0, -8.5),
+        new T.Vector2(18.0, -11.0), new T.Vector2(2.0, -11.0), new T.Vector2(2.0, 2.7), new T.Vector2(-18, 2.7)
+      ];
+      function routeLengths(route) {
+        var lengths = [0];
+        for (var i = 1; i < route.length; i += 1) lengths.push(lengths[i - 1] + route[i].distanceTo(route[i - 1]));
+        return { lengths: lengths, total: lengths[lengths.length - 1] };
+      }
+      var routeMeta = routeLengths(truckRoute);
+      var mixerRoute = [new T.Vector2(-18, 10.6), new T.Vector2(-18, 6.4), new T.Vector2(2.0, 6.4), new T.Vector2(2.0, 10.6)];
+      var mixerRouteMeta = routeLengths(mixerRoute);
+      function routeAt(route, meta, distance) {
+        var d = ((distance % meta.total) + meta.total) % meta.total;
+        var segment = 0;
+        while (segment < meta.lengths.length - 1 && meta.lengths[segment + 1] < d) segment += 1;
+        var start = route[segment];
+        var end = route[(segment + 1) % route.length];
+        var segmentLength = start.distanceTo(end) || 1;
+        var t = clamp((d - meta.lengths[segment]) / segmentLength, 0, 1);
+        return { x: lerp(start.x, end.x, t), z: lerp(start.y, end.y, t), dx: end.x - start.x, dz: end.y - start.y, segment: segment };
+      }
+      function makeTruck(index) {
+        var root = new T.Group();
+        root.name = "dump-truck-" + index;
+        scene.add(root);
+        addBox(root, 3.05, .34, 3.2, mats.black, 0, .44, 0, 0, true, true);
+        addBox(root, 2.7, .75, 1.85, mats.yellowDark, 0, 1.02, -.55, 0, true, true);
+        var cargo = new T.Group();
+        cargo.position.set(0, 1.25, -.35);
+        root.add(cargo);
+        addBox(cargo, 2.55, .72, 2.35, mats.safety, 0, .2, -.15, 0, true, true);
+        addBox(cargo, 2.36, .34, 2.1, mats.earthDark, 0, .68, -.15, 0, true, true);
+        for (var wheelX = -1.32; wheelX <= 1.32; wheelX += 2.64) {
+          for (var wheelZ = -1.05; wheelZ <= 1.05; wheelZ += 2.1) addCylinder(root, .48, .48, .34, mats.black, wheelX, .52, wheelZ, 0, Math.PI / 2);
+        }
+        addBox(root, .55, .2, .15, mats.warm, -.72, 1.05, 1.58, 0, false, false);
+        addBox(root, .55, .2, .15, mats.warm, .72, 1.05, 1.58, 0, false, false);
+        var truck = { root: root, cargo: cargo, distance: index * (routeMeta.total / 2), speed: 2.0 + index * .15, type: "truck", index: index, load: index === 0 };
+        root.position.set(-18, groundY, 10.8 + index * .9);
+        dynamicBodies.push({ root: root, halfX: 1.55, halfZ: 1.55, type: "truck", owner: truck });
+        animated.push({ type: "truck", item: truck });
+        return truck;
+      }
+      var trucks = [makeTruck(0), makeTruck(1)];
+
+      function makeMixer() {
+        var root = new T.Group();
+        root.name = "concrete-mixer";
+        scene.add(root);
+        addBox(root, 2.8, .3, 3.0, mats.black, 0, .43, 0, 0, true, true);
+        addBox(root, 2.25, .82, 1.3, mats.blue, 0, 1.05, 1.0, 0, true, true);
+        var drum = new T.Mesh(new T.CylinderGeometry(.95, .95, 1.9, 10), mats.concrete);
+        drum.position.set(0, 1.35, -.55);
+        drum.rotation.x = Math.PI / 2;
+        drum.castShadow = true;
+        root.add(drum);
+        addBox(root, .16, .16, 2.2, mats.safety, 0, 1.35, -.55, 0, true, false);
+        for (var mixerWheelX = -1.18; mixerWheelX <= 1.18; mixerWheelX += 2.36) {
+          addCylinder(root, .42, .42, .3, mats.black, mixerWheelX, .5, -.85, 0, Math.PI / 2);
+          addCylinder(root, .42, .42, .3, mats.black, mixerWheelX, .5, 1.1, 0, Math.PI / 2);
+        }
+        var mixer = { root: root, drum: drum, distance: 5, speed: 1.05, type: "mixer" };
+        root.position.set(3.2, groundY, 8.5);
+        dynamicBodies.push({ root: root, halfX: 1.55, halfZ: 1.65, type: "mixer", owner: mixer });
+        animated.push({ type: "mixer", item: mixer });
+        return mixer;
+      }
+      var mixer = makeMixer();
+
+      function makeLoader() {
+        var root = new T.Group();
+        root.name = "mini-loader";
+        scene.add(root);
+        addBox(root, 1.7, .42, 2.2, mats.yellow, 0, .62, 0, 0, true, true);
+        addBox(root, 1.35, .85, 1.1, mats.yellowDark, 0, 1.18, -.35, 0, true, true);
+        addBox(root, 1.15, .42, .06, mats.glass, 0, 1.3, .23, 0, false, false);
+        addCylinder(root, .36, .36, .32, mats.black, -1.0, .45, -.6, 0, Math.PI / 2);
+        addCylinder(root, .36, .36, .32, mats.black, 1.0, .45, -.6, 0, Math.PI / 2);
+        addCylinder(root, .36, .36, .32, mats.black, -1.0, .45, .75, 0, Math.PI / 2);
+        addCylinder(root, .36, .36, .32, mats.black, 1.0, .45, .75, 0, Math.PI / 2);
+        var arm = new T.Group();
+        arm.position.set(0, .9, 1.0);
+        root.add(arm);
+        addBox(arm, .18, .18, 1.8, mats.yellow, -.62, .05, .9, 0, true, false);
+        addBox(arm, .18, .18, 1.8, mats.yellow, .62, .05, .9, 0, true, false);
+        var bucket = new T.Group();
+        bucket.position.set(0, -.02, 1.84);
+        arm.add(bucket);
+        addBox(bucket, 1.55, .62, .72, mats.yellowDark, 0, -.2, .32, 0, true, true);
+        addBox(bucket, 1.45, .12, .18, mats.yellow, 0, -.53, .72, 0, true, false);
+        var loader = { root: root, arm: arm, bucket: bucket, distance: 4, speed: 1.3, type: "loader" };
+        root.position.set(-1.3, groundY, 10.6);
+        dynamicBodies.push({ root: root, halfX: 1.4, halfZ: 1.5, type: "loader", owner: loader });
+        animated.push({ type: "loader", item: loader });
+        return loader;
+      }
+      var loader = makeLoader();
+
+      // Instanced voxel crew, with small role-specific motion loops.
+      var workerRoles = [
+        { name: "钢筋工", body: 0xd4773c, helmet: 0xefad3e },
+        { name: "搬运工", body: 0x4e9b98, helmet: 0xf0b34c },
+        { name: "指挥员", body: 0x5078ad, helmet: 0xe7e0c1 },
+        { name: "安保", body: 0x405b63, helmet: 0x6cc0b4 },
+        { name: "测量员", body: 0x8c5d92, helmet: 0xf0b34c }
+      ];
+      var workerPositions = [
+        [-18.6, 9.8, 0], [-16.6, 8.5, 0], [-14.6, 8.4, 1], [-10.2, 8.5, 1], [-7.2, 9.8, 2], [-4.8, 9.8, 2],
+        [-18.8, -1.6, 0], [-18.1, -6.2, 0], [-15.8, .1, 1], [-6.5, -1.5, 1], [-4.9, -4.5, 0], [-5.7, -8.9, 2],
+        [4.6, -9.6, 0], [6.3, -8.4, 0], [10.6, -8.9, 1], [12.9, -9.0, 1], [4.8, -1.1, 2], [12.8, -1.2, 2],
+        [14.2, 2.2, 3], [18.9, 2.2, 3], [13.9, 6.0, 4], [18.8, 6.9, 4], [9.5, 2.9, 0], [11.6, 2.8, 0],
+        [-19.0, 12.0, 3], [-6.3, 12.0, 3], [7.4, 11.7, 4], [19.0, 11.8, 3]
+      ];
+      var workers = workerPositions.map(function (entry, index) {
+        var role = workerRoles[entry[2] % workerRoles.length];
+        return { x: entry[0], z: entry[1], role: role, index: index, phase: rand() * Math.PI * 2, task: role.name };
+      });
+      workers.forEach(function (worker, index) {
+        worker.bodyIndex = workerBodyBatch.add(worker.x, groundY + .62, worker.z, .54, 1.12, .42, 0, worker.role.body);
+        worker.headIndex = workerHeadBatch.add(worker.x, groundY + 1.43, worker.z, .38, .38, .38, 0, 0xe2b58e);
+        worker.helmetIndex = workerHelmetBatch.add(worker.x, groundY + 1.72, worker.z, .48, .16, .48, 0, worker.role.helmet);
+        worker.leftLegIndex = workerLegBatch.add(worker.x - .16, groundY + .3, worker.z, .15, .58, .18, 0, 0x27343a);
+        worker.rightLegIndex = workerLegBatch.add(worker.x + .16, groundY + .3, worker.z, .15, .58, .18, 0, 0x27343a);
+        worker.leftArmIndex = workerArmBatch.add(worker.x - .4, groundY + .88, worker.z, .13, .62, .15, 0, worker.role.body);
+        worker.rightArmIndex = workerArmBatch.add(worker.x + .4, groundY + .88, worker.z, .13, .62, .15, 0, worker.role.body);
+      });
+      workerBodyBatch.finish(); workerHeadBatch.finish(); workerHelmetBatch.finish(); workerLegBatch.finish(); workerArmBatch.finish();
+
+      function addDustParticles() {
+        var count = 520;
+        var positions = new Float32Array(count * 3);
+        var seeds = new Float32Array(count);
+        for (var i = 0; i < count; i += 1) {
+          positions[i * 3] = -19 + rand() * 38;
+          positions[i * 3 + 1] = 2.1 + rand() * 7.5;
+          positions[i * 3 + 2] = -12 + rand() * 24;
+          seeds[i] = rand();
+        }
+        var geometry = new T.BufferGeometry();
+        geometry.setAttribute("position", new T.BufferAttribute(positions, 3));
+        geometry.setAttribute("aSeed", new T.BufferAttribute(seeds, 1));
+        var material = new T.ShaderMaterial({
+          uniforms: { uTime: { value: 0 }, uStrength: { value: .95 } },
+          vertexShader: "attribute float aSeed; uniform float uTime; uniform float uStrength; varying float vAlpha; void main(){ vec3 p=position; p.x += sin(uTime*.35+aSeed*31.0)*.34; p.z += cos(uTime*.28+aSeed*19.0)*.28; p.y += mod(uTime*(.15+aSeed*.18)+aSeed*7.0, 3.7)-1.85; vec4 mvPosition=modelViewMatrix*vec4(p,1.0); gl_PointSize=(1.2+aSeed*2.2)*(1.0+uStrength*.8)*(85.0/-mvPosition.z); gl_Position=projectionMatrix*mvPosition; vAlpha=(.24+aSeed*.7)*uStrength; }",
+          fragmentShader: "varying float vAlpha; void main(){ vec2 p=gl_PointCoord-.5; float soft=smoothstep(.5,.04,length(p)); gl_FragColor=vec4(.78,.67,.49,soft*vAlpha); }",
+          transparent: true,
+          depthWrite: false,
+          blending: T.AdditiveBlending
+        });
+        var particles = new T.Points(geometry, material);
+        particles.name = "custom-dust-particles";
+        particles.frustumCulled = false;
+        scene.add(particles);
+        return material;
+      }
+      function addRainParticles() {
+        var count = 720;
+        var positions = new Float32Array(count * 3);
+        var seeds = new Float32Array(count);
+        for (var i = 0; i < count; i += 1) {
+          positions[i * 3] = -22 + rand() * 44;
+          positions[i * 3 + 1] = rand() * 23;
+          positions[i * 3 + 2] = -15 + rand() * 30;
+          seeds[i] = rand();
+        }
+        var geometry = new T.BufferGeometry();
+        geometry.setAttribute("position", new T.BufferAttribute(positions, 3));
+        geometry.setAttribute("aSeed", new T.BufferAttribute(seeds, 1));
+        var material = new T.ShaderMaterial({
+          uniforms: { uTime: { value: 0 }, uStorm: { value: 0 } },
+          vertexShader: "attribute float aSeed; uniform float uTime; varying float vAlpha; void main(){ vec3 p=position; p.y=mod(p.y-uTime*(15.0+aSeed*8.0)+24.0,24.0)+1.8; p.x+=sin(uTime*.7+aSeed*20.0)*.25; vec4 mvPosition=modelViewMatrix*vec4(p,1.0); gl_PointSize=(1.1+aSeed*1.7)*(78.0/-mvPosition.z); gl_Position=projectionMatrix*mvPosition; vAlpha=.48+aSeed*.38; }",
+          fragmentShader: "uniform float uStorm; varying float vAlpha; void main(){ vec2 p=gl_PointCoord-.5; float streak=smoothstep(.5,.02,length(p*vec2(4.0,.35))); gl_FragColor=vec4(.58,.76,.86,streak*vAlpha*uStorm); }",
+          transparent: true,
+          depthWrite: false,
+          blending: T.AdditiveBlending
+        });
+        var particles = new T.Points(geometry, material);
+        particles.name = "custom-rain-particles";
+        particles.frustumCulled = false;
+        particles.visible = false;
+        scene.add(particles);
+        return { mesh: particles, material: material };
+      }
+      var dustMaterial = addDustParticles();
+      var rain = addRainParticles();
+      var wetSurface = addBox(scene, 42.2, .025, 28.2, mats.wet, 0, 1.86, 0, 0, false, false);
+      wetSurface.visible = false;
+
+      // Physical front-edge desk console: raycast clicks land on these meshes.
+      function makeConsole() {
+        var consoleRoot = new T.Group();
+        consoleRoot.name = "physical-control-console";
+        consoleRoot.position.set(7.0, .75, 18.0);
+        scene.add(consoleRoot);
+        addBox(consoleRoot, 11.0, 1.1, 3.1, mats.deskEdge, 0, .55, 0, 0, true, true);
+        addBox(consoleRoot, 10.5, .16, 2.7, mats.steelDark, 0, 1.15, 0, 0, true, true);
+        addBox(consoleRoot, 10.0, .08, 2.5, mats.black, 0, 1.26, 0, 0, false, false);
+        var settings = [
+          { key: "speed", x: -3.5, label: "SPEED", tint: 0xef873d },
+          { key: "cycle", x: 0, label: "DAY / NIGHT", tint: 0x75cbb9 },
+          { key: "dust", x: 3.5, label: "DUST", tint: 0xe1a34b }
+        ];
+        settings.forEach(function (setting) {
+          var group = new T.Group();
+          group.position.set(setting.x, 1.28, 0);
+          consoleRoot.add(group);
+          addLowCylinder(group, .82, .28, mats.black, 0, .32, 0, 0, 0);
+          var knob = addLowCylinder(group, .62, .42, setting.key === "speed" ? mats.safety : setting.key === "cycle" ? mats.blue : mats.yellow, 0, .58, 0, 0, 0);
+          knob.userData.control = setting.key;
+          knob.userData.label = setting.label;
+          controlMeshes.push(knob);
+          addTorus(group, .65, .07, mats.steel, 0, .8, 0, 0);
+          addBox(group, .08, .12, .48, mats.white, 0, .82, .15, 0, false, false);
+          var led = addLowCylinder(group, .1, .12, mats.green, .95, .48, 0, 0, 0);
+          led.userData.controlLed = setting.key;
+          var label = makeLabel(setting.label, 7.0 + setting.x, 3.55, 18.0, setting.key === "cycle" ? "#74c9bb" : "#efae52", setting.key === "cycle" ? 4.5 : 3.2, .65);
+          label.userData.consoleLabel = setting.key;
+        });
+        var stormBase = new T.Group();
+        stormBase.position.set(5.25, 1.28, 0);
+        consoleRoot.add(stormBase);
+        addLowCylinder(stormBase, .42, .24, mats.black, 0, .28, 0, 0, 0);
+        var stormButton = addLowCylinder(stormBase, .3, .3, mats.red, 0, .52, 0, 0, 0);
+        stormButton.userData.control = "storm";
+        stormButton.userData.label = "STORM";
+        controlMeshes.push(stormButton);
+        addTorus(stormBase, .34, .045, mats.steel, 0, .7, 0, 0);
+        makeLabel("STORM", 12.25, 3.35, 18.0, "#ef7654", 2.8, .6);
+        addBox(consoleRoot, 9.8, .06, .08, mats.safety, 0, 1.4, 1.36, 0, false, false);
+        return consoleRoot;
+      }
+      makeConsole();
+
+      // Day / night and weather state.
+      var dayClock = .63;
+      var cycleEnabled = true;
+      var speedStep = 1;
+      var speedMultipliers = [.58, 1, 1.42];
+      var speedNames = ["CRAWL", "STEADY", "RUSH"];
+      var dustStep = 1;
+      var dustNames = ["LOW", "ACTIVE", "HEAVY", "OFF"];
+      var dustStrengths = [.3, .95, 1.65, 0];
+      var stormActive = false;
+      var stormAmount = 0;
+      var wetness = 0;
+      var currentEnvironment = { name: "DUSK", night: 0 };
+      var envKeyframes = [
+        { at: 0, name: "DAWN", bg: 0x6c7180, fog: 0x656c72, hemi: 0x9cbfc6, ground: 0x35271f, sun: 0xffbe89, sunIntensity: 1.9, ambient: 1.08 },
+        { at: .25, name: "NOON", bg: 0x8fb3b3, fog: 0x7f9c9b, hemi: 0xd4e3d1, ground: 0x534033, sun: 0xfff1c3, sunIntensity: 3.2, ambient: 1.55 },
+        { at: .5, name: "DUSK", bg: 0x765667, fog: 0x69525a, hemi: 0xf0ae91, ground: 0x3c2924, sun: 0xff986c, sunIntensity: 1.8, ambient: 1.0 },
+        { at: .75, name: "NIGHT", bg: 0x121b2b, fog: 0x172232, hemi: 0x8099c5, ground: 0x1e202c, sun: 0x7798d0, sunIntensity: .32, ambient: .42 }
+      ];
+      function environmentAt(phase) {
+        var normalized = ((phase % 1) + 1) % 1;
+        var fromIndex = Math.floor(normalized * 4);
+        var nextIndex = (fromIndex + 1) % 4;
+        var localT = normalized * 4 - fromIndex;
+        var from = envKeyframes[fromIndex];
+        var to = envKeyframes[nextIndex];
+        var output = {
+          name: from.name,
+          bg: color(from.bg).lerp(color(to.bg), localT),
+          fog: color(from.fog).lerp(color(to.fog), localT),
+          hemi: color(from.hemi).lerp(color(to.hemi), localT),
+          ground: color(from.ground).lerp(color(to.ground), localT),
+          sun: color(from.sun).lerp(color(to.sun), localT),
+          sunIntensity: lerp(from.sunIntensity, to.sunIntensity, localT),
+          ambient: lerp(from.ambient, to.ambient, localT),
+          night: normalized < .48 ? 0 : normalized < .66 ? (normalized - .48) / .18 : normalized < .82 ? 1 : 1 - (normalized - .82) / .18
+        };
+        if (normalized >= .875 || normalized < .08) output.name = "NIGHT";
+        return output;
+      }
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        toastTimer = 3;
+      }
+      function updateControlReadout() {
+        speedReadout.textContent = speedNames[speedStep];
+        dustReadout.textContent = dustNames[dustStep];
+        dustMaterial.uniforms.uStrength.value = dustStrengths[dustStep];
+        stateDot.classList.toggle("storm", stormActive);
+        weatherReadout.textContent = stormActive ? "STORM" : "CLEAR";
+        stateReadout.textContent = stormActive ? "RAIN PROTOCOL / LIGHTS BOOSTED" : "OPERATIONS LIVE / " + environmentAt(dayClock).name + " SHIFT";
+      }
+      function setStorm(force) {
+        stormActive = force === undefined ? !stormActive : force;
+        if (stormActive) {
+          showToast("暴雨模拟启动 / 雨滴与湿滑反光已上线");
+          activityReadout.textContent = "暴雨预警：探照灯增亮，车辆减速保持安全间距";
+        } else {
+          showToast("天气恢复晴朗 / 施工继续");
+          activityReadout.textContent = "挖掘机 E-02 正在基坑西侧取土";
+        }
+        updateControlReadout();
+      }
+      function activateControl(control) {
+        if (control === "speed") {
+          speedStep = (speedStep + 1) % speedNames.length;
+          showToast("设备运行速度 / " + speedNames[speedStep]);
+        } else if (control === "cycle") {
+          cycleEnabled = !cycleEnabled;
+          showToast(cycleEnabled ? "日夜循环 / AUTO" : "日夜循环 / HOLD");
+        } else if (control === "dust") {
+          dustStep = (dustStep + 1) % dustNames.length;
+          showToast("施工尘土强度 / " + dustNames[dustStep]);
+        } else if (control === "storm") {
+          setStorm();
+          return;
+        }
+        updateControlReadout();
+      }
+
+      var raycaster = new T.Raycaster();
+      var pointer = new T.Vector2();
+      function pointerToNdc(event) {
+        var rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = (event.clientX - rect.left) / rect.width * 2 - 1;
+        pointer.y = -(event.clientY - rect.top) / rect.height * 2 + 1;
+      }
+      function handleSceneClick(event) {
+        pointerToNdc(event);
+        raycaster.setFromCamera(pointer, camera);
+        var intersections = raycaster.intersectObjects(controlMeshes, false);
+        if (intersections.length) activateControl(intersections[0].object.userData.control);
+      }
+      sceneRoot.addEventListener("pointerdown", function (event) {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        dragging = true;
+        dragMoved = false;
+        idleTime = 0;
+        lastPointerX = event.clientX;
+        lastPointerY = event.clientY;
+        sceneRoot.classList.add("dragging");
+        sceneRoot.setPointerCapture(event.pointerId);
+      });
+      sceneRoot.addEventListener("pointermove", function (event) {
+        if (!dragging) return;
+        var dx = event.clientX - lastPointerX;
+        var dy = event.clientY - lastPointerY;
+        if (Math.abs(dx) + Math.abs(dy) > 2) dragMoved = true;
+        cameraYaw -= dx * .006;
+        cameraPitch = clamp(cameraPitch + dy * .0045, .08, .8);
+        lastPointerX = event.clientX;
+        lastPointerY = event.clientY;
+      });
+      sceneRoot.addEventListener("pointerup", function (event) {
+        if (!dragging) return;
+        dragging = false;
+        sceneRoot.classList.remove("dragging");
+        try { sceneRoot.releasePointerCapture(event.pointerId); } catch (error) { /* pointer may already be released */ }
+        if (!dragMoved) handleSceneClick(event);
+      });
+      sceneRoot.addEventListener("pointercancel", function () { dragging = false; sceneRoot.classList.remove("dragging"); });
+      sceneRoot.addEventListener("wheel", function (event) {
+        event.preventDefault();
+        cameraDistance = clamp(cameraDistance + event.deltaY * .025, 30, 62);
+        idleTime = 0;
+      }, { passive: false });
+      window.addEventListener("keydown", function (event) {
+        if (event.code === "Space") {
+          event.preventDefault();
+          setStorm();
+        }
+      });
+
+      function updateCamera(delta) {
+        if (!dragging) {
+          idleTime += delta;
+          if (idleTime > 2.5) cameraYaw += delta * .052 * (cycleEnabled ? 1 : .7);
+        }
+        var cosPitch = Math.cos(cameraPitch);
+        camera.position.set(
+          cameraTarget.x + Math.sin(cameraYaw) * cosPitch * cameraDistance,
+          cameraTarget.y + Math.sin(cameraPitch) * cameraDistance,
+          cameraTarget.z + Math.cos(cameraYaw) * cosPitch * cameraDistance
+        );
+        camera.lookAt(cameraTarget);
+      }
+
+      function bodyOverlaps(a, b, padding) {
+        var pad = padding || 0;
+        return Math.abs(a.x - b.x) < a.halfX + b.halfX + pad && Math.abs(a.z - b.z) < a.halfZ + b.halfZ + pad;
+      }
+      function moveDynamic(body, x, z) {
+        var next = { x: clamp(x, worldBounds.minX + body.halfX, worldBounds.maxX - body.halfX), z: clamp(z, worldBounds.minZ + body.halfZ, worldBounds.maxZ - body.halfZ) };
+        var current = { x: body.root.position.x, z: body.root.position.z, halfX: body.halfX, halfZ: body.halfZ };
+        for (var i = 0; i < collisionBoxes.length; i += 1) {
+          var obstacle = collisionBoxes[i];
+          var obstacleBody = { x: obstacle.x, z: obstacle.z, halfX: obstacle.w / 2, halfZ: obstacle.d / 2 };
+          if (bodyOverlaps({ x: next.x, z: next.z, halfX: body.halfX, halfZ: body.halfZ }, obstacleBody, .12)) return false;
+        }
+        for (var otherIndex = 0; otherIndex < dynamicBodies.length; otherIndex += 1) {
+          var other = dynamicBodies[otherIndex];
+          if (other === body || other.type === "excavator" || body.type === "excavator") continue;
+          var otherBody = { x: other.root.position.x, z: other.root.position.z, halfX: other.halfX, halfZ: other.halfZ };
+          if (bodyOverlaps({ x: next.x, z: next.z, halfX: body.halfX, halfZ: body.halfZ }, otherBody, .15)) return false;
+        }
+        body.root.position.x = next.x;
+        body.root.position.z = next.z;
+        return true;
+      }
+
+      function updateCrane(crane, time) {
+        crane.top.rotation.y = time * .22 + crane.phase;
+        var trolleyT = (Math.sin(time * .56 + crane.phase) + 1) / 2;
+        crane.trolley.position.z = 1.5 + trolleyT * Math.max(1.2, crane.length - 2.7);
+        var ropeLength = 2.6 + (Math.sin(time * .95 + crane.phase) + 1) * .95;
+        crane.rope.position.y = -ropeLength / 2;
+        crane.rope.scale.y = ropeLength / 2.8;
+        crane.load.position.y = -ropeLength - .04;
+        crane.load.rotation.y = Math.sin(time * .9 + crane.phase) * .2;
+        crane.hookLight.intensity = (currentEnvironment.night + stormAmount) * 1.8;
+        crane.beacon.material.emissiveIntensity = .25 + currentEnvironment.night * 1.9;
+      }
+      function updateExcavator(excavator, time) {
+        var cycle = (Math.sin(time * (.78 * speedMultipliers[speedStep]) + excavator.phase) + 1) / 2;
+        excavator.boom.rotation.x = -.48 + cycle * .4;
+        excavator.stick.rotation.x = .22 + cycle * .52;
+        excavator.bucket.rotation.x = -.32 + cycle * .55;
+        excavator.dirtLoad.visible = cycle > .73;
+      }
+      function updateTruck(truck, delta, time) {
+        var previous = routeAt(truckRoute, routeMeta, truck.distance);
+        truck.distance += delta * truck.speed * speedMultipliers[speedStep] * (stormActive ? .65 : 1);
+        var point = routeAt(truckRoute, routeMeta, truck.distance);
+        var body = dynamicBodies.find(function (entry) { return entry.owner === truck; });
+        if (!moveDynamic(body, point.x, point.z)) truck.distance -= delta * truck.speed * speedMultipliers[speedStep] * (stormActive ? .65 : 1);
+        var dx = point.dx || previous.dx;
+        var dz = point.dz || previous.dz;
+        truck.root.rotation.y = Math.atan2(dx, dz);
+        var nearPile = point.segment >= 7 && point.segment <= 10;
+        truck.load = !nearPile;
+        truck.cargo.rotation.x = nearPile ? -.12 - Math.sin(time * 2.5) * .08 : 0;
+      }
+      function updateMixer(mixer, delta) {
+        var previous = routeAt(mixerRoute, mixerRouteMeta, mixer.distance);
+        mixer.distance += delta * mixer.speed * speedMultipliers[speedStep] * .42;
+        var point = routeAt(mixerRoute, mixerRouteMeta, mixer.distance);
+        var body = dynamicBodies.find(function (entry) { return entry.owner === mixer; });
+        moveDynamic(body, point.x, point.z);
+        mixer.root.rotation.y = Math.atan2(point.dx || previous.dx, point.dz || previous.dz);
+        mixer.drum.rotation.z += delta * 1.5 * speedMultipliers[speedStep];
+      }
+      function updateLoader(loaderItem, delta, time) {
+        var body = dynamicBodies.find(function (entry) { return entry.owner === loaderItem; });
+        var x = -1.3 + Math.sin(time * .19) * 3.8;
+        var z = 10.4 + Math.cos(time * .19) * 1.1;
+        moveDynamic(body, x, z);
+        loaderItem.root.rotation.y = Math.sin(time * .19) > 0 ? Math.PI / 2 : -Math.PI / 2;
+        loaderItem.arm.rotation.x = -.18 + Math.sin(time * .8) * .22;
+        loaderItem.bucket.rotation.x = .28 + Math.sin(time * .8) * .18;
+      }
+      function updateWorkers(time) {
+        workers.forEach(function (worker) {
+          var bob = Math.sin(time * .9 + worker.phase) * .035;
+          var sway = Math.sin(time * .65 + worker.phase) * .08;
+          var armLift = worker.role.name === "指挥员" ? Math.sin(time * 1.3 + worker.phase) * .42 : Math.sin(time * 1.1 + worker.phase) * .12;
+          workerBodyBatch.update(worker.bodyIndex, worker.x + sway * .18, groundY + .62 + bob, worker.z, .54, 1.12, .42, sway, 0, 0);
+          workerHeadBatch.update(worker.headIndex, worker.x + sway * .18, groundY + 1.43 + bob, worker.z, .38, .38, .38, sway, 0, 0);
+          workerHelmetBatch.update(worker.helmetIndex, worker.x + sway * .18, groundY + 1.72 + bob, worker.z, .48, .16, .48, sway, 0, 0);
+          workerLegBatch.update(worker.leftLegIndex, worker.x - .16 + sway, groundY + .3, worker.z, .15, .58, .18, sway, 0, Math.sin(time * 1.2 + worker.phase) * .04);
+          workerLegBatch.update(worker.rightLegIndex, worker.x + .16 - sway, groundY + .3, worker.z, .15, .58, .18, sway, 0, -Math.sin(time * 1.2 + worker.phase) * .04);
+          workerArmBatch.update(worker.leftArmIndex, worker.x - .4, groundY + .88 + armLift * .25, worker.z, .13, .62, .15, sway, armLift, -.08);
+          workerArmBatch.update(worker.rightArmIndex, worker.x + .4, groundY + .88 - armLift * .16, worker.z, .13, .62, .15, sway, -armLift, .08);
+        });
+        workerBodyBatch.mesh.instanceMatrix.needsUpdate = true;
+        workerHeadBatch.mesh.instanceMatrix.needsUpdate = true;
+        workerHelmetBatch.mesh.instanceMatrix.needsUpdate = true;
+        workerLegBatch.mesh.instanceMatrix.needsUpdate = true;
+        workerArmBatch.mesh.instanceMatrix.needsUpdate = true;
+      }
+      function updateEnvironment(delta) {
+        if (cycleEnabled) dayClock = (dayClock + delta * .0085 * speedMultipliers[speedStep]) % 1;
+        var environment = environmentAt(dayClock);
+        currentEnvironment = environment;
+        scene.background.copy(environment.bg);
+        scene.fog.color.copy(environment.fog);
+        ambient.intensity = environment.ambient + stormAmount * .18;
+        hemisphere.color.copy(environment.hemi);
+        hemisphere.groundColor.copy(environment.ground);
+        sun.color.copy(environment.sun);
+        sun.intensity = environment.sunIntensity * (stormActive ? 1.1 : 1);
+        fillLight.intensity = .35 + environment.night * .25;
+        var lightPower = environment.night * 1.55 + stormAmount * .8;
+        lamps.forEach(function (lamp) { lamp.point.intensity = lightPower; });
+        windowMaterials.forEach(function (material) { material.emissiveIntensity = .08 + environment.night * 2.2 + stormAmount * .45; material.emissive.set(environment.night > .42 ? 0xff8e3d : 0x0c1517); });
+        mats.warm.emissiveIntensity = .16 + environment.night * 1.8 + stormAmount * .42;
+        mats.red.emissiveIntensity = .2 + environment.night * 1.45 + stormAmount * .2;
+        mats.wet.visible = wetness > .04;
+        mats.wet.opacity = .18 + wetness * .43;
+        wetSurface.visible = wetness > .04;
+        rain.mesh.visible = stormAmount > .02;
+        rain.material.uniforms.uStorm.value = stormAmount;
+        clockReadout.textContent = environment.name;
+        stateReadout.textContent = stormActive ? "RAIN PROTOCOL / LIGHTS BOOSTED" : "OPERATIONS LIVE / " + environment.name + " SHIFT";
+        dustMaterial.uniforms.uStrength.value = dustStrengths[dustStep] * (stormActive ? .32 : 1);
+        haloLights.forEach(function (entry) { entry.material.uniforms.uIntensity.value = (environment.night * 1.25 + stormAmount * .85) * entry.base; });
+      }
+      function updateStorm(delta) {
+        var target = stormActive ? 1 : 0;
+        stormAmount += (target - stormAmount) * Math.min(1, delta * 2.4);
+        var wetTarget = stormActive ? 1 : 0;
+        wetness += (wetTarget - wetness) * Math.min(1, delta * .65);
+        rain.material.uniforms.uTime.value += delta;
+      }
+      function updateActivity(time) {
+        var tick = Math.floor(time / 4) % 5;
+        var logs = [
+          "挖掘机 E-02 正在基坑西侧取土",
+          "塔吊 T-01 吊运混凝土料斗至 B-01",
+          "渣土卡车 D-02 正驶向渣土堆",
+          "钢筋棚完成一组梁柱箍筋加工",
+          "安保人员在施工大门完成巡逻"
+        ];
+        if (!stormActive) activityReadout.textContent = logs[tick];
+      }
+
+      var frameCount = 0;
+      var fpsTimer = 0;
+      var elapsed = 0;
+      function animate() {
+        requestAnimationFrame(animate);
+        var delta = Math.min(clock.getDelta(), .05);
+        elapsed += delta;
+        frameCount += 1;
+        fpsTimer += delta;
+        if (fpsTimer > .75) {
+          var fps = Math.round(frameCount / fpsTimer);
+          fpsReadout.textContent = clamp(fps, 1, 60) + " FPS";
+          frameCount = 0;
+          fpsTimer = 0;
+        }
+        updateCamera(delta);
+        updateEnvironment(delta);
+        updateStorm(delta);
+        animated.forEach(function (entry) {
+          if (entry.type === "crane") updateCrane(entry.item, elapsed);
+          else if (entry.type === "excavator") updateExcavator(entry.item, elapsed);
+          else if (entry.type === "truck") updateTruck(entry.item, delta, elapsed);
+          else if (entry.type === "mixer") updateMixer(entry.item, delta);
+          else if (entry.type === "loader") updateLoader(entry.item, delta, elapsed);
+        });
+        updateWorkers(elapsed);
+        dustMaterial.uniforms.uTime.value = elapsed;
+        updateActivity(elapsed);
+        if (toastTimer > 0) { toastTimer -= delta; if (toastTimer <= 0) toast.classList.remove("show"); }
+        renderer.render(scene, camera);
+      }
+      window.addEventListener("resize", function () {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      var machineCount = animated.filter(function (entry) { return ["crane", "excavator", "truck", "mixer", "loader"].indexOf(entry.type) !== -1; }).length;
+      machineReadout.textContent = String(machineCount).padStart(2, "0") + " / " + String(machineCount).padStart(2, "0");
+      crewReadout.textContent = workers.length + " 人";
+      updateControlReadout();
+      updateCamera(0);
+      renderer.render(scene, camera);
+      window.setTimeout(function () { loading.classList.add("done"); }, 520);
+      animate();
+    }());
+  </script>
+</body>
+</html>

@@ -7,6 +7,26 @@
    */
   var projectRecords = [
     {
+      id: "voxel-construction-site-gpt-5-6-luna-max",
+      number: "12",
+      title: "筑境工地 · GPT 5.6 Luna Max",
+      kicker: "体素微缩建筑工地沙盘 / 可交互昼夜系统",
+      category: "frontend",
+      categoryLabel: "前端应用",
+      status: "SINGLE HTML",
+      year: "2026.09",
+      model: "GPT 5.6 Luna Max",
+      description: "用 Three.js r160 与 InstancedMesh 搭建完整施工现场，支持设备作业、工人分工、日夜循环、尘土与暴雨控制。",
+      stack: ["HTML", "Three.js r160", "WebGL", "InstancedMesh"],
+      tags: ["体素沙盘", "程序化场景", "模型对比"],
+      accent: "coral",
+      order: 12,
+      links: [
+        { label: "打开 HTML 预览", href: "./voxel-construction-site-gpt-5.6-luna-max/index.html" },
+        { label: "查看提示词", href: "./voxel-construction-site-gpt-5.6-luna-max/Readme.md" }
+      ]
+    },
+    {
       id: "neo-gothic-tower-city-gpt-6-high",
       number: "11",
       title: "雾隐之城 · GPT 6 High",
