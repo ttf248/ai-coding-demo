@@ -43,6 +43,7 @@
 - **2026-09**：新增 GPT 6 Default 与 GPT 5.6 Luna Max 的新哥特式塔楼城市单 HTML 对比实验，并将首页目录改为数据驱动。
 - **2026-09-14**：增加 GPT 6 High 的独立实现「NOCTIS · 雾隐之城」，将 3D 引擎、程序化城市、海浪与音景内嵌为可离线打开的单 HTML，支持自由飞行和三组巡游视角。[提示词](neo-gothic-tower-city-gpt-6-high/Readme.md) · [预览](neo-gothic-tower-city-gpt-6-high/index.html)
 - **2026-09-15**：增加 GPT 5.6 Luna Max 的「筑境工地」体素微缩建筑工地沙盘，加入 InstancedMesh 批渲染、设备循环作业、日夜/尘土/暴雨控制与场景边界碰撞约束。[提示词](voxel-construction-site-gpt-5.6-luna-max/Readme.md) · [预览](voxel-construction-site-gpt-5.6-luna-max/index.html)
+- **2026-09-15**：归档 GPT 5.6 Sol High 的同提示词版本，将 `voxel_construction_site_threejs_r160.html` 规范化为独立 `index.html`，并记录其高层施工区 / 地下综合管廊双场景切换。[提示词](voxel-construction-site-gpt-5.6-sol-high/Readme.md) · [预览](voxel-construction-site-gpt-5.6-sol-high/index.html)
 - **持续更新**：随着模型和开发工具变化，继续补充新的提示词测试。
 
 ## 📚 技术文档列表
@@ -98,6 +99,15 @@
 - **交互**: 拖拽环视、滚轮缩放；点击桌面前沿实体控制台切换速度、日夜循环和尘土强度；按 `Space` 触发暴雨。
 - **提示词**: [原始提示词](voxel-construction-site-gpt-5.6-luna-max/Readme.md)
 - **预览**: [打开 HTML 页面](voxel-construction-site-gpt-5.6-luna-max/index.html)
+
+#### 体素微缩建筑工地沙盘 (GPT 5.6 Sol High)
+
+- **类型**: 单 HTML / 3D 前端视觉实验
+- **技术栈**: HTML / Three.js r160 / WebGL / InstancedMesh
+- **内容**: 同一施工沙盘提示词的 Sol High 版本，包含高层综合施工区与地下综合管廊 / 地铁竖井施工区两套可切换布局。
+- **交互**: 拖拽环视、滚轮缩放；点击桌面前沿实体控制台切换速度、日夜循环、尘土与场景；按 `Space` 触发暴雨，按 `N` 切换新场景。
+- **提示词**: [原始提示词](voxel-construction-site-gpt-5.6-sol-high/Readme.md)
+- **预览**: [打开 HTML 页面](voxel-construction-site-gpt-5.6-sol-high/index.html)
 
 #### 新哥特式塔楼城市 (GPT 6 High)
 
@@ -171,6 +181,6 @@
 
 ### 📊 项目统计
 
-- **实验项目与模型版本**: 12 个
+- **实验项目与模型版本**: 13 个
 - **技术主题**: 14 个
 - **可直接打开的静态页面**: 23+ 个
