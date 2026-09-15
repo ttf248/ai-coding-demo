@@ -7,6 +7,26 @@
    */
   var projectRecords = [
     {
+      id: "neo-gothic-tower-city-gpt-6-high",
+      number: "11",
+      title: "雾隐之城 · GPT 6 High",
+      kicker: "离线单文件的新哥特式海上城邦",
+      category: "frontend",
+      categoryLabel: "前端应用",
+      status: "SINGLE HTML",
+      year: "2026.09",
+      model: "GPT 6 High",
+      description: "以统一米制尺度构建尖塔、圣堂、海堤与拱桥，支持镜头巡航、自由飞行、昼夜气候调整与程序化海浪音景。",
+      stack: ["HTML", "Three.js", "WebGL"],
+      tags: ["模型对比", "离线漫游"],
+      accent: "teal",
+      order: 11,
+      links: [
+        { label: "打开 HTML 预览", href: "./neo-gothic-tower-city-gpt-6-high/index.html" },
+        { label: "查看提示词", href: "./neo-gothic-tower-city-gpt-6-high/Readme.md" }
+      ]
+    },
+    {
       id: "neo-gothic-tower-city-gpt-6-default",
       number: "01",
       title: "雾隐之城 · GPT 6 Default",
