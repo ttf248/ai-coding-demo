@@ -7,6 +7,26 @@
    */
   var projectRecords = [
     {
+      id: "voxel-construction-site-gpt-5-6-sol-high",
+      number: "13",
+      title: "筑境工地 · GPT 5.6 Sol High",
+      kicker: "体素微缩工地沙盘 / 双场景施工切换",
+      category: "frontend",
+      categoryLabel: "前端应用",
+      status: "SINGLE HTML",
+      year: "2026.09",
+      model: "GPT 5.6 Sol High",
+      description: "沿用同一施工沙盘提示词，增加高层综合施工区与地下综合管廊施工区两套布局，支持设备动画、昼夜天气和实体控制台。",
+      stack: ["HTML", "Three.js r160", "WebGL", "InstancedMesh"],
+      tags: ["体素沙盘", "双场景", "模型对比"],
+      accent: "blue",
+      order: 13,
+      links: [
+        { label: "打开 HTML 预览", href: "./voxel-construction-site-gpt-5.6-sol-high/index.html" },
+        { label: "查看提示词", href: "./voxel-construction-site-gpt-5.6-sol-high/Readme.md" }
+      ]
+    },
+    {
       id: "voxel-construction-site-gpt-5-6-luna-max",
       number: "12",
       title: "筑境工地 · GPT 5.6 Luna Max",
