@@ -28,13 +28,16 @@
         ? p.get("tab")
         : "preview",
       source: p.get("source") === "raw" ? "raw" : "task",
+      relatedOnly: p.get("related") !== "0",
       mobile: p.get("mobile") === "right" ? "right" : "left",
     };
   }
   const getRun = (side) => data.runs.find((r) => r.id === state[side]);
   function updateURL() {
     const p = new URLSearchParams();
-    for (const [k, v] of Object.entries(state)) if (v) p.set(k, v);
+    for (const [k, v] of Object.entries(state))
+      if (k !== "relatedOnly" && v) p.set(k, v);
+    if (!state.relatedOnly) p.set("related", "0");
     history.pushState(null, "", "?" + p.toString());
   }
   function textFor(run) {
@@ -77,6 +80,7 @@
         : U.relation(data, a, b);
     $("viewport").value = state.viewport;
     $("prompt-source").value = state.source;
+    $("related-only").checked = state.relatedOnly;
     $("source-control").hidden = state.tab !== "prompt";
     document
       .querySelectorAll("[data-tab]")
@@ -102,7 +106,14 @@
         other = getRun(side === "left" ? "right" : "left");
       const active = !narrow.matches || state.mobile === side;
       panel.classList.toggle("mobile-inactive", !active);
-      const ordered = U.filterRuns(data, {}).sort((x, y) => {
+      const candidates = U.filterRuns(data, {}).filter(
+        (r) =>
+          !state.relatedOnly ||
+          !other ||
+          r.topicId === other.topicId ||
+          r.id === state[side],
+      );
+      const ordered = candidates.sort((x, y) => {
         const rank = (r) =>
           other
             ? r.id === other.id
@@ -368,6 +379,7 @@
       unloaded[el.dataset.page] = false;
     } else if (el.id === "viewport") state.viewport = el.value;
     else if (el.id === "prompt-source") state.source = el.value;
+    else if (el.id === "related-only") state.relatedOnly = el.checked;
     else return;
     updateURL();
     render();
