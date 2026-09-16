@@ -45,6 +45,7 @@
 - **2026-09-15**：增加 GPT 5.6 Luna Max 的「筑境工地」体素微缩建筑工地沙盘，加入 InstancedMesh 批渲染、设备循环作业、日夜/尘土/暴雨控制与场景边界碰撞约束。[提示词](voxel-construction-site-gpt-5.6-luna-max/Readme.md) · [预览](voxel-construction-site-gpt-5.6-luna-max/index.html)
 - **2026-09-15**：归档 GPT 5.6 Sol High 的同提示词版本，将 `voxel_construction_site_threejs_r160.html` 规范化为独立 `index.html`，并记录其高层施工区 / 地下综合管廊双场景切换。[提示词](voxel-construction-site-gpt-5.6-sol-high/Readme.md) · [预览](voxel-construction-site-gpt-5.6-sol-high/index.html)
 - **2026-09-15**：新增 GPT 6 Astra Low 的独立体素沙盘「筑间 / FIELDWORK」，提供高层筑造、桥梁工坊两套场景，包含实体旋钮、施工调度、昼夜与暴雨系统。[提示词](voxel-construction-site-gpt-6-astra-low/Readme.md) · [预览](voxel-construction-site-gpt-6-astra-low/index.html)
+- **2026-09-16**：新增 GPT 6 Astra Xhigh 的独立体素沙盘「筑物 / LITTLE SITE STUDIO」，提供高层筑造、地铁车站两套场景，加入实例化机械与工人、车辆排队装卸、桌面实体旋钮、昼夜及暴雨交互。[提示词](voxel-construction-site-gpt-6-astra-xhigh/Readme.md) · [预览](voxel-construction-site-gpt-6-astra-xhigh/index.html)
 - **持续更新**：随着模型和开发工具变化，继续补充新的提示词测试。
 
 ## 📚 技术文档列表
@@ -91,6 +92,15 @@
 ---
 
 ### 🌌 沉浸式视觉实验
+
+#### 筑物 / LITTLE SITE STUDIO (GPT 6 Astra Xhigh)
+
+- **类型**: 单 HTML / 3D 前端视觉实验
+- **技术栈**: HTML / Three.js r160 / WebGL / InstancedMesh / ShaderMaterial
+- **内容**: 深色实木工作桌上的高层筑造与地铁车站双场景，包含开口基坑、钢筋棚、材料区、板房、48 名体素工人、8 台施工机械，以及代码生成的木纹、蓝图和桌面工具。
+- **交互**: 拖拽环视、滚轮 / 双指缩放、闲置巡航；实体旋钮与屏幕按钮控制设备速度、昼夜和尘土；`Space` 切换暴雨，`N` 切换场景，`R` 重置镜头，`P` 暂停设备。
+- **提示词**: [原始提示词](voxel-construction-site-gpt-6-astra-xhigh/Readme.md)
+- **预览**: [打开 HTML 页面](voxel-construction-site-gpt-6-astra-xhigh/index.html)
 
 #### 筑间 / FIELDWORK (GPT 6 Astra Low)
 
@@ -192,6 +202,6 @@
 
 ### 📊 项目统计
 
-- **实验项目与模型版本**: 14 个
+- **实验项目与模型版本**: 15 个
 - **技术主题**: 14 个
-- **可直接打开的静态页面**: 24+ 个
+- **可直接打开的静态页面**: 25+ 个
