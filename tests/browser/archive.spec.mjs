@@ -51,6 +51,27 @@ test("directory counts, filters, sort, views, pagination and selection", async (
   await expect(page.locator(".guide")).toHaveCount(1);
   expect(errors).toEqual([]);
 });
+test("homepage overview and keyboard filter helpers stay discoverable", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.locator("#recent-runs .signal-item")).toHaveCount(
+    Math.min(3, data.runs.length),
+  );
+  await expect(page.locator("#guide-count")).toContainText(
+    String(data.guides.length),
+  );
+  await page.keyboard.press("/");
+  await expect(page.locator("#q")).toBeFocused();
+  await page.locator("#q").fill("Astra");
+  await expect(
+    page.locator('#active-filters button[data-clear-filter="q"]'),
+  ).toContainText("Astra");
+  await page.locator('#active-filters button[data-clear-filter="q"]').click();
+  await expect(page.locator("#q")).toHaveValue("");
+  await page.locator("#guide-search").fill("typescript");
+  await expect(page.locator("#guide-count")).toContainText("1 /");
+});
 test("topic detail and prompt comparison restore URLs without executing demos", async ({
   page,
 }) => {
