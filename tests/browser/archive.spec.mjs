@@ -67,11 +67,37 @@ test("topic detail and prompt comparison restore URLs without executing demos", 
   await expect(page.locator("#run-left")).toHaveValue(voxel[0].id);
   await page.reload();
   await expect(page.locator("#prompt-source")).toHaveValue("raw");
+  await page.locator("#related-only").uncheck();
   await page.locator("#run-right").selectOption(city[0].id);
   await expect(page.locator("#relation")).toContainText("跨主题");
   await page.goto(url(city[0], city[1], "&tab=prompt"));
   await expect(page.locator("#relation")).toContainText("原始输入一致");
   await expect(page.locator("iframe")).toHaveCount(0);
+});
+test("comparison limits selectors to related topic cases by default", async ({
+  page,
+}) => {
+  await page.goto(url(voxel[0], voxel[1], "&tab=info"));
+  await expect(page.locator("#related-only")).toBeChecked();
+  await expect(page.locator("#run-left option")).toHaveCount(voxel.length + 1);
+  await expect(page.locator("#run-right option")).toHaveCount(voxel.length + 1);
+  const leftValues = await page
+    .locator("#run-left option")
+    .evaluateAll((options) =>
+      options.map((option) => option.value).filter(Boolean),
+    );
+  expect(
+    leftValues.every((id) => id.startsWith("voxel-construction-site--")),
+  ).toBe(true);
+  await page.locator("#related-only").uncheck();
+  await expect(page.locator("#run-left option")).toHaveCount(
+    data.runs.length + 1,
+  );
+  await expect(page).toHaveURL(/related=0/);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator("#related-only")).not.toBeChecked();
+  await page.locator("#related-only").check();
+  await expect(page.locator("#run-left option")).toHaveCount(voxel.length + 1);
 });
 test("live previews, equal viewports, unloading and single-side reload", async ({
   page,
