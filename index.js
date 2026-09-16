@@ -7,6 +7,26 @@
    */
   var projectRecords = [
     {
+      id: "voxel-construction-site-gpt-6-astra-xhigh",
+      number: "15",
+      title: "筑物工地 · GPT 6 Astra Xhigh",
+      kicker: "LITTLE SITE STUDIO / 高层与地铁双场景沙盘",
+      category: "frontend",
+      categoryLabel: "前端应用",
+      status: "SINGLE HTML",
+      year: "2026.09",
+      model: "GPT 6 Astra Xhigh",
+      description: "深色实木工作桌上的体素微型工地，48 名工人、8 台机械有序作业；支持高层与地铁车站切换、实体旋钮、昼夜流转和暴雨湿地效果。",
+      stack: ["HTML", "Three.js r160", "WebGL", "InstancedMesh", "ShaderMaterial"],
+      tags: ["体素沙盘", "双场景", "模型对比"],
+      accent: "teal",
+      order: 15,
+      links: [
+        { label: "打开 HTML 预览", href: "./voxel-construction-site-gpt-6-astra-xhigh/index.html" },
+        { label: "查看提示词", href: "./voxel-construction-site-gpt-6-astra-xhigh/Readme.md" }
+      ]
+    },
+    {
       id: "voxel-construction-site-gpt-6-astra-low",
       number: "14",
       title: "筑间工地 · GPT 6 Astra Low",
