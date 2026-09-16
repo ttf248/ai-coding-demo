@@ -6,7 +6,7 @@
 
 `index.html`、`topic.html`、`compare.html`、`assets/`、`previews/` 都是要提交的站点文件。构建缓存、`node_modules/`、demo 自身的 `dist/` 不提交。页面之间使用相对链接，支持域名根目录与 `/ai-coding-demo/` 子路径。整体站点使用 HTTP 预览，单 HTML demo 仍可直接打开。
 
-需要后端或独立运行环境的项目继续由维护者人工部署到 Vercel；本站只登记实际地址。不因为目录改造推测这些服务已部署。已有 Vercel 项目后续从新目录构建时，需要在 Vercel 项目设置中将 Root Directory 更新为对应 `demos/{topic}/runs/{run}/`（股票前端再追加 `frontend`），原有域名与环境变量保持原配置。
+需要后端或独立运行环境的项目继续由维护者人工部署到 Vercel；本站只登记实际地址。不因为目录改造推测这些服务已部署。目录迁移不会自动修改 Vercel 项目设置：迁移后先按 [Vercel Root Directory 对照表](vercel-root-directories.md) 更新 Root Directory，再重新部署；原有域名与环境变量保持原配置。股票项目的 Vercel 根目录需要指向 `demos/stock-watching/runs/unknown-unknown-r01/frontend/`。
 
 ## 目录和唯一事实来源
 
