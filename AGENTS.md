@@ -7,7 +7,7 @@
 - 保持现有 GitHub Pages 分支自动发布、域名与 CNB → GitHub 同步；提交到 GitHub 即自动更新。
 - 未经用户明确要求，不得改为 Actions 部署、修改 Pages 发布源或引入独立 deploy 步骤。
 - 仓库根目录必须是可直接静态托管的完整站点。首页、主题页、对比页、assets/generated 与 previews 都必须提交。
-- 需要独立服务的项目继续由维护者人工部署到 Vercel。除非明确授权，不修改外部部署设置；目录迁移后的 Root Directory 调整写入文档。
+- 需要独立服务的项目继续由维护者人工部署到 Vercel。除非明确授权，不修改外部部署设置；目录迁移后的 Root Directory 调整必须同步记录在 [Vercel 对照表](docs/vercel-root-directories.md)，并保留 GitHub Pages 提交即发布逻辑。
 
 ## 目录与数据
 
