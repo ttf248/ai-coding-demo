@@ -31,8 +31,8 @@
 ## 项目统计
 
 - 实验主题：8
-- 实验记录：22
-- 可预览记录：19
+- 实验记录：29
+- 可预览记录：25
 - 技术主题：14
 
 ## 实验目录
@@ -45,6 +45,7 @@
 |---|---|---|---|---|
 | [小蓝书](demos/bluebook/runs/claude-4-0-unknown-r01/Readme.md) | Claude 4.0 / unknown | 2025-05 | [v2](demos/bluebook/runs/claude-4-0-unknown-r01/prompt.md) | [打开](previews/bluebook/claude-4-0-unknown-r01/index.html) |
 | [小蓝书 · GPT 5.6 Luna Max](demos/bluebook/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-16 | [v1](demos/bluebook/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](previews/bluebook/gpt-5-6-luna-max-r01/index.html) |
+| [小蓝书 · GPT 6 Luna Max](demos/bluebook/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](demos/bluebook/runs/gpt-6-luna-max-r01/prompt.md) | [打开](previews/bluebook/gpt-6-luna-max-r01/index.html) |
 | [小蓝书 · MiniMax M2.1](demos/bluebook/runs/minimax-m2-1-unknown-r01/Readme.md) | MiniMax M2.1 / unknown | 2025-12 | [v1](demos/bluebook/runs/minimax-m2-1-unknown-r01/prompt.md) | [打开](previews/bluebook/minimax-m2-1-unknown-r01/index.html) |
 | [小蓝书 · MiniMaxi M2](demos/bluebook/runs/minimax-m2-unknown-r01/Readme.md) | MiniMaxi M2 / unknown | 2025-11 | [v1](demos/bluebook/runs/minimax-m2-unknown-r01/prompt.md) | [打开](previews/bluebook/minimax-m2-unknown-r01/index.html) |
 
@@ -55,6 +56,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [情绪日记 · GPT 5.6 Luna Max](demos/life-diary/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-16 | [v1](demos/life-diary/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-5-6-luna-max-r01/index.html) |
+| [情绪日记 · GPT 6 Luna Max](demos/life-diary/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](demos/life-diary/runs/gpt-6-luna-max-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-6-luna-max-r01/index.html) |
 | [生活情绪日记](demos/life-diary/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](demos/life-diary/runs/unknown-unknown-r01/prompt.md) | [打开](demos/life-diary/runs/unknown-unknown-r01/index.html) |
 
 ### 冥想 iOS App
@@ -64,6 +66,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [静心 · GPT 5.6 Luna Max](demos/meditation/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-16 | [v1](demos/meditation/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/meditation/runs/gpt-5-6-luna-max-r01/index.html) |
+| [静心 · GPT 6 Luna Max](demos/meditation/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](demos/meditation/runs/gpt-6-luna-max-r01/prompt.md) | [打开](demos/meditation/runs/gpt-6-luna-max-r01/index.html) |
 | [冥想 iOS App](demos/meditation/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](demos/meditation/runs/unknown-unknown-r01/prompt.md) | [打开](demos/meditation/runs/unknown-unknown-r01/index.html) |
 
 ### 新哥特式塔楼城市
@@ -75,6 +78,7 @@
 | [塔城漫游 · GPT 5.6 Luna Max](demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09 | [v1](demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/index.html) |
 | [雾隐之城 · GPT 6 Default](demos/neo-gothic-tower-city/runs/gpt-6-default-r01/Readme.md) | GPT 6 / default | 2026-09 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-default-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-default-r01/index.html) |
 | [雾隐之城 · GPT 6 High](demos/neo-gothic-tower-city/runs/gpt-6-high-r01/Readme.md) | GPT 6 / high | 2026-09-14 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-high-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-high-r01/index.html) |
+| [雾隐之城 · GPT 6 Luna Max](demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r01/index.html) |
 
 ### Pixel Flow
 
@@ -83,6 +87,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [Pixel Flow · GPT 5.6 Luna Max](demos/pixel-flow/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-16 | [v1](demos/pixel-flow/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-5-6-luna-max-r01/index.html) |
+| [Pixel Flow · GPT 6 Luna Max](demos/pixel-flow/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](demos/pixel-flow/runs/gpt-6-luna-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-luna-max-r01/index.html) |
 | [Pixel Flow](demos/pixel-flow/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-12 | [v1](demos/pixel-flow/runs/unknown-unknown-r01/prompt.md) | 无静态预览 |
 
 ### 自选股实战
@@ -92,6 +97,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [自选股实战 · GPT 5.6 Luna Max](demos/stock-watching/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-16 | [v1](demos/stock-watching/runs/gpt-5-6-luna-max-r01/prompt.md) | 无静态预览 |
+| [自选股实战 · GPT 6 Luna Max](demos/stock-watching/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](demos/stock-watching/runs/gpt-6-luna-max-r01/prompt.md) | 无静态预览 |
 | [自选股实战](demos/stock-watching/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-02 | [v1](demos/stock-watching/runs/unknown-unknown-r01/prompt.md) | 无静态预览 |
 
 ### 体素微缩建筑工地
@@ -113,6 +119,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [VideoTube UI · GPT 5.6 Luna Max](demos/youtube-ui/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-16 | [v1](demos/youtube-ui/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-5-6-luna-max-r01/index.html) |
+| [VideoTube UI · GPT 6 Luna Max](demos/youtube-ui/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](demos/youtube-ui/runs/gpt-6-luna-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-luna-max-r01/index.html) |
 | [YouTube UI 模块](demos/youtube-ui/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](demos/youtube-ui/runs/unknown-unknown-r01/prompt.md) | [打开](demos/youtube-ui/runs/unknown-unknown-r01/youtube-app-creator.html) |
 
 ## 技术文档

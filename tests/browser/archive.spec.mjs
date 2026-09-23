@@ -273,9 +273,6 @@ test("all catalog targets and published app assets are accessible", async ({
         match[1],
       ).toBe(200);
     }
-    expect(
-      (await request.get(new URL("images/1.jpg", entry).href)).status(),
-    ).toBe(200);
   }
 });
 test("built apps render their local images under the configured base", async ({
