@@ -31,8 +31,8 @@
 ## 项目统计
 
 - 实验主题：8
-- 实验记录：21
-- 可预览记录：18
+- 实验记录：22
+- 可预览记录：19
 - 技术主题：14
 
 ## 实验目录
@@ -104,6 +104,7 @@
 | [筑境工地 · GPT 5.6 Sol High](demos/voxel-construction-site/runs/gpt-5-6-sol-high-r01/Readme.md) | GPT 5.6 Sol / high | 2026-09-15 | [v1](demos/voxel-construction-site/runs/gpt-5-6-sol-high-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-5-6-sol-high-r01/index.html) |
 | [筑间工地 · GPT 6 Astra Low](demos/voxel-construction-site/runs/gpt-6-astra-low-r01/Readme.md) | GPT 6 Astra / low | 2026-09-15 | [v1](demos/voxel-construction-site/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-astra-low-r01/index.html) |
 | [筑物工地 · GPT 6 Astra Xhigh](demos/voxel-construction-site/runs/gpt-6-astra-xhigh-r01/Readme.md) | GPT 6 Astra / xhigh | 2026-09-16 | [v1](demos/voxel-construction-site/runs/gpt-6-astra-xhigh-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-astra-xhigh-r01/index.html) |
+| [筑境工地 · GPT 6 Luna Max](demos/voxel-construction-site/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](demos/voxel-construction-site/runs/gpt-6-luna-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-luna-max-r01/index.html) |
 
 ### YouTube UI 模块
 
