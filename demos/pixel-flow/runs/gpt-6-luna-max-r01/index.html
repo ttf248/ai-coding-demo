@@ -1,0 +1,1146 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090b17">
+  <meta name="description" content="将本地图片化为流动粒子，用手势或滑杆将它重新聚合。">
+  <title>Pixel Flow — Gesture Studio</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090b17;
+      --panel: rgba(18, 21, 39, .88);
+      --panel-soft: rgba(255, 255, 255, .035);
+      --line: rgba(190, 197, 255, .11);
+      --text: #f3f4ff;
+      --muted: #9298b5;
+      --faint: #686f8e;
+      --mint: #8ff4d7;
+      --blue: #8ca8ff;
+      --violet: #ba9aff;
+      --rose: #ff8eaf;
+      --radius: 24px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; }
+    body {
+      min-width: 320px;
+      min-height: 100%;
+      overflow: hidden;
+      color: var(--text);
+      background:
+        radial-gradient(ellipse at 57% 42%, rgba(82, 74, 150, .15), transparent 42%),
+        radial-gradient(ellipse at 2% 100%, rgba(55, 100, 112, .12), transparent 34%),
+        var(--bg);
+    }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, label:focus-within {
+      outline: 2px solid rgba(143, 244, 215, .84);
+      outline-offset: 3px;
+    }
+
+    .app-frame { width: 100%; height: 100dvh; min-height: 590px; display: flex; flex-direction: column; }
+    .topbar {
+      height: 76px;
+      flex: 0 0 76px;
+      padding: 0 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(186, 192, 246, .09);
+      background: rgba(8, 10, 22, .44);
+      backdrop-filter: blur(16px);
+      position: relative;
+      z-index: 5;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      width: 38px; height: 38px; flex: 0 0 auto; border: 1px solid rgba(143, 244, 215, .27);
+      border-radius: 13px; display: grid; place-items: center;
+      background: linear-gradient(145deg, rgba(143, 244, 215, .15), rgba(140, 168, 255, .09));
+      box-shadow: inset 0 0 18px rgba(143, 244, 215, .05), 0 0 26px rgba(110, 203, 198, .07);
+    }
+    .brand-mark svg { width: 22px; height: 22px; }
+    .brand-name { font-size: 14px; font-weight: 740; letter-spacing: .14em; line-height: 1.2; }
+    .brand-sub { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .19em; }
+    .top-meta { display: flex; align-items: center; gap: 11px; color: #b9bfd7; font-size: 11px; letter-spacing: .03em; }
+    .local-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 99px; background: rgba(255,255,255,.025); }
+    .local-badge::before { content: ""; width: 6px; height: 6px; border-radius: 99px; background: var(--mint); box-shadow: 0 0 11px rgba(143,244,215,.7); }
+    .top-version { color: var(--faint); font-size: 10px; letter-spacing: .1em; }
+
+    .workspace {
+      flex: 1;
+      min-height: 0;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 18px;
+      grid-template-areas: "panel stage";
+    }
+    .control-panel {
+      grid-area: panel;
+      min-height: 0;
+      overflow: auto;
+      padding: 6px 2px 8px 0;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(161, 169, 209, .2) transparent;
+    }
+    .panel-intro { padding: 6px 10px 17px; }
+    .eyebrow { color: var(--mint); font-size: 9px; font-weight: 740; letter-spacing: .2em; text-transform: uppercase; }
+    .panel-intro h1 { margin: 9px 0 7px; font-size: 23px; line-height: 1.1; letter-spacing: -.045em; font-weight: 640; }
+    .panel-intro p { margin: 0; max-width: 260px; color: var(--muted); font-size: 12px; line-height: 1.65; }
+    .control-card {
+      margin-bottom: 12px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 19px;
+      background: linear-gradient(150deg, rgba(27, 31, 56, .82), rgba(17, 20, 37, .74));
+      box-shadow: 0 12px 36px rgba(0, 0, 0, .11), inset 0 1px rgba(255,255,255,.025);
+    }
+    .card-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
+    .card-title { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 670; letter-spacing: .02em; }
+    .card-title svg { width: 15px; height: 15px; color: #aeb8ec; }
+    .mini-label { color: var(--faint); font-size: 9px; letter-spacing: .11em; text-transform: uppercase; }
+    .upload-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); border: 0; }
+    .upload-tile {
+      min-height: 98px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 15px;
+      border: 1px dashed rgba(158, 173, 230, .31);
+      border-radius: 14px;
+      background: rgba(124, 143, 208, .045);
+      cursor: pointer;
+      text-align: center;
+      transition: border-color .2s ease, background .2s ease, transform .2s ease;
+    }
+    .upload-tile:hover, .upload-tile.drag-active { border-color: rgba(143, 244, 215, .64); background: rgba(143, 244, 215, .07); transform: translateY(-1px); }
+    .upload-icon { width: 24px; height: 24px; color: var(--mint); }
+    .upload-title { font-size: 11px; font-weight: 650; }
+    .upload-hint { color: var(--muted); font-size: 10px; }
+    .file-name { margin: 10px 2px 0; overflow: hidden; color: #afb5d0; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .range-label { display: flex; align-items: center; justify-content: space-between; margin: 16px 1px 7px; color: #c7cbe0; font-size: 10px; }
+    .range-value { color: var(--mint); font-variant-numeric: tabular-nums; }
+    input[type="range"] { display: block; width: 100%; height: 4px; margin: 0; appearance: none; border: 0; border-radius: 99px; background: linear-gradient(90deg, rgba(143,244,215,.8), rgba(140,168,255,.58)); cursor: pointer; }
+    input[type="range"]::-webkit-slider-thumb { width: 13px; height: 13px; appearance: none; border: 3px solid #e9fff8; border-radius: 50%; background: #84e9cf; box-shadow: 0 0 0 4px rgba(143,244,215,.14), 0 0 12px rgba(143,244,215,.46); }
+    input[type="range"]::-moz-range-thumb { width: 9px; height: 9px; border: 3px solid #e9fff8; border-radius: 50%; background: #84e9cf; box-shadow: 0 0 0 4px rgba(143,244,215,.14), 0 0 12px rgba(143,244,215,.46); }
+    .range-ends { display: flex; justify-content: space-between; margin-top: 6px; color: var(--faint); font-size: 9px; }
+
+    .gesture-list { display: grid; gap: 8px; }
+    .gesture-row { min-height: 43px; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid rgba(193,199,247,.07); border-radius: 12px; background: rgba(255,255,255,.022); }
+    .gesture-icon { width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 8px; background: rgba(143,244,215,.09); color: var(--mint); }
+    .gesture-icon svg { width: 15px; height: 15px; }
+    .gesture-row.hold .gesture-icon { color: #c2a4ff; background: rgba(186,154,255,.1); }
+    .gesture-copy { min-width: 0; flex: 1; }
+    .gesture-name { display: block; color: #e8eaf8; font-size: 10px; font-weight: 620; }
+    .gesture-desc { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; }
+    .gesture-key { color: var(--faint); font-size: 8px; letter-spacing: .1em; }
+    .gesture-row.is-active { border-color: rgba(143,244,215,.34); background: rgba(143,244,215,.065); box-shadow: inset 0 0 20px rgba(143,244,215,.025); }
+    .gesture-row.hold.is-active { border-color: rgba(186,154,255,.4); background: rgba(186,154,255,.07); }
+    .progress-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .progress-number { color: var(--mint); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .progress-range { background: linear-gradient(90deg, rgba(143,244,215,.85), rgba(186,154,255,.8)) !important; }
+    .progress-range::-webkit-slider-thumb { background: #c6adff !important; border-color: #f2ebff !important; box-shadow: 0 0 0 4px rgba(186,154,255,.14), 0 0 12px rgba(186,154,255,.45) !important; }
+    .progress-range::-moz-range-thumb { background: #c6adff !important; border-color: #f2ebff !important; box-shadow: 0 0 0 4px rgba(186,154,255,.14), 0 0 12px rgba(186,154,255,.45) !important; }
+    .action-row { display: grid; grid-template-columns: 1.15fr 1fr; gap: 8px; margin-top: 15px; }
+    .button {
+      min-height: 39px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 12px;
+      border: 1px solid rgba(192,198,244,.14);
+      border-radius: 11px;
+      background: rgba(255,255,255,.045);
+      color: #d5d8ec;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 640;
+      transition: background .2s ease, border-color .2s ease, transform .2s ease, opacity .2s ease;
+    }
+    .button:hover:not(:disabled) { transform: translateY(-1px); border-color: rgba(210,218,255,.28); background: rgba(255,255,255,.075); }
+    .button svg { width: 14px; height: 14px; }
+    .button-primary { border-color: rgba(143,244,215,.28); background: linear-gradient(120deg, rgba(87,194,165,.21), rgba(111,142,224,.17)); color: #cffff0; box-shadow: inset 0 1px rgba(255,255,255,.05); }
+    .button-primary:hover:not(:disabled) { border-color: rgba(143,244,215,.52); background: linear-gradient(120deg, rgba(87,194,165,.31), rgba(111,142,224,.23)); }
+    .button:disabled { cursor: wait; opacity: .55; }
+    .camera-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .camera-state-dot { width: 7px; height: 7px; border-radius: 50%; background: #727991; box-shadow: 0 0 0 4px rgba(114,121,145,.09); }
+    .camera-state-dot.live { background: var(--mint); box-shadow: 0 0 0 4px rgba(143,244,215,.09), 0 0 10px rgba(143,244,215,.45); }
+    .camera-button { width: 100%; margin-top: 12px; }
+    .camera-message { margin: 10px 1px 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+    .camera-message.is-error { color: #ffafbf; }
+    .camera-message.is-warning { color: #f2d39b; }
+    .camera-message.is-success { color: #9cebd4; }
+    .privacy-note { display: flex; gap: 8px; align-items: flex-start; margin: 5px 10px 12px; color: #777f9f; font-size: 9px; line-height: 1.55; }
+    .privacy-note svg { width: 13px; height: 13px; flex: 0 0 auto; color: #9aadd0; }
+
+    .stage-shell { grid-area: stage; position: relative; min-width: 0; min-height: 0; }
+    .stage {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      border: 1px solid rgba(187,195,250,.12);
+      border-radius: 27px;
+      background:
+        radial-gradient(ellipse at 52% 49%, rgba(53, 62, 107, .2), transparent 55%),
+        radial-gradient(circle at 68% 20%, rgba(128, 90, 188, .09), transparent 26%),
+        linear-gradient(145deg, rgba(20, 23, 43, .86), rgba(10, 13, 27, .96));
+      box-shadow: 0 24px 70px rgba(0,0,0,.26), inset 0 1px rgba(255,255,255,.035);
+      isolation: isolate;
+    }
+    .stage::before, .stage::after { content: ""; position: absolute; pointer-events: none; z-index: 1; }
+    .stage::before {
+      inset: 0;
+      opacity: .24;
+      background-image: radial-gradient(rgba(214,224,255,.48) .55px, transparent .75px);
+      background-size: 29px 29px;
+      mask-image: linear-gradient(135deg, rgba(0,0,0,.64), transparent 72%);
+    }
+    .stage::after { inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,.018), inset 0 0 90px rgba(9,11,23,.17); }
+    #particleCanvas { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; display: block; }
+    .stage-head { position: absolute; z-index: 2; top: 26px; left: 29px; right: 29px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; pointer-events: none; }
+    .stage-heading { max-width: 320px; }
+    .stage-overline { display: flex; align-items: center; gap: 8px; color: #b7bed8; font-size: 9px; font-weight: 650; letter-spacing: .16em; text-transform: uppercase; }
+    .stage-overline::before { content: ""; width: 17px; height: 1px; background: var(--mint); box-shadow: 0 0 8px rgba(143,244,215,.8); }
+    .stage-heading h2 { margin: 11px 0 6px; font-size: clamp(20px, 2.35vw, 31px); font-weight: 570; letter-spacing: -.05em; }
+    .stage-heading p { max-width: 285px; margin: 0; color: #9ca3c0; font-size: 11px; line-height: 1.6; }
+    .stage-stats { display: flex; align-items: center; gap: 8px; }
+    .stat-pill { display: flex; align-items: center; gap: 8px; padding: 8px 11px; border: 1px solid rgba(203,209,250,.12); border-radius: 99px; background: rgba(14,17,34,.53); backdrop-filter: blur(10px); color: #bdc3dc; font-size: 9px; white-space: nowrap; }
+    .stat-pill svg { width: 13px; height: 13px; color: var(--mint); }
+    .state-pill { position: relative; padding-left: 21px; }
+    .state-pill::before { content: ""; position: absolute; left: 10px; top: 50%; width: 5px; height: 5px; border-radius: 50%; transform: translateY(-50%); background: var(--mint); box-shadow: 0 0 9px rgba(143,244,215,.55); }
+    .stage-footer { position: absolute; z-index: 2; right: 28px; bottom: 25px; left: 28px; display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; pointer-events: none; }
+    .gesture-hint { display: flex; align-items: center; gap: 10px; color: #afb6d2; font-size: 10px; line-height: 1.5; }
+    .hint-orb { width: 27px; height: 27px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid rgba(143,244,215,.18); border-radius: 50%; background: rgba(143,244,215,.07); color: var(--mint); }
+    .hint-orb svg { width: 14px; height: 14px; }
+    .stage-footer-note { color: #69718f; font-size: 9px; letter-spacing: .07em; text-align: right; }
+    .gesture-field { position: absolute; z-index: 2; width: 116px; height: 116px; display: none; pointer-events: none; transform: translate(-50%, -50%); }
+    .gesture-field.visible { display: block; }
+    .field-ring { position: absolute; inset: 0; border: 1px solid rgba(143,244,215,.6); border-radius: 50%; box-shadow: 0 0 24px rgba(143,244,215,.11), inset 0 0 20px rgba(143,244,215,.05); animation: field-breathe 2.2s ease-in-out infinite; }
+    .field-ring::before, .field-ring::after { content: ""; position: absolute; border: 1px solid rgba(143,244,215,.23); border-radius: inherit; }
+    .field-ring::before { inset: 10px; }
+    .field-ring::after { inset: 25px; border-color: rgba(143,244,215,.13); }
+    .field-core { position: absolute; top: 50%; left: 50%; width: 5px; height: 5px; border-radius: 50%; background: #c5ffed; box-shadow: 0 0 12px 4px rgba(143,244,215,.42); transform: translate(-50%,-50%); }
+    @keyframes field-breathe { 50% { opacity: .58; transform: scale(.91); } }
+    .camera-preview {
+      position: absolute;
+      z-index: 3;
+      left: 25px;
+      bottom: 67px;
+      width: 172px;
+      aspect-ratio: 4 / 3;
+      overflow: hidden;
+      border: 1px solid rgba(207,213,255,.18);
+      border-radius: 15px;
+      background:
+        radial-gradient(circle at 50% 40%, rgba(127,148,215,.15), transparent 52%),
+        linear-gradient(145deg, rgba(31,35,60,.94), rgba(13,16,32,.98));
+      box-shadow: 0 10px 34px rgba(0,0,0,.25), inset 0 1px rgba(255,255,255,.04);
+    }
+    .camera-preview video { width: 100%; height: 100%; display: none; object-fit: cover; transform: scaleX(-1); }
+    .camera-preview.has-video video { display: block; }
+    .preview-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px; color: #8e96b6; font-size: 9px; }
+    .preview-placeholder svg { width: 24px; height: 24px; color: #a3afd6; opacity: .8; }
+    .camera-preview.has-video .preview-placeholder { display: none; }
+    .preview-caption { position: absolute; right: 7px; bottom: 7px; left: 7px; display: flex; align-items: center; justify-content: space-between; padding: 5px 7px; border: 1px solid rgba(255,255,255,.07); border-radius: 7px; background: rgba(7,9,18,.6); backdrop-filter: blur(8px); color: #e5e8f6; font-size: 8px; }
+    .preview-live { display: inline-flex; align-items: center; gap: 5px; color: #c5ffe9; letter-spacing: .1em; }
+    .preview-live::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #8ff4d7; box-shadow: 0 0 8px #8ff4d7; }
+    .drop-overlay { position: absolute; z-index: 5; inset: 10px; display: none; place-items: center; border: 1px dashed rgba(143,244,215,.7); border-radius: 21px; background: rgba(18,35,43,.74); color: #d6fff1; font-size: 15px; font-weight: 650; pointer-events: none; backdrop-filter: blur(8px); }
+    .stage-shell.dragging .drop-overlay { display: grid; }
+    .toast { position: absolute; z-index: 7; top: 84px; left: 50%; max-width: min(90%, 480px); padding: 10px 14px; border: 1px solid rgba(255,142,175,.24); border-radius: 12px; background: rgba(49,22,39,.93); color: #ffc2d0; font-size: 11px; line-height: 1.45; box-shadow: 0 12px 30px rgba(0,0,0,.25); opacity: 0; pointer-events: none; transform: translate(-50%, -7px); transition: opacity .2s ease, transform .2s ease; }
+    .toast.visible { opacity: 1; transform: translate(-50%, 0); }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    @media (max-width: 900px) {
+      .workspace { grid-template-columns: 260px minmax(0, 1fr); padding: 14px; gap: 13px; }
+      .control-card { padding: 13px; }
+      .stage-head { top: 21px; left: 21px; right: 21px; }
+      .stage-footer { right: 21px; bottom: 19px; left: 21px; }
+      .camera-preview { left: 19px; bottom: 59px; width: 148px; }
+      .topbar { padding-inline: 22px; }
+    }
+    @media (max-width: 700px) {
+      body { overflow: auto; }
+      .app-frame { height: auto; min-height: 100dvh; }
+      .topbar { height: 64px; flex-basis: 64px; padding-inline: 16px; }
+      .brand-mark { width: 34px; height: 34px; border-radius: 11px; }
+      .brand-name { font-size: 12px; }
+      .brand-sub { font-size: 8px; }
+      .top-version { display: none; }
+      .local-badge { padding: 7px 9px; font-size: 9px; }
+      .workspace { display: flex; flex-direction: column; padding: 12px; gap: 13px; }
+      .stage-shell { order: 0; flex: 0 0 auto; height: clamp(390px, 57dvh, 570px); min-height: 390px; }
+      .control-panel { order: 1; overflow: visible; padding: 0 0 8px; }
+      .panel-intro { padding: 5px 3px 12px; }
+      .panel-intro h1 { font-size: 21px; }
+      .panel-intro p { max-width: 390px; }
+      .control-card { margin-bottom: 10px; padding: 15px; }
+      .stage { border-radius: 22px; }
+      .stage-head { top: 17px; left: 16px; right: 16px; }
+      .stage-heading { max-width: 72%; }
+      .stage-heading h2 { margin-top: 9px; font-size: clamp(19px, 6vw, 26px); }
+      .stage-heading p { font-size: 10px; }
+      .stage-overline { font-size: 8px; }
+      .stage-stats { gap: 5px; }
+      .stat-pill { padding: 7px 8px; font-size: 8px; }
+      .stat-pill svg { width: 11px; height: 11px; }
+      .stat-pill.particle-count { display: none; }
+      .camera-preview { left: 14px; bottom: 57px; width: 130px; border-radius: 12px; }
+      .stage-footer { right: 15px; bottom: 16px; left: 15px; }
+      .gesture-hint { max-width: 190px; gap: 7px; font-size: 9px; }
+      .hint-orb { width: 24px; height: 24px; }
+      .stage-footer-note { max-width: 120px; font-size: 8px; }
+      .gesture-field { width: 88px; height: 88px; }
+      .toast { top: 74px; }
+    }
+    @media (max-width: 390px) {
+      .stage-shell { height: 400px; }
+      .stage-heading p { max-width: 220px; }
+      .stage-stats .state-pill { padding-right: 7px; font-size: 0; width: 27px; height: 27px; }
+      .state-pill::before { left: 10px; }
+      .camera-preview { width: 116px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-frame">
+    <header class="topbar">
+      <div class="brand" aria-label="Pixel Flow 手势工作室">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M5 7.2 8 4l4 2.2L16 4l3 3.2-1.8 4.2L19 16l-4 4-3-2-4 2-3-4 1.5-4.5L5 7.2Z" stroke="#a7ffe3" stroke-width="1.2"/><circle cx="12" cy="11.8" r="2.1" fill="#a7ffe3"/><circle cx="6.4" cy="8" r=".8" fill="#a7ffe3"/><circle cx="17.4" cy="7.4" r=".8" fill="#bda7ff"/><circle cx="7" cy="16" r=".8" fill="#8ca8ff"/><circle cx="17" cy="16.5" r=".8" fill="#a7ffe3"/></svg>
+        </div>
+        <div><div class="brand-name">PIXEL FLOW</div><span class="brand-sub">GESTURE STUDIO</span></div>
+      </div>
+      <div class="top-meta"><span class="local-badge">本地图片 · 实时粒子</span><span class="top-version">EXPERIMENT 01</span></div>
+    </header>
+
+    <main class="workspace">
+      <aside class="control-panel" aria-label="粒子与手势控制">
+        <div class="panel-intro">
+          <div class="eyebrow">手势驱动的图像实验</div>
+          <h1>让图像重新聚合</h1>
+          <p>上传一张图片，看它散作流光，再用手掌把每个粒子带回原位。</p>
+        </div>
+
+        <section class="control-card" aria-labelledby="image-card-title">
+          <div class="card-heading">
+            <div class="card-title" id="image-card-title">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="3" width="15" height="14" rx="2" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="8" r="1.4" stroke="currentColor" stroke-width="1.2"/><path d="m4 15 4-4 2.4 2.2 2.2-2.4L16 15" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              图像源
+            </div>
+            <span class="mini-label">JPG · PNG · WEBP</span>
+          </div>
+          <input class="upload-input" id="fileInput" type="file" accept="image/*" aria-label="选择本地图片">
+          <label class="upload-tile" id="uploadTile" for="fileInput" tabindex="0">
+            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4.2c0 1 .8 1.8 1.8 1.8h10.4c1 0 1.8-.8 1.8-1.8V14" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="upload-title">选择图片，或拖放到画布</span>
+            <span class="upload-hint">图片只在当前浏览器中处理</span>
+          </label>
+          <div class="file-name" id="fileName" title="内置示例">内置示例 · Aurora Bloom</div>
+          <div class="range-label"><label for="densityRange">粒子细节</label><span class="range-value" id="densityValue">7 px</span></div>
+          <input id="densityRange" type="range" min="4" max="12" value="7" aria-label="粒子采样间距">
+          <div class="range-ends"><span>更细腻</span><span>更轻盈</span></div>
+        </section>
+
+        <section class="control-card" aria-labelledby="gesture-card-title">
+          <div class="card-heading">
+            <div class="card-title" id="gesture-card-title">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 10V5.2a1.2 1.2 0 0 1 2.4 0v3.3-4.4a1.2 1.2 0 0 1 2.4 0v4.1-3.1a1.2 1.2 0 0 1 2.4 0v3.5-1.4a1.2 1.2 0 0 1 2.4 0v4.2c0 3.1-1.9 5.1-5.2 5.1h-.8c-1.5 0-2.8-.7-3.7-2l-2.3-3.1a1.3 1.3 0 0 1 2.1-1.5L6 10Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              手势指令
+            </div>
+            <span class="mini-label" id="gestureStateLabel">等待相机</span>
+          </div>
+          <div class="gesture-list">
+            <div class="gesture-row" id="openGestureRow">
+              <span class="gesture-icon"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 10V5.2a1.2 1.2 0 0 1 2.4 0v3.3-4.4a1.2 1.2 0 0 1 2.4 0v4.1-3.1a1.2 1.2 0 0 1 2.4 0v3.5-1.4a1.2 1.2 0 0 1 2.4 0v4.2c0 3.1-1.9 5.1-5.2 5.1h-.8c-1.5 0-2.8-.7-3.7-2l-2.3-3.1a1.3 1.3 0 0 1 2.1-1.5L6 10Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <span class="gesture-copy"><span class="gesture-name">张开手掌</span><span class="gesture-desc">吸引粒子，逐渐还原图像</span></span>
+              <span class="gesture-key">RESTORE</span>
+            </div>
+            <div class="gesture-row hold" id="fistGestureRow">
+              <span class="gesture-icon"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5.1 9.1V7.7a1.3 1.3 0 0 1 2.6 0V6.1a1.3 1.3 0 0 1 2.6 0V5.8a1.3 1.3 0 0 1 2.6 0v1.3a1.3 1.3 0 0 1 2.6 0v4.3c0 3.2-2 5.1-5.1 5.1h-.6a5 5 0 0 1-3.9-1.9l-2-2.5a1.6 1.6 0 0 1 2.3-2.2l.9.8V9.1Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <span class="gesture-copy"><span class="gesture-name">握紧拳头</span><span class="gesture-desc">暂停吸引，粒子停在当前位置</span></span>
+              <span class="gesture-key">HOLD</span>
+            </div>
+          </div>
+          <div class="range-label progress-head"><label for="progressRange">还原进度</label><span class="progress-number" id="progressValue">0%</span></div>
+          <input class="progress-range" id="progressRange" type="range" min="0" max="100" value="0" aria-label="手动调整图像还原进度">
+          <div class="action-row">
+            <button class="button button-primary" id="restoreButton" type="button">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.5 10a5.5 5.5 0 1 0 1.2-3.4L4 8.2M4 4.9v3.3h3.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="m8.3 10.2 1.2 1.2 2.5-2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              开始还原
+            </button>
+            <button class="button" id="scatterButton" type="button">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7 5H4v3m0-3 4.1 4.1m4.8 1.8L16 15m0 0v-3m0 3h-3M4 15l3.9-3.9m4.2-2.2L16 4m0 0h-3m3 0v3" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              散开粒子
+            </button>
+          </div>
+        </section>
+
+        <section class="control-card" aria-labelledby="camera-card-title">
+          <div class="camera-top">
+            <div class="card-title" id="camera-card-title">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="5" width="10.6" height="10" rx="2" stroke="currentColor" stroke-width="1.25"/><path d="m13.2 8 4.3-2v8l-4.3-2" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              摄像头追踪
+            </div>
+            <span class="camera-state-dot" id="cameraDot" aria-label="摄像头未连接"></span>
+          </div>
+          <button class="button camera-button" id="cameraButton" type="button">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.2 5.2H5.5A2.5 2.5 0 0 0 3 7.7v5.1a2.5 2.5 0 0 0 2.5 2.5h7a2.5 2.5 0 0 0 2.5-2.5v-.2l2.5 1.5v-8L15 7.6v-.1A2.3 2.3 0 0 0 12.7 5H11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            允许摄像头
+          </button>
+          <p class="camera-message" id="cameraMessage" role="status" aria-live="polite">开启后即可使用手势。你也可以直接用还原按钮和进度条控制粒子。</p>
+        </section>
+        <p class="privacy-note"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.8 13 4v3.5c0 3.1-2 5.3-5 6.7-3-1.4-5-3.6-5-6.7V4l5-2.2Z" stroke="currentColor" stroke-width="1.2"/><path d="m5.8 7.9 1.5 1.5 3-3.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>摄像头与图片仅在本机浏览器中处理，不会上传。</p>
+      </aside>
+
+      <section class="stage-shell" id="stageShell" aria-label="粒子图像画布">
+        <div class="stage" id="stage">
+          <canvas id="particleCanvas" aria-label="图片粒子动画"></canvas>
+          <div class="stage-head">
+            <div class="stage-heading">
+              <div class="stage-overline">PIXEL MEMORY / LIVE</div>
+              <h2 id="stageTitle">光粒正在等待指令</h2>
+              <p id="stageSubtitle">张开手掌，让散落的色彩沿着力场回到图像之中。</p>
+            </div>
+            <div class="stage-stats">
+              <div class="stat-pill particle-count"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="4" cy="4" r="1.2" fill="currentColor"/><circle cx="11.5" cy="3.5" r=".8" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="3.5" cy="12" r=".8" fill="currentColor"/><circle cx="12" cy="11.5" r="1.2" fill="currentColor"/></svg><span id="particleCount">0 粒子</span></div>
+              <div class="stat-pill state-pill" id="stageState">粒子已散开</div>
+            </div>
+          </div>
+          <div class="gesture-field" id="gestureField" aria-hidden="true"><div class="field-ring"></div><div class="field-core"></div></div>
+          <div class="camera-preview" id="cameraPreview" aria-label="摄像头预览">
+            <video id="cameraVideo" autoplay playsinline muted></video>
+            <div class="preview-placeholder"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2.5" stroke="currentColor" stroke-width="1.3"/><path d="m16 10 5-2.5v9L16 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.5" cy="12" r="2" stroke="currentColor" stroke-width="1.1"/></svg><span>相机预览将在此显示</span></div>
+            <div class="preview-caption"><span id="previewStatus">CAMERA STANDBY</span><span class="preview-live" id="previewLive" hidden>LIVE</span></div>
+          </div>
+          <div class="stage-footer">
+            <div class="gesture-hint"><span class="hint-orb"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 10V5.2a1.2 1.2 0 0 1 2.4 0v3.3-4.4a1.2 1.2 0 0 1 2.4 0v4.1-3.1a1.2 1.2 0 0 1 2.4 0v3.5-1.4a1.2 1.2 0 0 1 2.4 0v4.2c0 3.1-1.9 5.1-5.2 5.1h-.8c-1.5 0-2.8-.7-3.7-2l-2.3-3.1a1.3 1.3 0 0 1 2.1-1.5L6 10Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><strong>张开手掌</strong>　粒子向原图归位<br><span style="color:#8088a5">握拳暂停 · 移动手掌以控制力场</span></span></div>
+            <div class="stage-footer-note">MOVE SLOWLY<br>LET THE IMAGE FIND ITS SHAPE</div>
+          </div>
+        </div>
+        <div class="drop-overlay">松开鼠标，载入这张图片</div>
+        <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+  <script>
+    (() => {
+      'use strict';
+
+      const byId = (id) => document.getElementById(id);
+      const stageShell = byId('stageShell');
+      const stage = byId('stage');
+      const canvas = byId('particleCanvas');
+      const fileInput = byId('fileInput');
+      const uploadTile = byId('uploadTile');
+      const fileName = byId('fileName');
+      const densityRange = byId('densityRange');
+      const densityValue = byId('densityValue');
+      const progressRange = byId('progressRange');
+      const progressValue = byId('progressValue');
+      const restoreButton = byId('restoreButton');
+      const scatterButton = byId('scatterButton');
+      const cameraButton = byId('cameraButton');
+      const cameraMessage = byId('cameraMessage');
+      const cameraDot = byId('cameraDot');
+      const cameraVideo = byId('cameraVideo');
+      const cameraPreview = byId('cameraPreview');
+      const previewStatus = byId('previewStatus');
+      const previewLive = byId('previewLive');
+      const gestureField = byId('gestureField');
+      const openGestureRow = byId('openGestureRow');
+      const fistGestureRow = byId('fistGestureRow');
+      const gestureStateLabel = byId('gestureStateLabel');
+      const stageTitle = byId('stageTitle');
+      const stageSubtitle = byId('stageSubtitle');
+      const stageState = byId('stageState');
+      const particleCountLabel = byId('particleCount');
+      const toast = byId('toast');
+
+      let renderer;
+      let scene;
+      let camera;
+      let pointMaterial;
+      let pointCloud;
+      let particleData = null;
+      let sourceCanvas = null;
+      let sourceName = 'Aurora Bloom';
+      let viewWidth = 16;
+      let viewHeight = 9;
+      let restoreProgress = 0;
+      let lastPercent = -1;
+      let manualRestore = false;
+      let lastFrameTime = 0;
+      let elapsed = 0;
+      let stableGesture = 'none';
+      let candidateGesture = 'none';
+      let candidateFrames = 0;
+      let noHandFrames = 0;
+      let handWorld = null;
+      let cameraStream = null;
+      let handsModel = null;
+      let cameraLoopId = 0;
+      let cameraBusy = false;
+      let toastTimeout = 0;
+      let resizeTimer = 0;
+
+      function setCameraMessage(message, tone = '') {
+        cameraMessage.textContent = message;
+        cameraMessage.classList.remove('is-error', 'is-warning', 'is-success');
+        if (tone) cameraMessage.classList.add(`is-${tone}`);
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add('visible');
+        window.clearTimeout(toastTimeout);
+        toastTimeout = window.setTimeout(() => toast.classList.remove('visible'), 3800);
+      }
+
+      function makeSampleImage() {
+        const sample = document.createElement('canvas');
+        sample.width = 840;
+        sample.height = 560;
+        const ctx = sample.getContext('2d');
+        const bg = ctx.createLinearGradient(0, 0, 840, 560);
+        bg.addColorStop(0, '#10172e');
+        bg.addColorStop(.48, '#17182e');
+        bg.addColorStop(1, '#201632');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, sample.width, sample.height);
+
+        const glowA = ctx.createRadialGradient(290, 255, 12, 290, 255, 260);
+        glowA.addColorStop(0, 'rgba(72, 212, 189, .72)');
+        glowA.addColorStop(.35, 'rgba(58, 142, 184, .26)');
+        glowA.addColorStop(1, 'rgba(58, 142, 184, 0)');
+        ctx.fillStyle = glowA;
+        ctx.fillRect(0, 0, sample.width, sample.height);
+        const glowB = ctx.createRadialGradient(585, 280, 8, 585, 280, 245);
+        glowB.addColorStop(0, 'rgba(192, 115, 245, .55)');
+        glowB.addColorStop(.38, 'rgba(102, 92, 211, .24)');
+        glowB.addColorStop(1, 'rgba(94, 74, 179, 0)');
+        ctx.fillStyle = glowB;
+        ctx.fillRect(0, 0, sample.width, sample.height);
+
+        ctx.save();
+        ctx.translate(422, 279);
+        for (let i = 0; i < 13; i += 1) {
+          ctx.save();
+          ctx.rotate((Math.PI * 2 * i) / 13);
+          const petal = ctx.createLinearGradient(0, -24, 0, -188);
+          petal.addColorStop(0, 'rgba(208, 255, 239, .78)');
+          petal.addColorStop(.42, i % 2 ? 'rgba(125, 236, 218, .51)' : 'rgba(165, 156, 255, .61)');
+          petal.addColorStop(1, 'rgba(134, 112, 230, .025)');
+          ctx.fillStyle = petal;
+          ctx.beginPath();
+          ctx.ellipse(0, -89, 31 + (i % 3) * 4, 93, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+        const core = ctx.createRadialGradient(-10, -13, 2, 0, 0, 52);
+        core.addColorStop(0, '#f3fff9');
+        core.addColorStop(.2, '#b9ffe9');
+        core.addColorStop(.55, 'rgba(120, 228, 218, .9)');
+        core.addColorStop(1, 'rgba(144, 152, 255, 0)');
+        ctx.fillStyle = core;
+        ctx.beginPath();
+        ctx.arc(0, 0, 53, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(422, 279);
+        for (let ring = 0; ring < 4; ring += 1) {
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 120 + ring * 53, 54 + ring * 25, -.42 + ring * .18, .2, Math.PI * 1.85);
+          ctx.strokeStyle = `rgba(${ring % 2 ? '174, 164, 255' : '148, 243, 218'}, ${.36 - ring * .055})`;
+          ctx.lineWidth = ring === 0 ? 2 : 1;
+          ctx.stroke();
+        }
+        for (let i = 0; i < 64; i += 1) {
+          const angle = i * 2.399963;
+          const radius = 79 + (i % 9) * 16;
+          const x = Math.cos(angle) * radius * 1.24;
+          const y = Math.sin(angle) * radius * .68;
+          const size = i % 8 === 0 ? 2.3 : .9 + (i % 3) * .35;
+          ctx.beginPath();
+          ctx.arc(x, y, size, 0, Math.PI * 2);
+          ctx.fillStyle = i % 3 === 0 ? 'rgba(193, 177, 255, .88)' : 'rgba(169, 255, 228, .76)';
+          ctx.fill();
+        }
+        ctx.restore();
+
+        const vignette = ctx.createRadialGradient(420, 275, 180, 420, 275, 490);
+        vignette.addColorStop(0, 'rgba(4, 6, 18, 0)');
+        vignette.addColorStop(1, 'rgba(4, 6, 18, .77)');
+        ctx.fillStyle = vignette;
+        ctx.fillRect(0, 0, sample.width, sample.height);
+        return sample;
+      }
+
+      function initThree() {
+        if (!window.THREE) {
+          showToast('Three.js 未能从 CDN 加载。请检查网络连接后刷新页面。');
+          stageTitle.textContent = '图形引擎暂不可用';
+          stageSubtitle.textContent = '请检查 CDN 网络连接。摄像头和粒子需要 Three.js 才能启动。';
+          return false;
+        }
+        try {
+          renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.setClearColor(0x000000, 0);
+          if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+          scene = new THREE.Scene();
+          camera = new THREE.OrthographicCamera(-8, 8, 4.5, -4.5, .1, 100);
+          camera.position.set(0, 0, 30);
+
+          const spriteCanvas = document.createElement('canvas');
+          spriteCanvas.width = 32;
+          spriteCanvas.height = 32;
+          const spriteCtx = spriteCanvas.getContext('2d');
+          const glow = spriteCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+          glow.addColorStop(0, 'rgba(255,255,255,1)');
+          glow.addColorStop(.28, 'rgba(255,255,255,.95)');
+          glow.addColorStop(.58, 'rgba(255,255,255,.42)');
+          glow.addColorStop(1, 'rgba(255,255,255,0)');
+          spriteCtx.fillStyle = glow;
+          spriteCtx.fillRect(0, 0, 32, 32);
+          const sprite = new THREE.CanvasTexture(spriteCanvas);
+          if ('colorSpace' in sprite) sprite.colorSpace = THREE.SRGBColorSpace;
+          pointMaterial = new THREE.PointsMaterial({
+            size: 4.2,
+            map: sprite,
+            vertexColors: true,
+            transparent: true,
+            opacity: .96,
+            alphaTest: .025,
+            depthWrite: false,
+            sizeAttenuation: false,
+            blending: THREE.AdditiveBlending
+          });
+          resizeRenderer();
+          return true;
+        } catch (error) {
+          showToast('当前浏览器无法创建 WebGL 画布，请尝试更新浏览器或开启硬件加速。');
+          stageTitle.textContent = 'WebGL 不可用';
+          stageSubtitle.textContent = error && error.message ? error.message : '此浏览器无法启动图形画布。';
+          return false;
+        }
+      }
+
+      function resizeRenderer() {
+        if (!renderer || !stage) return;
+        const rect = stage.getBoundingClientRect();
+        if (rect.width < 2 || rect.height < 2) return;
+        const oldWidth = viewWidth;
+        const oldHeight = viewHeight;
+        viewWidth = 16;
+        viewHeight = viewWidth * rect.height / rect.width;
+        camera.left = -viewWidth / 2;
+        camera.right = viewWidth / 2;
+        camera.top = viewHeight / 2;
+        camera.bottom = -viewHeight / 2;
+        camera.updateProjectionMatrix();
+        renderer.setSize(rect.width, rect.height, false);
+        if (particleData) {
+          const xScale = viewWidth / oldWidth;
+          const yScale = viewHeight / oldHeight;
+          for (let i = 0; i < particleData.count; i += 1) {
+            const offset = i * 3;
+            particleData.positions[offset] *= xScale;
+            particleData.positions[offset + 1] *= yScale;
+          }
+          updateTargetPositions();
+          particleData.geometry.attributes.position.needsUpdate = true;
+          particleData.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), Math.hypot(viewWidth, viewHeight) * 1.2);
+        }
+      }
+
+      function updateTargetPositions() {
+        if (!particleData || !sourceCanvas) return;
+        const fitScale = Math.min(viewWidth * .72 / sourceCanvas.width, viewHeight * .61 / sourceCanvas.height);
+        for (let i = 0; i < particleData.count; i += 1) {
+          const offset = i * 3;
+          particleData.targets[offset] = particleData.imageX[i] * sourceCanvas.width * fitScale;
+          particleData.targets[offset + 1] = particleData.imageY[i] * sourceCanvas.height * fitScale;
+          particleData.targets[offset + 2] = 0;
+        }
+      }
+
+      function buildParticles(resetProgress = true) {
+        if (!renderer || !sourceCanvas) return;
+        const ctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+        const imageData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+        const stride = Number(densityRange.value);
+        const samples = [];
+        for (let y = Math.floor(stride / 2); y < sourceCanvas.height; y += stride) {
+          for (let x = Math.floor(stride / 2); x < sourceCanvas.width; x += stride) {
+            const pixel = (y * sourceCanvas.width + x) * 4;
+            const alpha = imageData.data[pixel + 3];
+            const red = imageData.data[pixel];
+            const green = imageData.data[pixel + 1];
+            const blue = imageData.data[pixel + 2];
+            if (alpha < 55 || red + green + blue < 45) continue;
+            samples.push(x, y, red, green, blue, alpha);
+          }
+        }
+        const count = samples.length / 6;
+        if (count < 1) {
+          showToast('这张图片没有可见像素，请选择另一张图片。');
+          return;
+        }
+
+        if (pointCloud) {
+          scene.remove(pointCloud);
+          pointCloud.geometry.dispose();
+          pointCloud = null;
+        }
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(count * 3);
+        const colors = new Float32Array(count * 3);
+        const targets = new Float32Array(count * 3);
+        const imageX = new Float32Array(count);
+        const imageY = new Float32Array(count);
+        const scatterX = new Float32Array(count);
+        const scatterY = new Float32Array(count);
+        const scatterZ = new Float32Array(count);
+        const velocities = new Float32Array(count * 3);
+
+        for (let i = 0; i < count; i += 1) {
+          const sample = i * 6;
+          const offset = i * 3;
+          const x = samples[sample];
+          const y = samples[sample + 1];
+          const alpha = samples[sample + 5] / 255;
+          imageX[i] = x / sourceCanvas.width - .5;
+          imageY[i] = .5 - y / sourceCanvas.height;
+          colors[offset] = samples[sample + 2] / 255;
+          colors[offset + 1] = samples[sample + 3] / 255;
+          colors[offset + 2] = samples[sample + 4] / 255;
+          scatterX[i] = (Math.random() - .5) * 1.48;
+          scatterY[i] = (Math.random() - .5) * 1.36;
+          scatterZ[i] = (Math.random() - .5) * 1.5;
+          positions[offset] = scatterX[i] * viewWidth;
+          positions[offset + 1] = scatterY[i] * viewHeight;
+          positions[offset + 2] = scatterZ[i];
+          colors[offset] *= alpha;
+          colors[offset + 1] *= alpha;
+          colors[offset + 2] *= alpha;
+        }
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), Math.hypot(viewWidth, viewHeight) * 1.2);
+        particleData = { geometry, positions, targets, imageX, imageY, scatterX, scatterY, scatterZ, velocities, count };
+        updateTargetPositions();
+        pointCloud = new THREE.Points(geometry, pointMaterial);
+        scene.add(pointCloud);
+        particleCountLabel.textContent = `${count.toLocaleString('zh-CN')} 粒子`;
+        if (resetProgress) {
+          manualRestore = false;
+          setProgress(0);
+        }
+        updateStageCopy();
+      }
+
+      function setProgress(value) {
+        restoreProgress = Math.max(0, Math.min(1, value));
+        const percent = Math.round(restoreProgress * 100);
+        if (percent !== lastPercent) {
+          lastPercent = percent;
+          progressValue.textContent = `${percent}%`;
+          progressRange.value = String(percent);
+          updateStageCopy();
+        }
+      }
+
+      function updateStageCopy() {
+        if (!particleData) return;
+        const frozen = stableGesture === 'fist';
+        if (frozen) {
+          stageTitle.textContent = '粒子停在此刻';
+          stageSubtitle.textContent = '握拳暂停了吸引，松开手掌即可继续还原。';
+          stageState.textContent = '手势已暂停';
+        } else if (stableGesture === 'open') {
+          stageTitle.textContent = '力场正在聚合色彩';
+          stageSubtitle.textContent = '移动手掌，引导粒子逐步回到图像原位。';
+          stageState.textContent = '开掌吸引中';
+        } else if (manualRestore && restoreProgress < 1) {
+          stageTitle.textContent = '图像正在重组';
+          stageSubtitle.textContent = '粒子沿着柔和的力场回到原来的位置。';
+          stageState.textContent = '正在还原';
+        } else if (restoreProgress >= .995) {
+          stageTitle.textContent = '图像已重新聚合';
+          stageSubtitle.textContent = '每个像素都回到了它原本的位置。';
+          stageState.textContent = '还原完成';
+        } else if (restoreProgress > .02) {
+          stageTitle.textContent = '形状正在显现';
+          stageSubtitle.textContent = '用手势、按钮或进度条继续完成还原。';
+          stageState.textContent = '部分还原';
+        } else {
+          stageTitle.textContent = '光粒正在等待指令';
+          stageSubtitle.textContent = '张开手掌，让散落的色彩沿着力场回到图像之中。';
+          stageState.textContent = '粒子已散开';
+        }
+      }
+
+      function updateGestureUI() {
+        openGestureRow.classList.toggle('is-active', stableGesture === 'open');
+        fistGestureRow.classList.toggle('is-active', stableGesture === 'fist');
+        if (stableGesture === 'open') gestureStateLabel.textContent = '开掌吸引';
+        else if (stableGesture === 'fist') gestureStateLabel.textContent = '握拳暂停';
+        else if (stableGesture === 'other') gestureStateLabel.textContent = '手势未识别';
+        else gestureStateLabel.textContent = cameraStream ? '寻找手部' : '等待相机';
+        updateStageCopy();
+      }
+
+      function updateHandField(landmark) {
+        const mirroredX = 1 - landmark.x;
+        gestureField.style.left = `${Math.max(0, Math.min(100, mirroredX * 100))}%`;
+        gestureField.style.top = `${Math.max(0, Math.min(100, landmark.y * 100))}%`;
+        gestureField.classList.add('visible');
+        handWorld = { x: (mirroredX - .5) * viewWidth, y: (.5 - landmark.y) * viewHeight };
+      }
+
+      function classifyGesture(landmarks) {
+        const fingerPairs = [[8, 6], [12, 10], [16, 14], [20, 18]];
+        let extended = 0;
+        for (const [tipIndex, jointIndex] of fingerPairs) {
+          if (landmarks[tipIndex].y < landmarks[jointIndex].y - .012) extended += 1;
+        }
+        if (extended >= 3) return 'open';
+        if (extended === 0) return 'fist';
+        return 'other';
+      }
+
+      function handleHandResults(results) {
+        const list = results && results.multiHandLandmarks;
+        if (!list || list.length === 0) {
+          noHandFrames += 1;
+          candidateFrames = 0;
+          handWorld = null;
+          gestureField.classList.remove('visible');
+          if (noHandFrames >= 5 && stableGesture !== 'none') {
+            stableGesture = 'none';
+            updateGestureUI();
+          }
+          return;
+        }
+        noHandFrames = 0;
+        const landmarks = list[0];
+        updateHandField(landmarks[9]);
+        const nextGesture = classifyGesture(landmarks);
+        if (nextGesture === candidateGesture) candidateFrames += 1;
+        else {
+          candidateGesture = nextGesture;
+          candidateFrames = 1;
+        }
+        if (candidateFrames >= 3 && stableGesture !== candidateGesture) {
+          stableGesture = candidateGesture;
+          updateGestureUI();
+        }
+      }
+
+      function animate(time) {
+        requestAnimationFrame(animate);
+        if (!renderer || !scene || !camera) return;
+        const dt = Math.min(.04, Math.max(0, (time - lastFrameTime) / 1000));
+        lastFrameTime = time;
+        elapsed += dt;
+        if (particleData && pointCloud) {
+          const data = particleData;
+          const gestureActive = stableGesture === 'open';
+          const frozen = stableGesture === 'fist';
+          const attracting = !frozen && (gestureActive || manualRestore);
+          if (attracting && restoreProgress < 1) setProgress(restoreProgress + dt * .205);
+          const positions = data.positions;
+          const velocities = data.velocities;
+          const radius = Math.min(viewWidth, viewHeight) * .38;
+          for (let i = 0; i < data.count; i += 1) {
+            const offset = i * 3;
+            if (frozen) continue;
+            const sx = data.scatterX[i] * viewWidth;
+            const sy = data.scatterY[i] * viewHeight;
+            const sz = data.scatterZ[i];
+            const progress = restoreProgress;
+            let tx = sx + (data.targets[offset] - sx) * progress;
+            let ty = sy + (data.targets[offset + 1] - sy) * progress;
+            let tz = sz * (1 - progress);
+            if (progress < .015) {
+              const phase = i * .017 + elapsed * .65;
+              tx += Math.sin(phase) * .105;
+              ty += Math.cos(phase * .83) * .09;
+            }
+            let force = 1;
+            if (gestureActive && handWorld) {
+              const dx = positions[offset] - handWorld.x;
+              const dy = positions[offset + 1] - handWorld.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              const influence = Math.max(0, 1 - distance / radius);
+              force += influence * 2.9;
+            }
+            const spring = attracting ? 6.2 * force : 2.5;
+            const drag = attracting ? 3.25 : 2.2;
+            velocities[offset] += ((tx - positions[offset]) * spring - velocities[offset] * drag) * dt;
+            velocities[offset + 1] += ((ty - positions[offset + 1]) * spring - velocities[offset + 1] * drag) * dt;
+            velocities[offset + 2] += ((tz - positions[offset + 2]) * spring - velocities[offset + 2] * drag) * dt;
+            positions[offset] += velocities[offset] * dt;
+            positions[offset + 1] += velocities[offset + 1] * dt;
+            positions[offset + 2] += velocities[offset + 2] * dt;
+          }
+          data.geometry.attributes.position.needsUpdate = true;
+          if (restoreProgress >= 1) manualRestore = false;
+        }
+        renderer.render(scene, camera);
+      }
+
+      function loadImageFile(file) {
+        if (!file) return;
+        if (!file.type || !file.type.startsWith('image/')) {
+          showToast('请选择 JPG、PNG、WEBP 等图片文件。');
+          return;
+        }
+        const objectUrl = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+          const maxWidth = 840;
+          const maxHeight = 620;
+          const scale = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+          const nextCanvas = document.createElement('canvas');
+          nextCanvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+          nextCanvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+          const ctx = nextCanvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(image, 0, 0, nextCanvas.width, nextCanvas.height);
+          sourceCanvas = nextCanvas;
+          sourceName = file.name;
+          fileName.textContent = file.name;
+          fileName.title = file.name;
+          URL.revokeObjectURL(objectUrl);
+          buildParticles(true);
+        };
+        image.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          showToast('无法读取这张图片，请尝试另一种格式。');
+        };
+        image.src = objectUrl;
+      }
+
+      function handleFiles(files) {
+        if (files && files.length) loadImageFile(files[0]);
+      }
+
+      function mediaErrorMessage(error) {
+        if (!error) return '无法访问摄像头，请检查浏览器权限后重试。';
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError' || error.name === 'SecurityError') {
+          return '摄像头权限被拒绝。请在浏览器地址栏的站点权限中允许摄像头，然后重试。';
+        }
+        if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+          return '没有找到可用摄像头。连接摄像头后即可使用手势，或继续使用手动控件。';
+        }
+        if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+          return '摄像头当前不可用，可能正被其他应用占用。关闭占用程序后重试。';
+        }
+        if (error.name === 'OverconstrainedError') return '摄像头不支持请求的视频规格，请检查设备后重试。';
+        if (!window.isSecureContext) return '浏览器只允许在安全页面访问摄像头。请使用 HTTPS 或 localhost 打开本页。';
+        return `无法启动摄像头：${error.message || error.name || '未知错误'}。`;
+      }
+
+      async function startCamera() {
+        if (!window.isSecureContext && location.protocol !== 'file:') {
+          setCameraMessage('浏览器只允许在 HTTPS 或 localhost 页面访问摄像头。', 'warning');
+          return;
+        }
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+          setCameraMessage('此浏览器不支持摄像头访问。请更新浏览器，或继续使用手动还原控件。', 'error');
+          return;
+        }
+        if (typeof window.Hands !== 'function') {
+          setCameraMessage('MediaPipe Hands 未能从 CDN 加载。请检查网络连接；图片和手动粒子控制仍可使用。', 'error');
+          return;
+        }
+
+        cameraButton.disabled = true;
+        setCameraMessage('等待浏览器摄像头授权…');
+        previewStatus.textContent = 'REQUESTING ACCESS';
+        try {
+          cameraStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+          });
+          cameraVideo.srcObject = cameraStream;
+          await cameraVideo.play();
+          cameraPreview.classList.add('has-video');
+          previewStatus.textContent = 'LOADING HAND MODEL';
+          cameraDot.classList.add('live');
+          cameraDot.setAttribute('aria-label', '摄像头已连接');
+          cameraButton.innerHTML = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/></svg>关闭摄像头';
+          setCameraMessage('摄像头已连接，正在加载 MediaPipe 手部模型…');
+
+          handsModel = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}` });
+          handsModel.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: .62,
+            minTrackingConfidence: .55
+          });
+          handsModel.onResults(handleHandResults);
+          await handsModel.initialize();
+          previewStatus.textContent = 'GESTURE TRACKING';
+          previewLive.hidden = false;
+          setCameraMessage('追踪已就绪。张开手掌开始还原，握拳即可暂停。', 'success');
+          cameraLoopId = window.requestAnimationFrame(cameraLoop);
+        } catch (error) {
+          if (cameraStream && !handsModel) {
+            for (const track of cameraStream.getTracks()) track.stop();
+            cameraStream = null;
+            cameraVideo.srcObject = null;
+            cameraPreview.classList.remove('has-video');
+            cameraDot.classList.remove('live');
+            cameraDot.setAttribute('aria-label', '摄像头未连接');
+            cameraButton.innerHTML = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.2 5.2H5.5A2.5 2.5 0 0 0 3 7.7v5.1a2.5 2.5 0 0 0 2.5 2.5h7a2.5 2.5 0 0 0 2.5-2.5v-.2l2.5 1.5v-8L15 7.6v-.1A2.3 2.3 0 0 0 12.7 5H11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>允许摄像头';
+            previewStatus.textContent = 'CAMERA STANDBY';
+          }
+          setCameraMessage(mediaErrorMessage(error), 'error');
+          previewLive.hidden = true;
+          if (cameraStream && handsModel) {
+            setCameraMessage('摄像头已开启，但 MediaPipe 模型启动失败。重试或继续使用手动控件。', 'error');
+          }
+        } finally {
+          cameraButton.disabled = false;
+        }
+      }
+
+      async function stopCamera() {
+        if (cameraLoopId) window.cancelAnimationFrame(cameraLoopId);
+        cameraLoopId = 0;
+        cameraBusy = false;
+        if (cameraStream) {
+          for (const track of cameraStream.getTracks()) track.stop();
+        }
+        cameraStream = null;
+        cameraVideo.srcObject = null;
+        cameraPreview.classList.remove('has-video');
+        cameraDot.classList.remove('live');
+        cameraDot.setAttribute('aria-label', '摄像头未连接');
+        previewStatus.textContent = 'CAMERA STANDBY';
+        previewLive.hidden = true;
+        if (handsModel) {
+          try { await handsModel.close(); } catch (error) { /* The stream is already stopped. */ }
+        }
+        handsModel = null;
+        stableGesture = 'none';
+        candidateGesture = 'none';
+        candidateFrames = 0;
+        noHandFrames = 0;
+        handWorld = null;
+        gestureField.classList.remove('visible');
+        updateGestureUI();
+        cameraButton.innerHTML = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.2 5.2H5.5A2.5 2.5 0 0 0 3 7.7v5.1a2.5 2.5 0 0 0 2.5 2.5h7a2.5 2.5 0 0 0 2.5-2.5v-.2l2.5 1.5v-8L15 7.6v-.1A2.3 2.3 0 0 0 12.7 5H11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>允许摄像头';
+        setCameraMessage('摄像头已关闭。你可以继续使用还原按钮和进度条控制粒子。');
+      }
+
+      async function cameraLoop(now) {
+        if (!cameraStream || !handsModel) return;
+        if (!cameraBusy && cameraVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && now - (cameraLoop.lastSent || 0) > 55) {
+          cameraBusy = true;
+          cameraLoop.lastSent = now;
+          try { await handsModel.send({ image: cameraVideo }); }
+          catch (error) {
+            setCameraMessage('手部追踪暂时中断。请检查摄像头画面或重新启动追踪。', 'warning');
+          } finally { cameraBusy = false; }
+        }
+        if (cameraStream) cameraLoopId = window.requestAnimationFrame(cameraLoop);
+      }
+
+      fileInput.addEventListener('change', (event) => {
+        handleFiles(event.target.files);
+        fileInput.value = '';
+      });
+      uploadTile.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          fileInput.click();
+        }
+      });
+      densityRange.addEventListener('input', () => {
+        densityValue.textContent = `${densityRange.value} px`;
+      });
+      densityRange.addEventListener('change', () => buildParticles(true));
+      progressRange.addEventListener('input', () => {
+        manualRestore = false;
+        setProgress(Number(progressRange.value) / 100);
+      });
+      restoreButton.addEventListener('click', () => {
+        if (restoreProgress >= .995) setProgress(0);
+        manualRestore = true;
+        updateStageCopy();
+      });
+      scatterButton.addEventListener('click', () => {
+        manualRestore = false;
+        setProgress(0);
+        updateStageCopy();
+      });
+      cameraButton.addEventListener('click', () => {
+        if (cameraStream) stopCamera();
+        else startCamera();
+      });
+      for (const type of ['dragenter', 'dragover']) {
+        stageShell.addEventListener(type, (event) => {
+          event.preventDefault();
+          stageShell.classList.add('dragging');
+        });
+        uploadTile.addEventListener(type, (event) => {
+          event.preventDefault();
+          uploadTile.classList.add('drag-active');
+        });
+      }
+      for (const type of ['dragleave', 'drop']) {
+        stageShell.addEventListener(type, (event) => {
+          event.preventDefault();
+          if (type === 'drop') handleFiles(event.dataTransfer.files);
+          stageShell.classList.remove('dragging');
+        });
+        uploadTile.addEventListener(type, (event) => {
+          event.preventDefault();
+          if (type === 'drop') handleFiles(event.dataTransfer.files);
+          uploadTile.classList.remove('drag-active');
+        });
+      }
+      window.addEventListener('dragend', () => {
+        stageShell.classList.remove('dragging');
+        uploadTile.classList.remove('drag-active');
+      });
+      window.addEventListener('resize', () => {
+        window.clearTimeout(resizeTimer);
+        resizeTimer = window.setTimeout(resizeRenderer, 70);
+      });
+      window.addEventListener('beforeunload', () => {
+        if (cameraStream) for (const track of cameraStream.getTracks()) track.stop();
+      });
+
+      if (initThree()) {
+        sourceCanvas = makeSampleImage();
+        buildParticles(true);
+        requestAnimationFrame(animate);
+        if (typeof ResizeObserver === 'function') {
+          const observer = new ResizeObserver(() => resizeRenderer());
+          observer.observe(stage);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
