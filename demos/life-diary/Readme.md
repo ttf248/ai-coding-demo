@@ -8,4 +8,5 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [情绪日记 · GPT 5.6 Luna Max](../../demos/life-diary/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-16 | [v1](../../demos/life-diary/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../demos/life-diary/runs/gpt-5-6-luna-max-r01/index.html) |
+| [情绪日记 · GPT 6 Luna Max](../../demos/life-diary/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](../../demos/life-diary/runs/gpt-6-luna-max-r01/prompt.md) | [打开](../../demos/life-diary/runs/gpt-6-luna-max-r01/index.html) |
 | [生活情绪日记](../../demos/life-diary/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](../../demos/life-diary/runs/unknown-unknown-r01/prompt.md) | [打开](../../demos/life-diary/runs/unknown-unknown-r01/index.html) |

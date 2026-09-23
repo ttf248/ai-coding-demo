@@ -8,4 +8,5 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [静心 · GPT 5.6 Luna Max](../../demos/meditation/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-16 | [v1](../../demos/meditation/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../demos/meditation/runs/gpt-5-6-luna-max-r01/index.html) |
+| [静心 · GPT 6 Luna Max](../../demos/meditation/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](../../demos/meditation/runs/gpt-6-luna-max-r01/prompt.md) | [打开](../../demos/meditation/runs/gpt-6-luna-max-r01/index.html) |
 | [冥想 iOS App](../../demos/meditation/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](../../demos/meditation/runs/unknown-unknown-r01/prompt.md) | [打开](../../demos/meditation/runs/unknown-unknown-r01/index.html) |

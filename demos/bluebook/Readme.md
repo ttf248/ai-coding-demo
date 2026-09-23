@@ -9,5 +9,6 @@
 |---|---|---|---|---|
 | [小蓝书](../../demos/bluebook/runs/claude-4-0-unknown-r01/Readme.md) | Claude 4.0 / unknown | 2025-05 | [v2](../../demos/bluebook/runs/claude-4-0-unknown-r01/prompt.md) | [打开](../../previews/bluebook/claude-4-0-unknown-r01/index.html) |
 | [小蓝书 · GPT 5.6 Luna Max](../../demos/bluebook/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-16 | [v1](../../demos/bluebook/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../previews/bluebook/gpt-5-6-luna-max-r01/index.html) |
+| [小蓝书 · GPT 6 Luna Max](../../demos/bluebook/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](../../demos/bluebook/runs/gpt-6-luna-max-r01/prompt.md) | [打开](../../previews/bluebook/gpt-6-luna-max-r01/index.html) |
 | [小蓝书 · MiniMax M2.1](../../demos/bluebook/runs/minimax-m2-1-unknown-r01/Readme.md) | MiniMax M2.1 / unknown | 2025-12 | [v1](../../demos/bluebook/runs/minimax-m2-1-unknown-r01/prompt.md) | [打开](../../previews/bluebook/minimax-m2-1-unknown-r01/index.html) |
 | [小蓝书 · MiniMaxi M2](../../demos/bluebook/runs/minimax-m2-unknown-r01/Readme.md) | MiniMaxi M2 / unknown | 2025-11 | [v1](../../demos/bluebook/runs/minimax-m2-unknown-r01/prompt.md) | [打开](../../previews/bluebook/minimax-m2-unknown-r01/index.html) |

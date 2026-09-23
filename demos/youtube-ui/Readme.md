@@ -8,4 +8,5 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [VideoTube UI · GPT 5.6 Luna Max](../../demos/youtube-ui/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-16 | [v1](../../demos/youtube-ui/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../demos/youtube-ui/runs/gpt-5-6-luna-max-r01/index.html) |
+| [VideoTube UI · GPT 6 Luna Max](../../demos/youtube-ui/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](../../demos/youtube-ui/runs/gpt-6-luna-max-r01/prompt.md) | [打开](../../demos/youtube-ui/runs/gpt-6-luna-max-r01/index.html) |
 | [YouTube UI 模块](../../demos/youtube-ui/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](../../demos/youtube-ui/runs/unknown-unknown-r01/prompt.md) | [打开](../../demos/youtube-ui/runs/unknown-unknown-r01/youtube-app-creator.html) |
