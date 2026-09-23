@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#071019">
+  <meta name="description" content="一座以真实尺度构筑、可自由漫游的新哥特式海上塔城。">
+  <title>黑潮城 · TIDEMARK</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #dce8e8;
+      --muted: #85979a;
+      --cyan: #9ce6df;
+      --gold: #dab782;
+      --panel: rgba(9, 19, 27, .74);
+      --line: rgba(174, 209, 206, .2);
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #071019; }
+    body { color: var(--ink); font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif; letter-spacing: .025em; }
+    button { color: inherit; font: inherit; }
+    #world { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+    .vignette { position: fixed; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse at 50% 47%, transparent 38%, rgba(2, 7, 12, .24) 78%, rgba(1, 4, 9, .68) 140%); }
+    .grain { position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: .12; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.92' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E"); mix-blend-mode: screen; }
+    .hud { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
+    .topbar { position: absolute; top: 25px; left: 30px; right: 30px; display: flex; align-items: flex-start; justify-content: space-between; }
+    .brand { display: flex; gap: 13px; align-items: center; }
+    .sigil { width: 34px; height: 43px; position: relative; border: 1px solid rgba(218,183,130,.7); clip-path: polygon(50% 0, 100% 25%, 86% 100%, 14% 100%, 0 25%); }
+    .sigil::before, .sigil::after { content: ""; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 1px; height: 88%; background: var(--gold); }
+    .sigil::after { width: 72%; height: 1px; bottom: 36%; }
+    .brand-name { font-size: 12px; font-weight: 650; letter-spacing: .24em; }
+    .brand-sub { margin-top: 5px; font-size: 9px; letter-spacing: .2em; color: var(--muted); }
+    .top-meta { display: flex; gap: 22px; align-items: center; color: #a8b7b8; font: 10px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .13em; text-transform: uppercase; }
+    .live { display: inline-flex; align-items: center; gap: 8px; }
+    .live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #9de6d6; box-shadow: 0 0 12px #8cead9; animation: pulse 2s infinite; }
+    @keyframes pulse { 50% { opacity: .45; box-shadow: 0 0 3px #8cead9; } }
+    .side-card { position: absolute; left: 30px; top: 112px; width: 224px; padding: 14px; border: 1px solid var(--line); background: linear-gradient(145deg, rgba(10,22,30,.78), rgba(8,16,23,.42)); backdrop-filter: blur(12px); box-shadow: 0 16px 50px #02070b55; }
+    .card-label { display: flex; justify-content: space-between; color: #91a5a7; font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .17em; text-transform: uppercase; }
+    #map { display: block; width: 194px; height: 194px; margin: 13px auto 12px; border: 1px solid rgba(151,191,188,.15); background: rgba(6,14,20,.7); }
+    .coords { display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid rgba(174,209,206,.14); color: #829598; font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .11em; }
+    .coords b { color: #cad9d6; font-weight: 500; }
+    .location { position: absolute; left: 30px; bottom: 29px; max-width: 290px; }
+    .location .eyebrow { color: var(--gold); font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .2em; }
+    .location h2 { margin: 8px 0 5px; font: 300 21px/1.1 Georgia, "Times New Roman", serif; letter-spacing: .04em; }
+    .location p { margin: 0; color: #8b9c9e; font-size: 10px; letter-spacing: .08em; }
+    .compass { position: absolute; top: 27px; left: 50%; transform: translateX(-50%); width: 112px; text-align: center; color: #9aabad; font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .14em; }
+    .compass-rose { position: relative; margin: 8px auto 0; width: 54px; height: 25px; overflow: hidden; border-top: 1px solid #a5b5b2; }
+    .compass-rose::before { content: ""; position: absolute; top: -1px; left: 50%; width: 1px; height: 15px; background: var(--gold); transform-origin: top; transform: translateX(-50%) rotate(var(--bearing, 0deg)); box-shadow: 0 0 7px #e0b881; }
+    .compass-rose::after { content: "N     E     S     W"; position: absolute; left: -4px; right: -4px; top: 7px; color: #718387; font-size: 8px; white-space: pre; }
+    .crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; transform: translate(-50%,-50%); opacity: .68; }
+    .crosshair::before, .crosshair::after { content: ""; position: absolute; background: rgba(212,232,226,.8); }
+    .crosshair::before { top: 8px; left: 0; width: 18px; height: 1px; }
+    .crosshair::after { left: 8px; top: 0; width: 1px; height: 18px; }
+    #poi-layer { position: absolute; inset: 0; overflow: hidden; }
+    .poi { position: absolute; padding: 5px 8px; color: #c6d5cf; border-left: 1px solid var(--gold); background: rgba(7,17,23,.55); font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .12em; white-space: nowrap; opacity: 0; transition: opacity .25s; text-shadow: 0 1px 8px #071019; }
+    .poi.visible { opacity: .88; }
+    .controls { position: absolute; right: 30px; bottom: 27px; width: 235px; padding: 14px 15px; border: 1px solid var(--line); background: linear-gradient(145deg, rgba(10,22,30,.78), rgba(8,16,23,.42)); backdrop-filter: blur(12px); }
+    .controls-title { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid rgba(174,209,206,.15); color: #a4b5b4; font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .17em; }
+    .keyrow { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; color: #87999b; font-size: 9px; letter-spacing: .08em; }
+    .keys { display: flex; align-items: center; gap: 3px; }
+    kbd { min-width: 19px; height: 18px; padding: 2px 4px; border: 1px solid rgba(174,209,206,.24); border-radius: 2px; color: #d0ddda; text-align: center; font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; background: rgba(197,224,217,.04); }
+    .actions { display: flex; gap: 7px; margin-top: 13px; }
+    .action { pointer-events: auto; flex: 1; cursor: pointer; padding: 9px 6px; border: 1px solid rgba(174,209,206,.24); border-radius: 0; color: #c3d1ce; background: rgba(164,205,196,.07); font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .08em; transition: .2s; }
+    .action:hover, .action.active { border-color: rgba(218,183,130,.72); color: #f0d6aa; background: rgba(218,183,130,.11); }
+    .sound-note { position: absolute; top: 31px; right: 30px; margin-top: 31px; color: #839496; font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .12em; }
+    .veil { position: fixed; inset: 0; z-index: 8; display: grid; place-items: center; background: linear-gradient(90deg,rgba(4,10,16,.78),rgba(4,10,16,.18) 80%), linear-gradient(0deg,rgba(3,8,13,.4),transparent 60%); transition: opacity .85s ease, visibility .85s; }
+    .veil.dismissed { opacity: 0; visibility: hidden; pointer-events: none; }
+    .intro { width: min(610px, calc(100vw - 44px)); margin-left: min(8vw, 120px); transform: translateY(-1vh); }
+    .intro-kicker { display: flex; align-items: center; gap: 13px; color: var(--gold); font: 10px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .25em; }
+    .intro-kicker::before { content: ""; width: 34px; height: 1px; background: var(--gold); }
+    h1 { margin: 21px 0 10px; font: 300 clamp(45px, 7vw, 82px)/.95 Georgia, "Times New Roman", serif; letter-spacing: .02em; text-shadow: 0 5px 32px #0008; }
+    h1 span { display: block; margin-top: 13px; color: #b2c3c0; font: 300 clamp(16px, 2vw, 22px)/1.2 Inter, "Segoe UI", sans-serif; letter-spacing: .38em; }
+    .intro-copy { max-width: 410px; margin: 27px 0 0; color: #a7b6b5; font-size: 12px; line-height: 1.9; letter-spacing: .07em; }
+    .enter { display: inline-flex; align-items: center; gap: 23px; margin-top: 28px; padding: 14px 19px; border: 1px solid rgba(218,183,130,.7); color: #f0d4a6; background: rgba(218,183,130,.08); cursor: pointer; font: 10px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .16em; transition: background .2s, box-shadow .2s; }
+    .enter:hover { background: rgba(218,183,130,.17); box-shadow: 0 0 28px #d6b87d22; }
+    .enter i { display: block; width: 22px; height: 1px; background: var(--gold); position: relative; }
+    .enter i::after { content: ""; position: absolute; right: 0; top: -3px; width: 6px; height: 6px; border-top: 1px solid var(--gold); border-right: 1px solid var(--gold); transform: rotate(45deg); }
+    .intro-foot { margin-top: 38px; color: #788b8e; font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .16em; }
+    #error { display: none; position: fixed; inset: 0; z-index: 20; place-items: center; padding: 30px; color: #eee; text-align: center; background: #071019; font: 14px/1.7 sans-serif; }
+    .touch-pad { display: none; position: absolute; left: 25px; bottom: 32px; width: 116px; height: 116px; pointer-events: auto; }
+    .touch-pad button { position: absolute; width: 38px; height: 38px; border: 1px solid rgba(174,209,206,.3); background: rgba(8,19,26,.62); color: #cfe1dc; touch-action: none; }
+    .touch-pad button:active { background: rgba(218,183,130,.25); }
+    .touch-pad .up { left: 39px; top: 0; }.touch-pad .left { left: 0; top: 39px; }.touch-pad .down { left: 39px; top: 78px; }.touch-pad .right { left: 78px; top: 39px; }
+    @media (max-width: 650px) {
+      .topbar { left: 17px; right: 17px; top: 17px; }.top-meta { gap: 9px; font-size: 8px; }.top-meta .build { display: none; }
+      .compass { top: 87px; left: auto; right: 17px; transform: scale(.9); transform-origin: top right; }
+      .side-card { left: 16px; top: 83px; width: 142px; padding: 8px; }.side-card .card-label { font-size: 7px; } #map { width: 124px; height: 124px; margin: 8px auto; }.coords { font-size: 7px; }
+      .location { left: 17px; bottom: 23px; max-width: 200px; }.location h2 { font-size: 17px; }.location p { font-size: 8px; }
+      .controls { right: 14px; bottom: 18px; width: 177px; padding: 10px; }.controls-title { font-size: 8px; }.keyrow { font-size: 8px; padding-top: 8px; }.keyrow:nth-of-type(3) { display: none; }.actions { margin-top: 9px; }.action { padding: 8px 3px; font-size: 8px; }
+      .touch-pad { display: block; left: 16px; bottom: 96px; transform: scale(.88); transform-origin: bottom left; }
+      .sound-note { display: none; }.intro { margin-left: 0; transform: translateY(-3vh); }.intro-copy { font-size: 11px; max-width: 330px; }
+    }
+    @media (max-height: 580px) and (min-width: 651px) { .side-card { top: 82px; width: 180px; padding: 9px; } #map { width: 148px; height: 148px; } .location { bottom: 15px; } .controls { bottom: 14px; } }
+  </style>
+</head>
+<body>
+  <canvas id="world" aria-label="黑潮城三维漫游场景"></canvas>
+  <div class="vignette"></div><div class="grain"></div>
+  <div class="hud">
+    <header class="topbar">
+      <div class="brand"><div class="sigil"></div><div><div class="brand-name">TIDEMARK / 黑潮城</div><div class="brand-sub">A CITY AT THE EDGE OF THE SEA</div></div></div>
+      <div class="top-meta"><span class="live">CITY SYSTEMS ONLINE</span><span class="build">VOL. 01 · SCALE 1:1</span></div>
+    </header>
+    <div class="compass"><span>BEARING</span><div class="compass-rose" id="compass"></div></div>
+    <aside class="side-card">
+      <div class="card-label"><span>WAYFINDER</span><span>01 / 04</span></div>
+      <canvas id="map" width="388" height="388"></canvas>
+      <div class="coords"><span>N <b id="coord-n">00.0</b></span><span>E <b id="coord-e">00.0</b></span><span>ALT <b>01.7</b></span></div>
+    </aside>
+    <div class="crosshair"></div>
+    <div id="poi-layer"></div>
+    <div class="location"><div class="eyebrow" id="district-code">DISTRICT 00 — OUTER GATE</div><h2 id="district-name">盐雾海门</h2><p id="district-desc">潮墙之外，群塔在雾中升起。</p></div>
+    <div class="sound-note">ATMOSPHERE · TIDAL WIND</div>
+    <aside class="controls">
+      <div class="controls-title"><span>NAVIGATION</span><span id="speed-readout">09 M/S</span></div>
+      <div class="keyrow"><span>MOVE</span><span class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span></div>
+      <div class="keyrow"><span>LOOK AROUND</span><span class="keys"><kbd>DRAG</kbd></span></div>
+      <div class="keyrow"><span>RUN</span><span class="keys"><kbd>SHIFT</kbd></span></div>
+      <div class="actions"><button class="action" id="route-btn">追随灯火 ↗</button><button class="action" id="reset-btn">返回海门</button></div>
+    </aside>
+    <div class="touch-pad" id="touch-pad" aria-label="触屏移动控制">
+      <button class="up" data-key="w" aria-label="前进">▲</button><button class="left" data-key="a" aria-label="左移">◀</button><button class="down" data-key="s" aria-label="后退">▼</button><button class="right" data-key="d" aria-label="右移">▶</button>
+    </div>
+  </div>
+  <div class="veil" id="veil"><main class="intro">
+    <div class="intro-kicker">FICTIONAL COAST · ARCHIVE / 01</div>
+    <h1>黑潮城<span>TIDEMARK, THE LAST CITADEL</span></h1>
+    <p class="intro-copy">在盐雾与潮声之间，一座新哥特式海上城邦沿着圣徒尖塔层层升起。走过海门、灯火广场与高耸的穹顶——每一步都是一米。</p>
+    <button class="enter" id="enter-btn"><span>进入城域 / ENTER THE CITY</span><i></i></button>
+    <div class="intro-foot">WASD MOVE&nbsp;&nbsp; · &nbsp;&nbsp;MOUSE LOOK&nbsp;&nbsp; · &nbsp;&nbsp;SHIFT RUN</div>
+  </main></div>
+  <div id="error"></div>
+<script>
+(() => {
+  'use strict';
+  const canvas = document.getElementById('world');
+  const mapCanvas = document.getElementById('map');
+  const gl = canvas.getContext('webgl', { antialias: true, alpha: false, powerPreference: 'high-performance' });
+  const errorBox = document.getElementById('error');
+  if (!gl) {
+    errorBox.style.display = 'grid';
+    errorBox.textContent = '此浏览器没有可用的 WebGL 图形环境。请尝试在启用硬件加速的现代浏览器中打开此页面。';
+    return;
+  }
+  const vertexSource = `
+    attribute vec3 aPosition; attribute vec3 aNormal; attribute vec3 aColor; attribute float aWater; attribute float aGlow;
+    uniform mat4 uViewProjection; uniform mediump float uTime; uniform mediump vec3 uCamera;
+    varying mediump vec3 vNormal; varying mediump vec3 vColor; varying mediump vec3 vWorld; varying mediump float vWater; varying mediump float vGlow; varying mediump float vDepth;
+    void main() {
+      vec3 p = aPosition;
+      if (aWater > 0.5) p.y += sin(p.x * 0.075 + uTime * 0.62) * 0.22 + cos(p.z * 0.092 + uTime * 0.47) * 0.19;
+      vWorld = p; vNormal = aNormal; vColor = aColor; vWater = aWater; vGlow = aGlow;
+      vDepth = distance(p, uCamera);
+      gl_Position = uViewProjection * vec4(p, 1.0);
+    }`;
+  const fragmentSource = `
+    precision mediump float;
+    uniform mediump vec3 uCamera; uniform mediump float uTime;
+    varying mediump vec3 vNormal; varying mediump vec3 vColor; varying mediump vec3 vWorld; varying mediump float vWater; varying mediump float vGlow; varying mediump float vDepth;
+    void main() {
+      vec3 n = normalize(vNormal);
+      vec3 light = normalize(vec3(-0.38, 0.82, 0.43));
+      float diffuse = max(dot(n, light), 0.0);
+      float hemi = 0.37 + diffuse * 0.66 + max(n.y, 0.0) * 0.13;
+      vec3 color = vColor * hemi;
+      color = mix(color, vColor * 1.25, vGlow);
+      if (vWater > 0.5) {
+        float fres = pow(1.0 - max(dot(n, normalize(uCamera - vWorld)), 0.0), 2.4);
+        float ripple = 0.5 + 0.5 * sin(vWorld.x * 0.22 + vWorld.z * 0.11 + uTime * 1.4);
+        color += vec3(0.045, 0.18, 0.2) * fres + vec3(0.018, 0.065, 0.07) * ripple;
+      }
+      float fog = smoothstep(185.0, 440.0, vDepth);
+      vec3 fogColor = vec3(0.035, 0.067, 0.095);
+      color = mix(color, fogColor, fog);
+      gl_FragColor = vec4(color, 1.0);
+    }`;
+  const particleVertex = `
+    attribute vec3 aPosition; attribute vec3 aColor; attribute float aSize; attribute float aSeed; attribute float aRise;
+    uniform mat4 uViewProjection; uniform float uTime; uniform float uPixelRatio;
+    varying mediump vec3 vColor; varying mediump float vAlpha;
+    void main() {
+      vec3 p = aPosition;
+      float phase = fract(uTime * (0.11 + aSeed * 0.12) + aSeed * 7.31);
+      p.y += phase * aRise;
+      p.x += sin(uTime * 0.82 + aSeed * 43.0) * (aRise > 0.1 ? 0.26 : 0.0);
+      vec4 clip = uViewProjection * vec4(p, 1.0);
+      gl_Position = clip;
+      gl_PointSize = clamp(aSize * uPixelRatio * (235.0 / max(1.0, clip.w)), 1.0, 17.0);
+      vColor = aColor; vAlpha = aRise > 0.1 ? (0.45 + 0.55 * sin(phase * 3.14159)) : 0.78;
+    }`;
+  const particleFragment = `
+    precision mediump float; varying mediump vec3 vColor; varying mediump float vAlpha;
+    void main() {
+      vec2 q = gl_PointCoord - vec2(0.5); float d = length(q);
+      float a = (1.0 - smoothstep(0.05, 0.5, d)) * vAlpha;
+      if (a < 0.03) discard;
+      gl_FragColor = vec4(vColor, a);
+    }`;
+  function compile(type, source) {
+    const shader = gl.createShader(type); gl.shaderSource(shader, source); gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader) || 'Shader compile failed');
+    return shader;
+  }
+  function program(vs, fs) {
+    const p = gl.createProgram(); gl.attachShader(p, compile(gl.VERTEX_SHADER, vs)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) || 'Program link failed');
+    return p;
+  }
+  let mainProgram, particleProgram;
+  try { mainProgram = program(vertexSource, fragmentSource); particleProgram = program(particleVertex, particleFragment); }
+  catch (err) { errorBox.style.display = 'grid'; errorBox.textContent = '图形着色器初始化失败：' + err.message; return; }
+  const mainLoc = {
+    pos: gl.getAttribLocation(mainProgram, 'aPosition'), normal: gl.getAttribLocation(mainProgram, 'aNormal'), color: gl.getAttribLocation(mainProgram, 'aColor'),
+    water: gl.getAttribLocation(mainProgram, 'aWater'), glow: gl.getAttribLocation(mainProgram, 'aGlow'), vp: gl.getUniformLocation(mainProgram, 'uViewProjection'),
+    time: gl.getUniformLocation(mainProgram, 'uTime'), camera: gl.getUniformLocation(mainProgram, 'uCamera')
+  };
+  const particleLoc = {
+    pos: gl.getAttribLocation(particleProgram, 'aPosition'), color: gl.getAttribLocation(particleProgram, 'aColor'), size: gl.getAttribLocation(particleProgram, 'aSize'),
+    seed: gl.getAttribLocation(particleProgram, 'aSeed'), rise: gl.getAttribLocation(particleProgram, 'aRise'), vp: gl.getUniformLocation(particleProgram, 'uViewProjection'),
+    time: gl.getUniformLocation(particleProgram, 'uTime'), ratio: gl.getUniformLocation(particleProgram, 'uPixelRatio')
+  };
+  const vertices = [], particles = [], buildings = [], colliders = [];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const hex = (s) => { const n = parseInt(s.slice(1), 16); return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; };
+  const C = {
+    stone: hex('#35434a'), stoneLight: hex('#53616a'), shadow: hex('#202e35'), roof: hex('#182a33'), roofLight: hex('#293e47'),
+    gold: hex('#b98e5e'), goldBright: hex('#e0bd83'), blue: hex('#61bcb9'), blueLite: hex('#a3e3d9'), water: hex('#07363e'), ground: hex('#17262b'), road: hex('#101d22'), ember: hex('#f1a257')
+  };
+  const addVertex = (p, n, color, water = 0, glow = 0) => vertices.push(p[0], p[1], p[2], n[0], n[1], n[2], color[0], color[1], color[2], water, glow);
+  function tri(a, b, c, color, normal = [0, 1, 0], glow = 0) { addVertex(a, normal, color, 0, glow); addVertex(b, normal, color, 0, glow); addVertex(c, normal, color, 0, glow); }
+  function quad(a, b, c, d, color, normal = [0, 1, 0], glow = 0) { tri(a, b, c, color, normal, glow); tri(a, c, d, color, normal, glow); }
+  function box(x, y, z, w, h, d, color) {
+    const x0 = x-w/2, x1 = x+w/2, y0 = y-h/2, y1 = y+h/2, z0 = z-d/2, z1 = z+d/2;
+    quad([x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1],color,[0,1,0]);
+    quad([x0,y0,z1],[x1,y0,z1],[x1,y0,z0],[x0,y0,z0],color,[0,-1,0]);
+    quad([x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],color,[0,0,1]);
+    quad([x1,y0,z0],[x0,y0,z0],[x0,y1,z0],[x1,y1,z0],color,[0,0,-1]);
+    quad([x1,y0,z1],[x1,y0,z0],[x1,y1,z0],[x1,y1,z1],color,[1,0,0]);
+    quad([x0,y0,z0],[x0,y0,z1],[x0,y1,z1],[x0,y1,z0],color,[-1,0,0]);
+  }
+  function beam(a, b, width, depth, color) {
+    const dx=b[0]-a[0], dy=b[1]-a[1], dz=b[2]-a[2], len=Math.hypot(dx,dy,dz), axis=[dx/len,dy/len,dz/len];
+    let u=[axis[2],0,-axis[0]], ul=Math.hypot(u[0],u[2]); if(ul<.001) u=[1,0,0]; else u=[u[0]/ul,0,u[2]/ul];
+    const v=[axis[1]*u[2]-axis[2]*u[1],axis[2]*u[0]-axis[0]*u[2],axis[0]*u[1]-axis[1]*u[0]];
+    const corners=[]; for(const p of [a,b]) for(const su of [-1,1]) for(const sv of [-1,1]) corners.push([p[0]+u[0]*width*su/2+v[0]*depth*sv/2,p[1]+u[1]*width*su/2+v[1]*depth*sv/2,p[2]+u[2]*width*su/2+v[2]*depth*sv/2]);
+    const A=corners; const n=[u[0],u[1],u[2]];
+    quad(A[0],A[1],A[5],A[4],color,n); quad(A[2],A[3],A[7],A[6],color,[-n[0],-n[1],-n[2]]);
+    quad(A[0],A[2],A[6],A[4],color,v); quad(A[1],A[3],A[7],A[5],color,[-v[0],-v[1],-v[2]]);
+    tri(A[0],A[2],A[3],color,[-axis[0],-axis[1],-axis[2]]); tri(A[0],A[3],A[1],color,[-axis[0],-axis[1],-axis[2]]);
+    tri(A[4],A[6],A[7],color,axis); tri(A[4],A[7],A[5],color,axis);
+  }
+  function cylinder(x, y, z, rb, rt, h, sides, color, glow=0) {
+    const y0=y-h/2, y1=y+h/2;
+    for(let i=0;i<sides;i++) {
+      const a=i*Math.PI*2/sides, b=(i+1)*Math.PI*2/sides;
+      const p0=[x+Math.cos(a)*rb,y0,z+Math.sin(a)*rb], p1=[x+Math.cos(b)*rb,y0,z+Math.sin(b)*rb];
+      const p2=[x+Math.cos(b)*rt,y1,z+Math.sin(b)*rt], p3=[x+Math.cos(a)*rt,y1,z+Math.sin(a)*rt];
+      const n=[Math.cos((a+b)/2),.13,Math.sin((a+b)/2)]; quad(p0,p1,p2,p3,color,n,glow);
+      tri([x,y0,z],p1,p0,color,[0,-1,0],glow); tri([x,y1,z],p3,p2,color,[0,1,0],glow);
+    }
+  }
+  function gableRoof(x, baseY, z, w, d, rise, color) {
+    const xl=x-w/2, xr=x+w/2, z0=z-d/2, z1=z+d/2, yp=baseY+rise;
+    tri([xl,baseY,z1],[x,yp,z1],[xr,baseY,z1],color,[0,0,1]);
+    tri([xr,baseY,z0],[x,yp,z0],[xl,baseY,z0],color,[0,0,-1]);
+    quad([xl,baseY,z0],[x,yp,z0],[x,yp,z1],[xl,baseY,z1],color,[-.65,.72,0]);
+    quad([x,yp,z0],[xr,baseY,z0],[xr,baseY,z1],[x,yp,z1],color,[.65,.72,0]);
+    box(x,yp+.35,z,w*.12,.7,d*.15,C.gold);
+  }
+  function mapPlane(u, v, axis, value, center, facing, offset=0) {
+    return axis==='z' ? [center+u,v,value+facing*offset] : [value+facing*offset,v,center+u];
+  }
+  function archShape(w,h) {
+    const pts=[[-w/2,0],[-w/2,h*.56]];
+    for(let i=1;i<=6;i++) { const t=i/6, a=1-t, x=a*a*(-w*.5)+2*a*t*(-w*.18), y=a*a*(h*.56)+2*a*t*(h*.99)+t*t*h; pts.push([x,y]); }
+    for(let i=5;i>=0;i--) { const t=i/6, a=1-t, x=a*a*(-w*.5)+2*a*t*(-w*.18); const y=a*a*(h*.56)+2*a*t*(h*.99)+t*t*h; pts.push([-x,y]); }
+    pts.push([w/2,h*.56],[w/2,0]); return pts;
+  }
+  function flatPolygon(center, y, axis, value, facing, points, color, offset=0, glow=0) {
+    const c=[0,0]; for(const p of points){c[0]+=p[0]/points.length;c[1]+=p[1]/points.length;}
+    const normal=axis==='z'?[0,0,facing]:[facing,0,0], cp=mapPlane(c[0],y+c[1],axis,value,center,facing,offset);
+    for(let i=0;i<points.length;i++) tri(cp,mapPlane(points[i][0],y+points[i][1],axis,value,center,facing,offset),mapPlane(points[(i+1)%points.length][0],y+points[(i+1)%points.length][1],axis,value,center,facing,offset),color,normal,glow);
+  }
+  function stripe(center, y, axis, value, facing, u1,v1,u2,v2,t,color,offset=.1,glow=0) {
+    const du=u2-u1, dv=v2-v1, len=Math.hypot(du,dv)||1, nu=-dv/len*t/2, nv=du/len*t/2;
+    const pts=[[u1+nu,v1+nv],[u2+nu,v2+nv],[u2-nu,v2-nv],[u1-nu,v1-nv]];
+    const n=axis==='z'?[0,0,facing]:[facing,0,0];
+    quad(mapPlane(pts[0][0],y+pts[0][1],axis,value,center,facing,offset),mapPlane(pts[1][0],y+pts[1][1],axis,value,center,facing,offset),mapPlane(pts[2][0],y+pts[2][1],axis,value,center,facing,offset),mapPlane(pts[3][0],y+pts[3][1],axis,value,center,facing,offset),color,n,glow);
+  }
+  function lancet(center, y, axis, value, facing, w, h, tint=C.blue, glow=.35) {
+    flatPolygon(center,y,axis,value,facing,archShape(w,h),C.stoneLight,.055);
+    flatPolygon(center+w*.015,y+.045,axis,value,facing,archShape(w*.75,h*.83),tint,.085,glow);
+    stripe(center,y,axis,value,facing,0,.12,0,h*.81,.11,C.shadow,.105,.08);
+    stripe(center,y,axis,value,facing,-w*.31,h*.38,w*.31,h*.38,.085,C.gold,.108,.06);
+  }
+  function circlePanel(center, y, axis, value, facing, radius, color, offset, glow=0, sides=16) {
+    const pts=[]; for(let i=0;i<sides;i++){const a=i*Math.PI*2/sides;pts.push([Math.cos(a)*radius,Math.sin(a)*radius]);}
+    flatPolygon(center,y,axis,value,facing,pts,color,offset,glow);
+  }
+  function addParticle(x,y,z,r,g,b,size,seed,rise) { particles.push(x,y,z,r,g,b,size,seed,rise); }
+  function addLantern(x,z) {
+    box(x,1.15,z,.55,2.3,.55,C.shadow); cylinder(x,2.55,z,.42,.2,1.15,6,C.gold); cylinder(x,3.15,z,.18,0,.8,6,C.ember,.8);
+    for(let i=0;i<10;i++) addParticle(x+(Math.random()-.5)*.5,2.7+Math.random()*1.2,z+(Math.random()-.5)*.5,1,.43,.15,.8+Math.random()*.7,Math.random(),3.5);
+  }
+  function addOctagonalSpire(x,z,base,h,r,color=C.roofLight) {
+    cylinder(x,base+h*.16,z,r,r*.91,h*.32,8,C.stoneLight);
+    cylinder(x,base+h*.52,z,r*.91,.08,h*.42,8,color);
+    cylinder(x,base+h*.78,z,.08,0,h*.1,8,C.goldBright,.18);
+    beam([x,base+h*.79,z],[x,base+h,z],.13,.13,C.gold);
+  }
+  function facadeTower(x,z,scale=1) {
+    const w=10*scale, h=48*scale, d=11*scale;
+    box(x,h/2,z,w,h,d,C.stone);
+    box(x,h*.25,z+d*.505,w*1.14,1.1*scale,.6,C.stoneLight);
+    box(x,h*.65,z+d*.505,w*1.14,.85*scale,.6,C.stoneLight);
+    for(let row=0;row<4;row++) lancet(x,h*.13+row*9.1*scale,z+d/2,'z',1,3.2*scale,7*scale,row%2?C.blue:C.blueLite,.34);
+    cylinder(x,h+5*scale,z,6*scale,6*scale,10*scale,8,C.stoneLight);
+    addOctagonalSpire(x,z,h+10*scale,34*scale,6*scale);
+  }
+  function addCathedral() {
+    const z=-76;
+    box(0,1.1,z,57,2.2,42,C.shadow);
+    box(0,25,z,48,46,38,C.stone);
+    box(0,12,z,57,2.2,43,C.stoneLight);
+    box(0,36,z+19.3,48,2,1.2,C.stoneLight);
+    gableRoof(0,48,z,51,42,13,C.roofLight);
+    box(0,24,z-21,24,45,19,C.stone);
+    gableRoof(0,46.5,z-21,27,22,8,C.roof);
+    box(0,49,z-9,17,17,17,C.stoneLight);
+    box(0,58,z-9,13,3,13,C.gold);
+    cylinder(0,66,z-9,7,7,15,8,C.stoneLight);
+    addOctagonalSpire(0,z-9,73,74,7,C.roof);
+    facadeTower(-27,-55,1.16); facadeTower(27,-55,1.16);
+    for(const side of [-1,1]) {
+      box(side*35,20,z,8,40,11,C.stone);
+      beam([side*37,4,z+3],[side*26,43,z+2],3.4,5,C.stoneLight);
+      beam([side*40,4,z+7],[side*30,42,z+6],1.7,2.2,C.gold);
+      cylinder(side*35,42,z,5,4,5,8,C.stoneLight); addOctagonalSpire(side*35,z,44,19,4);
+      box(side*22,28,z+4,1.2,52,1.2,C.stoneLight);
+    }
+    // West front transept and matching apse keep the basilica's cross plan legible from above.
+    box(0,15,z+4,63,29,14,C.stone);
+    gableRoof(0,29.5,z+4,66,17,9,C.roofLight);
+    for(let x=-24;x<=24;x+=12) lancet(x,4,z+11,'z',1,6.2,15,C.blue,.36);
+    for(let x=-18;x<=18;x+=12) lancet(x,10,z+10.35,'z',1,5.1,12,C.blueLite,.4);
+    // Front elevation: three deep portals, a luminous rose, and rhythmic clerestory bays.
+    for(let x=-10;x<=10;x+=10) {
+      lancet(x,1.2,'z',-55.25,1,7.2,13.2,x===0?C.blueLite:C.blue,.48);
+      box(x-4.5,8,-55.6,.65,15,.85,C.stoneLight); box(x+4.5,8,-55.6,.65,15,.85,C.stoneLight);
+    }
+    circlePanel(0,31,'z',-55.3,1,9,C.stoneLight,.1,0,20);
+    circlePanel(0,31,'z',-55.3,1,7.45,C.blue,.15,.55,20);
+    for(let i=0;i<8;i++){const a=i*Math.PI/4;stripe(0,31,'z',-55.5,1,Math.cos(a)*.7,Math.sin(a)*.7,Math.cos(a)*7.1,Math.sin(a)*7.1,.35,C.goldBright,.16,.2);}
+    for(let x=-19;x<=19;x+=9.5) {
+      lancet(x,32,'z',-56.1,1,5.1,12,C.blueLite,.52);
+      box(x,29,-56.5,.7,32,1,C.stoneLight);
+    }
+    box(0,49,-55.8,53,2,1.4,C.stoneLight);
+    for(let x=-25;x<=25;x+=5) box(x,51,-55.8,.8,3,1.2,C.gold);
+    // Flying buttresses tie the high nave into the lower side aisles.
+    for(const side of [-1,1]) for(let zB=-96;zB<=-58;zB+=12) {
+      beam([side*22,8,zB],[side*34,39,zB+2],2.2,3.4,C.stoneLight);
+      beam([side*31,5,zB],[side*39,23,zB],1.3,1.5,C.gold);
+      cylinder(side*39,25,zB,1.9,1.5,4,6,C.stoneLight);
+    }
+    // Copper roof crosses and small ridge finials.
+    for(const zz of [-91,-76,-61]) { cylinder(0,63,zz,.28,.28,5,5,C.goldBright); beam([0,65,zz],[0,68,zz],.18,.18,C.goldBright); }
+    colliders.push({x:0,z:-76,w:53,d:43},{x:0,z:-55,w:68,d:13},{x:-27,z:-55,w:15,d:15},{x:27,z:-55,w:15,d:15});
+  }
+  function addBuilding(x,z,w,d,h,seed) {
+    const tint=seed%3===0?C.stoneLight:C.stone, roofColor=seed%2?C.roof:C.roofLight;
+    box(x,h/2,z,w,h,d,tint);
+    box(x,h*.11,z,w+1.2,1.2,d+1.2,C.stoneLight);
+    box(x,h-.25,z,w+1,.7,d+1,C.stoneLight);
+    const orient=x<0?1:-1, sideX=x+orient*(w/2+.035), sideSign=orient;
+    const floors=clamp(Math.floor((h-3)/4.6),2,8), rows=Math.max(2,Math.floor(w/5));
+    for(let row=0;row<floors;row++) {
+      const wy=2.2+row*4.45, wh=3.35;
+      for(let c=0;c<rows;c++) {
+        const u=-w*.34+c*(w*.68/Math.max(1,rows-1));
+        lancet(x+u,wy,'z',z+d/2+.04,1,Math.min(2.45,w/rows*.68),wh,(seed+c+row)%4===0?C.blueLite:C.blue,.23);
+      }
+      const sideCols=Math.max(2,Math.floor(d/6));
+      for(let c=0;c<sideCols;c++) {
+        const u=-d*.34+c*(d*.68/Math.max(1,sideCols-1));
+        lancet(z+u,wy,'x',sideX,sideSign,Math.min(2.45,d/sideCols*.68),wh,(seed+c+row)%5===0?C.blueLite:C.blue,.2);
+      }
+      if(row>0) box(x,wy-.65,z,w+.18,.22,d+.18,C.gold);
+    }
+    if(seed%3===0) gableRoof(x,h,z,w+1,d+1,3+seed%4,roofColor);
+    else {
+      box(x,h+1.1,z,w+1.1,2.2,d+1.1,roofColor);
+      for(const sx of [-1,1]) for(const sz of [-1,1]) {
+        if(seed%4!==0 && sx===1 && sz===-1) continue;
+        const tx=x+sx*w*.42, tz=z+sz*d*.4; cylinder(tx,h+3,tz,1.35,1.1,3.8,6,C.stoneLight); addOctagonalSpire(tx,tz,h+4.9,6+(seed%5),1.2,roofColor);
+      }
+      if(seed%4===0) gableRoof(x,h,z,w*.72,d*.72,4,roofColor);
+    }
+    for(const sx of [-1,1]) box(x+sx*(w/2-.42),h*.51,z+d/2+.08,.55,h*.95,.5,C.stoneLight);
+    buildings.push({x,z,w,d}); colliders.push({x,z,w,d});
+  }
+  function addGate() {
+    const z=111;
+    for(const side of [-1,1]) {
+      const x=side*17; box(x,13,z,11,26,12,C.stoneLight); box(x,4,z+6,13,2,2,C.gold);
+      lancet(x,2,'z',z+6.1,1,6.4,17,C.shadow,.05);
+      cylinder(x,29,z,6,5,5,8,C.stoneLight); addOctagonalSpire(x,z,31.5,21,5);
+      for(let i=0;i<4;i++) lancet(x,6+i*5,'x',x+side*5.55,side,3,4,C.blue,.2);
+    }
+    // A pointed arch of individual stone ribs leaves the full passage open.
+    const left=[-11,0,z+5.5], peak=[0,19,z+5.5], right=[11,0,z+5.5];
+    beam(left,[-11,12,z+5.5],2.4,2.4,C.gold); beam([-11,12,z+5.5],peak,2.4,2.4,C.stoneLight);
+    beam(peak,[11,12,z+5.5],2.4,2.4,C.stoneLight); beam([11,12,z+5.5],right,2.4,2.4,C.gold);
+    box(0,24,z,28,3,12,C.stoneLight);
+    for(let x=-12;x<=12;x+=4) box(x,26,z,.7,2,1,C.gold);
+    // Sea walls enclose the old town, leaving the south portal open.
+    box(-67,4,-15,102,8,5,C.stone); box(67,4,-15,102,8,5,C.stone);
+    box(0,4,-142,238,8,5,C.stone); box(-118,4,-15,5,8,254,C.stone); box(118,4,-15,5,8,254,C.stone);
+    for(let x=-117;x<=117;x+=12) { box(x,8,-142,2,2,5,C.stoneLight); if(Math.abs(x)>19) box(x,8,111,2,2,5,C.stoneLight); }
+    for(const x of [-118,118]) for(const zc of [-140,108]) { box(x,12,zc,9,24,9,C.stoneLight); addOctagonalSpire(x,zc,24,18,4); }
+    for(let zc=-133;zc<=103;zc+=24) for(const x of [-118,118]) { box(x,7,zc,7,14,7,C.stone); cylinder(x,16,zc,4,3.5,4,7,C.stoneLight); addOctagonalSpire(x,zc,18,11,3); }
+    colliders.push({x:0,z:-142,w:245,d:7},{x:-118,z:-15,w:7,d:256},{x:118,z:-15,w:7,d:256},{x:-67,z:111,w:104,d:7},{x:67,z:111,w:104,d:7});
+  }
+  function addCity() {
+    // The stone island and its wet basalt quays.
+    box(0,-1.4,-14,242,2.8,260,C.ground);
+    box(0,-.3,-14,232,.55,250,C.shadow);
+    for(let x=-112;x<=112;x+=7) { box(x,.02,108,2,.1,3,C.gold); box(x,.02,-137,2,.1,3,C.gold); }
+    for(let z=-135;z<=107;z+=7) { box(-113,.02,z,3,.1,2,C.gold); box(113,.02,z,3,.1,2,C.gold); }
+    // Main processional road, drainage cuts, and narrow warm guide lines.
+    box(0,.08,-14,22,.18,247,C.road);
+    box(-9,.19,-14,.22,.07,242,C.gold); box(9,.19,-14,.22,.07,242,C.gold);
+    for(const side of [-1,1]) {
+      box(side*16,.03,-14,3,.12,245,C.shadow);
+      for(let z=-129;z<102;z+=17) { box(side*18,.12,z,4,.18,.7,C.stoneLight); }
+    }
+    // Small radiating lanes make the city blocks readable from the map and the street.
+    for(let z=-127;z<=94;z+=23) {
+      box(0,.02,z,216,.12,2,C.road);
+      box(0,.1,z,216,.06,.16,C.gold);
+    }
+    addGate();
+    let seed=1;
+    for(const side of [-1,1]) for(let col=0;col<6;col++) {
+      const x=side*(29+col*15.1);
+      for(let row=0;row<11;row++) {
+        const z=96-row*22.3+(col%2?4:0)+(Math.sin((col+2)*(row+1))*1.8);
+        if(Math.abs(x)<54 && z<-43 && z>-116) continue;
+        if(Math.abs(x)>107) continue;
+        const w=10.4+((seed*7)%5)*.7, d=12.4+((seed*11)%5)*.65, h=17+((seed*17)%33);
+        addBuilding(x,z,w,d,h,seed++);
+      }
+    }
+    // A lamp-lined ember court widens into the cathedral forecourt.
+    box(0,.16,-31,75,.24,31,C.shadow);
+    for(let i=-4;i<=4;i++) box(i*8,.3,-31,.22,.08,30,C.gold);
+    box(0,.38,-19,16,.46,15,C.stoneLight); box(0,.65,-19,10,.3,9,C.shadow);
+    cylinder(0,2.5,-19,2.8,1.9,3.4,8,C.gold); cylinder(0,5.4,-19,1.2,.1,2.4,7,C.ember,.8);
+    for(let i=0;i<46;i++) addParticle((Math.random()-.5)*5,2.6+Math.random()*2.2,-19+(Math.random()-.5)*5,1,.46,.16,.7+Math.random(),Math.random(),6.5);
+    for(const side of [-1,1]) for(let z=-15;z>=-111;z-=18) addLantern(side*17.5,z);
+    for(let x=-29;x<=29;x+=14.5) { addLantern(x,-42); addLantern(x,-7); }
+    addCathedral();
+    // Banners and needle-like corner pinnacles along the southern gate approach.
+    for(const side of [-1,1]) {
+      box(side*28,9,78,1.1,18,1.1,C.gold); beam([side*28,16,78],[side*28,8,78],2.4,1,C.blue);
+      cylinder(side*28,20,78,.45,.35,3,6,C.goldBright,.15);
+    }
+  }
+  function addWater() {
+    const nx=72,nz=76,x0=-270,x1=270,z0=-325,z1=208,y=-2.15;
+    const local=[];
+    for(let iz=0;iz<=nz;iz++) for(let ix=0;ix<=nx;ix++) {
+      const x=x0+(x1-x0)*ix/nx, z=z0+(z1-z0)*iz/nz;
+      const edge=Math.min(ix,nx-ix,iz,nz-iz)/Math.min(nx,nz);
+      const col=[.018+edge*.007,.14+edge*.065,.17+edge*.08];
+      local.push(x,y,z,0,1,0,col[0],col[1],col[2],1,0);
+    }
+    const waterIndices=[];
+    for(let iz=0;iz<nz;iz++) for(let ix=0;ix<nx;ix++) { const a=iz*(nx+1)+ix,b=a+1,c=a+nx+2,d=a+nx+1; waterIndices.push(a,b,c,a,c,d); }
+    const waterBuffer=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,waterBuffer); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(local),gl.STATIC_DRAW);
+    const indexBuffer=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(waterIndices),gl.STATIC_DRAW);
+    return {buffer:waterBuffer,index:indexBuffer,count:waterIndices.length};
+  }
+  function addSky() {
+    // A dim amber moon is a faceted sphere rather than a flat background decal.
+    const cx=96,cy=111,cz=-175,r=8,lat=10,lon=16;
+    for(let j=0;j<lat;j++) for(let i=0;i<lon;i++) {
+      const point=(a,b)=>[cx+r*Math.sin(a)*Math.cos(b),cy+r*Math.cos(a),cz+r*Math.sin(a)*Math.sin(b)];
+      const a=Math.PI*j/lat,b=Math.PI*(j+1)/lat,c=Math.PI*2*i/lon,d=Math.PI*2*(i+1)/lon;
+      const p0=point(a,c),p1=point(a,d),p2=point(b,d),p3=point(b,c); const col=hex('#d1b77d');
+      const norm=p=>[(p[0]-cx)/r,(p[1]-cy)/r,(p[2]-cz)/r]; tri(p0,p1,p2,col,norm(p0),.24);tri(p0,p2,p3,col,norm(p0),.24);
+    }
+    for(let i=0;i<230;i++) {
+      const x=(Math.random()-.5)*420, y=35+Math.random()*135, z=-210+Math.random()*340;
+      addParticle(x,y,z,.44+.28*Math.random(),.62+.24*Math.random(),.7+.28*Math.random(),.42+Math.random()*.5,Math.random(),0);
+    }
+  }
+  addCity(); addSky();
+  const mainBuffer=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,mainBuffer); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.STATIC_DRAW);
+  const particleBuffer=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,particleBuffer); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(particles),gl.STATIC_DRAW);
+  const water=addWater();
+  const stride=11*4;
+  const bindMain = (buffer) => {
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
+    for(const [loc,size,offset] of [[mainLoc.pos,3,0],[mainLoc.normal,3,3],[mainLoc.color,3,6],[mainLoc.water,1,9],[mainLoc.glow,1,10]]) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,size,gl.FLOAT,false,stride,offset*4); }
+  };
+  const bindParticles = () => {
+    gl.bindBuffer(gl.ARRAY_BUFFER,particleBuffer); const s=9*4;
+    for(const [loc,size,offset] of [[particleLoc.pos,3,0],[particleLoc.color,3,3],[particleLoc.size,1,6],[particleLoc.seed,1,7],[particleLoc.rise,1,8]]) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,size,gl.FLOAT,false,s,offset*4); }
+  };
+  gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.disable(gl.CULL_FACE); gl.clearColor(.025,.044,.068,1);
+  const player={x:0,y:1.72,z:84,yaw:0,pitch:0};
+  const start={x:0,y:1.72,z:84,yaw:0,pitch:0};
+  const keys=Object.create(null); let guide=false, started=false, dragging=false, previousPointer=null, lastFrame=performance.now(), elapsed=0;
+  const fov=62*Math.PI/180;
+  function perspective(fovy,aspect,near,far) {
+    const f=1/Math.tan(fovy/2), nf=1/(near-far);
+    return new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0]);
+  }
+  function lookAt(eye,center) {
+    let zx=eye[0]-center[0],zy=eye[1]-center[1],zz=eye[2]-center[2],l=Math.hypot(zx,zy,zz)||1; zx/=l;zy/=l;zz/=l;
+    let xx=zz,xy=0,xz=-zx; l=Math.hypot(xx,xy,xz)||1;xx/=l;xy/=l;xz/=l;
+    const yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+    return new Float32Array([xx,yx,zx,0, xy,yy,zy,0, xz,yz,zz,0, -(xx*eye[0]+xy*eye[1]+xz*eye[2]),-(yx*eye[0]+yy*eye[1]+yz*eye[2]),-(zx*eye[0]+zy*eye[1]+zz*eye[2]),1]);
+  }
+  function multiply(a,b) {
+    const out=new Float32Array(16);
+    for(let c=0;c<4;c++) for(let r=0;r<4;r++) out[c*4+r]=a[r]*b[c*4]+a[4+r]*b[c*4+1]+a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3];
+    return out;
+  }
+  function resize() {
+    const ratio=Math.min(window.devicePixelRatio||1,1.75),w=Math.max(1,Math.floor(innerWidth*ratio)),h=Math.max(1,Math.floor(innerHeight*ratio));
+    if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}
+  }
+  function collided(x,z) {
+    if(x < -112 || x > 112 || z < -136 || z > 106) return true;
+    for(const b of colliders) if(Math.abs(x-b.x)<b.w/2+.85 && Math.abs(z-b.z)<b.d/2+.85) return true;
+    return false;
+  }
+  function movePlayer(dt) {
+    let forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0), side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
+    if(Math.abs(forward)+Math.abs(side)<.01) return;
+    const m=Math.hypot(forward,side); forward/=m;side/=m;
+    const sprint=keys.shift?1.85:1, speed=9*sprint;
+    const dx=(Math.sin(player.yaw)*forward+Math.cos(player.yaw)*side)*speed*dt;
+    const dz=(-Math.cos(player.yaw)*forward+Math.sin(player.yaw)*side)*speed*dt;
+    if(!collided(player.x+dx,player.z)) player.x+=dx;
+    if(!collided(player.x,player.z+dz)) player.z+=dz;
+    document.getElementById('speed-readout').textContent=String(Math.round(speed)).padStart(2,'0')+' M/S';
+  }
+  function renderMap() {
+    const ctx=mapCanvas.getContext('2d'),w=mapCanvas.width,h=mapCanvas.height; ctx.clearRect(0,0,w,h);
+    ctx.fillStyle='#08171d';ctx.fillRect(0,0,w,h);
+    const sx=w/250,sz=h/275, px=x=>(x+125)*sx,pz=z=>(z+150)*sz;
+    ctx.fillStyle='#19282b';ctx.fillRect(px(-117),pz(-142),234*sx,254*sz);
+    ctx.fillStyle='#2e3b3c';ctx.fillRect(px(-117),pz(-142),234*sx,5*sz);ctx.fillRect(px(-117),pz(106),98*sx,5*sz);ctx.fillRect(px(19),pz(106),98*sx,5*sz);
+    ctx.fillStyle='#101c20';ctx.fillRect(px(-11),pz(-139),22*sx,246*sz);
+    ctx.strokeStyle='rgba(213,177,119,.45)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(px(0),pz(-135));ctx.lineTo(px(0),pz(100));ctx.stroke();
+    for(const b of buildings){ctx.fillStyle='#54615d';ctx.fillRect(px(b.x-b.w/2),pz(b.z-b.d/2),Math.max(2,b.w*sx),Math.max(2,b.d*sz));}
+    ctx.fillStyle='#a18c6c';ctx.fillRect(px(-35),pz(-105),70*sx,56*sz);ctx.fillStyle='#7dcfc5';ctx.fillRect(px(-31),pz(-101),62*sx,48*sz);
+    ctx.fillStyle='#cba46e';ctx.beginPath();ctx.arc(px(0),pz(-19),4,0,Math.PI*2);ctx.fill();
+    const x=px(player.x),y=pz(player.z);ctx.save();ctx.translate(x,y);ctx.rotate(player.yaw);ctx.fillStyle='#e5c48c';ctx.shadowColor='#e5c48c';ctx.shadowBlur=14;ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(5,6);ctx.lineTo(0,3);ctx.lineTo(-5,6);ctx.closePath();ctx.fill();ctx.restore();
+  }
+  function updateDistrict() {
+    const el=document.getElementById('district-code'),name=document.getElementById('district-name'),desc=document.getElementById('district-desc');
+    let code='DISTRICT 00 — OUTER GATE',n='盐雾海门',d='潮墙之外，群塔在雾中升起。';
+    if(player.z<58){code='DISTRICT 01 — LOWER WARD';n='灰石下城';d='窄街与尖拱窗，沿海墙向内收束。';}
+    if(player.z<5){code='DISTRICT 02 — EMBER COURT';n='圣火广场';d='沿灯火大道，朝高穹顶继续前行。';}
+    if(player.z<-46){code='DISTRICT 03 — THE SANCTUARY';n='圣徒大教堂';d='主塔高约一百四十米，钟声沉入潮汐。';}
+    if(el.textContent!==code){el.textContent=code;name.textContent=n;desc.textContent=d;}
+  }
+  const points=[
+    {x:0,y:15,z:100,label:'盐雾海门  /  TIDAL GATE'},
+    {x:0,y:10,z:-19,label:'圣火广场  /  EMBER COURT'},
+    {x:0,y:81,z:-85,label:'圣徒大教堂  /  HIGH SANCTUARY'},
+    {x:0,y:42,z:-9,label:'西钟塔  /  BELL TOWER'}
+  ];
+  const poiEls=points.map(()=>{const e=document.createElement('div');e.className='poi';document.getElementById('poi-layer').appendChild(e);return e;});
+  points.forEach((p,i)=>poiEls[i].textContent=p.label);
+  function drawPOIs(dir,right,up) {
+    for(let i=0;i<points.length;i++) {
+      const p=points[i],e=poiEls[i],rx=p.x-player.x,ry=p.y-player.y,rz=p.z-player.z,depth=rx*dir[0]+ry*dir[1]+rz*dir[2];
+      const dist=Math.hypot(rx,ry,rz);if(depth<3||dist>165){e.classList.remove('visible');continue;}
+      const nx=(rx*right[0]+ry*right[1]+rz*right[2])/(depth*Math.tan(fov/2)*(innerWidth/innerHeight));
+      const ny=(rx*up[0]+ry*up[1]+rz*up[2])/(depth*Math.tan(fov/2));
+      const x=(.5+nx*.5)*innerWidth,y=(.5-ny*.5)*innerHeight;
+      if(x<10||x>innerWidth-10||y<40||y>innerHeight-40){e.classList.remove('visible');continue;}
+      e.style.transform=`translate(${x}px, ${y}px) translate(-50%, -50%)`;e.classList.add('visible');
+    }
+  }
+  function frame(now) {
+    resize(); const dt=Math.min(.045,(now-lastFrame)/1000);lastFrame=now;elapsed+=dt;
+    if(guide) {
+      const target=0;
+      let diff=((target-player.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;
+      player.yaw+=diff*Math.min(1,dt*.95);
+    }
+    movePlayer(dt);
+    const cy=Math.cos(player.yaw),sy=Math.sin(player.yaw),cp=Math.cos(player.pitch),sp=Math.sin(player.pitch);
+    const dir=[sy*cp,sp,-cy*cp],right=[cy,0,sy],up=[-sy*sp,cp,cy*sp];
+    const eye=[player.x,player.y,player.z],center=[eye[0]+dir[0],eye[1]+dir[1],eye[2]+dir[2]];
+    const vp=multiply(perspective(fov,canvas.width/canvas.height,.1,750),lookAt(eye,center));
+    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(mainProgram);gl.uniformMatrix4fv(mainLoc.vp,false,vp);gl.uniform1f(mainLoc.time,elapsed);gl.uniform3f(mainLoc.camera,player.x,player.y,player.z);
+    bindMain(mainBuffer);gl.drawArrays(gl.TRIANGLES,0,vertices.length/11);
+    bindMain(water.buffer);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,water.index);gl.drawElements(gl.TRIANGLES,water.count,gl.UNSIGNED_SHORT,0);
+    gl.useProgram(particleProgram);gl.uniformMatrix4fv(particleLoc.vp,false,vp);gl.uniform1f(particleLoc.time,elapsed);gl.uniform1f(particleLoc.ratio,canvas.height/900);
+    bindParticles();gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.depthMask(false);gl.drawArrays(gl.POINTS,0,particles.length/9);gl.depthMask(true);gl.disable(gl.BLEND);
+    renderMap();drawPOIs(dir,right,up);updateDistrict();
+    document.getElementById('coord-n').textContent=(-player.z).toFixed(1);
+    document.getElementById('coord-e').textContent=player.x.toFixed(1);
+    document.getElementById('compass').style.setProperty('--bearing',(-player.yaw*180/Math.PI)+'deg');
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  function enter() { started=true;document.getElementById('veil').classList.add('dismissed');if(innerWidth>650&&canvas.requestPointerLock)canvas.requestPointerLock(); }
+  document.getElementById('enter-btn').addEventListener('click',enter);
+  document.getElementById('reset-btn').addEventListener('click',()=>{player.x=start.x;player.y=start.y;player.z=start.z;player.yaw=start.yaw;player.pitch=start.pitch;guide=false;document.getElementById('route-btn').classList.remove('active');});
+  document.getElementById('route-btn').addEventListener('click',e=>{guide=!guide;e.currentTarget.classList.toggle('active',guide);});
+  document.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['w','a','s','d','shift','arrowup','arrowdown','arrowleft','arrowright'].includes(k)){keys[k]=true;e.preventDefault();}if(k==='escape'&&document.pointerLockElement)document.exitPointerLock();});
+  document.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+  window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false;});
+  canvas.addEventListener('pointerdown',e=>{if(!started){enter();return;}if(document.pointerLockElement)return;dragging=true;previousPointer=[e.clientX,e.clientY];canvas.setPointerCapture?.(e.pointerId);});
+  canvas.addEventListener('pointermove',e=>{
+    if(document.pointerLockElement){player.yaw+=e.movementX*.0024;player.pitch=clamp(player.pitch-e.movementY*.0021,-1.15,1.15);return;}
+    if(dragging&&previousPointer){player.yaw+=(e.clientX-previousPointer[0])*.004;player.pitch=clamp(player.pitch-(e.clientY-previousPointer[1])*.003,-1.15,1.15);previousPointer=[e.clientX,e.clientY];}
+  });
+  canvas.addEventListener('pointerup',()=>{dragging=false;previousPointer=null;});
+  canvas.addEventListener('pointercancel',()=>{dragging=false;previousPointer=null;});
+  for(const button of document.querySelectorAll('.touch-pad button')) {
+    const key=button.dataset.key;button.addEventListener('pointerdown',e=>{e.preventDefault();keys[key]=true;button.setPointerCapture?.(e.pointerId);});
+    for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>{keys[key]=false;});
+  }
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){for(const k in keys)keys[k]=false;}});
+})();
+</script>
+</body>
+</html>

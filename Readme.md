@@ -31,8 +31,8 @@
 ## 项目统计
 
 - 实验主题：8
-- 实验记录：29
-- 可预览记录：25
+- 实验记录：30
+- 可预览记录：26
 - 技术主题：14
 
 ## 实验目录
@@ -79,6 +79,7 @@
 | [雾隐之城 · GPT 6 Default](demos/neo-gothic-tower-city/runs/gpt-6-default-r01/Readme.md) | GPT 6 / default | 2026-09 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-default-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-default-r01/index.html) |
 | [雾隐之城 · GPT 6 High](demos/neo-gothic-tower-city/runs/gpt-6-high-r01/Readme.md) | GPT 6 / high | 2026-09-14 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-high-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-high-r01/index.html) |
 | [雾隐之城 · GPT 6 Luna Max](demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r01/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r01/index.html) |
+| [雾隐之城 · GPT 6 Luna Max 修复版](demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r02/Readme.md) | GPT 6 Luna / max | 2026-09-23 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r02/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r02/index.html) |
 
 ### Pixel Flow
 
