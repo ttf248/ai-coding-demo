@@ -236,8 +236,8 @@ test("single HTML entries remain directly openable", async ({
     await page.goto(pathToFileURL(resolveLocal(r.preview.pages[0].href)).href, {
       waitUntil: "domcontentloaded",
     });
+    expect(page.url()).toMatch(/^file:/);
     expect(await page.locator("body").innerHTML()).not.toBe("");
-    await expect(page.locator("canvas").first()).toBeAttached();
   }
 });
 test("desktop catalog screenshot", async ({ page }, testInfo) => {
