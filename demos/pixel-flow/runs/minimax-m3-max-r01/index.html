@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>Pixel Flow · 图片粒子化与手势还原</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #07090f;
+        color: #e6e3df;
+        font-family: "Inter", "PingFang SC", system-ui, sans-serif;
+        overflow: hidden;
+        height: 100%;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+        display: block;
+      }
+      #video {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        width: 200px;
+        height: 150px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        object-fit: cover;
+        transform: scaleX(-1);
+        opacity: 0.85;
+        z-index: 5;
+      }
+      .panel {
+        position: fixed;
+        z-index: 4;
+        background: rgba(15, 17, 25, 0.78);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 16px;
+        padding: 14px 18px;
+        pointer-events: auto;
+        color: #e6e3df;
+        font-size: 12px;
+        line-height: 1.5;
+        max-width: 320px;
+      }
+      .panel h1 {
+        font-size: 14px;
+        margin: 0 0 6px;
+        letter-spacing: 0.16em;
+      }
+      .panel .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 6px;
+      }
+      .panel .row input[type="range"] {
+        flex: 1;
+      }
+      .panel .row span {
+        width: 50px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .panel button {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 6px 12px;
+        border-radius: 999px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .panel button:hover {
+        background: rgba(255, 255, 255, 0.18);
+      }
+      .panel .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+      }
+      .badge.green {
+        background: rgba(76, 175, 80, 0.16);
+        color: #a5d6a7;
+        border: 1px solid rgba(76, 175, 80, 0.4);
+      }
+      .badge.amber {
+        background: rgba(255, 152, 0, 0.16);
+        color: #ffcc80;
+        border: 1px solid rgba(255, 152, 0, 0.4);
+      }
+      .badge.gray {
+        background: rgba(255, 255, 255, 0.08);
+        color: #bdbdbd;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      #status {
+        position: fixed;
+        top: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 4;
+        font-size: 12px;
+        color: #fff;
+        opacity: 0.7;
+        pointer-events: none;
+      }
+      .hint {
+        position: fixed;
+        bottom: 18px;
+        left: 18px;
+        font-size: 11px;
+        opacity: 0.65;
+        z-index: 4;
+        max-width: 460px;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <video id="video" playsinline autoplay muted></video>
+    <div id="status">等待模型加载…</div>
+    <div class="panel" style="top: 18px; left: 18px;">
+      <h1>PIXEL FLOW</h1>
+      <div>由 minimax-m3 / max 在测试基线中按 v1 任务正文生成。</div>
+      <div class="row" style="margin-top:10px;">
+        <span style="width:72px;">采样密度</span>
+        <input id="density" type="range" min="2" max="10" step="1" value="4" />
+        <span id="densityVal">4</span>
+      </div>
+      <div class="row">
+        <span style="width:72px;">吸引强度</span>
+        <input id="force" type="range" min="0.2" max="3" step="0.1" value="1.2" />
+        <span id="forceVal">1.2</span>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button id="upload">上传图片</button>
+        <input id="file" type="file" accept="image/*" hidden />
+        <button id="demo">使用演示图</button>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <span id="gestureBadge" class="badge gray">未检测到手势</span>
+        <span id="restorePct" class="badge gray">还原 0%</span>
+      </div>
+    </div>
+    <div class="hint">
+      “张开手掌”激活粒子吸引；“握拳”暂停吸引。允许摄像头后即可开始；如果浏览器无摄像头权限，下方摄像头预览会显示“摄像头不可用”，仍可通过强度滑块手动体验。
+    </div>
+
+    <script type="module">
+      import * as THREE from "three";
+
+      // ---------- Three.js core ----------
+      const canvas = document.getElementById("stage");
+      const renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        powerPreference: "high-performance",
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x07090f);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        55,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000,
+      );
+      camera.position.set(0, 0, 14);
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // ---------- Particle system ----------
+      const MAX_PARTICLES = 28000;
+      let particleCount = 0;
+      const positions = new Float32Array(MAX_PARTICLES * 3);
+      const origins = new Float32Array(MAX_PARTICLES * 3);
+      const colors = new Float32Array(MAX_PARTICLES * 3);
+      const sizes = new Float32Array(MAX_PARTICLES);
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage),
+      );
+      geometry.setAttribute(
+        "color",
+        new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage),
+      );
+      geometry.setAttribute(
+        "size",
+        new THREE.BufferAttribute(sizes, 1).setUsage(THREE.DynamicDrawUsage),
+      );
+
+      const vertexShader = `
+        attribute float size;
+        varying vec3 vColor;
+        void main() {
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size * (320.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `;
+      const fragmentShader = `
+        varying vec3 vColor;
+        void main() {
+          vec2 c = gl_PointCoord - vec2(0.5);
+          float d = length(c);
+          if (d > 0.5) discard;
+          float a = smoothstep(0.5, 0.1, d);
+          gl_FragColor = vec4(vColor, a);
+        }
+      `;
+      const material = new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader,
+        vertexColors: true,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+
+      const points = new THREE.Points(geometry, material);
+      scene.add(points);
+
+      // ---------- Image → particle sampling ----------
+      function buildParticlesFromImage(img, sampleStep) {
+        const w = 240;
+        const h = Math.round((img.height / img.width) * w);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h).data;
+
+        const aspect = w / h;
+        const worldHeight = 10;
+        const worldWidth = worldHeight * aspect;
+
+        let count = 0;
+        for (let y = 0; y < h; y += sampleStep) {
+          for (let x = 0; x < w; x += sampleStep) {
+            if (count >= MAX_PARTICLES) break;
+            const idx = (y * w + x) * 4;
+            const r = data[idx] / 255;
+            const g = data[idx + 1] / 255;
+            const b = data[idx + 2] / 255;
+            const a = data[idx + 3] / 255;
+            if (a < 0.4) continue;
+            const px = (x / w - 0.5) * worldWidth;
+            const py = -(y / h - 0.5) * worldHeight;
+            const pz = 0;
+            const i3 = count * 3;
+            origins[i3] = px;
+            origins[i3 + 1] = py;
+            origins[i3 + 2] = pz;
+            colors[i3] = r;
+            colors[i3 + 1] = g;
+            colors[i3 + 2] = b;
+            sizes[count] = 8;
+            count++;
+          }
+        }
+        particleCount = count;
+
+        // Initial positions = random cloud.
+        for (let i = 0; i < particleCount; i++) {
+          const i3 = i * 3;
+          const r = 30 * Math.cbrt(Math.random());
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+          positions[i3] = r * Math.sin(phi) * Math.cos(theta);
+          positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+          positions[i3 + 2] = r * Math.cos(phi) * 4;
+        }
+        geometry.setDrawRange(0, particleCount);
+        geometry.attributes.position.needsUpdate = true;
+        geometry.attributes.color.needsUpdate = true;
+        geometry.attributes.size.needsUpdate = true;
+      }
+
+      // Demo image: a programmatically generated radial sunset.
+      function buildDemoImage() {
+        const c = document.createElement("canvas");
+        c.width = 320;
+        c.height = 200;
+        const ctx = c.getContext("2d");
+        const g = ctx.createLinearGradient(0, 0, 0, c.height);
+        g.addColorStop(0, "#1b1f3a");
+        g.addColorStop(0.5, "#7b3a83");
+        g.addColorStop(1, "#f59e0b");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, c.width, c.height);
+        // Sun
+        const sun = ctx.createRadialGradient(
+          c.width / 2,
+          c.height * 0.7,
+          4,
+          c.width / 2,
+          c.height * 0.7,
+          90,
+        );
+        sun.addColorStop(0, "rgba(255,235,160,1)");
+        sun.addColorStop(1, "rgba(255,180,80,0)");
+        ctx.fillStyle = sun;
+        ctx.fillRect(0, 0, c.width, c.height);
+        // Horizon silhouette
+        ctx.fillStyle = "rgba(20,15,30,0.92)";
+        ctx.beginPath();
+        ctx.moveTo(0, c.height);
+        for (let x = 0; x <= c.width; x += 16) {
+          const y =
+            c.height - 30 - Math.abs(Math.sin(x * 0.04)) * 25 - Math.random() * 4;
+          ctx.lineTo(x, y);
+        }
+        ctx.lineTo(c.width, c.height);
+        ctx.closePath();
+        ctx.fill();
+        const img = new Image();
+        img.src = c.toDataURL();
+        return img;
+      }
+
+      let sampleStep = 4;
+      const demoImg = buildDemoImage();
+      demoImg.onload = () => buildParticlesFromImage(demoImg, sampleStep);
+
+      // Upload handler.
+      document.getElementById("upload").addEventListener("click", () => {
+        document.getElementById("file").click();
+      });
+      document.getElementById("demo").addEventListener("click", () => {
+        buildParticlesFromImage(demoImg, sampleStep);
+      });
+      document.getElementById("file").addEventListener("change", (e) => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => buildParticlesFromImage(img, sampleStep);
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(f);
+      });
+      document.getElementById("density").addEventListener("input", (e) => {
+        sampleStep = Number(e.target.value);
+        document.getElementById("densityVal").textContent = sampleStep;
+        buildParticlesFromImage(demoImg, sampleStep);
+      });
+
+      // ---------- Hand tracking ----------
+      const video = document.getElementById("video");
+      let hands = null;
+      let gesture = "open"; // 'open' | 'fist' | 'idle'
+      let attractStrength = 1.2;
+
+      const gestureBadge = document.getElementById("gestureBadge");
+      const restorePctBadge = document.getElementById("restorePct");
+      const statusEl = document.getElementById("status");
+
+      async function startCamera() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user", width: 320, height: 240 },
+            audio: false,
+          });
+          video.srcObject = stream;
+          await video.play();
+        } catch (err) {
+          statusEl.textContent = "摄像头不可用，请使用滑块手动控制吸引强度。";
+          video.style.display = "none";
+          return false;
+        }
+        return true;
+      }
+
+      // Load MediaPipe Hands (CDN). If blocked, we fall back to manual control.
+      async function loadMediaPipe() {
+        try {
+          statusEl.textContent = "加载 MediaPipe Hands…";
+          // Inject script
+          await new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src =
+              "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.min.js";
+            script.crossOrigin = "anonymous";
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+          });
+          if (typeof window.Hands === "undefined") {
+            throw new Error("MediaPipe unavailable");
+          }
+          hands = new window.Hands({
+            locateFile: (file) =>
+              `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
+          });
+          hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.5,
+          });
+          hands.onResults(onHandsResults);
+          statusEl.textContent = "等待摄像头授权…";
+          const ok = await startCamera();
+          if (!ok) return false;
+          statusEl.textContent = "识别中…";
+          const loop = async () => {
+            if (video.readyState >= 2) {
+              await hands.send({ image: video });
+            }
+            requestAnimationFrame(loop);
+          };
+          loop();
+          return true;
+        } catch (err) {
+          statusEl.textContent = "MediaPipe 加载失败，请使用滑块手动控制。";
+          return false;
+        }
+      }
+
+      function onHandsResults(results) {
+        if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+          gesture = "idle";
+          gestureBadge.textContent = "未检测到手势";
+          gestureBadge.className = "badge gray";
+          return;
+        }
+        const lm = results.multiHandLandmarks[0];
+        const palm = lm[0];
+        const tips = [lm[8], lm[12], lm[16], lm[20]];
+        const pips = [lm[6], lm[10], lm[14], lm[18]];
+        let openCount = 0;
+        for (let i = 0; i < tips.length; i++) {
+          const tip = tips[i];
+          const pip = pips[i];
+          // distance from palm center
+          const dt = Math.hypot(tip.x - palm.x, tip.y - palm.y);
+          const dp = Math.hypot(pip.x - palm.x, pip.y - palm.y);
+          if (dt > dp * 1.1) openCount++;
+        }
+        if (openCount >= 3) {
+          gesture = "open";
+          gestureBadge.textContent = "🖐 张开 → 激活吸引";
+          gestureBadge.className = "badge green";
+        } else if (openCount <= 1) {
+          gesture = "fist";
+          gestureBadge.textContent = "✊ 握拳 → 暂停吸引";
+          gestureBadge.className = "badge amber";
+        } else {
+          gesture = "idle";
+          gestureBadge.textContent = "过渡手势…";
+          gestureBadge.className = "badge gray";
+        }
+      }
+
+      document.getElementById("force").addEventListener("input", (e) => {
+        attractStrength = Number(e.target.value);
+        document.getElementById("forceVal").textContent = attractStrength.toFixed(1);
+      });
+
+      // Try MediaPipe; if it fails, the manual slider still works.
+      loadMediaPipe();
+
+      // ---------- Restore loop ----------
+      const tmp = new THREE.Vector3();
+      let restoredCount = 0;
+      function tick() {
+        let count = 0;
+        for (let i = 0; i < particleCount; i++) {
+          const i3 = i * 3;
+          const ox = origins[i3];
+          const oy = origins[i3 + 1];
+          const oz = origins[i3 + 2];
+          const px = positions[i3];
+          const py = positions[i3 + 1];
+          const pz = positions[i3 + 2];
+          const active = gesture === "open";
+          const target = active ? attractStrength : 0.05;
+          // Spring back to origin if "open", else drift back to cloud center.
+          if (active) {
+            tmp.set(ox - px, oy - py, oz - pz);
+            positions[i3] = px + tmp.x * 0.03 * target;
+            positions[i3 + 1] = py + tmp.y * 0.03 * target;
+            positions[i3 + 2] = pz + tmp.z * 0.03 * target;
+          } else {
+            // Mild pull to origin too, but slower.
+            tmp.set(ox - px, oy - py, oz - pz);
+            positions[i3] = px + tmp.x * 0.004;
+            positions[i3 + 1] = py + tmp.y * 0.004;
+            positions[i3 + 2] = pz + tmp.z * 0.004;
+          }
+          const d = Math.hypot(ox - positions[i3], oy - positions[i3 + 1]);
+          if (d < 0.1) count++;
+        }
+        geometry.attributes.position.needsUpdate = true;
+        restoredCount = count;
+        const pct = particleCount > 0 ? Math.round((count / particleCount) * 100) : 0;
+        restorePctBadge.textContent = `还原 ${pct}%`;
+        restorePctBadge.className = `badge ${pct > 70 ? "green" : pct > 30 ? "amber" : "gray"}`;
+        // Gentle camera orbit so even idle motion feels alive.
+        const t = performance.now() * 0.0002;
+        camera.position.x = Math.sin(t) * 2;
+        camera.position.y = Math.cos(t * 0.7) * 0.6;
+        camera.lookAt(0, 0, 0);
+        renderer.render(scene, camera);
+        requestAnimationFrame(tick);
+      }
+      tick();
+    </script>
+  </body>
+</html>
