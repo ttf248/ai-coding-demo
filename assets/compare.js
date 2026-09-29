@@ -1,0 +1,663 @@
+(function () {
+  "use strict";
+  const data = window.ARCHIVE,
+    U = window.ArchiveUI,
+    e = U.escape,
+    $ = (id) => document.getElementById(id);
+  const sides = ["left", "right", "third", "fourth"],
+    labels = { left: "A", right: "B", third: "C", fourth: "D" },
+    seen = new Set(),
+    narrow = matchMedia("(max-width:700px)"),
+    unloaded = { left: false, right: false, third: false, fourth: false };
+  const sizes = {
+    desktop: [1440, 900],
+    tablet: [768, 1024],
+    mobile: [390, 844],
+  };
+  let state = {},
+    diffCache = null;
+  function fromURL() {
+    const p = new URLSearchParams(location.search);
+    state = {
+      left: p.get("left") || "",
+      right: p.get("right") || "",
+      third: p.get("third") || "",
+      fourth: p.get("fourth") || "",
+      thirdPage: p.get("thirdPage") || "",
+      fourthPage: p.get("fourthPage") || "",
+      group: p.get("group") || "",
+      scope: ["task", "raw", "topic", "all"].includes(p.get("scope"))
+        ? p.get("scope")
+        : "task",
+      layout: ["dual", "quad", "single"].includes(p.get("layout"))
+        ? p.get("layout")
+        : "dual",
+      focus: sides.includes(p.get("focus")) ? p.get("focus") : "",
+
+      leftPage: p.get("leftPage") || "",
+      rightPage: p.get("rightPage") || "",
+      viewport: ["adaptive", ...Object.keys(sizes)].includes(p.get("viewport"))
+        ? p.get("viewport")
+        : "adaptive",
+      tab: ["preview", "prompt", "info"].includes(p.get("tab"))
+        ? p.get("tab")
+        : "preview",
+      source: p.get("source") === "raw" ? "raw" : "task",
+      relatedOnly: p.get("related") !== "0",
+      mobile: sides.includes(p.get("mobile")) ? p.get("mobile") : "left",
+    };
+    if (!state.group) {
+      const initial = data.runs.find((r) => r.id === state.left);
+      if (initial) state.group = initial.topicId + "/" + initial.promptId;
+    }
+    if (!state.left && !state.right && groupPrompt()) fillGroup();
+  }
+  function groupPrompt() {
+    return data.prompts.find((p) => p.topicId + "/" + p.id === state.group);
+  }
+  function pool() {
+    const anchor = data.runs.find((r) => r.id === state.left);
+    const prompt = groupPrompt() || (anchor && U.promptFor(data, anchor));
+    return U.filterRuns(data, {}).filter((r) => {
+      if (state.scope === "all") return true;
+      if (state.scope === "raw")
+        return (
+          anchor &&
+          anchor.raw.trim() &&
+          anchor.input.completeness !== "unknown" &&
+          r.input.completeness !== "unknown" &&
+          r.rawHash === anchor.rawHash
+        );
+      if (!prompt) return true;
+      if (state.scope === "topic") return r.topicId === prompt.topicId;
+      return U.promptFor(data, r)?.hash === prompt.hash;
+    });
+  }
+  function fillGroup() {
+    state.scope = "task";
+    const runs = pool();
+    sides.forEach((side, i) => {
+      state[side] = state.layout === "quad" || i < 2 ? runs[i]?.id || "" : "";
+      state[side + "Page"] = "";
+      unloaded[side] = false;
+    });
+    state.mobile = "left";
+    state.focus = "";
+  }
+  function runLabel(r) {
+    return (
+      U.modelLabel(data, r) +
+      " · " +
+      r.effort +
+      " · " +
+      r.runId.match(/r\d+$/)?.[0]
+    );
+  }
+  const slots = () => (state.layout === "quad" ? sides : sides.slice(0, 2));
+  function visibleSides() {
+    const available = slots();
+    const current = available.includes(state.mobile) ? state.mobile : "left";
+    if (narrow.matches || state.layout === "single") return [current];
+    return state.focus && available.includes(state.focus)
+      ? [state.focus]
+      : available;
+  }
+  function choose(side, id) {
+    state[side] = id;
+    state[side + "Page"] = "";
+    unloaded[side] = false;
+  }
+  function renderPicker() {
+    $("scope").value = state.scope;
+    const q = $("model-search").value.trim().toLocaleLowerCase();
+    const runs = pool().filter((r) =>
+      (runLabel(r) + " " + r.title + " " + (r.date || ""))
+        .toLocaleLowerCase()
+        .includes(q),
+    );
+    const side = $("picker-side").value;
+    $("picker-count").textContent =
+      `${runs.length} 条实验 · 点击放入 ${labels[side]}`;
+    $("model-list").innerHTML =
+      runs
+        .map((r) => {
+          const occupied = slots()
+            .filter((s) => state[s] === r.id)
+            .map((s) => labels[s])
+            .join(" / ");
+          return `<button class="model-choice" data-choice="${e(r.id)}" ${slots().some((s) => s !== side && state[s] === r.id) ? "disabled" : ""}><strong>${e(runLabel(r))}</strong><span>${e(r.title)} · ${e(r.date || "日期未记录")}</span><small>${occupied ? "已选 " + occupied + " · " : ""}${seen.has(r.id) ? "已浏览 · " : ""}${r.preview.kind === "none" ? "无预览" : r.preview.embed ? "可预览" : "独立打开"} · ${r.input.completeness === "complete" ? "完整输入" : "输入留存不完整"}</small></button>`;
+        })
+        .join("") ||
+      '<p class="frame-placeholder">没有匹配实验，请调整范围或搜索。</p>';
+    for (const option of $("picker-side").options)
+      option.hidden =
+        state.layout !== "quad" && ["third", "fourth"].includes(option.value);
+  }
+  const getRun = (side) => data.runs.find((r) => r.id === state[side]);
+  function updateURL() {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(state))
+      if (k !== "relatedOnly" && v) p.set(k, v);
+    if (!state.relatedOnly) p.set("related", "0");
+    history.pushState(null, "", "?" + p.toString());
+  }
+  function textFor(run) {
+    return !run
+      ? ""
+      : state.source === "raw"
+        ? run.raw
+        : U.promptFor(data, run)?.text || "";
+  }
+  function frameKey(side) {
+    return [
+      state[side],
+      state[side + "Page"] || getRun(side)?.preview.defaultPage,
+    ].join("/");
+  }
+  function resizeFrames() {
+    const shells = [...document.querySelectorAll(".viewport-shell")].filter(
+      (el) => el.offsetWidth,
+    );
+    const common = Math.min(...shells.map((el) => el.clientWidth));
+    for (const shell of shells) {
+      const frame = shell.querySelector("iframe");
+      if (!frame) continue;
+      const availableHeight = shell.parentElement.clientHeight;
+      const [width, height] = sizes[state.viewport] || [
+        common,
+        availableHeight,
+      ];
+      const scale = Math.min(
+        1,
+        shell.clientWidth / width,
+        availableHeight / height,
+      );
+      frame.style.width = width + "px";
+      frame.style.height = height + "px";
+      frame.style.transform = `scale(${scale})`;
+      shell.style.height = availableHeight + "px";
+      frame.style.marginLeft =
+        Math.max(0, (shell.clientWidth - width * scale) / 2) + "px";
+      shell.closest(".compare-panel").querySelector("[data-size]").textContent =
+        `${width} × ${height} · ${Math.round(scale * 100)}%`;
+    }
+  }
+  function render() {
+    const visible = visibleSides();
+    document.body.dataset.mode = state.layout;
+    document.querySelector(".compare-grid").dataset.layout =
+      visible.length === 1 ? "single" : state.layout;
+    $("layout").value = state.layout;
+    $("group").value = state.group;
+    document
+      .querySelector(".mobile-tabs")
+      .classList.toggle("show-tabs", state.layout === "single");
+    document.querySelectorAll("[data-mobile]").forEach((btn) => {
+      btn.hidden =
+        state.layout !== "quad" &&
+        ["third", "fourth"].includes(btn.dataset.mobile);
+    });
+    const a = getRun("left"),
+      b = getRun("right");
+    $("relation").textContent =
+      state.left && state.left === state.right
+        ? "不能选择同一条实验，请更换一侧。"
+        : U.relation(data, a, b);
+    $("viewport").value = state.viewport;
+    $("prompt-source").value = state.source;
+    $("related-only").checked = state.relatedOnly;
+    $("source-control").hidden = state.tab !== "prompt";
+    document
+      .querySelectorAll("[data-tab]")
+      .forEach((btn) =>
+        btn.setAttribute("aria-pressed", String(btn.dataset.tab === state.tab)),
+      );
+    document
+      .querySelectorAll("[data-mobile]")
+      .forEach((btn) =>
+        btn.setAttribute(
+          "aria-pressed",
+          String(btn.dataset.mobile === state.mobile),
+        ),
+      );
+    if (state.tab === "prompt") {
+      const key = [...sides.map((s) => state[s]), state.source].join("/");
+      if (diffCache?.key !== key) {
+        diffCache = { key, ...U.diff(textFor(a), textFor(b)) };
+        for (const side of ["third", "fourth"])
+          diffCache[side] = U.diff(textFor(a), textFor(getRun(side))).right;
+      }
+    }
+    for (const side of sides) {
+      const panel = $("panel-" + side),
+        run = getRun(side),
+        other = getRun(side === "left" ? "right" : "left");
+      const active = visible.includes(side);
+      panel.hidden = !active;
+      if (active && run && state.tab === "preview" && !unloaded[side])
+        seen.add(run.id);
+      panel.classList.toggle("mobile-inactive", !active);
+      const candidates = U.filterRuns(data, {}).filter(
+        (r) =>
+          !state.relatedOnly ||
+          !other ||
+          r.topicId === other.topicId ||
+          r.id === state[side],
+      );
+      const ordered = candidates.sort((x, y) => {
+        const rank = (r) =>
+          other
+            ? r.id === other.id
+              ? 3
+              : U.promptFor(data, r)?.hash === U.promptFor(data, other)?.hash
+                ? 0
+                : r.topicId === other.topicId
+                  ? 1
+                  : 2
+            : 0;
+        return rank(x) - rank(y);
+      });
+      const options =
+        '<option value="">选择实验…</option>' +
+        (state[side] && !run
+          ? '<option value="' +
+            e(state[side]) +
+            '" selected>未找到：' +
+            e(state[side]) +
+            "</option>"
+          : "") +
+        ordered
+          .map(
+            (r) =>
+              '<option value="' +
+              e(r.id) +
+              '"' +
+              (r.id === state[side] ? " selected" : "") +
+              (slots().some((s) => s !== side && state[s] === r.id)
+                ? " disabled"
+                : "") +
+              ">" +
+              e(runLabel(r)) +
+              (other &&
+              r.id !== other.id &&
+              U.promptFor(data, r)?.hash === U.promptFor(data, other)?.hash
+                ? " · 同正文"
+                : "") +
+              "</option>",
+          )
+          .join("");
+      // Keep an untouched iframe in place: moving its DOM node would reload it.
+      const viewKey = JSON.stringify([
+        frameKey(side),
+        state.tab,
+        state.tab === "prompt"
+          ? diffCache.key
+          : state.tab === "info"
+            ? other?.id
+            : "",
+        active,
+        unloaded[side],
+        Boolean(
+          run &&
+          slots().some(
+            (s) =>
+              sides.indexOf(s) < sides.indexOf(side) && state[s] === run.id,
+          ),
+        ),
+      ]);
+      if (panel.dataset.viewKey === viewKey) {
+        panel.querySelector("[data-run]").innerHTML = options;
+        panel.querySelector("[data-maximize]").textContent =
+          state.focus === side ? "还原" : "放大";
+        continue;
+      }
+      panel.dataset.viewKey = viewKey;
+      const href = U.previewURL(run, state[side + "Page"]);
+      const invalidPage = Boolean(
+        run &&
+        state[side + "Page"] &&
+        !run.preview.pages.some((p) => p.id === state[side + "Page"]),
+      );
+      panel.innerHTML =
+        '<div class="panel-header"><h2>' +
+        (labels[side] + (side === "left" ? " · 基准" : "")) +
+        '</h2><label for="run-' +
+        side +
+        '">实验版本</label><select id="run-' +
+        side +
+        '" data-run="' +
+        side +
+        '">' +
+        options +
+        "</select>" +
+        `<div class="panel-navigation"><button data-step="-1" data-side="${side}" aria-label="${labels[side]} 上一版本">←</button><button data-step="1" data-side="${side}" aria-label="${labels[side]} 下一版本">→</button><button data-maximize="${side}" aria-label="放大或还原 ${labels[side]}">${state.focus === side ? "还原" : "放大"}</button></div>` +
+        (run && (run.preview.pages.length > 1 || invalidPage)
+          ? '<label for="page-' +
+            side +
+            '">页面模块</label><select id="page-' +
+            side +
+            '" data-page="' +
+            side +
+            '">' +
+            (invalidPage
+              ? '<option value="" disabled selected>页面无效，请重新选择</option>'
+              : "") +
+            run.preview.pages
+              .map(
+                (p) =>
+                  '<option value="' +
+                  e(p.id) +
+                  '"' +
+                  (p.id === (state[side + "Page"] || run.preview.defaultPage)
+                    ? " selected"
+                    : "") +
+                  ">" +
+                  e(p.label) +
+                  "</option>",
+              )
+              .join("") +
+            "</select>"
+          : "") +
+        '<div class="panel-actions">' +
+        (href
+          ? '<a class="button" href="' +
+            e(href) +
+            '" target="_blank" rel="noopener">独立打开 ↗</a><button data-reload="' +
+            side +
+            '">重载</button><button data-unload="' +
+            side +
+            '">' +
+            (unloaded[side] ? "加载此侧" : "卸载此侧") +
+            "</button>"
+          : "") +
+        (run ? '<a href="' + e(run.document) + '">实验记录</a>' : "") +
+        '</div><p class="panel-status">' +
+        (run
+          ? e(
+              U.modelLabel(data, run) +
+                " / " +
+                run.effort +
+                " · " +
+                (run.environment.tool || "工具未记录"),
+            )
+          : "请选择实验") +
+        '</p><p class="panel-status" data-size></p></div><div data-content></div>';
+      const content = panel.querySelector("[data-content]");
+      if (!run) {
+        content.innerHTML =
+          '<div class="frame-placeholder"><h3>' +
+          (state[side] ? "实验不存在或已经迁移" : "选一个实验开始") +
+          "</h3><p>上方可以选择任意主题的实验。另一侧会优先列出同正文版本。</p></div>";
+        continue;
+      }
+      if (
+        Boolean(
+          run &&
+          slots().some(
+            (s) =>
+              sides.indexOf(s) < sides.indexOf(side) && state[s] === run.id,
+          ),
+        )
+      ) {
+        content.innerHTML =
+          '<div class="frame-placeholder">请选择不同的实验记录。</div>';
+        continue;
+      }
+      if (state.tab === "prompt") {
+        content.innerHTML =
+          '<div class="panel-text"><p>' +
+          e(
+            state.source === "raw"
+              ? "完整原始输入 · 已留存部分"
+              : "可复用任务正文",
+          ) +
+          "</p><p>" +
+          e(
+            (side === "left" ? "与 B：" : "与基准 A：") +
+              U.relation(data, side === "left" ? b : a, run),
+          ) +
+          "</p><p>" +
+          e(run.input.notes) +
+          "</p><pre>" +
+          diffCache[side] +
+          "</pre></div>";
+        continue;
+      }
+      if (state.tab === "info") {
+        const info = [
+          ["输入关系", U.relation(data, side === "left" ? b : a, run)],
+          ["模型 / 推理档位", U.modelLabel(data, run) + " / " + run.effort],
+          ["日期", run.date || "未记录"],
+          ["原始输入记录", run.input.completeness + " · " + run.input.notes],
+          ["平台与工具", run.environment.tool || "未记录"],
+          ["上下文说明", run.environment.notes],
+          [
+            "产物与运行",
+            run.type +
+              " / " +
+              run.preview.kind +
+              " / 网络：" +
+              run.preview.network,
+          ],
+          ["技术栈", run.stack.join(" / ")],
+          ["人工修改与部署适配", run.changes.join("\n") || "未记录新增改动"],
+          ["实验 ID", run.id],
+        ];
+        content.innerHTML =
+          '<dl class="panel-info">' +
+          info
+            .map(
+              ([k, v]) =>
+                "<dt>" +
+                e(k) +
+                "</dt><dd>" +
+                e(v).replaceAll("\n", "<br>") +
+                "</dd>",
+            )
+            .join("") +
+          "</dl>";
+        continue;
+      }
+      if (!active) continue;
+      if (unloaded[side]) {
+        content.innerHTML =
+          '<div class="frame-placeholder"><h3>已卸载此侧</h3><p>已释放嵌入页面；再次加载会重置页面状态。</p></div>';
+        continue;
+      }
+      if (!href || !run.preview.embed) {
+        content.innerHTML =
+          '<div class="frame-placeholder"><h3>' +
+          (!href ? "没有可用静态预览" : "请独立打开这个项目") +
+          "</h3><p>" +
+          e(
+            run.preview.kind === "none"
+              ? "此记录保留源码或提示词，请查看实验说明。"
+              : "子页面无效或外部站点未确认支持嵌入。可重新选择页面或独立打开。",
+          ) +
+          "</p></div>";
+        continue;
+      }
+      const shell = document.createElement("div");
+      shell.className = "viewport-shell";
+      content.append(shell);
+      const status = panel.querySelector("[data-size]");
+      const frame = document.createElement("iframe");
+      frame.title = run.title + " · " + side;
+      frame.dataset.key = frameKey(side);
+      frame.setAttribute("allow", "fullscreen; autoplay; clipboard-write");
+      frame.setAttribute("allowfullscreen", "");
+      frame.setAttribute(
+        "sandbox",
+        "allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-downloads allow-popups",
+      );
+      frame.src = href;
+      shell.append(frame);
+      status.textContent = "正在请求预览…";
+      frame.addEventListener("load", () => {
+        if (frame.isConnected) resizeFrames();
+      });
+      // HEAD validates local HTTP availability, not application initialization.
+      if (run.preview.kind !== "external" && location.protocol !== "file:")
+        fetch(href, { method: "HEAD" })
+          .then((res) => {
+            if (!res.ok && frame.isConnected) {
+              frame.remove();
+              shell.innerHTML =
+                '<div class="frame-placeholder"><h3>预览文件不可用</h3><p>HTTP ' +
+                res.status +
+                "，请重试或独立打开。</p></div>";
+              status.textContent = "加载失败";
+            }
+          })
+          .catch(() => {
+            if (frame.isConnected)
+              status.textContent = "无法确认网络状态，请重试或独立打开。";
+          });
+      const timeout = setTimeout(() => {
+        if (frame.isConnected) {
+          const hint = document.createElement("p");
+          hint.className = "panel-status";
+          hint.textContent = "若画面为空或受浏览器限制，请重载或独立打开。";
+          panel.querySelector(".panel-header").append(hint);
+        }
+      }, 10000);
+      frame.addEventListener("load", () => clearTimeout(timeout), {
+        once: true,
+      });
+    }
+    renderPicker();
+    requestAnimationFrame(resizeFrames);
+  }
+  document.addEventListener("change", (event) => {
+    const el = event.target;
+    if (el.id === "picker-side" || el.id === "scope") {
+      if (el.id === "scope") {
+        state.scope = el.value;
+        updateURL();
+      }
+      renderPicker();
+      return;
+    }
+    if (el.id === "group") {
+      state.group = el.value;
+      fillGroup();
+    } else if (el.id === "layout") {
+      state.layout = el.value;
+      state.focus = "";
+      if (state.layout !== "quad" && ["third", "fourth"].includes(state.mobile))
+        state.mobile = "left";
+      if (state.layout === "quad") {
+        const occupied = new Set([state.left, state.right]);
+        for (const side of ["third", "fourth"]) {
+          if (!state[side] || occupied.has(state[side])) {
+            choose(side, pool().find((r) => !occupied.has(r.id))?.id || "");
+          }
+          occupied.add(state[side]);
+        }
+      }
+    } else if (el.dataset.run) {
+      const side = el.dataset.run;
+      state[side] = el.value;
+      state[side + "Page"] = "";
+      unloaded[side] = false;
+    } else if (el.dataset.page) {
+      state[el.dataset.page + "Page"] = el.value;
+      unloaded[el.dataset.page] = false;
+    } else if (el.id === "viewport") state.viewport = el.value;
+    else if (el.id === "prompt-source") state.source = el.value;
+    else if (el.id === "related-only") state.relatedOnly = el.checked;
+    else return;
+    updateURL();
+    render();
+  });
+  document.addEventListener("click", (event) => {
+    const el = event.target.closest("button");
+    if (!el) return;
+    if (el.id === "pick-models") {
+      $("picker-side").value =
+        state.layout === "single" || narrow.matches
+          ? visibleSides()[0]
+          : "right";
+      renderPicker();
+      $("model-picker").showModal();
+      $("model-search").focus();
+      return;
+    } else if (el.id === "close-picker") {
+      $("model-picker").close();
+      return;
+    } else if (el.dataset.choice) {
+      choose($("picker-side").value, el.dataset.choice);
+      $("model-picker").close();
+    } else if (el.dataset.step) {
+      const side = el.dataset.side;
+      const candidates = pool().filter(
+        (r) =>
+          !sides.some(
+            (s) => s !== side && slots().includes(s) && state[s] === r.id,
+          ),
+      );
+      if (!candidates.length) return;
+      const index = candidates.findIndex((r) => r.id === state[side]);
+      choose(
+        side,
+        candidates[
+          (index + Number(el.dataset.step) + candidates.length) %
+            candidates.length
+        ].id,
+      );
+    } else if (el.dataset.maximize) {
+      state.focus =
+        state.focus === el.dataset.maximize ? "" : el.dataset.maximize;
+    } else if (el.dataset.tab) state.tab = el.dataset.tab;
+    else if (el.dataset.mobile) state.mobile = el.dataset.mobile;
+    else if (el.dataset.unload)
+      unloaded[el.dataset.unload] = !unloaded[el.dataset.unload];
+    else if (el.dataset.reload) {
+      const side = el.dataset.reload;
+      unloaded[side] = false;
+      delete $("panel-" + side).dataset.viewKey;
+    } else if (el.id === "swap") {
+      [state.left, state.right] = [state.right, state.left];
+      [state.leftPage, state.rightPage] = [state.rightPage, state.leftPage];
+      [unloaded.left, unloaded.right] = [unloaded.right, unloaded.left];
+    } else return;
+    updateURL();
+    render();
+  });
+  $("share").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(location.href);
+      $("share-message").textContent = "分享链接已复制";
+      $("share-fallback").hidden = true;
+    } catch {
+      $("share-message").textContent = "请复制下方链接";
+      $("share-fallback").hidden = false;
+      $("share-fallback").value = location.href;
+      $("share-fallback").select();
+    }
+  });
+  window.addEventListener("popstate", () => {
+    fromURL();
+    sides.forEach((side) => (unloaded[side] = false));
+    render();
+  });
+  narrow.addEventListener("change", render);
+  window.addEventListener("resize", resizeFrames);
+  $("group").innerHTML =
+    '<option value="">选择主题 / 提示词…</option>' +
+    data.prompts
+      .map((p) => {
+        const topic = data.topics.find((t) => t.id === p.topicId);
+        const count = data.runs.filter(
+          (r) => U.promptFor(data, r)?.hash === p.hash,
+        ).length;
+        return `<option value="${e(p.topicId + "/" + p.id)}">${e(topic.title)} / ${e(p.id)} · ${count} 个实验</option>`;
+      })
+      .join("");
+  $("model-search").addEventListener("input", renderPicker);
+  new ResizeObserver(resizeFrames).observe(
+    document.querySelector(".compare-grid"),
+  );
+  fromURL();
+  render();
+})();
