@@ -38,7 +38,9 @@
           e(p.text) +
           '</pre><a href="' +
           e(p.directory) +
-          '/prompt.md">原始文件 ↗</a></details>',
+          '/prompt.md">原始文件 ↗</a> · <a href="compare.html?group=' +
+          encodeURIComponent(p.topicId + "/" + p.id) +
+          '">比较此提示词的全部实验 →</a></details>',
       )
       .join("") +
     '</section><section><div class="section-title"><h2>实验记录</h2><p>选择两个版本，并排查看实现与输入条件</p></div><div class="cards">' +
