@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gotham Tide · 新哥特式塔楼城市</title>
+    <style>
+      :root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#090d16;font-family:Inter,ui-sans-serif,system-ui,sans-serif}#scene{display:block;width:100%;height:100%;cursor:grab}#scene.dragging{cursor:grabbing}.hud{position:fixed;inset:0;pointer-events:none;padding:24px;display:flex;flex-direction:column;justify-content:space-between}.topbar{display:flex;align-items:flex-start;justify-content:space-between}.eyebrow{margin:0;color:#9aaabd;font:500 10px/1.4 ui-monospace,SFMono-Regular,monospace;letter-spacing:.26em;text-transform:uppercase}.title{margin:8px 0 0;color:#eef2f6;font:700 clamp(24px,4vw,42px)/1.05 Georgia,serif;letter-spacing:-.03em}.title em{color:#d78c5b;font-style:normal}.pill{border:1px solid rgba(225,232,241,.2);background:rgba(13,20,32,.55);backdrop-filter:blur(16px);border-radius:999px;padding:9px 13px;color:#b8c5d5;font:11px ui-monospace,SFMono-Regular,monospace}.bottom{display:flex;justify-content:space-between;align-items:flex-end;gap:20px}.panel{pointer-events:auto;border:1px solid rgba(214,225,237,.16);background:rgba(9,15,26,.68);backdrop-filter:blur(18px);border-radius:18px;padding:14px;min-width:248px;box-shadow:0 20px 60px rgba(0,0,0,.22)}.panel h2{margin:0 0 10px;color:#dfe8f1;font-size:12px;font-weight:600}.controls{display:grid;grid-template-columns:1fr 1fr;gap:7px}.controls button{border:1px solid rgba(225,232,241,.14);border-radius:10px;background:rgba(255,255,255,.05);color:#aebccc;padding:9px 10px;text-align:left;font-size:11px;cursor:pointer;transition:.2s}.controls button:hover,.controls button.active{border-color:rgba(215,140,91,.7);color:#f0c19e;background:rgba(215,140,91,.14)}.legend{pointer-events:none;text-align:right;color:#9eabbc;font-size:11px;line-height:1.8}.legend strong{color:#e6edf4;font-size:18px}.mark{display:inline-flex;align-items:center;gap:7px}.dot{width:7px;height:7px;border-radius:50%;background:#d78c5b;box-shadow:0 0 14px #d78c5b}.confirm{color:#e1b587;border-bottom:1px dashed #e1b587}.hint{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;color:rgba(231,239,245,.52);font:11px ui-monospace,monospace;letter-spacing:.1em;transition:opacity 1s}.hidden{opacity:0}
+    </style>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div class="hud">
+      <div class="topbar"><div><p class="eyebrow">GOTHAM TIDE / 03:47 PM</p><h1 class="title">A city built for the <em>afterglow.</em></h1></div><div class="pill"><span class="mark"><i class="dot"></i> LIVE EXPLORATION</span></div></div>
+      <div class="bottom"><div class="panel"><h2>ATMOSPHERE / 环境</h2><div class="controls"><button class="active" data-mode="dusk">黄昏光线</button><button data-mode="night">午夜雾色</button><button id="fireToggle">火焰粒子 · ON</button><button id="autoToggle">自动环绕 · ON</button></div><p class="eyebrow" style="margin-top:12px;letter-spacing:.12em">Drag to orbit · wheel to zoom</p></div><div class="legend"><strong id="towerCount">17</strong><br>tower silhouettes above<br><span class="confirm">待确认 · 真实比例数据</span></div></div>
+    </div>
+    <div id="hint" class="hint">DRAG TO ENTER THE CITY</div>
+    <script type="module">
+      import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+      const canvas = document.querySelector('#scene');
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+      const scene = new THREE.Scene(); scene.background = new THREE.Color('#111a2a'); scene.fog = new THREE.FogExp2('#111a2a', .012);
+      const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, .1, 260); let yaw = .65, pitch = .36, distance = 70, target = new THREE.Vector3(0, 10, 0);
+      const ambient = new THREE.HemisphereLight('#9fb4ce', '#090b12', 1.5); scene.add(ambient);
+      const moon = new THREE.DirectionalLight('#b9cbe7', 3); moon.position.set(-30, 60, 20); moon.castShadow = true; moon.shadow.mapSize.set(1024, 1024); scene.add(moon);
+      const warm = new THREE.PointLight('#e07852', 22, 70, 2); warm.position.set(-5, 10, 4); scene.add(warm);
+      const city = new THREE.Group(); scene.add(city);
+      const towerMat = new THREE.MeshStandardMaterial({ color:'#33445c', roughness:.72, metalness:.18 });
+      const stoneMat = new THREE.MeshStandardMaterial({ color:'#53637a', roughness:.8 });
+      const darkMat = new THREE.MeshStandardMaterial({ color:'#172133', roughness:.65 });
+      const roofMat = new THREE.MeshStandardMaterial({ color:'#151b2b', roughness:.6, metalness:.35 });
+      const windowMat = new THREE.MeshBasicMaterial({ color:'#edb37a' });
+      const waterMat = new THREE.MeshStandardMaterial({ color:'#101e32', roughness:.23, metalness:.75, transparent:true, opacity:.94 });
+      const box = (w,h,d,mat, x=0,y=0,z=0) => { const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;return m; };
+      function windowStrip(group, width, height, depth, floors, cols, side='front') { for(let fy=0;fy<floors;fy++){for(let c=0;c<cols;c++){const x=-width/2+.45+(width-.9)*((c+.5)/cols);const y=.8+(height-1.6)*((fy+.5)/floors);const w=Math.max(.16,(width-.9)/cols*.34);const light=box(w,.22,depth,windowMat,x,y,side==='front'?depth/2+.015:0);if(side==='front')group.add(light);}} }
+      function gothicTower(x,z,h=24,w=5.5,accent='#33445c') {
+        const g=new THREE.Group();g.position.set(x,0,z);const base=box(w, h*.55, w*.76, towerMat,0,h*.275,0);g.add(base);const mid=box(w*.82,h*.27,w*.63,stoneMat,0,h*.68,0);g.add(mid);const roof=new THREE.Mesh(new THREE.ConeGeometry(w*.62,h*.32,4),roofMat);roof.position.y=h*.86;roof.rotation.y=Math.PI/4;roof.castShadow=true;g.add(roof);const spire=new THREE.Mesh(new THREE.ConeGeometry(w*.13,h*.34,4),roofMat);spire.position.y=h*1.18;spire.castShadow=true;g.add(spire);windowStrip(g,w,h*.55,.12,Math.max(3,Math.floor(h/4)),Math.max(2,Math.floor(w/1.7)));const buttressMat=new THREE.MeshStandardMaterial({color:accent,roughness:.75});for(const sx of[-1,1]){const b=box(.42,h*.62,.5,buttressMat,sx*w*.46,h*.31,w*.37);g.add(b);const cap=new THREE.Mesh(new THREE.ConeGeometry(.38,.8,4),roofMat);cap.position.set(sx*w*.46,h*.66,w*.37);cap.rotation.y=Math.PI/4;g.add(cap);}return g;
+      }
+      const towers=[]; const placements=[[-16,-8,26,6],[-7,-11,17,4.2],[2,-10,21,5], [12,-8,30,6.8], [21,-3,18,4.8], [-23,1,20,4.4],[-11,1,35,7],[3,2,20,4.5],[15,4,23,5],[-25,12,28,6.3],[-14,12,19,4.6],[-2,12,26,5.6],[11,14,17,4],[22,14,25,5.5],[-22,23,17,4.4],[-9,24,24,5.4],[9,24,20,4.8]];
+      placements.forEach((p,i)=>{const t=gothicTower(...p);t.rotation.y=(i%3)*.08;city.add(t);towers.push(t);});
+      const plaza=box(58,.7,54,darkMat,0,-.35,7);city.add(plaza);const water=new THREE.Mesh(new THREE.PlaneGeometry(100,80),waterMat);water.rotation.x=-Math.PI/2;water.position.y=-.7;water.position.z=42;scene.add(water);
+      const roadMat=new THREE.MeshStandardMaterial({color:'#202e3e',roughness:.9});city.add(box(58,.12,3.8,roadMat,0,.05,-12),box(3.8,.13,38,roadMat,-18,.05,8),box(3.8,.13,38,roadMat,18,.05,10));
+      for(let x=-27;x<=27;x+=3){city.add(box(1.35,.18,.42,new THREE.MeshStandardMaterial({color:'#d09665',roughness:.8}),x,.16,-12));}
+      const bridge=box(13,.4,26,stoneMat,0,-.25,33);city.add(bridge); for(let x=-5;x<=5;x+=2){city.add(box(.3,1,.5,roofMat,x,.3,33));}
+      const island=new THREE.Mesh(new THREE.CylinderGeometry(8,10,.9,32),new THREE.MeshStandardMaterial({color:'#17251f',roughness:1}));island.position.set(2,-.15,40);scene.add(island);island.add(gothicTower(0,0,15,4.2));
+      // warm windows around the city, kept separate so night mode can dim them together.
+      const windows=new THREE.Group();city.add(windows);for(let i=0;i<80;i++){const x=(Math.random()-.5)*48,z=(Math.random()-.05)*27,y=1+Math.random()*18;const light=box(.16,.35,.08,windowMat,x,y,z);windows.add(light);}
+      // Fireflies and ember particles: color and motion are generated at runtime.
+      const fireCount=680, firePos=new Float32Array(fireCount*3), fireCol=new Float32Array(fireCount*3);for(let i=0;i<fireCount;i++){firePos[i*3]=(Math.random()-.5)*62;firePos[i*3+1]=1+Math.random()*25;firePos[i*3+2]=(-12)+Math.random()*43;const c=new THREE.Color().setHSL(.06+Math.random()*.08,.7,.55);fireCol.set([c.r,c.g,c.b],i*3);}const fireGeo=new THREE.BufferGeometry();fireGeo.setAttribute('position',new THREE.BufferAttribute(firePos,3));fireGeo.setAttribute('color',new THREE.BufferAttribute(fireCol,3));const fire=new THREE.Points(fireGeo,new THREE.PointsMaterial({size:.16,vertexColors:true,transparent:true,opacity:.72,blending:THREE.AdditiveBlending}));scene.add(fire);
+      const waveGeo=new THREE.BufferGeometry(), wavePos=[];for(let i=0;i<150;i++){wavePos.push((Math.random()-.5)*80,-.45,15+Math.random()*50);}waveGeo.setAttribute('position',new THREE.Float32BufferAttribute(wavePos,3));const waves=new THREE.Points(waveGeo,new THREE.PointsMaterial({color:'#6a91af',size:.1,transparent:true,opacity:.65}));scene.add(waves);
+      const flameGroup=new THREE.Group();scene.add(flameGroup);for(const p of [[-5,2,4],[7,2,0],[-15,1,-4],[16,1,-8]]){const light=new THREE.PointLight('#e36b43',7,8);light.position.set(...p);flameGroup.add(light);const ember=new THREE.Mesh(new THREE.SphereGeometry(.18,6,6),new THREE.MeshBasicMaterial({color:'#ff9a5d'}));ember.position.set(...p);flameGroup.add(ember);}
+      let clock=0, auto=true, fireOn=true, drag=false, lastX=0,lastY=0, speed=1; function updateCamera(){camera.position.set(Math.cos(yaw)*Math.cos(pitch)*distance,Math.sin(pitch)*distance+10,Math.sin(yaw)*Math.cos(pitch)*distance);camera.lookAt(target);}
+      function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}addEventListener('resize',resize);canvas.addEventListener('pointerdown',e=>{drag=true;lastX=e.clientX;lastY=e.clientY;canvas.classList.add('dragging');document.querySelector('#hint').classList.add('hidden');});addEventListener('pointerup',()=>{drag=false;canvas.classList.remove('dragging')});addEventListener('pointermove',e=>{if(!drag)return;yaw-=(e.clientX-lastX)*.005;pitch+=(e.clientY-lastY)*.004;pitch=Math.max(.08,Math.min(.85,pitch));lastX=e.clientX;lastY=e.clientY;});canvas.addEventListener('wheel',e=>{distance=Math.max(28,Math.min(110,distance+e.deltaY*.04));});
+      document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-mode]').forEach(b=>b.classList.remove('active'));button.classList.add('active');const night=button.dataset.mode==='night';scene.background.set(night?'#070b15':'#111a2a');scene.fog.color.set(night?'#070b15':'#111a2a');ambient.intensity=night?.55:1.5;moon.intensity=night?1.2:3;warm.intensity=night?42:22;}));document.querySelector('#autoToggle').addEventListener('click',e=>{auto=!auto;e.currentTarget.textContent=`自动环绕 · ${auto?'ON':'OFF'}`;e.currentTarget.classList.toggle('active',auto)});document.querySelector('#fireToggle').addEventListener('click',e=>{fireOn=!fireOn;e.currentTarget.textContent=`火焰粒子 · ${fireOn?'ON':'OFF'}`;fire.visible=fireOn;flameGroup.visible=fireOn;e.currentTarget.classList.toggle('active',fireOn)});
+      function animate(){requestAnimationFrame(animate);clock+=.01;if(auto&&!drag)yaw+=.0009*speed;updateCamera();fire.rotation.y=clock*.08;fire.position.y=Math.sin(clock*.8)*.14;waves.position.x=Math.sin(clock*.32)*.7;flameGroup.children.forEach((c,i)=>{if(c.isLight)c.intensity=(fireOn?7:0)+Math.sin(clock*5+i)*1.3;});renderer.render(scene,camera);}updateCamera();animate();
+    </script>
+  </body>
+</html>
