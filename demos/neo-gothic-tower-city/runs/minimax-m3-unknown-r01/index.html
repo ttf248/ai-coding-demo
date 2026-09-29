@@ -1,0 +1,1278 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080b14">
+  <meta name="description" content="A walkable 1:1 scale neo-gothic tower city rendered in raw WebGL.">
+  <title>鸦塔之城 · RAVENSPIRE</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #d8e0e6;
+      --muted: #8a99a3;
+      --crimson: #c45a55;
+      --gold: #d6b27c;
+      --cyan: #93d8d6;
+      --panel: rgba(8, 13, 20, 0.78);
+      --line: rgba(160, 184, 200, 0.18);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #060912; }
+    body { color: var(--ink); font-family: "Inter", "Segoe UI", "Microsoft YaHei", sans-serif; letter-spacing: 0.02em; }
+    button { color: inherit; font: inherit; }
+    #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+    .vignette { position: fixed; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse at 50% 46%, transparent 32%, rgba(2, 5, 10, 0.22) 70%, rgba(0, 2, 6, 0.7) 145%); }
+    .noise { position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0.10; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='r'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.84' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23r)' opacity='0.3'/%3E%3C/svg%3E"); mix-blend-mode: screen; }
+    .hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
+    .crest { position: absolute; top: 22px; left: 28px; display: flex; gap: 12px; align-items: center; }
+    .crest-mark { width: 36px; height: 36px; border: 1px solid rgba(214, 178, 124, 0.65); position: relative; clip-path: polygon(50% 0%, 100% 28%, 100% 72%, 50% 100%, 0% 72%, 0% 28%); background: linear-gradient(180deg, rgba(214, 178, 124, 0.06), transparent 65%); }
+    .crest-mark::before { content: ""; position: absolute; left: 50%; top: 22%; transform: translateX(-50%); width: 1px; height: 60%; background: rgba(214, 178, 124, 0.8); }
+    .crest-mark::after { content: ""; position: absolute; left: 24%; top: 50%; width: 52%; height: 1px; background: rgba(214, 178, 124, 0.8); }
+    .crest-text { display: flex; flex-direction: column; gap: 4px; }
+    .crest-name { font-size: 12px; font-weight: 600; letter-spacing: 0.26em; color: #e6dccd; }
+    .crest-sub { font-size: 9px; letter-spacing: 0.22em; color: var(--muted); text-transform: uppercase; }
+    .meta { position: absolute; top: 22px; right: 28px; display: flex; gap: 18px; align-items: center; color: #95a3ac; font: 10px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: 0.14em; text-transform: uppercase; }
+    .live { display: inline-flex; align-items: center; gap: 8px; }
+    .live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #9de6d6; box-shadow: 0 0 12px #8cead9; animation: pulse 2.2s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: 0.4; box-shadow: 0 0 3px #8cead9; } }
+    .panel { position: absolute; padding: 13px 14px; border: 1px solid var(--line); background: linear-gradient(155deg, rgba(12, 20, 28, 0.82), rgba(7, 12, 18, 0.45)); backdrop-filter: blur(10px); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42); }
+    .panel-label { display: flex; justify-content: space-between; color: #92a4ac; font: 9px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: 0.18em; text-transform: uppercase; }
+    .compass { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); width: 110px; text-align: center; color: #9aabad; font: 9px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: 0.15em; }
+    .compass-rose { position: relative; margin: 8px auto 0; width: 56px; height: 26px; overflow: hidden; border-top: 1px solid #a0b0ad; }
+    .compass-rose::before { content: ""; position: absolute; top: -1px; left: 50%; width: 1px; height: 14px; background: var(--gold); transform-origin: top; transform: translateX(-50%) rotate(var(--bearing, 0deg)); box-shadow: 0 0 8px rgba(214, 178, 124, 0.7); }
+    .compass-rose::after { content: "N   E   S   W"; position: absolute; left: -3px; right: -3px; top: 7px; color: #6d7c81; font-size: 8px; white-space: pre; letter-spacing: 0.18em; }
+    .sidebar { position: absolute; left: 28px; top: 108px; width: 222px; padding: 14px; }
+    #minimap { display: block; width: 192px; height: 192px; margin: 13px auto 12px; border: 1px solid rgba(146, 192, 200, 0.16); background: rgba(8, 14, 20, 0.65); }
+    .coords { display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid rgba(160, 184, 200, 0.14); color: #829598; font: 9px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: 0.12em; }
+    .coords b { color: #cad9d6; font-weight: 500; }
+    .cross { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); opacity: 0.6; }
+    .cross::before, .cross::after { content: ""; position: absolute; background: rgba(220, 234, 240, 0.7); }
+    .cross::before { top: 10px; left: 0; width: 22px; height: 1px; }
+    .cross::after { left: 10px; top: 0; width: 1px; height: 22px; }
+    #poi-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+    .poi { position: absolute; padding: 5px 9px; color: #c8d6d0; border-left: 1px solid var(--crimson); background: rgba(10, 18, 24, 0.62); font: 9px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: 0.14em; white-space: nowrap; opacity: 0; transition: opacity 0.3s; text-shadow: 0 1px 8px rgba(4, 8, 14, 0.95); }
+    .poi.visible { opacity: 0.92; }
+    .info-card { position: absolute; left: 28px; bottom: 26px; max-width: 295px; padding: 13px 15px; }
+    .info-card .eyebrow { color: var(--gold); font: 9px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: 0.22em; }
+    .info-card h2 { margin: 7px 0 5px; font: 300 22px/1.05 Georgia, "Times New Roman", serif; letter-spacing: 0.04em; }
+    .info-card p { margin: 0; color: #92a4a7; font-size: 11px; line-height: 1.7; letter-spacing: 0.06em; }
+    .nav-panel { position: absolute; right: 28px; bottom: 24px; width: 232px; padding: 14px; }
+    .nav-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid rgba(160, 184, 200, 0.14); color: #a4b6bd; font: 9px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: 0.18em; }
+    .key-row { display: flex; align-items: center; justify-content: space-between; padding-top: 9px; color: #86979a; font-size: 9px; letter-spacing: 0.08em; }
+    .keys { display: flex; align-items: center; gap: 3px; }
+    kbd { min-width: 20px; height: 19px; padding: 2px 5px; border: 1px solid rgba(160, 184, 200, 0.24); border-radius: 2px; color: #d0ddda; text-align: center; font: 9px ui-monospace, "SFMono-Regular", Consolas, monospace; background: rgba(146, 184, 192, 0.04); }
+    .actions { display: flex; gap: 7px; margin-top: 13px; }
+    .action { pointer-events: auto; flex: 1; cursor: pointer; padding: 9px 6px; border: 1px solid rgba(160, 184, 200, 0.22); border-radius: 0; color: #c3d1ce; background: rgba(146, 184, 192, 0.06); font: 9px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: 0.1em; transition: 0.2s; }
+    .action:hover, .action.active { border-color: rgba(214, 178, 124, 0.72); color: #f0d6aa; background: rgba(214, 178, 124, 0.1); }
+    .footnote { position: absolute; top: 32px; right: 28px; margin-top: 33px; color: #839496; font: 9px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: 0.14em; }
+    .splash { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; background: linear-gradient(95deg, rgba(4, 8, 14, 0.82), rgba(4, 8, 14, 0.22) 80%), linear-gradient(0deg, rgba(3, 6, 10, 0.5), transparent 65%); transition: opacity 0.9s ease, visibility 0.9s; }
+    .splash.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    .splash-inner { width: min(610px, calc(100vw - 44px)); margin-left: min(8vw, 110px); transform: translateY(-1vh); }
+    .kicker { display: flex; align-items: center; gap: 13px; color: var(--gold); font: 10px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: 0.26em; }
+    .kicker::before { content: ""; width: 36px; height: 1px; background: var(--gold); }
+    h1 { margin: 22px 0 10px; font: 300 clamp(46px, 7vw, 84px)/0.95 Georgia, "Times New Roman", serif; letter-spacing: 0.02em; text-shadow: 0 5px 32px rgba(0, 0, 0, 0.55); }
+    h1 span { display: block; margin-top: 13px; color: #b6c2c8; font: 300 clamp(16px, 2vw, 22px)/1.2 "Inter", "Segoe UI", sans-serif; letter-spacing: 0.4em; }
+    .splash-copy { max-width: 410px; margin: 28px 0 0; color: #a7b6b8; font-size: 12px; line-height: 1.95; letter-spacing: 0.06em; }
+    .enter-btn { display: inline-flex; align-items: center; gap: 22px; margin-top: 28px; padding: 13px 19px; border: 1px solid rgba(214, 178, 124, 0.7); color: #f0d4a6; background: rgba(214, 178, 124, 0.08); cursor: pointer; font: 10px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: 0.18em; transition: background 0.2s, box-shadow 0.2s; }
+    .enter-btn:hover { background: rgba(214, 178, 124, 0.18); box-shadow: 0 0 28px rgba(214, 178, 124, 0.14); }
+    .enter-btn i { display: block; width: 22px; height: 1px; background: var(--gold); position: relative; }
+    .enter-btn i::after { content: ""; position: absolute; right: 0; top: -3px; width: 6px; height: 6px; border-top: 1px solid var(--gold); border-right: 1px solid var(--gold); transform: rotate(45deg); }
+    .splash-foot { margin-top: 38px; color: #788b8e; font: 9px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: 0.16em; }
+    #fatal { display: none; position: fixed; inset: 0; z-index: 20; place-items: center; padding: 30px; color: #eee; text-align: center; background: #060912; font: 14px/1.7 sans-serif; }
+    .touch-pad { display: none; position: absolute; left: 26px; bottom: 28px; width: 120px; height: 120px; pointer-events: auto; }
+    .touch-pad button { position: absolute; width: 40px; height: 40px; border: 1px solid rgba(160, 184, 200, 0.3); background: rgba(8, 16, 22, 0.62); color: #cfe1dc; font-size: 14px; touch-action: none; }
+    .touch-pad button:active { background: rgba(214, 178, 124, 0.28); }
+    .touch-pad .up { left: 40px; top: 0; }
+    .touch-pad .left { left: 0; top: 40px; }
+    .touch-pad .down { left: 40px; top: 80px; }
+    .touch-pad .right { left: 80px; top: 40px; }
+    @media (max-width: 660px) {
+      .crest { left: 16px; top: 14px; } .meta { right: 16px; top: 14px; gap: 8px; font-size: 8px; } .meta .build { display: none; }
+      .compass { top: 86px; left: auto; right: 16px; transform: scale(0.9); transform-origin: top right; }
+      .sidebar { left: 16px; top: 82px; width: 145px; padding: 8px; } .sidebar .panel-label { font-size: 7px; } #minimap { width: 124px; height: 124px; margin: 8px auto; } .coords { font-size: 7px; }
+      .info-card { left: 16px; bottom: 22px; max-width: 200px; } .info-card h2 { font-size: 17px; } .info-card p { font-size: 9px; }
+      .nav-panel { right: 14px; bottom: 18px; width: 174px; padding: 10px; } .nav-head { font-size: 8px; } .key-row { font-size: 8px; padding-top: 7px; } .key-row:nth-of-type(3) { display: none; } .actions { margin-top: 9px; } .action { padding: 7px 3px; font-size: 8px; }
+      .touch-pad { display: block; left: 16px; bottom: 100px; transform: scale(0.86); transform-origin: bottom left; }
+      .footnote { display: none; } .splash-inner { margin-left: 0; transform: translateY(-3vh); } .splash-copy { font-size: 11px; max-width: 320px; }
+    }
+    @media (max-height: 580px) and (min-width: 661px) { .sidebar { top: 80px; width: 178px; padding: 9px; } #minimap { width: 148px; height: 148px; } .info-card { bottom: 14px; } .nav-panel { bottom: 14px; } }
+  </style>
+</head>
+<body>
+  <canvas id="scene" aria-label="Walkable neo-gothic tower city"></canvas>
+  <div class="vignette"></div><div class="noise"></div>
+  <div class="hud">
+    <header class="crest">
+      <div class="crest-mark"></div>
+      <div class="crest-text">
+        <div class="crest-name">RAVENSPIRE / 鸦塔之城</div>
+        <div class="crest-sub">A WALKABLE 1:1 NEO-GOTHIC REALM</div>
+      </div>
+    </header>
+    <div class="meta">
+      <span class="live">CITY SYSTEMS ONLINE</span>
+      <span class="build">VOL. 01 · SCALE 1:1</span>
+    </div>
+    <div class="compass"><span>BEARING</span><div class="compass-rose" id="compass"></div></div>
+    <aside class="panel sidebar">
+      <div class="panel-label"><span>WAYFINDER</span><span>01 / 05</span></div>
+      <canvas id="minimap" width="384" height="384"></canvas>
+      <div class="coords"><span>N <b id="coord-n">00.0</b></span><span>E <b id="coord-e">00.0</b></span><span>ALT <b id="coord-h">01.7</b></span></div>
+    </aside>
+    <div class="cross"></div>
+    <div id="poi-layer"></div>
+    <div class="info-card panel">
+      <div class="eyebrow" id="district-code">DISTRICT 00 — THE OUTER QUAY</div>
+      <h2 id="district-name">鸦巢码头</h2>
+      <p id="district-desc">盐与煤的灰烬之下，群塔的第一根尖刺刺入黄昏。</p>
+    </div>
+    <div class="footnote">AMBIENT · TIDAL & EMBER</div>
+    <aside class="panel nav-panel">
+      <div class="nav-head"><span>NAVIGATION</span><span id="speed-readout">09 M/S</span></div>
+      <div class="key-row"><span>MOVE</span><span class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span></div>
+      <div class="key-row"><span>LOOK</span><span class="keys"><kbd>DRAG</kbd></span></div>
+      <div class="key-row"><span>RUN</span><span class="keys"><kbd>SHIFT</kbd></span></div>
+      <div class="actions"><button class="action" id="tour-btn">循灯火漫游 ↗</button><button class="action" id="reset-btn">返回码头</button></div>
+    </aside>
+    <div class="touch-pad" id="touch-pad" aria-label="Touch movement controls">
+      <button class="up" data-key="w" aria-label="Forward">▲</button>
+      <button class="left" data-key="a" aria-label="Left">◀</button>
+      <button class="down" data-key="s" aria-label="Back">▼</button>
+      <button class="right" data-key="d" aria-label="Right">▶</button>
+    </div>
+  </div>
+  <div class="splash" id="splash">
+    <main class="splash-inner">
+      <div class="kicker">FICTIONAL COAST · ARCHIVE / 02</div>
+      <h1>鸦塔之城<span>RAVENSPIRE, THE LAST CITADEL</span></h1>
+      <p class="splash-copy">在潮水与鸦鸣之间，一座新哥特式海上城邦沿着尖塔层层升起。走过码头、灯火大道与高耸的穹顶——每一步都是一米；每束光都来自真实的灯芯。</p>
+      <button class="enter-btn" id="enter-btn"><span>进入城域 / ENTER THE CITY</span><i></i></button>
+      <div class="splash-foot">WASD MOVE&nbsp;&nbsp; · &nbsp;&nbsp;MOUSE LOOK&nbsp;&nbsp; · &nbsp;&nbsp;SHIFT RUN&nbsp;&nbsp; · &nbsp;&nbsp;WHEEL ZOOM</div>
+    </main>
+  </div>
+  <div id="fatal"></div>
+<script>
+(() => {
+  'use strict';
+  const canvas = document.getElementById('scene');
+  const minimap = document.getElementById('minimap');
+  const fatalBox = document.getElementById('fatal');
+  const gl = canvas.getContext('webgl', { antialias: true, alpha: false, powerPreference: 'high-performance' });
+  if (!gl) {
+    fatalBox.style.display = 'grid';
+    fatalBox.textContent = '此浏览器没有可用的 WebGL 图形环境。请尝试启用硬件加速的现代浏览器。';
+    return;
+  }
+  /* === Shaders === */
+  const landVertex = `
+    attribute vec3 aPos;
+    attribute vec3 aNormal;
+    attribute vec3 aColor;
+    attribute float aGlow;
+    attribute float aWater;
+    uniform mat4 uVP;
+    uniform float uTime;
+    uniform vec3 uCam;
+    uniform float uDayMix;
+    varying vec3 vN;
+    varying vec3 vC;
+    varying vec3 vW;
+    varying float vGlow;
+    varying float vDepth;
+    varying float vWater;
+    void main() {
+      vec3 p = aPos;
+      if (aWater > 0.5) {
+        float w1 = sin(p.x * 0.08 + uTime * 0.7 + p.z * 0.05) * 0.28;
+        float w2 = cos(p.z * 0.11 + uTime * 0.55 - p.x * 0.04) * 0.22;
+        p.y += w1 + w2;
+      }
+      vN = aNormal;
+      vC = aColor;
+      vW = p;
+      vGlow = aGlow;
+      vDepth = distance(p, uCam);
+      vWater = aWater;
+      gl_Position = uVP * vec4(p, 1.0);
+    }`;
+  const landFragment = `
+    precision mediump float;
+    uniform float uTime;
+    uniform vec3 uCam;
+    uniform float uDayMix;
+    varying vec3 vN;
+    varying vec3 vC;
+    varying vec3 vW;
+    varying float vGlow;
+    varying float vDepth;
+    varying float vWater;
+    void main() {
+      vec3 n = normalize(vN);
+      vec3 keyDir = normalize(vec3(-0.32, 0.86, 0.40));
+      float key = max(dot(n, keyDir), 0.0);
+      float ambient = 0.42 + key * 0.72;
+      float upLift = max(n.y, 0.0) * 0.18;
+      vec3 base = vC * (0.55 + ambient * 0.55) + upLift * vec3(0.04, 0.05, 0.07);
+      vec3 emissive = mix(vec3(0.0), vec3(1.0, 0.78, 0.42), vGlow);
+      base = mix(base, base * 1.35 + emissive * 0.85, vGlow * 0.85);
+      // Day/night drift: warmer (cloudy dusk) baseline, slight cooler at midnight.
+      vec3 dayTint = vec3(1.02, 0.99, 0.93);
+      vec3 nightTint = vec3(0.78, 0.86, 1.08);
+      vec3 sky = mix(nightTint, dayTint, uDayMix);
+      base *= sky;
+      if (vWater > 0.5) {
+        float fres = pow(1.0 - max(dot(n, normalize(uCam - vW)), 0.0), 2.6);
+        float ripple = 0.5 + 0.5 * sin(vW.x * 0.28 + vW.z * 0.18 + uTime * 1.55);
+        float caustics = 0.5 + 0.5 * sin((vW.x + vW.z) * 0.4 + uTime * 0.9);
+        base += vec3(0.05, 0.18, 0.22) * fres;
+        base += vec3(0.02, 0.07, 0.09) * ripple;
+        base += vec3(0.04, 0.10, 0.14) * pow(caustics, 2.0) * 0.45;
+      }
+      float fog = smoothstep(160.0, 460.0, vDepth);
+      vec3 fogColor = mix(vec3(0.025, 0.04, 0.07), vec3(0.06, 0.08, 0.11), uDayMix);
+      vec3 finalColor = mix(base, fogColor, fog);
+      gl_FragColor = vec4(finalColor, 1.0);
+    }`;
+  const emberVertex = `
+    attribute vec3 aPos;
+    attribute vec3 aColor;
+    attribute float aSize;
+    attribute float aSeed;
+    attribute float aRise;
+    uniform mat4 uVP;
+    uniform float uTime;
+    uniform float uRatio;
+    varying vec3 vColor;
+    varying float vAlpha;
+    void main() {
+      vec3 p = aPos;
+      float phase = fract(uTime * (0.10 + aSeed * 0.13) + aSeed * 5.71);
+      p.y += phase * aRise;
+      p.x += sin(uTime * 0.74 + aSeed * 41.0) * (aRise > 0.1 ? 0.32 : 0.0);
+      p.z += cos(uTime * 0.62 + aSeed * 27.0) * (aRise > 0.1 ? 0.18 : 0.0);
+      vec4 clip = uVP * vec4(p, 1.0);
+      gl_Position = clip;
+      gl_PointSize = clamp(aSize * uRatio * (240.0 / max(1.0, clip.w)), 1.0, 18.0);
+      vColor = aColor;
+      vAlpha = aRise > 0.1 ? (0.5 + 0.5 * sin(phase * 3.14159)) : 0.7;
+    }`;
+  const emberFragment = `
+    precision mediump float;
+    varying vec3 vColor;
+    varying float vAlpha;
+    void main() {
+      vec2 q = gl_PointCoord - vec2(0.5);
+      float d = length(q);
+      float a = (1.0 - smoothstep(0.05, 0.5, d)) * vAlpha;
+      if (a < 0.03) discard;
+      gl_FragColor = vec4(vColor, a);
+    }`;
+  function compile(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      throw new Error(gl.getShaderInfoLog(shader) || 'Shader compile failed');
+    }
+    return shader;
+  }
+  function program(vs, fs) {
+    const p = gl.createProgram();
+    gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      throw new Error(gl.getProgramInfoLog(p) || 'Program link failed');
+    }
+    return p;
+  }
+  let landProgram, emberProgram;
+  try {
+    landProgram = program(landVertex, landFragment);
+    emberProgram = program(emberVertex, emberFragment);
+  } catch (err) {
+    fatalBox.style.display = 'grid';
+    fatalBox.textContent = '着色器初始化失败：' + err.message;
+    return;
+  }
+  const landLoc = {
+    pos: gl.getAttribLocation(landProgram, 'aPos'),
+    normal: gl.getAttribLocation(landProgram, 'aNormal'),
+    color: gl.getAttribLocation(landProgram, 'aColor'),
+    glow: gl.getAttribLocation(landProgram, 'aGlow'),
+    water: gl.getAttribLocation(landProgram, 'aWater'),
+    vp: gl.getUniformLocation(landProgram, 'uVP'),
+    time: gl.getUniformLocation(landProgram, 'uTime'),
+    cam: gl.getUniformLocation(landProgram, 'uCam'),
+    dayMix: gl.getUniformLocation(landProgram, 'uDayMix')
+  };
+  const emberLoc = {
+    pos: gl.getAttribLocation(emberProgram, 'aPos'),
+    color: gl.getAttribLocation(emberProgram, 'aColor'),
+    size: gl.getAttribLocation(emberProgram, 'aSize'),
+    seed: gl.getAttribLocation(emberProgram, 'aSeed'),
+    rise: gl.getAttribLocation(emberProgram, 'aRise'),
+    vp: gl.getUniformLocation(emberProgram, 'uVP'),
+    time: gl.getUniformLocation(emberProgram, 'uTime'),
+    ratio: gl.getUniformLocation(emberProgram, 'uRatio')
+  };
+  /* === Geometry helpers === */
+  const verts = [], embers = [], buildings = [], colliders = [];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const hex = (s) => {
+    const n = parseInt(s.slice(1), 16);
+    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  };
+  const C = {
+    basalt: hex('#1c2329'),
+    stone: hex('#2f3a40'),
+    stoneLite: hex('#4a5760'),
+    marble: hex('#5e6e75'),
+    shadow: hex('#161e23'),
+    roof: hex('#15232a'),
+    roofLite: hex('#243640'),
+    gold: hex('#a87d4f'),
+    goldBright: hex('#d6b27c'),
+    crimson: hex('#a1423f'),
+    ember: hex('#f1a257'),
+    azure: hex('#5fb1ae'),
+    azureLite: hex('#9ee0d6'),
+    water: hex('#0a303a'),
+    waterDeep: hex('#061820'),
+    ground: hex('#131e22'),
+    road: hex('#0c171b'),
+    moss: hex('#26392b')
+  };
+  function addVertex(p, n, c, glow = 0, water = 0) {
+    verts.push(p[0], p[1], p[2], n[0], n[1], n[2], c[0], c[1], c[2], glow, water);
+  }
+  function tri(a, b, c, color, normal = [0, 1, 0], glow = 0, water = 0) {
+    addVertex(a, normal, color, glow, water);
+    addVertex(b, normal, color, glow, water);
+    addVertex(c, normal, color, glow, water);
+  }
+  function quad(a, b, c, d, color, normal = [0, 1, 0], glow = 0, water = 0) {
+    tri(a, b, c, color, normal, glow, water);
+    tri(a, c, d, color, normal, glow, water);
+  }
+  function box(x, y, z, w, h, d, color, glow = 0) {
+    const x0 = x - w / 2, x1 = x + w / 2;
+    const y0 = y - h / 2, y1 = y + h / 2;
+    const z0 = z - d / 2, z1 = z + d / 2;
+    quad([x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1], color, [0, 1, 0], glow);
+    quad([x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0], color, [0, -1, 0], glow);
+    quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], color, [0, 0, 1], glow);
+    quad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], color, [0, 0, -1], glow);
+    quad([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], color, [1, 0, 0], glow);
+    quad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], color, [-1, 0, 0], glow);
+  }
+  function beam(a, b, width, depth, color, glow = 0) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+    const len = Math.hypot(dx, dy, dz) || 1;
+    const axis = [dx / len, dy / len, dz / len];
+    let u = [axis[2], 0, -axis[0]];
+    const ul = Math.hypot(u[0], u[2]);
+    if (ul < 0.001) u = [1, 0, 0]; else u = [u[0] / ul, 0, u[2] / ul];
+    const v = [
+      axis[1] * u[2] - axis[2] * u[1],
+      axis[2] * u[0] - axis[0] * u[2],
+      axis[0] * u[1] - axis[1] * u[0]
+    ];
+    const corners = [];
+    for (const p of [a, b]) {
+      for (const su of [-1, 1]) {
+        for (const sv of [-1, 1]) {
+          corners.push([
+            p[0] + u[0] * width * su / 2 + v[0] * depth * sv / 2,
+            p[1] + u[1] * width * su / 2 + v[1] * depth * sv / 2,
+            p[2] + u[2] * width * su / 2 + v[2] * depth * sv / 2
+          ]);
+        }
+      }
+    }
+    const A = corners;
+    const n = [u[0], u[1], u[2]];
+    quad(A[0], A[1], A[5], A[4], color, n, glow);
+    quad(A[2], A[3], A[7], A[6], color, [-n[0], -n[1], -n[2]], glow);
+    quad(A[0], A[2], A[6], A[4], color, v, glow);
+    quad(A[1], A[3], A[7], A[5], color, [-v[0], -v[1], -v[2]], glow);
+    tri(A[0], A[2], A[3], color, [-axis[0], -axis[1], -axis[2]], glow);
+    tri(A[0], A[3], A[1], color, [-axis[0], -axis[1], -axis[2]], glow);
+    tri(A[4], A[6], A[7], color, axis, glow);
+    tri(A[4], A[7], A[5], color, axis, glow);
+  }
+  function cone(x, y, z, rb, h, sides, color, glow = 0) {
+    const y0 = y, y1 = y + h;
+    for (let i = 0; i < sides; i++) {
+      const a = i * Math.PI * 2 / sides;
+      const b = (i + 1) * Math.PI * 2 / sides;
+      const p0 = [x + Math.cos(a) * rb, y0, z + Math.sin(a) * rb];
+      const p1 = [x + Math.cos(b) * rb, y0, z + Math.sin(b) * rb];
+      const peak = [x, y1, z];
+      const midA = (Math.cos((a + b) / 2) * (rb + 0) / 2);
+      const midB = (Math.sin((a + b) / 2) * (rb + 0) / 2);
+      const n = [midA * 0.6, 0.5, midB * 0.6];
+      tri(p0, p1, peak, color, n, glow);
+    }
+    const lastA = (sides - 1) * Math.PI * 2 / sides;
+    const lastB = sides * Math.PI * 2 / sides;
+    tri([x + Math.cos(lastA) * rb, y0, z + Math.sin(lastA) * rb],
+        [x + Math.cos(lastB) * rb, y0, z + Math.sin(lastB) * rb],
+        [x, y0, z], color, [0, -1, 0], glow);
+  }
+  function cylinder(x, y, z, rb, rt, h, sides, color, glow = 0) {
+    const y0 = y - h / 2, y1 = y + h / 2;
+    for (let i = 0; i < sides; i++) {
+      const a = i * Math.PI * 2 / sides;
+      const b = (i + 1) * Math.PI * 2 / sides;
+      const p0 = [x + Math.cos(a) * rb, y0, z + Math.sin(a) * rb];
+      const p1 = [x + Math.cos(b) * rb, y0, z + Math.sin(b) * rb];
+      const p2 = [x + Math.cos(b) * rt, y1, z + Math.sin(b) * rt];
+      const p3 = [x + Math.cos(a) * rt, y1, z + Math.sin(a) * rt];
+      const n = [Math.cos((a + b) / 2), 0.13, Math.sin((a + b) / 2)];
+      quad(p0, p1, p2, p3, color, n, glow);
+      tri([x, y0, z], p1, p0, color, [0, -1, 0], glow);
+      tri([x, y1, z], p3, p2, color, [0, 1, 0], glow);
+    }
+  }
+  function octagonSpire(x, z, baseY, totalH, baseR, roof = C.roofLite) {
+    cylinder(x, baseY + totalH * 0.16, z, baseR, baseR * 0.92, totalH * 0.30, 8, C.stoneLite);
+    cylinder(x, baseY + totalH * 0.50, z, baseR * 0.92, 0.08, totalH * 0.42, 8, roof);
+    cylinder(x, baseY + totalH * 0.77, z, 0.08, 0, totalH * 0.10, 8, C.goldBright, 0.18);
+    beam([x, baseY + totalH * 0.78, z], [x, baseY + totalH, z], 0.14, 0.14, C.gold);
+  }
+  function gableRoof(x, baseY, z, w, d, rise, color) {
+    const xl = x - w / 2, xr = x + w / 2, z0 = z - d / 2, z1 = z + d / 2, yp = baseY + rise;
+    tri([xl, baseY, z1], [x, yp, z1], [xr, baseY, z1], color, [0, 0, 1]);
+    tri([xr, baseY, z0], [x, yp, z0], [xl, baseY, z0], color, [0, 0, -1]);
+    quad([xl, baseY, z0], [x, yp, z0], [x, yp, z1], [xl, baseY, z1], color, [-0.66, 0.74, 0]);
+    quad([x, yp, z0], [xr, baseY, z0], [xr, baseY, z1], [x, yp, z1], color, [0.66, 0.74, 0]);
+    box(x, yp + 0.35, z, w * 0.12, 0.7, d * 0.15, C.gold);
+  }
+  function mapPlane(u, v, axis, value, center, facing, offset = 0) {
+    return axis === 'z' ? [center + u, v, value + facing * offset] : [value + facing * offset, v, center + u];
+  }
+  function archShape(w, h) {
+    const pts = [[-w / 2, 0], [-w / 2, h * 0.58]];
+    for (let i = 1; i <= 6; i++) {
+      const t = i / 6, a = 1 - t;
+      const x = a * a * (-w * 0.5) + 2 * a * t * (-w * 0.18);
+      const y = a * a * (h * 0.58) + 2 * a * t * (h * 0.99) + t * t * h;
+      pts.push([x, y]);
+    }
+    for (let i = 5; i >= 0; i--) {
+      const t = i / 6, a = 1 - t;
+      const x = a * a * (-w * 0.5) + 2 * a * t * (-w * 0.18);
+      const y = a * a * (h * 0.58) + 2 * a * t * (h * 0.99) + t * t * h;
+      pts.push([-x, y]);
+    }
+    pts.push([w / 2, h * 0.58], [w / 2, 0]);
+    return pts;
+  }
+  function flatPolygon(center, y, axis, value, facing, points, color, offset = 0, glow = 0) {
+    const c = [0, 0];
+    for (const p of points) { c[0] += p[0] / points.length; c[1] += p[1] / points.length; }
+    const normal = axis === 'z' ? [0, 0, facing] : [facing, 0, 0];
+    const cp = mapPlane(c[0], y + c[1], axis, value, center, facing, offset);
+    for (let i = 0; i < points.length; i++) {
+      tri(
+        cp,
+        mapPlane(points[i][0], y + points[i][1], axis, value, center, facing, offset),
+        mapPlane(points[(i + 1) % points.length][0], y + points[(i + 1) % points.length][1], axis, value, center, facing, offset),
+        color, normal, glow
+      );
+    }
+  }
+  function stripe(center, y, axis, value, facing, u1, v1, u2, v2, t, color, offset = 0.1, glow = 0) {
+    const du = u2 - u1, dv = v2 - v1, len = Math.hypot(du, dv) || 1;
+    const nu = -dv / len * t / 2, nv = du / len * t / 2;
+    const pts = [[u1 + nu, v1 + nv], [u2 + nu, v2 + nv], [u2 - nu, v2 - nv], [u1 - nu, v1 - nv]];
+    const n = axis === 'z' ? [0, 0, facing] : [facing, 0, 0];
+    quad(
+      mapPlane(pts[0][0], y + pts[0][1], axis, value, center, facing, offset),
+      mapPlane(pts[1][0], y + pts[1][1], axis, value, center, facing, offset),
+      mapPlane(pts[2][0], y + pts[2][1], axis, value, center, facing, offset),
+      mapPlane(pts[3][0], y + pts[3][1], axis, value, center, facing, offset),
+      color, n, glow
+    );
+  }
+  function lancet(center, y, axis, value, facing, w, h, tint = C.azure, glow = 0.32) {
+    flatPolygon(center, y, axis, value, facing, archShape(w, h), C.stoneLite, 0.06);
+    flatPolygon(center + w * 0.018, y + 0.05, axis, value, facing, archShape(w * 0.74, h * 0.82), tint, 0.09, glow);
+    stripe(center, y, axis, value, facing, 0, 0.13, 0, h * 0.81, 0.12, C.shadow, 0.11, 0.08);
+    stripe(center, y, axis, value, facing, -w * 0.31, h * 0.38, w * 0.31, h * 0.38, 0.085, C.gold, 0.115, 0.06);
+  }
+  function circlePanel(center, y, axis, value, facing, radius, tint, offset, glow = 0, sides = 18) {
+    const pts = [];
+    for (let i = 0; i < sides; i++) {
+      const a = i * Math.PI * 2 / sides;
+      pts.push([Math.cos(a) * radius, Math.sin(a) * radius]);
+    }
+    flatPolygon(center, y, axis, value, facing, pts, tint, offset, glow);
+  }
+  function addEmber(x, y, z, r, g, b, size, seed, rise) {
+    embers.push(x, y, z, r, g, b, size, seed, rise);
+  }
+  function addLantern(x, z) {
+    box(x, 1.15, z, 0.55, 2.3, 0.55, C.shadow);
+    cylinder(x, 2.55, z, 0.42, 0.2, 1.15, 6, C.gold);
+    cylinder(x, 3.15, z, 0.18, 0, 0.8, 6, C.ember, 0.85);
+    for (let i = 0; i < 10; i++) {
+      addEmber(
+        x + (Math.random() - 0.5) * 0.5,
+        2.7 + Math.random() * 1.3,
+        z + (Math.random() - 0.5) * 0.5,
+        1, 0.42, 0.14,
+        0.7 + Math.random() * 0.7,
+        Math.random(),
+        3.6
+      );
+    }
+  }
+  /* === Cathedral: main tower ≈140m === */
+  function addCathedral() {
+    const z = -82;
+    // Transept base
+    box(0, 1.1, z, 60, 2.2, 44, C.shadow);
+    box(0, 25, z, 50, 48, 40, C.stone);
+    box(0, 12, z, 60, 2.2, 45, C.stoneLite);
+    box(0, 36, z + 20.5, 50, 2, 1.4, C.stoneLite);
+    gableRoof(0, 50, z, 53, 44, 14, C.roofLite);
+    // Apse
+    box(0, 24, z - 22, 26, 47, 21, C.stone);
+    gableRoof(0, 47.5, z - 22, 29, 24, 9, C.roof);
+    // Crossing
+    box(0, 51, z - 10, 19, 18, 19, C.stoneLite);
+    box(0, 60, z - 10, 15, 3, 15, C.gold);
+    // Crossing spire reaches the 140m crest.
+    cylinder(0, 68, z - 10, 7.2, 1.0, 9, 8, C.stoneLite);
+    octagonSpire(0, z - 10, 72.5, 68, 7.2, C.roof);
+    // Bell towers flanking the nave
+    facadeTower(-28, -60, 1.18);
+    facadeTower(28, -60, 1.18);
+    // Nave side walls
+    for (const side of [-1, 1]) {
+      box(side * 36, 21, z, 8, 42, 12, C.stone);
+      beam([side * 38, 4, z + 3], [side * 27, 44, z + 2], 3.5, 5.4, C.stoneLite);
+      beam([side * 41, 4, z + 8], [side * 31, 43, z + 6.5], 1.7, 2.2, C.gold);
+      cylinder(side * 36, 43, z, 5, 4, 5, 8, C.stoneLite);
+      octagonSpire(side * 36, z, 45.5, 19, 4);
+      box(side * 22, 28, z + 4, 1.4, 54, 1.4, C.stoneLite);
+    }
+    // Transept & clerestory rhythm
+    box(0, 16, z + 4, 65, 30, 15, C.stone);
+    gableRoof(0, 30.5, z + 4, 68, 18, 10, C.roofLite);
+    for (let x = -25; x <= 25; x += 12) {
+      lancet(x, 4, z + 12, x + 12, 1, 6.4, 15, C.azure, 0.36);
+    }
+    for (let x = -19; x <= 19; x += 12) {
+      lancet(x, 10, z + 11.4, 1, 1, 5.1, 12, C.azureLite, 0.4);
+    }
+    // West front: portals, rose, pinnacle lancets
+    for (let x = -10; x <= 10; x += 10) {
+      lancet(x, 1.2, 'z', -55.25, 1, 7.2, 13.2, x === 0 ? C.azureLite : C.azure, 0.48);
+      box(x - 4.6, 8.5, -55.6, 0.7, 16, 0.85, C.stoneLite);
+      box(x + 4.6, 8.5, -55.6, 0.7, 16, 0.85, C.stoneLite);
+    }
+    circlePanel(0, 32, 'z', -55.3, 1, 9.5, C.stoneLite, 0.1, 0, 22);
+    circlePanel(0, 32, 'z', -55.3, 1, 7.7, C.azure, 0.16, 0.55, 22);
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      stripe(0, 32, 'z', -55.5, 1,
+        Math.cos(a) * 0.7, Math.sin(a) * 0.7,
+        Math.cos(a) * 7.2, Math.sin(a) * 7.2,
+        0.35, C.goldBright, 0.17, 0.2);
+    }
+    for (let x = -19; x <= 19; x += 9.5) {
+      lancet(x, 33, 'z', -56.1, 1, 5.1, 12, C.azureLite, 0.52);
+      box(x, 30, -56.5, 0.7, 33, 1, C.stoneLite);
+    }
+    box(0, 50, -55.8, 54, 2, 1.4, C.stoneLite);
+    for (let x = -25; x <= 25; x += 5) {
+      box(x, 52, -55.8, 0.8, 3, 1.2, C.gold);
+    }
+    // Flying buttresses tie the high nave into the lower aisles.
+    for (const side of [-1, 1]) {
+      for (let zB = -100; zB <= -60; zB += 12) {
+        beam([side * 22, 8, zB], [side * 35, 40, zB + 2], 2.3, 3.5, C.stoneLite);
+        beam([side * 32, 5, zB], [side * 40, 24, zB], 1.4, 1.6, C.gold);
+        cylinder(side * 40, 26, zB, 2, 1.5, 4, 6, C.stoneLite);
+      }
+    }
+    // Ridge finials with tiny crosses
+    for (const zz of [-95, -82, -69]) {
+      cylinder(0, 64, zz, 0.3, 0.3, 5, 5, C.goldBright);
+      beam([0, 66.5, zz], [0, 69, zz], 0.2, 0.2, C.goldBright);
+    }
+    colliders.push({ x: 0, z: -82, w: 56, d: 45 });
+    colliders.push({ x: 0, z: -55, w: 70, d: 14 });
+    colliders.push({ x: -28, z: -60, w: 16, d: 16 });
+    colliders.push({ x: 28, z: -60, w: 16, d: 16 });
+  }
+  function facadeTower(x, z, scale) {
+    const w = 10 * scale, h = 49 * scale, d = 11 * scale;
+    box(x, h / 2, z, w, h, d, C.stone);
+    box(x, h * 0.25, z + d * 0.51, w * 1.16, 1.1 * scale, 0.65, C.stoneLite);
+    box(x, h * 0.66, z + d * 0.51, w * 1.16, 0.9 * scale, 0.65, C.stoneLite);
+    for (let row = 0; row < 4; row++) {
+      lancet(x, h * 0.13 + row * 9.3 * scale, z + d / 2, 1, 1, 3.2 * scale, 7.2 * scale, row % 2 ? C.azure : C.azureLite, 0.34);
+    }
+    cylinder(x, h + 5 * scale, z, 6 * scale, 6 * scale, 10 * scale, 8, C.stoneLite);
+    octagonSpire(x, z, h + 10 * scale, 35 * scale, 6 * scale);
+  }
+  function addBuilding(x, z, w, d, h, seed) {
+    const tint = seed % 3 === 0 ? C.stoneLite : C.stone;
+    const roofColor = seed % 2 ? C.roof : C.roofLite;
+    box(x, h / 2, z, w, h, d, tint);
+    box(x, h * 0.11, z, w + 1.2, 1.2, d + 1.2, C.stoneLite);
+    box(x, h - 0.3, z, w + 1, 0.7, d + 1, C.stoneLite);
+    const orient = x < 0 ? 1 : -1;
+    const sideX = x + orient * (w / 2 + 0.04);
+    const sideSign = orient;
+    const floors = clamp(Math.floor((h - 3) / 4.6), 2, 8);
+    const rows = Math.max(2, Math.floor(w / 5));
+    for (let row = 0; row < floors; row++) {
+      const wy = 2.2 + row * 4.45;
+      const wh = 3.35;
+      for (let c = 0; c < rows; c++) {
+        const u = -w * 0.34 + c * (w * 0.68 / Math.max(1, rows - 1));
+        lancet(x + u, wy, 'z', z + d / 2 + 0.05, 1,
+          Math.min(2.45, w / rows * 0.68),
+          wh,
+          (seed + c + row) % 4 === 0 ? C.azureLite : C.azure,
+          0.23);
+      }
+      const sideCols = Math.max(2, Math.floor(d / 6));
+      for (let c = 0; c < sideCols; c++) {
+        const u = -d * 0.34 + c * (d * 0.68 / Math.max(1, sideCols - 1));
+        lancet(z + u, wy, 'x', sideX, sideSign,
+          Math.min(2.45, d / sideCols * 0.68),
+          wh,
+          (seed + c + row) % 5 === 0 ? C.azureLite : C.azure,
+          0.2);
+      }
+      if (row > 0) box(x, wy - 0.65, z, w + 0.18, 0.22, d + 0.18, C.gold);
+    }
+    if (seed % 3 === 0) {
+      gableRoof(x, h, z, w + 1, d + 1, 3 + seed % 4, roofColor);
+    } else {
+      box(x, h + 1.1, z, w + 1.1, 2.2, d + 1.1, roofColor);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+        if (seed % 4 !== 0 && sx === 1 && sz === -1) continue;
+        const tx = x + sx * w * 0.42, tz = z + sz * d * 0.4;
+        cylinder(tx, h + 3, tz, 1.4, 1.1, 3.8, 6, C.stoneLite);
+        octagonSpire(tx, tz, h + 4.9, 6 + (seed % 5), 1.2, roofColor);
+      }
+      if (seed % 4 === 0) gableRoof(x, h, z, w * 0.72, d * 0.72, 4, roofColor);
+    }
+    for (const sx of [-1, 1]) {
+      box(x + sx * (w / 2 - 0.42), h * 0.51, z + d / 2 + 0.09, 0.55, h * 0.95, 0.5, C.stoneLite);
+    }
+    buildings.push({ x, z, w, d });
+    colliders.push({ x, z, w, d });
+  }
+  function addGate() {
+    const z = 112;
+    for (const side of [-1, 1]) {
+      const x = side * 18;
+      box(x, 14, z, 12, 28, 13, C.stoneLite);
+      box(x, 4, z + 6.5, 14, 2, 2, C.gold);
+      lancet(x, 2, 'z', z + 6.2, 1, 6.6, 18, C.shadow, 0.05);
+      cylinder(x, 30, z, 6, 5, 5, 8, C.stoneLite);
+      octagonSpire(x, z, 32.5, 22, 5);
+      for (let i = 0; i < 4; i++) {
+        lancet(x, 6 + i * 5, 'x', x + side * 5.6, side, 3, 4, C.azure, 0.2);
+      }
+    }
+    // Pointed arch of stone ribs keeps the south passage open.
+    const left = [-11, 0, z + 5.5];
+    const peak = [0, 20, z + 5.5];
+    const right = [11, 0, z + 5.5];
+    beam(left, [-11, 13, z + 5.5], 2.5, 2.5, C.gold);
+    beam([-11, 13, z + 5.5], peak, 2.5, 2.5, C.stoneLite);
+    beam(peak, [11, 13, z + 5.5], 2.5, 2.5, C.stoneLite);
+    beam([11, 13, z + 5.5], right, 2.5, 2.5, C.gold);
+    box(0, 25, z, 29, 3, 13, C.stoneLite);
+    for (let x = -12; x <= 12; x += 4) {
+      box(x, 27, z, 0.7, 2, 1, C.gold);
+    }
+    // Sea walls enclose the old town, leaving the south portal open.
+    box(-67, 4, -15, 102, 8, 5, C.stone);
+    box(67, 4, -15, 102, 8, 5, C.stone);
+    box(0, 4, -146, 244, 8, 5, C.stone);
+    box(-118, 4, -15, 5, 8, 258, C.stone);
+    box(118, 4, -15, 5, 8, 258, C.stone);
+    for (let x = -117; x <= 117; x += 12) {
+      box(x, 8, -146, 2, 2, 5, C.stoneLite);
+      if (Math.abs(x) > 19) box(x, 8, 112, 2, 2, 5, C.stoneLite);
+    }
+    for (const x of [-118, 118]) for (const zc of [-144, 110]) {
+      box(x, 12, zc, 9, 24, 9, C.stoneLite);
+      octagonSpire(x, zc, 24, 19, 4);
+    }
+    for (let zc = -134; zc <= 106; zc += 24) for (const x of [-118, 118]) {
+      box(x, 7, zc, 7, 14, 7, C.stone);
+      cylinder(x, 16, zc, 4, 3.5, 4, 7, C.stoneLite);
+      octagonSpire(x, zc, 18, 11, 3);
+    }
+    colliders.push({ x: 0, z: -146, w: 250, d: 7 });
+    colliders.push({ x: -118, z: -15, w: 7, d: 258 });
+    colliders.push({ x: 118, z: -15, w: 7, d: 258 });
+    colliders.push({ x: -67, z: 112, w: 106, d: 7 });
+    colliders.push({ x: 67, z: 112, w: 106, d: 7 });
+  }
+  function addCity() {
+    // Stone island & quays
+    box(0, -1.4, -14, 248, 2.8, 268, C.ground);
+    box(0, -0.3, -14, 238, 0.55, 256, C.shadow);
+    for (let x = -114; x <= 114; x += 7) {
+      box(x, 0.02, 110, 2, 0.1, 3, C.gold);
+      box(x, 0.02, -140, 2, 0.1, 3, C.gold);
+    }
+    for (let z = -138; z <= 108; z += 7) {
+      box(-115, 0.02, z, 3, 0.1, 2, C.gold);
+      box(115, 0.02, z, 3, 0.1, 2, C.gold);
+    }
+    // Processional road, drainage cuts, warm guide strips.
+    box(0, 0.08, -14, 23, 0.18, 252, C.road);
+    box(-9.5, 0.19, -14, 0.22, 0.07, 246, C.gold);
+    box(9.5, 0.19, -14, 0.22, 0.07, 246, C.gold);
+    for (const side of [-1, 1]) {
+      box(side * 16, 0.03, -14, 3, 0.12, 250, C.shadow);
+      for (let z = -132; z < 105; z += 17) {
+        box(side * 18, 0.12, z, 4, 0.18, 0.7, C.stoneLite);
+      }
+    }
+    // Radiating lanes for legibility from the minimap and the street.
+    for (let z = -130; z <= 96; z += 23) {
+      box(0, 0.02, z, 220, 0.12, 2, C.road);
+      box(0, 0.1, z, 220, 0.06, 0.16, C.gold);
+    }
+    addGate();
+    let seed = 1;
+    for (const side of [-1, 1]) for (let col = 0; col < 6; col++) {
+      const x = side * (29 + col * 15.4);
+      for (let row = 0; row < 11; row++) {
+        const z = 98 - row * 22.6 + (col % 2 ? 4 : 0) + (Math.sin((col + 2) * (row + 1)) * 1.8);
+        if (Math.abs(x) < 55 && z < -42 && z > -120) continue;
+        if (Math.abs(x) > 110) continue;
+        const w = 10.6 + ((seed * 7) % 5) * 0.7;
+        const d = 12.6 + ((seed * 11) % 5) * 0.65;
+        const h = 17 + ((seed * 17) % 33);
+        addBuilding(x, z, w, d, h, seed++);
+      }
+    }
+    // Lamp-lit ember court
+    box(0, 0.16, -33, 78, 0.24, 32, C.shadow);
+    for (let i = -4; i <= 4; i++) box(i * 8.4, 0.3, -33, 0.22, 0.08, 31, C.gold);
+    box(0, 0.38, -19, 17, 0.46, 16, C.stoneLite);
+    box(0, 0.65, -19, 11, 0.3, 10, C.shadow);
+    cylinder(0, 2.5, -19, 2.9, 1.95, 3.4, 8, C.gold);
+    cylinder(0, 5.5, -19, 1.25, 0.1, 2.4, 7, C.ember, 0.85);
+    for (let i = 0; i < 48; i++) {
+      addEmber(
+        (Math.random() - 0.5) * 5,
+        2.6 + Math.random() * 2.4,
+        -19 + (Math.random() - 0.5) * 5,
+        1, 0.46, 0.16,
+        0.7 + Math.random(),
+        Math.random(),
+        6.8
+      );
+    }
+    // Lanterns along the processional way
+    for (const side of [-1, 1]) for (let z = -16; z >= -114; z -= 18) {
+      addLantern(side * 17.5, z);
+    }
+    for (let x = -30; x <= 30; x += 15) {
+      addLantern(x, -42);
+      addLantern(x, -7);
+    }
+    addCathedral();
+    // Banners and pinnacles along the south approach
+    for (const side of [-1, 1]) {
+      box(side * 28, 9, 78, 1.1, 18, 1.1, C.gold);
+      beam([side * 28, 16, 78], [side * 28, 8, 78], 2.4, 1, C.crimson);
+      cylinder(side * 28, 20, 78, 0.45, 0.35, 3, 6, C.goldBright, 0.18);
+    }
+    // A small fang of basalt along the north breakwater
+    box(-78, 1, -142, 6, 2, 4, C.basalt);
+    box(78, 1, -142, 6, 2, 4, C.basalt);
+    box(0, 0.6, 100, 4, 1.4, 18, C.basalt);
+  }
+  function addWater() {
+    const nx = 80, nz = 84;
+    const x0 = -280, x1 = 280, z0 = -340, z1 = 215, y = -2.15;
+    const local = [];
+    for (let iz = 0; iz <= nz; iz++) for (let ix = 0; ix <= nx; ix++) {
+      const x = x0 + (x1 - x0) * ix / nx;
+      const z = z0 + (z1 - z0) * iz / nz;
+      const edge = Math.min(ix, nx - ix, iz, nz - iz) / Math.min(nx, nz);
+      const col = [0.018 + edge * 0.008, 0.14 + edge * 0.07, 0.17 + edge * 0.085];
+      local.push(x, y, z, 0, 1, 0, col[0], col[1], col[2], 0, 1);
+    }
+    const waterIndices = [];
+    for (let iz = 0; iz < nz; iz++) for (let ix = 0; ix < nx; ix++) {
+      const a = iz * (nx + 1) + ix;
+      const b = a + 1;
+      const c = a + nx + 2;
+      const d = a + nx + 1;
+      waterIndices.push(a, b, c, a, c, d);
+    }
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(local), gl.STATIC_DRAW);
+    const idxBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(waterIndices), gl.STATIC_DRAW);
+    return { buffer: buf, index: idxBuf, count: waterIndices.length };
+  }
+  function addSky() {
+    // Faceted moon instead of a flat background decal.
+    const cx = 100, cy = 120, cz = -190, r = 9;
+    const lat = 10, lon = 16;
+    for (let j = 0; j < lat; j++) for (let i = 0; i < lon; i++) {
+      const pt = (a, b) => [
+        cx + r * Math.sin(a) * Math.cos(b),
+        cy + r * Math.cos(a),
+        cz + r * Math.sin(a) * Math.sin(b)
+      ];
+      const a = Math.PI * j / lat, b = Math.PI * (j + 1) / lat;
+      const c = Math.PI * 2 * i / lon, d = Math.PI * 2 * (i + 1) / lon;
+      const p0 = pt(a, c), p1 = pt(a, d), p2 = pt(b, d), p3 = pt(b, c);
+      const col = hex('#d4b783');
+      const norm = (p) => [(p[0] - cx) / r, (p[1] - cy) / r, (p[2] - cz) / r];
+      tri(p0, p1, p2, col, norm(p0), 0.26);
+      tri(p0, p2, p3, col, norm(p0), 0.26);
+    }
+    // Drifting fog (low-altitude embers with no rise)
+    for (let i = 0; i < 250; i++) {
+      const x = (Math.random() - 0.5) * 440;
+      const y = 25 + Math.random() * 130;
+      const z = -220 + Math.random() * 360;
+      addEmber(x, y, z,
+        0.4 + 0.28 * Math.random(),
+        0.6 + 0.24 * Math.random(),
+        0.7 + 0.28 * Math.random(),
+        0.4 + Math.random() * 0.5,
+        Math.random(),
+        0);
+    }
+    // Slow sea spray near the embankment
+    for (let i = 0; i < 130; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 110 + Math.random() * 28;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius * 1.6 - 90;
+      addEmber(x, -1.6, z,
+        0.55 + 0.25 * Math.random(),
+        0.72 + 0.18 * Math.random(),
+        0.8 + 0.12 * Math.random(),
+        0.5 + Math.random() * 0.7,
+        Math.random(),
+        1.8 + Math.random() * 1.4);
+    }
+  }
+  addCity();
+  addSky();
+  const landBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, landBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+  const emberBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, emberBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(embers), gl.STATIC_DRAW);
+  const water = addWater();
+  const stride = 11 * 4;
+  const bindLand = (buffer) => {
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    for (const [loc, size, off] of [
+      [landLoc.pos, 3, 0],
+      [landLoc.normal, 3, 3],
+      [landLoc.color, 3, 6],
+      [landLoc.glow, 1, 9],
+      [landLoc.water, 1, 10]
+    ]) {
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, size, gl.FLOAT, false, stride, off * 4);
+    }
+  };
+  const bindEmber = () => {
+    gl.bindBuffer(gl.ARRAY_BUFFER, emberBuffer);
+    const s = 9 * 4;
+    for (const [loc, size, off] of [
+      [emberLoc.pos, 3, 0],
+      [emberLoc.color, 3, 3],
+      [emberLoc.size, 1, 6],
+      [emberLoc.seed, 1, 7],
+      [emberLoc.rise, 1, 8]
+    ]) {
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, size, gl.FLOAT, false, s, off * 4);
+    }
+  };
+  gl.enable(gl.DEPTH_TEST);
+  gl.depthFunc(gl.LEQUAL);
+  gl.disable(gl.CULL_FACE);
+  gl.clearColor(0.018, 0.030, 0.05, 1.0);
+  const player = { x: 0, y: 1.72, z: 86, yaw: 0, pitch: 0 };
+  const spawn = { x: 0, y: 1.72, z: 86, yaw: 0, pitch: 0 };
+  const keys = Object.create(null);
+  let guide = false, started = false, dragging = false, previousPointer = null;
+  let lastFrame = performance.now();
+  let elapsed = 0;
+  let autoOrbit = 0;
+  let lastInputAt = performance.now();
+  const fov = 62 * Math.PI / 180;
+  function perspective(fovy, aspect, near, far) {
+    const f = 1 / Math.tan(fovy / 2);
+    const nf = 1 / (near - far);
+    return new Float32Array([
+      f / aspect, 0, 0, 0,
+      0, f, 0, 0,
+      0, 0, (far + near) * nf, -1,
+      0, 0, 2 * far * near * nf, 0
+    ]);
+  }
+  function lookAt(eye, center) {
+    let zx = eye[0] - center[0], zy = eye[1] - center[1], zz = eye[2] - center[2];
+    let l = Math.hypot(zx, zy, zz) || 1; zx /= l; zy /= l; zz /= l;
+    let xx = zz, xy = 0, xz = -zx;
+    l = Math.hypot(xx, xy, xz) || 1; xx /= l; xy /= l; xz /= l;
+    const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+    return new Float32Array([
+      xx, yx, zx, 0,
+      xy, yy, zy, 0,
+      xz, yz, zz, 0,
+      -(xx * eye[0] + xy * eye[1] + xz * eye[2]),
+      -(yx * eye[0] + yy * eye[1] + yz * eye[2]),
+      -(zx * eye[0] + zy * eye[1] + zz * eye[2]),
+      1
+    ]);
+  }
+  function multiply(a, b) {
+    const out = new Float32Array(16);
+    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+      out[c * 4 + r] =
+        a[r] * b[c * 4] +
+        a[4 + r] * b[c * 4 + 1] +
+        a[8 + r] * b[c * 4 + 2] +
+        a[12 + r] * b[c * 4 + 3];
+    }
+    return out;
+  }
+  function resize() {
+    const ratio = Math.min(window.devicePixelRatio || 1, 1.75);
+    const w = Math.max(1, Math.floor(innerWidth * ratio));
+    const h = Math.max(1, Math.floor(innerHeight * ratio));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w; canvas.height = h;
+      gl.viewport(0, 0, w, h);
+    }
+  }
+  function collided(x, z) {
+    if (x < -114 || x > 114 || z < -140 || z > 108) return true;
+    for (const b of colliders) {
+      if (Math.abs(x - b.x) < b.w / 2 + 0.85 && Math.abs(z - b.z) < b.d / 2 + 0.85) return true;
+    }
+    return false;
+  }
+  function markInput() { lastInputAt = performance.now(); }
+  function movePlayer(dt) {
+    let forward = (keys.w || keys.arrowup ? 1 : 0) - (keys.s || keys.arrowdown ? 1 : 0);
+    let side = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0);
+    if (Math.abs(forward) + Math.abs(side) < 0.01) return;
+    const m = Math.hypot(forward, side);
+    forward /= m; side /= m;
+    const sprint = keys.shift ? 1.85 : 1;
+    const speed = 9 * sprint;
+    const dx = (Math.sin(player.yaw) * forward + Math.cos(player.yaw) * side) * speed * dt;
+    const dz = (-Math.cos(player.yaw) * forward + Math.sin(player.yaw) * side) * speed * dt;
+    if (!collided(player.x + dx, player.z)) player.x += dx;
+    if (!collided(player.x, player.z + dz)) player.z += dz;
+    document.getElementById('speed-readout').textContent = String(Math.round(speed)).padStart(2, '0') + ' M/S';
+  }
+  function drawMinimap() {
+    const ctx = minimap.getContext('2d');
+    const w = minimap.width, h = minimap.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#07101a';
+    ctx.fillRect(0, 0, w, h);
+    const sx = w / 256, sz = h / 280;
+    const px = (x) => (x + 128) * sx;
+    const pz = (z) => (z + 150) * sz;
+    ctx.fillStyle = '#1c2a30';
+    ctx.fillRect(px(-118), pz(-145), 236 * sx, 260 * sz);
+    ctx.fillStyle = '#33434a';
+    ctx.fillRect(px(-118), pz(-145), 236 * sx, 5 * sz);
+    ctx.fillRect(px(-118), pz(108), 100 * sx, 5 * sz);
+    ctx.fillRect(px(19), pz(108), 100 * sx, 5 * sz);
+    ctx.fillStyle = '#0f1d22';
+    ctx.fillRect(px(-11), pz(-141), 22 * sx, 248 * sz);
+    ctx.strokeStyle = 'rgba(214, 178, 124, 0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(px(0), pz(-138)); ctx.lineTo(px(0), pz(102)); ctx.stroke();
+    for (const b of buildings) {
+      ctx.fillStyle = '#566565';
+      ctx.fillRect(px(b.x - b.w / 2), pz(b.z - b.d / 2), Math.max(2, b.w * sx), Math.max(2, b.d * sz));
+    }
+    ctx.fillStyle = '#a48a6b';
+    ctx.fillRect(px(-35), pz(-110), 70 * sx, 58 * sz);
+    ctx.fillStyle = '#7dcfc5';
+    ctx.fillRect(px(-31), pz(-106), 62 * sx, 50 * sz);
+    ctx.fillStyle = '#cba46e';
+    ctx.beginPath(); ctx.arc(px(0), pz(-19), 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(245, 200, 130, 0.8)';
+    ctx.beginPath();
+    ctx.arc(px(0), pz(-19), 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    const x = px(player.x), y = pz(player.z);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(player.yaw);
+    ctx.fillStyle = '#f0d29a';
+    ctx.shadowColor = '#f0d29a';
+    ctx.shadowBlur = 16;
+    ctx.beginPath();
+    ctx.moveTo(0, -9);
+    ctx.lineTo(5, 6);
+    ctx.lineTo(0, 3);
+    ctx.lineTo(-5, 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  function updateDistrict() {
+    const code = document.getElementById('district-code');
+    const name = document.getElementById('district-name');
+    const desc = document.getElementById('district-desc');
+    let c = 'DISTRICT 00 — THE OUTER QUAY';
+    let n = '鸦巢码头';
+    let d = '盐与煤的灰烬之下，群塔的第一根尖刺刺入黄昏。';
+    if (player.z < 60) {
+      c = 'DISTRICT 01 — LOWER WARD';
+      n = '灰石下城';
+      d = '窄街与尖拱窗，沿海墙向内收束。';
+    }
+    if (player.z < 8) {
+      c = 'DISTRICT 02 — EMBER COURT';
+      n = '灯火广场';
+      d = '沿灯火大道，朝高穹顶继续前行。';
+    }
+    if (player.z < -48) {
+      c = 'DISTRICT 03 — HIGH SANCTUARY';
+      n = '圣徒大教堂';
+      d = '主塔高约一百四十米，钟声沉入潮汐。';
+    }
+    if (code.textContent !== c) { code.textContent = c; name.textContent = n; desc.textContent = d; }
+  }
+  const points = [
+    { x: 0, y: 15, z: 102, label: '鸦巢码头  /  RAVEN QUAY' },
+    { x: 0, y: 11, z: -19, label: '灯火广场  /  EMBER COURT' },
+    { x: 0, y: 86, z: -92, label: '圣徒大教堂  /  HIGH SANCTUARY' },
+    { x: 0, y: 45, z: -10, label: '钟塔  /  BELL TOWER' }
+  ];
+  const poiEls = points.map(() => {
+    const e = document.createElement('div');
+    e.className = 'poi';
+    document.getElementById('poi-layer').appendChild(e);
+    return e;
+  });
+  points.forEach((p, i) => { poiEls[i].textContent = p.label; });
+  function drawPOIs(dir, right, up) {
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i], e = poiEls[i];
+      const rx = p.x - player.x, ry = p.y - player.y, rz = p.z - player.z;
+      const depth = rx * dir[0] + ry * dir[1] + rz * dir[2];
+      const dist = Math.hypot(rx, ry, rz);
+      if (depth < 3 || dist > 175) { e.classList.remove('visible'); continue; }
+      const aspect = innerWidth / innerHeight;
+      const nx = (rx * right[0] + ry * right[1] + rz * right[2]) / (depth * Math.tan(fov / 2) * aspect);
+      const ny = (rx * up[0] + ry * up[1] + rz * up[2]) / (depth * Math.tan(fov / 2));
+      const x = (0.5 + nx * 0.5) * innerWidth;
+      const y = (0.5 - ny * 0.5) * innerHeight;
+      if (x < 10 || x > innerWidth - 10 || y < 40 || y > innerHeight - 40) {
+        e.classList.remove('visible'); continue;
+      }
+      e.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+      e.classList.add('visible');
+    }
+  }
+  function frame(now) {
+    resize();
+    const dt = Math.min(0.045, (now - lastFrame) / 1000);
+    lastFrame = now;
+    elapsed += dt;
+    // Auto-orbit when idle and walking hasn't happened in a while.
+    if (!guide && now - lastInputAt > 4500 && Math.abs((keys.w ? 1 : 0) - (keys.s ? 1 : 0)) < 0.001) {
+      autoOrbit += dt * 0.16;
+      player.yaw += autoOrbit * 0.5;
+    } else {
+      autoOrbit *= 0.92;
+    }
+    if (guide) {
+      const target = 0;
+      let diff = ((target - player.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+      player.yaw += diff * Math.min(1, dt * 0.95);
+    }
+    movePlayer(dt);
+    const cy = Math.cos(player.yaw), sy = Math.sin(player.yaw);
+    const cp = Math.cos(player.pitch), sp = Math.sin(player.pitch);
+    const dir = [sy * cp, sp, -cy * cp];
+    const right = [cy, 0, sy];
+    const up = [-sy * sp, cp, cy * sp];
+    const eye = [player.x, player.y, player.z];
+    const center = [eye[0] + dir[0], eye[1] + dir[1], eye[2] + dir[2]];
+    const vp = multiply(perspective(fov, canvas.width / canvas.height, 0.1, 760), lookAt(eye, center));
+    const dayMix = 0.5 + 0.5 * Math.sin(elapsed * 0.025);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(landProgram);
+    gl.uniformMatrix4fv(landLoc.vp, false, vp);
+    gl.uniform1f(landLoc.time, elapsed);
+    gl.uniform3f(landLoc.cam, player.x, player.y, player.z);
+    gl.uniform1f(landLoc.dayMix, dayMix);
+    bindLand(landBuffer);
+    gl.drawArrays(gl.TRIANGLES, 0, verts.length / 11);
+    bindLand(water.buffer);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, water.index);
+    gl.drawElements(gl.TRIANGLES, water.count, gl.UNSIGNED_SHORT, 0);
+    gl.useProgram(emberProgram);
+    gl.uniformMatrix4fv(emberLoc.vp, false, vp);
+    gl.uniform1f(emberLoc.time, elapsed);
+    gl.uniform1f(emberLoc.ratio, canvas.height / 900);
+    bindEmber();
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.depthMask(false);
+    gl.drawArrays(gl.POINTS, 0, embers.length / 9);
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
+    drawMinimap();
+    drawPOIs(dir, right, up);
+    updateDistrict();
+    document.getElementById('coord-n').textContent = (-player.z).toFixed(1);
+    document.getElementById('coord-e').textContent = player.x.toFixed(1);
+    document.getElementById('coord-h').textContent = player.y.toFixed(1);
+    document.getElementById('compass').style.setProperty('--bearing', (-player.yaw * 180 / Math.PI) + 'deg');
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  function enter() {
+    started = true;
+    document.getElementById('splash').classList.add('hidden');
+    if (innerWidth > 650 && canvas.requestPointerLock) {
+      try { canvas.requestPointerLock(); } catch (_) { /* unsupported */ }
+    }
+  }
+  document.getElementById('enter-btn').addEventListener('click', enter);
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    player.x = spawn.x; player.y = spawn.y; player.z = spawn.z;
+    player.yaw = spawn.yaw; player.pitch = spawn.pitch;
+    guide = false;
+    document.getElementById('tour-btn').classList.remove('active');
+    markInput();
+  });
+  document.getElementById('tour-btn').addEventListener('click', (e) => {
+    guide = !guide;
+    e.currentTarget.classList.toggle('active', guide);
+    markInput();
+  });
+  document.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (['w', 'a', 's', 'd', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+      keys[k] = true;
+      e.preventDefault();
+      markInput();
+    }
+    if (k === 'escape' && document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+  });
+  document.addEventListener('keyup', (e) => {
+    keys[e.key.toLowerCase()] = false;
+  });
+  window.addEventListener('blur', () => {
+    for (const k in keys) keys[k] = false;
+  });
+  // Mouse wheel "zoom" changes pitch/FoV inertia is too costly, so we shift camera altitude slightly.
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    player.y = clamp(player.y - e.deltaY * 0.0035, 1.6, 38);
+    markInput();
+  }, { passive: false });
+  canvas.addEventListener('pointerdown', (e) => {
+    markInput();
+    if (!started) { enter(); return; }
+    if (document.pointerLockElement) return;
+    dragging = true;
+    previousPointer = [e.clientX, e.clientY];
+    canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (document.pointerLockElement) {
+      player.yaw += e.movementX * 0.0024;
+      player.pitch = clamp(player.pitch - e.movementY * 0.0021, -1.15, 1.15);
+      markInput();
+      return;
+    }
+    if (dragging && previousPointer) {
+      player.yaw += (e.clientX - previousPointer[0]) * 0.004;
+      player.pitch = clamp(player.pitch - (e.clientY - previousPointer[1]) * 0.003, -1.15, 1.15);
+      previousPointer = [e.clientX, e.clientY];
+      markInput();
+    }
+  });
+  canvas.addEventListener('pointerup', () => { dragging = false; previousPointer = null; });
+  canvas.addEventListener('pointercancel', () => { dragging = false; previousPointer = null; });
+  // Two-finger pinch for "zoom" on touch devices.
+  let pinchState = null;
+  canvas.addEventListener('gesturestart', (e) => { e.preventDefault(); });
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      const t = [e.touches[0], e.touches[1]];
+      pinchState = {
+        dist: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY),
+        midY: (t[0].clientY + t[1].clientY) / 2
+      };
+    }
+  }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && pinchState) {
+      const t = [e.touches[0], e.touches[1]];
+      const dist = Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+      const midY = (t[0].clientY + t[1].clientY) / 2;
+      const scale = dist / pinchState.dist;
+      if (Math.abs(scale - 1) > 0.02) {
+        player.y = clamp(player.y * scale, 1.6, 38);
+        pinchState.dist = dist;
+        pinchState.midY = midY;
+      }
+      const dy = midY - pinchState.midY;
+      if (Math.abs(dy) > 0.5) {
+        player.yaw += dy * 0.001;
+        pinchState.midY = midY;
+      }
+    }
+  }, { passive: true });
+  canvas.addEventListener('touchend', () => { pinchState = null; });
+  // Touch directional pad
+  for (const button of document.querySelectorAll('.touch-pad button')) {
+    const key = button.dataset.key;
+    button.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      keys[key] = true;
+      button.setPointerCapture && button.setPointerCapture(e.pointerId);
+      markInput();
+    });
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+      button.addEventListener(type, () => { keys[key] = false; });
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) for (const k in keys) keys[k] = false;
+  });
+  window.addEventListener('resize', () => { resize(); markInput(); });
+})();
+</script>
+</body>
+</html>
