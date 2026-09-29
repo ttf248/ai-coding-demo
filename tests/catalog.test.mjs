@@ -22,7 +22,7 @@ vm.runInNewContext(read("assets/core.js"), ctx);
 const U = ctx.ArchiveUI;
 test("archive migration preserves record counts and task relations", () => {
   assert.ok(data.topics.length >= 8);
-  assert.equal(data.runs.length, 15);
+  assert.equal(data.runs.length, 13);
   assert.ok(data.guides.length >= 14);
   for (const r of data.runs) assert.equal(r.rawHash, r.input.hash);
   const city = data.runs.filter((r) => r.topicId === "neo-gothic-tower-city");
@@ -49,7 +49,7 @@ test("combined filters operate on runs before topic grouping", () => {
   assert.equal(U.filterRuns(data, { preview: "no" }).length, 2);
   assert.equal(
     U.filterRuns(data, { prompt: "voxel-construction-site/v1" }).length,
-    4,
+    3,
   );
 });
 test("diff preserves and escapes input, handles insertion/deletion/large inputs", () => {

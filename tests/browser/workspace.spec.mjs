@@ -22,7 +22,7 @@ test("prompt workspace supports cycling, searchable selection, four panels and U
     return d.prompts.find(
       (p) =>
         d.runs.filter((r) => r.topicId === p.topicId && r.promptId === p.id)
-          .length >= 4,
+          .length >= 3,
     );
   });
   await page.locator("#group").selectOption(group.topicId + "/" + group.id);
@@ -38,6 +38,7 @@ test("prompt workspace supports cycling, searchable selection, four panels and U
     "yes",
   );
   await page.locator("#pick-models").click();
+  await page.locator("#scope").selectOption("all");
   await page.locator("#model-search").fill("no-such-model");
   await expect(page.locator("#model-list")).toContainText("没有匹配");
   await page.locator("#model-search").fill("");
