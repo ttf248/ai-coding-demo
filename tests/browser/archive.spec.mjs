@@ -279,6 +279,11 @@ test("built apps render their local images under the configured base", async ({
   page,
   baseURL,
 }) => {
+  // This test verifies committed local images. Fail the optional remote source
+  // promptly so its unbounded speed probe cannot block the local fallback.
+  await page.route("https://raw.githubusercontent.com/**", (route) =>
+    route.abort(),
+  );
   for (const r of blue) {
     const failures = [];
     const watch = (res) => {

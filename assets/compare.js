@@ -4,9 +4,11 @@
     U = window.ArchiveUI,
     e = U.escape,
     $ = (id) => document.getElementById(id);
-  const sides = ["left", "right"],
+  const sides = ["left", "right", "third", "fourth"],
+    labels = { left: "A", right: "B", third: "C", fourth: "D" },
+    seen = new Set(),
     narrow = matchMedia("(max-width:700px)"),
-    unloaded = { left: false, right: false };
+    unloaded = { left: false, right: false, third: false, fourth: false };
   const sizes = {
     desktop: [1440, 900],
     tablet: [768, 1024],
@@ -19,6 +21,19 @@
     state = {
       left: p.get("left") || "",
       right: p.get("right") || "",
+      third: p.get("third") || "",
+      fourth: p.get("fourth") || "",
+      thirdPage: p.get("thirdPage") || "",
+      fourthPage: p.get("fourthPage") || "",
+      group: p.get("group") || "",
+      scope: ["task", "raw", "topic", "all"].includes(p.get("scope"))
+        ? p.get("scope")
+        : "task",
+      layout: ["dual", "quad", "single"].includes(p.get("layout"))
+        ? p.get("layout")
+        : "dual",
+      focus: sides.includes(p.get("focus")) ? p.get("focus") : "",
+
       leftPage: p.get("leftPage") || "",
       rightPage: p.get("rightPage") || "",
       viewport: ["adaptive", ...Object.keys(sizes)].includes(p.get("viewport"))
@@ -29,8 +44,94 @@
         : "preview",
       source: p.get("source") === "raw" ? "raw" : "task",
       relatedOnly: p.get("related") !== "0",
-      mobile: p.get("mobile") === "right" ? "right" : "left",
+      mobile: sides.includes(p.get("mobile")) ? p.get("mobile") : "left",
     };
+    if (!state.group) {
+      const initial = data.runs.find((r) => r.id === state.left);
+      if (initial) state.group = initial.topicId + "/" + initial.promptId;
+    }
+    if (!state.left && !state.right && groupPrompt()) fillGroup();
+  }
+  function groupPrompt() {
+    return data.prompts.find((p) => p.topicId + "/" + p.id === state.group);
+  }
+  function pool() {
+    const anchor = data.runs.find((r) => r.id === state.left);
+    const prompt = groupPrompt() || (anchor && U.promptFor(data, anchor));
+    return U.filterRuns(data, {}).filter((r) => {
+      if (state.scope === "all") return true;
+      if (state.scope === "raw")
+        return (
+          anchor &&
+          anchor.raw.trim() &&
+          anchor.input.completeness !== "unknown" &&
+          r.input.completeness !== "unknown" &&
+          r.rawHash === anchor.rawHash
+        );
+      if (!prompt) return true;
+      if (state.scope === "topic") return r.topicId === prompt.topicId;
+      return U.promptFor(data, r)?.hash === prompt.hash;
+    });
+  }
+  function fillGroup() {
+    state.scope = "task";
+    const runs = pool();
+    sides.forEach((side, i) => {
+      state[side] = state.layout === "quad" || i < 2 ? runs[i]?.id || "" : "";
+      state[side + "Page"] = "";
+      unloaded[side] = false;
+    });
+    state.mobile = "left";
+    state.focus = "";
+  }
+  function runLabel(r) {
+    return (
+      U.modelLabel(data, r) +
+      " · " +
+      r.effort +
+      " · " +
+      r.runId.match(/r\d+$/)?.[0]
+    );
+  }
+  const slots = () => (state.layout === "quad" ? sides : sides.slice(0, 2));
+  function visibleSides() {
+    const available = slots();
+    const current = available.includes(state.mobile) ? state.mobile : "left";
+    if (narrow.matches || state.layout === "single") return [current];
+    return state.focus && available.includes(state.focus)
+      ? [state.focus]
+      : available;
+  }
+  function choose(side, id) {
+    state[side] = id;
+    state[side + "Page"] = "";
+    unloaded[side] = false;
+  }
+  function renderPicker() {
+    $("scope").value = state.scope;
+    const q = $("model-search").value.trim().toLocaleLowerCase();
+    const runs = pool().filter((r) =>
+      (runLabel(r) + " " + r.title + " " + (r.date || ""))
+        .toLocaleLowerCase()
+        .includes(q),
+    );
+    const side = $("picker-side").value;
+    $("picker-count").textContent =
+      `${runs.length} 条实验 · 点击放入 ${labels[side]}`;
+    $("model-list").innerHTML =
+      runs
+        .map((r) => {
+          const occupied = slots()
+            .filter((s) => state[s] === r.id)
+            .map((s) => labels[s])
+            .join(" / ");
+          return `<button class="model-choice" data-choice="${e(r.id)}" ${slots().some((s) => s !== side && state[s] === r.id) ? "disabled" : ""}><strong>${e(runLabel(r))}</strong><span>${e(r.title)} · ${e(r.date || "日期未记录")}</span><small>${occupied ? "已选 " + occupied + " · " : ""}${seen.has(r.id) ? "已浏览 · " : ""}${r.preview.kind === "none" ? "无预览" : r.preview.embed ? "可预览" : "独立打开"} · ${r.input.completeness === "complete" ? "完整输入" : "输入留存不完整"}</small></button>`;
+        })
+        .join("") ||
+      '<p class="frame-placeholder">没有匹配实验，请调整范围或搜索。</p>';
+    for (const option of $("picker-side").options)
+      option.hidden =
+        state.layout !== "quad" && ["third", "fourth"].includes(option.value);
   }
   const getRun = (side) => data.runs.find((r) => r.id === state[side]);
   function updateURL() {
@@ -61,17 +162,41 @@
     for (const shell of shells) {
       const frame = shell.querySelector("iframe");
       if (!frame) continue;
-      const [width, height] = sizes[state.viewport] || [common, 580];
-      const scale = Math.min(1, shell.clientWidth / width);
+      const availableHeight = shell.parentElement.clientHeight;
+      const [width, height] = sizes[state.viewport] || [
+        common,
+        availableHeight,
+      ];
+      const scale = Math.min(
+        1,
+        shell.clientWidth / width,
+        availableHeight / height,
+      );
       frame.style.width = width + "px";
       frame.style.height = height + "px";
       frame.style.transform = `scale(${scale})`;
-      shell.style.height = Math.ceil(height * scale) + "px";
+      shell.style.height = availableHeight + "px";
+      frame.style.marginLeft =
+        Math.max(0, (shell.clientWidth - width * scale) / 2) + "px";
       shell.closest(".compare-panel").querySelector("[data-size]").textContent =
         `${width} × ${height} · ${Math.round(scale * 100)}%`;
     }
   }
   function render() {
+    const visible = visibleSides();
+    document.body.dataset.mode = state.layout;
+    document.querySelector(".compare-grid").dataset.layout =
+      visible.length === 1 ? "single" : state.layout;
+    $("layout").value = state.layout;
+    $("group").value = state.group;
+    document
+      .querySelector(".mobile-tabs")
+      .classList.toggle("show-tabs", state.layout === "single");
+    document.querySelectorAll("[data-mobile]").forEach((btn) => {
+      btn.hidden =
+        state.layout !== "quad" &&
+        ["third", "fourth"].includes(btn.dataset.mobile);
+    });
     const a = getRun("left"),
       b = getRun("right");
     $("relation").textContent =
@@ -96,15 +221,21 @@
         ),
       );
     if (state.tab === "prompt") {
-      const key = [state.left, state.right, state.source].join("/");
-      if (diffCache?.key !== key)
+      const key = [...sides.map((s) => state[s]), state.source].join("/");
+      if (diffCache?.key !== key) {
         diffCache = { key, ...U.diff(textFor(a), textFor(b)) };
+        for (const side of ["third", "fourth"])
+          diffCache[side] = U.diff(textFor(a), textFor(getRun(side))).right;
+      }
     }
     for (const side of sides) {
       const panel = $("panel-" + side),
         run = getRun(side),
         other = getRun(side === "left" ? "right" : "left");
-      const active = !narrow.matches || state.mobile === side;
+      const active = visible.includes(side);
+      panel.hidden = !active;
+      if (active && run && state.tab === "preview" && !unloaded[side])
+        seen.add(run.id);
       panel.classList.toggle("mobile-inactive", !active);
       const candidates = U.filterRuns(data, {}).filter(
         (r) =>
@@ -142,9 +273,11 @@
               e(r.id) +
               '"' +
               (r.id === state[side] ? " selected" : "") +
-              (r.id === other?.id ? " disabled" : "") +
+              (slots().some((s) => s !== side && state[s] === r.id)
+                ? " disabled"
+                : "") +
               ">" +
-              e(r.title) +
+              e(runLabel(r)) +
               (other &&
               r.id !== other.id &&
               U.promptFor(data, r)?.hash === U.promptFor(data, other)?.hash
@@ -157,13 +290,25 @@
       const viewKey = JSON.stringify([
         frameKey(side),
         state.tab,
-        state.tab === "prompt" ? diffCache.key : "",
+        state.tab === "prompt"
+          ? diffCache.key
+          : state.tab === "info"
+            ? other?.id
+            : "",
         active,
         unloaded[side],
-        side === "right" && state.left === state.right,
+        Boolean(
+          run &&
+          slots().some(
+            (s) =>
+              sides.indexOf(s) < sides.indexOf(side) && state[s] === run.id,
+          ),
+        ),
       ]);
       if (panel.dataset.viewKey === viewKey) {
         panel.querySelector("[data-run]").innerHTML = options;
+        panel.querySelector("[data-maximize]").textContent =
+          state.focus === side ? "还原" : "放大";
         continue;
       }
       panel.dataset.viewKey = viewKey;
@@ -175,7 +320,7 @@
       );
       panel.innerHTML =
         '<div class="panel-header"><h2>' +
-        (side === "left" ? "A · 左侧" : "B · 右侧") +
+        (labels[side] + (side === "left" ? " · 基准" : "")) +
         '</h2><label for="run-' +
         side +
         '">实验版本</label><select id="run-' +
@@ -185,6 +330,7 @@
         '">' +
         options +
         "</select>" +
+        `<div class="panel-navigation"><button data-step="-1" data-side="${side}" aria-label="${labels[side]} 上一版本">←</button><button data-step="1" data-side="${side}" aria-label="${labels[side]} 下一版本">→</button><button data-maximize="${side}" aria-label="放大或还原 ${labels[side]}">${state.focus === side ? "还原" : "放大"}</button></div>` +
         (run && (run.preview.pages.length > 1 || invalidPage)
           ? '<label for="page-' +
             side +
@@ -244,7 +390,15 @@
           "</h3><p>上方可以选择任意主题的实验。另一侧会优先列出同正文版本。</p></div>";
         continue;
       }
-      if (side === "right" && state.left === state.right) {
+      if (
+        Boolean(
+          run &&
+          slots().some(
+            (s) =>
+              sides.indexOf(s) < sides.indexOf(side) && state[s] === run.id,
+          ),
+        )
+      ) {
         content.innerHTML =
           '<div class="frame-placeholder">请选择不同的实验记录。</div>';
         continue;
@@ -258,6 +412,11 @@
               : "可复用任务正文",
           ) +
           "</p><p>" +
+          e(
+            (side === "left" ? "与 B：" : "与基准 A：") +
+              U.relation(data, side === "left" ? b : a, run),
+          ) +
+          "</p><p>" +
           e(run.input.notes) +
           "</p><pre>" +
           diffCache[side] +
@@ -266,6 +425,7 @@
       }
       if (state.tab === "info") {
         const info = [
+          ["输入关系", U.relation(data, side === "left" ? b : a, run)],
           ["模型 / 推理档位", U.modelLabel(data, run) + " / " + run.effort],
           ["日期", run.date || "未记录"],
           ["原始输入记录", run.input.completeness + " · " + run.input.notes],
@@ -365,11 +525,37 @@
         once: true,
       });
     }
+    renderPicker();
     requestAnimationFrame(resizeFrames);
   }
   document.addEventListener("change", (event) => {
     const el = event.target;
-    if (el.dataset.run) {
+    if (el.id === "picker-side" || el.id === "scope") {
+      if (el.id === "scope") {
+        state.scope = el.value;
+        updateURL();
+      }
+      renderPicker();
+      return;
+    }
+    if (el.id === "group") {
+      state.group = el.value;
+      fillGroup();
+    } else if (el.id === "layout") {
+      state.layout = el.value;
+      state.focus = "";
+      if (state.layout !== "quad" && ["third", "fourth"].includes(state.mobile))
+        state.mobile = "left";
+      if (state.layout === "quad") {
+        const occupied = new Set([state.left, state.right]);
+        for (const side of ["third", "fourth"]) {
+          if (!state[side] || occupied.has(state[side])) {
+            choose(side, pool().find((r) => !occupied.has(r.id))?.id || "");
+          }
+          occupied.add(state[side]);
+        }
+      }
+    } else if (el.dataset.run) {
       const side = el.dataset.run;
       state[side] = el.value;
       state[side + "Page"] = "";
@@ -387,7 +573,42 @@
   document.addEventListener("click", (event) => {
     const el = event.target.closest("button");
     if (!el) return;
-    if (el.dataset.tab) state.tab = el.dataset.tab;
+    if (el.id === "pick-models") {
+      $("picker-side").value =
+        state.layout === "single" || narrow.matches
+          ? visibleSides()[0]
+          : "right";
+      renderPicker();
+      $("model-picker").showModal();
+      $("model-search").focus();
+      return;
+    } else if (el.id === "close-picker") {
+      $("model-picker").close();
+      return;
+    } else if (el.dataset.choice) {
+      choose($("picker-side").value, el.dataset.choice);
+      $("model-picker").close();
+    } else if (el.dataset.step) {
+      const side = el.dataset.side;
+      const candidates = pool().filter(
+        (r) =>
+          !sides.some(
+            (s) => s !== side && slots().includes(s) && state[s] === r.id,
+          ),
+      );
+      if (!candidates.length) return;
+      const index = candidates.findIndex((r) => r.id === state[side]);
+      choose(
+        side,
+        candidates[
+          (index + Number(el.dataset.step) + candidates.length) %
+            candidates.length
+        ].id,
+      );
+    } else if (el.dataset.maximize) {
+      state.focus =
+        state.focus === el.dataset.maximize ? "" : el.dataset.maximize;
+    } else if (el.dataset.tab) state.tab = el.dataset.tab;
     else if (el.dataset.mobile) state.mobile = el.dataset.mobile;
     else if (el.dataset.unload)
       unloaded[el.dataset.unload] = !unloaded[el.dataset.unload];
@@ -417,11 +638,26 @@
   });
   window.addEventListener("popstate", () => {
     fromURL();
-    unloaded.left = unloaded.right = false;
+    sides.forEach((side) => (unloaded[side] = false));
     render();
   });
   narrow.addEventListener("change", render);
   window.addEventListener("resize", resizeFrames);
+  $("group").innerHTML =
+    '<option value="">选择主题 / 提示词…</option>' +
+    data.prompts
+      .map((p) => {
+        const topic = data.topics.find((t) => t.id === p.topicId);
+        const count = data.runs.filter(
+          (r) => U.promptFor(data, r)?.hash === p.hash,
+        ).length;
+        return `<option value="${e(p.topicId + "/" + p.id)}">${e(topic.title)} / ${e(p.id)} · ${count} 个实验</option>`;
+      })
+      .join("");
+  $("model-search").addEventListener("input", renderPicker);
+  new ResizeObserver(resizeFrames).observe(
+    document.querySelector(".compare-grid"),
+  );
   fromURL();
   render();
 })();
