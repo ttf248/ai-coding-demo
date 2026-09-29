@@ -22,18 +22,22 @@ vm.runInNewContext(read("assets/core.js"), ctx);
 const U = ctx.ArchiveUI;
 test("archive migration preserves record counts and task relations", () => {
   assert.ok(data.topics.length >= 8);
-  assert.equal(data.runs.length, 13);
+  assert.equal(data.runs.length, 15);
   assert.ok(data.guides.length >= 14);
   for (const r of data.runs) assert.equal(r.rawHash, r.input.hash);
   const city = data.runs.filter((r) => r.topicId === "neo-gothic-tower-city");
-  assert.match(U.relation(data, ...city.slice(0, 2)), /原始输入一致/);
+  const cityDefault = city.find((r) => r.id.endsWith("gpt-6-default-r01"));
+  const cityHigh = city.find((r) => r.id.endsWith("gpt-6-high-r01"));
+  assert.match(U.relation(data, cityDefault, cityHigh), /原始输入一致/);
   const voxel = data.runs.filter(
     (r) => r.topicId === "voxel-construction-site",
   );
-  assert.match(U.relation(data, ...voxel.slice(0, 2)), /任务正文一致/);
-  assert.match(U.relation(data, city[0], voxel[0]), /跨主题/);
-  const unknown = { ...city[0], input: { completeness: "unknown" } };
-  assert.match(U.relation(data, unknown, city[1]), /信息不足/);
+  const voxelSol = voxel.find((r) => r.id.endsWith("gpt-5-6-sol-high-r01"));
+  const voxelAstra = voxel.find((r) => r.id.endsWith("gpt-6-astra-low-r01"));
+  assert.match(U.relation(data, voxelSol, voxelAstra), /任务正文一致/);
+  assert.match(U.relation(data, cityDefault, voxelSol), /跨主题/);
+  const unknown = { ...cityDefault, input: { completeness: "unknown" } };
+  assert.match(U.relation(data, unknown, cityHigh), /信息不足/);
 });
 test("combined filters operate on runs before topic grouping", () => {
   assert.equal(U.filterRuns(data, { model: "gpt-6-astra" }).length, 2);
@@ -49,7 +53,7 @@ test("combined filters operate on runs before topic grouping", () => {
   assert.equal(U.filterRuns(data, { preview: "no" }).length, 2);
   assert.equal(
     U.filterRuns(data, { prompt: "voxel-construction-site/v1" }).length,
-    3,
+    4,
   );
 });
 test("diff preserves and escapes input, handles insertion/deletion/large inputs", () => {
