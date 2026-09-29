@@ -1,0 +1,10 @@
+import { useEffect } from 'react';
+import Header from './components/Header';
+import Feed from './components/Feed';
+import { useFeed } from './store';
+
+export default function App() {
+  const refresh = useFeed((s) => s.refresh), following = useFeed((s) => s.following);
+  useEffect(() => { const onRefresh = () => { refresh(); window.scrollTo({ top: 0, behavior: 'smooth' }); }; window.addEventListener('bluebook:refresh', onRefresh); const shortcut = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); document.querySelector<HTMLInputElement>('.search-box input')?.focus(); } }; window.addEventListener('keydown', shortcut); return () => { window.removeEventListener('bluebook:refresh', onRefresh); window.removeEventListener('keydown', shortcut); }; }, [refresh]);
+  return <div id="top" className="app-shell min-h-screen bg-[#f6f6f4] transition-all duration-500"><Header /><div className="desktop-layout mx-auto grid"><aside className="side-nav"><div className="side-title">发现日常</div><button className="side-link active">⌂ <span>为你推荐</span></button><button className={`side-link ${following ? 'active' : ''}`} onClick={() => useFeed.getState().setFollowing(!following)}>♡ <span>我的关注</span></button><button className="side-link">▤ <span>灵感收藏</span></button><div className="side-divider" /><p className="side-caption">我的频道</p><button className="author-link"><i style={{ background: '#b7d6c4' }}>林</i>林间慢镜头</button><button className="author-link"><i style={{ background: '#ebc7cf' }}>花</i>花房日记</button><button className="author-link"><i style={{ background: '#bfd7dc' }}>海</i>海风来信</button><div className="side-note"><b>慢一点，也很好</b><p>收集那些让日常变柔软的瞬间。</p></div></aside><Feed /></div><nav className="mobile-nav"><button className="active">⌂<span>首页</span></button><button>⌕<span>发现</span></button><button className="mobile-publish" onClick={() => window.alert('发布入口原型')}>＋</button><button>♡<span>收藏</span></button><button>◉<span>我的</span></button></nav><footer className="site-footer">小蓝书 · 让每一天都有可收藏的灵感</footer></div>;
+}
