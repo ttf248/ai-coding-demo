@@ -95,11 +95,26 @@
           e(t.title) +
           "</a></h3><p>" +
           e(t.description) +
-          '</p><div class="tags">' +
-          [...new Set(runs.map((r) => U.modelLabel(data, r)))]
+          '</p><p class="topic-metrics">' +
+          new Set(runs.map((r) => r.modelId)).size +
+          " 个模型 · 最近 " +
+          e(
+            runs
+              .map((r) => r.date || "")
+              .sort()
+              .at(-1) || "日期未记录",
+          ) +
+          '</p><details class="topic-models"><summary>查看模型范围</summary><div class="tags">' +
+          [
+            ...new Set(
+              [...runs]
+                .sort((a, b) => U.compareModelRuns(data, a, b))
+                .map((r) => U.modelLabel(data, r)),
+            ),
+          ]
             .map((m) => "<span>" + e(m) + "</span>")
             .join("") +
-          '</div><div class="card-actions"><a href="topic.html?id=' +
+          '</div></details><div class="card-actions"><a href="topic.html?id=' +
           t.id +
           '">查看实验 →</a>' +
           (recommended
@@ -148,6 +163,34 @@
       "sort",
     ])
       $(key).value = state[key];
+    $("active-filters").innerHTML = [
+      "q",
+      "category",
+      "model",
+      "type",
+      "prompt",
+      "preview",
+      "sort",
+    ]
+      .filter(
+        (key) => state[key] && !(key === "sort" && state[key] === "latest"),
+      )
+      .map((key) => {
+        const label =
+          key === "q"
+            ? "搜索：" + state[key]
+            : $(key).selectedOptions[0]?.textContent || state[key];
+        return (
+          '<button data-remove-filter="' +
+          key +
+          '" aria-label="移除筛选 ' +
+          e(label) +
+          '">' +
+          e(label) +
+          " ×</button>"
+        );
+      })
+      .join("");
     const search = new URLSearchParams();
     Object.entries(state).forEach(([k, v]) => {
       if (v) search.set(k, v);
@@ -192,6 +235,38 @@
       render(true);
     }),
   );
+  $("active-filters").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-remove-filter]");
+    if (!button) return;
+    const key = button.dataset.removeFilter;
+    state[key] = key === "sort" ? "latest" : "";
+    render(true);
+  });
+  $("advanced-filters").open = !!(
+    state.type ||
+    state.prompt ||
+    state.preview ||
+    state.sort !== "latest"
+  );
+  $("recent-list").innerHTML = U.filterRuns(data, {})
+    .slice(0, 5)
+    .map(
+      (r) =>
+        '<a href="topic.html?id=' +
+        e(r.topicId) +
+        "&prompt=" +
+        e(r.promptId) +
+        "&view=list#run-" +
+        e(r.id) +
+        '"><span>' +
+        e(data.topics.find((t) => t.id === r.topicId).title) +
+        "</span><strong>" +
+        e(U.runSummary(data, r)) +
+        "</strong><small>" +
+        e(r.date || "日期未记录") +
+        "</small></a>",
+    )
+    .join("");
   function guides() {
     const q = $("guide-search").value.toLowerCase();
     const list = data.guides.filter((g) =>

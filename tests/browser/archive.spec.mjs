@@ -70,6 +70,7 @@ test("directory counts, filters, sort, views, pagination and selection", async (
     Math.min(9, data.runs.filter((r) => r.modelId === "gpt-6-astra").length),
   );
   await page.locator("#model").selectOption("gpt-6-astra");
+  await page.locator("#advanced-filters summary").click();
   await page.locator("#sort").selectOption("title");
   await page.locator('[data-view="list"]').click();
   await expect(page.locator("#project-grid")).toHaveClass(/list/);
@@ -80,6 +81,9 @@ test("directory counts, filters, sort, views, pagination and selection", async (
   await page.locator("[data-compare]").nth(0).click();
   await page.locator("[data-compare]").nth(1).click();
   await page.locator("[data-compare]").nth(2).click();
+  await expect(page.locator("#replace-dialog")).not.toBeVisible();
+  await page.locator("[data-compare]").nth(3).click();
+  await page.locator("[data-compare]").nth(4).click();
   await expect(page.locator("#replace-dialog")).toBeVisible();
   await page.locator('[data-slot="0"]').click();
   await expect(page.locator("#compare-tray a")).toHaveAttribute(
@@ -95,7 +99,8 @@ test("topic detail and prompt comparison restore URLs without executing demos", 
 }) => {
   await page.goto("topic.html?id=voxel-construction-site");
   await expect(page.locator(".cards .card")).toHaveCount(voxel.length);
-  await page.locator("summary").first().click();
+  await page.locator('[data-topic-view="prompt"]').click();
+  await page.locator("#topic-prompts summary").first().click();
   await expect(page.locator("details pre")).toContainText("InstancedMesh");
   await page.goto(url(voxelSol, voxelAstra, "&tab=prompt&source=raw"));
   await expect(page.locator("#relation")).toContainText("任务正文一致");
