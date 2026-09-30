@@ -40,7 +40,7 @@
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`voxel-construction-site--gpt-5-6-sol-high-r01`
-- 模型：GPT 5.6 Sol；推理档位：high
+- 模型：GPT-5.6 Sol；推理档位：high
 - 类型：single-html；预览：static；网络：required
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=voxel-construction-site)
 - 输入记录：保留文档中的原始输入；其他会话上下文未记录。

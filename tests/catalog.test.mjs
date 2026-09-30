@@ -37,7 +37,7 @@ test("comparison groups providers, sorts numeric versions descending and leaves 
     runs.sort((a, b) => U.compareModelRuns({ models }, a, b)).map((r) => r.id),
     ["other", "newer", "older", "unknown"],
   );
-  assert.equal(U.modelLabel(all, { modelId: "gpt-6-1-sol" }), "GPT 6.1 Sol");
+  assert.equal(U.modelLabel(all, { modelId: "gpt-6-1-sol" }), "GPT-6.1 Sol");
   assert.equal(U.modelLabel(all, { modelId: "minimax-m2" }), "MiniMax M2");
 });
 test("archive migration preserves record counts and task relations", () => {

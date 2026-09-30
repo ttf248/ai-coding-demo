@@ -22,7 +22,7 @@
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`pixel-flow--gpt-6-1-sol-medium-r01`
-- 模型：GPT 6.1 Sol；推理档位：medium
+- 模型：GPT-6.1 Sol；推理档位：medium
 - 类型：single-html；预览：static；网络：required
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=pixel-flow)
 - 输入记录：保存用户本轮原始请求、仓库规则与读取的任务原文。当前会话逐个执行，并非独立会话；系统/开发者上下文、工具输出及前序案例上下文未逐字复制，不能视为独立同输入评测。

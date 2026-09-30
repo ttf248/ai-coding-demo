@@ -28,7 +28,7 @@ npm run dev
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`stock-watching--gpt-6-luna-max-r02`
-- 模型：GPT 6 Luna；推理档位：max
+- 模型：GPT-6 Luna；推理档位：max
 - 类型：fullstack；预览：none；网络：unknown
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=stock-watching)
 - 输入记录：提示词 v1 原文已完整保存；正文引用的项目原型和行情服务未随本分支提供。实现仅采用正文明确列出的功能，示例行情单独标注。

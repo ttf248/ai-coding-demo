@@ -90,9 +90,11 @@
     return (
       U.modelLabel(data, r) +
       " · " +
-      r.effort +
+      U.effortLabel(r.effort) +
       " · " +
-      r.runId.match(/r\d+$/)?.[0]
+      (r.runId.match(/r(\d+)$/)
+        ? "第 " + Number(r.runId.match(/r(\d+)$/)[1]) + " 轮"
+        : "轮次未记录")
     );
   }
   const slots = () => (state.layout === "quad" ? sides : sides.slice(0, 2));
@@ -119,6 +121,8 @@
         U.modelProvider(data, r) +
         " " +
         r.modelId +
+        " " +
+        r.effort +
         " " +
         r.title +
         " " +
@@ -269,19 +273,7 @@
           r.topicId === other.topicId ||
           r.id === state[side],
       );
-      const ordered = candidates.sort((x, y) => {
-        const rank = (r) =>
-          other
-            ? r.id === other.id
-              ? 3
-              : U.promptFor(data, r)?.hash === U.promptFor(data, other)?.hash
-                ? 0
-                : r.topicId === other.topicId
-                  ? 1
-                  : 2
-            : 0;
-        return rank(x) - rank(y) || U.compareModelRuns(data, x, y);
-      });
+      const ordered = candidates.sort((x, y) => U.compareModelRuns(data, x, y));
       const options =
         '<option value="">选择实验…</option>' +
         (state[side] && !run
@@ -291,26 +283,26 @@
             e(state[side]) +
             "</option>"
           : "") +
-        ordered
-          .map(
-            (r) =>
-              '<option value="' +
-              e(r.id) +
-              '"' +
-              (r.id === state[side] ? " selected" : "") +
-              (slots().some((s) => s !== side && state[s] === r.id)
-                ? " disabled"
-                : "") +
-              ">" +
-              e(runLabel(r)) +
-              (other &&
-              r.id !== other.id &&
-              U.promptFor(data, r)?.hash === U.promptFor(data, other)?.hash
-                ? " · 同正文"
-                : "") +
-              "</option>",
-          )
-          .join("");
+        U.groupedOptions(
+          ordered,
+          (r) => U.modelProvider(data, r),
+          (r) =>
+            '<option value="' +
+            e(r.id) +
+            '"' +
+            (r.id === state[side] ? " selected" : "") +
+            (slots().some((s) => s !== side && state[s] === r.id)
+              ? " disabled"
+              : "") +
+            ">" +
+            e(runLabel(r)) +
+            (other &&
+            r.id !== other.id &&
+            U.promptFor(data, r)?.hash === U.promptFor(data, other)?.hash
+              ? " · 同正文"
+              : "") +
+            "</option>",
+        );
       // Keep an untouched iframe in place: moving its DOM node would reload it.
       const viewKey = JSON.stringify([
         frameKey(side),
@@ -401,7 +393,7 @@
           ? e(
               U.modelLabel(data, run) +
                 " / " +
-                run.effort +
+                U.effortLabel(run.effort) +
                 " · " +
                 (run.environment.tool || "工具未记录"),
             )
@@ -412,7 +404,7 @@
         content.innerHTML =
           '<div class="frame-placeholder"><h3>' +
           (state[side] ? "实验不存在或已经迁移" : "选一个实验开始") +
-          "</h3><p>上方可以选择任意主题的实验。另一侧会优先列出同正文版本。</p></div>";
+          "</h3><p>上方可以选择任意主题的实验。候选按厂商和版本排列，同正文版本会单独标注。</p></div>";
         continue;
       }
       if (
@@ -451,7 +443,10 @@
       if (state.tab === "info") {
         const info = [
           ["输入关系", U.relation(data, side === "left" ? b : a, run)],
-          ["模型 / 推理档位", U.modelLabel(data, run) + " / " + run.effort],
+          [
+            "模型 / 推理档位",
+            U.modelLabel(data, run) + " / " + U.effortLabel(run.effort),
+          ],
           ["日期", run.date || "未记录"],
           ["原始输入记录", run.input.completeness + " · " + run.input.notes],
           ["平台与工具", run.environment.tool || "未记录"],

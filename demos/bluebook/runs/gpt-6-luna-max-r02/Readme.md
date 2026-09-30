@@ -8,7 +8,7 @@ React 18 + TypeScript 实现响应式瀑布流：首屏 20 条 mock 内容、两
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`bluebook--gpt-6-luna-max-r02`
-- 模型：GPT 6 Luna；推理档位：max
+- 模型：GPT-6 Luna；推理档位：max
 - 类型：app；预览：build；网络：required
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=bluebook)
 - 输入记录：使用 bluebook 提示词 v2 的完整正文；未附加 v1 内容或历史上下文。

@@ -12,6 +12,41 @@ const voxelAstra = voxel.find((r) => r.id.endsWith("gpt-6-astra-low-r01"));
 const blue = data.runs.filter((r) => r.topicId === "bluebook");
 const url = (a, b, extra = "") =>
   `compare.html?left=${a.id}&right=${b.id}${extra}`;
+test("homepage model dropdown has canonical names and vendor/version ordering", async ({
+  page,
+}) => {
+  await page.goto("./");
+  expect(
+    await page
+      .locator("#model optgroup")
+      .evaluateAll((groups) => groups.map((g) => g.label)),
+  ).toEqual(["Anthropic", "MiniMax", "OpenAI", "未记录 / 多轮混合"]);
+  await expect(page.locator("#model option")).toHaveText([
+    "全部模型",
+    "Claude 4.0",
+    "MiniMax M3.1 Flash Preview",
+    "MiniMax M3",
+    "MiniMax M2.1",
+    "MiniMax M2",
+    "GPT-6.1 Sol",
+    "GPT-6",
+    "GPT-6 Astra",
+    "GPT-6 Luna",
+    "GPT-6 Sol",
+    "GPT-5.6 Luna",
+    "GPT-5.6 Sol",
+    "未记录 / 多轮混合",
+  ]);
+  await page.locator("#model").selectOption("gpt-6-1-sol");
+  await page.reload();
+  await expect(page.locator("#model")).toHaveValue("gpt-6-1-sol");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
 test("directory counts, filters, sort, views, pagination and selection", async ({
   page,
 }) => {

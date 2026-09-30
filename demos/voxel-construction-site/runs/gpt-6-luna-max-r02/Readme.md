@@ -8,7 +8,7 @@
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`voxel-construction-site--gpt-6-luna-max-r02`
-- 模型：GPT 6 Luna；推理档位：max
+- 模型：GPT-6 Luna；推理档位：max
 - 类型：single-html；预览：static；网络：offline
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=voxel-construction-site)
 - 输入记录：提示词 v1 原文完整快照；正文包含 Three.js CDN 与不得加载外部资源的冲突要求，并在末尾提及未具体说明的新增场景。
