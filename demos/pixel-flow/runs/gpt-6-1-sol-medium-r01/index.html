@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Pixel Flow · 用手势找回一张图片</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #080b14;
+        color: #e8ecf7;
+        font-family: Arial, "Microsoft YaHei", sans-serif;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+      }
+      canvas {
+        display: block;
+      }
+      header {
+        position: fixed;
+        left: 32px;
+        top: 28px;
+        pointer-events: none;
+      }
+      header small {
+        font-size: 10px;
+        letter-spacing: 4px;
+        color: #8aa7ff;
+      }
+      h1 {
+        margin: 14px 0 10px;
+        font-size: 36px;
+        letter-spacing: -1.5px;
+      }
+      header p {
+        font-size: 12px;
+        color: #8390ad;
+        line-height: 1.8;
+      }
+      .panel {
+        position: fixed;
+        right: 28px;
+        top: 28px;
+        bottom: 28px;
+        width: 270px;
+        padding: 20px;
+        background: #11182ad9;
+        border: 1px solid #9facff26;
+        border-radius: 20px;
+        backdrop-filter: blur(14px);
+        overflow: auto;
+      }
+      .panel h2 {
+        font-size: 11px;
+        letter-spacing: 2px;
+        color: #91a1c7;
+        margin: 0 0 15px;
+      }
+      button,
+      .upload {
+        display: block;
+        width: 100%;
+        border: 1px solid #93a9ff44;
+        background: #788ff516;
+        color: #d7e0ff;
+        border-radius: 10px;
+        padding: 12px;
+        font-size: 12px;
+        cursor: pointer;
+        text-align: center;
+      }
+      button:hover,
+      .upload:hover {
+        background: #788ff536;
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      button:focus-visible,
+      input:focus-visible {
+        outline: 2px solid #a8bdff;
+      }
+      input[type="file"] {
+        width: 100%;
+        margin-top: 10px;
+        font-size: 10px;
+      }
+      input[type="range"] {
+        width: 100%;
+        accent-color: #9bb0ff;
+      }
+      label {
+        display: block;
+        font-size: 11px;
+        color: #a3b0cf;
+        margin: 14px 0;
+      }
+      video {
+        width: 100%;
+        height: 135px;
+        border-radius: 12px;
+        background: #080d1a;
+        object-fit: cover;
+        transform: scaleX(-1);
+      }
+      .row {
+        display: flex;
+        gap: 7px;
+      }
+      .row button {
+        flex: 1;
+      }
+      .section {
+        margin-top: 22px;
+        padding-top: 20px;
+        border-top: 1px solid #9facff1c;
+      }
+      #status {
+        font-size: 11px;
+        color: #95aad8;
+        line-height: 1.8;
+      }
+      progress {
+        width: 100%;
+        height: 6px;
+        accent-color: #b1c1ff;
+      }
+      .hint {
+        font-size: 11px;
+        color: #7183a6;
+        line-height: 1.8;
+      }
+      #stats {
+        position: fixed;
+        bottom: 28px;
+        left: 32px;
+        font-size: 11px;
+        line-height: 1.9;
+        color: #8096c4;
+      }
+      #error {
+        color: #f7b995;
+        font-size: 11px;
+        line-height: 1.7;
+      }
+      #error:empty {
+        display: none;
+      }
+      @media (max-width: 650px) {
+        header {
+          left: 18px;
+          top: 18px;
+        }
+        h1 {
+          font-size: 26px;
+        }
+        header p {
+          max-width: 220px;
+          font-size: 10px;
+        }
+        .panel {
+          top: auto;
+          right: 12px;
+          left: 12px;
+          bottom: 12px;
+          width: auto;
+          max-height: 44vh;
+          padding: 15px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+        .section {
+          margin: 0;
+          padding: 0;
+          border: 0;
+        }
+        .panel h2 {
+          margin-bottom: 10px;
+        }
+        video {
+          height: 88px;
+        }
+        .hint {
+          font-size: 10px;
+        }
+        #stats {
+          left: 18px;
+          top: 125px;
+          bottom: auto;
+          font-size: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <header>
+      <small>IMAGE × PARTICLES × YOU</small>
+      <h1>Pixel Flow<span style="color: #9eb5ff">.</span></h1>
+      <p>让一张图片散落成星河，<br />再用一个手势，把它温柔地找回来。</p>
+    </header>
+    <aside class="panel">
+      <div>
+        <h2>01 / YOUR IMAGE</h2>
+        <label class="upload"
+          >选择本地图片<input id="file" type="file" accept="image/*" /></label
+        ><button id="demo">载入示例图案</button
+        ><label
+          >采样步长 <output id="sample-label">6 px</output
+          ><input id="sample" type="range" min="3" max="12" value="6" step="1"
+        /></label>
+        <div class="row">
+          <button id="restore">完整还原</button
+          ><button id="scatter">重新散开</button>
+        </div>
+        <label
+          >吸引区域大小<input
+            id="radius"
+            type="range"
+            min="0.1"
+            max="0.8"
+            step="0.05"
+            value="0.35" /></label
+        ><progress id="progress" max="100" value="0"></progress>
+        <p id="status" role="status">正在加载渲染引擎…</p>
+        <p id="error" role="alert"></p>
+      </div>
+      <div class="section">
+        <h2>02 / HAND CONTROL</h2>
+        <video id="video" autoplay muted playsinline></video>
+        <div class="row" style="margin-top: 10px">
+          <button id="camera">启动摄像头</button
+          ><button id="stop" disabled>停止</button>
+        </div>
+        <p id="gesture" class="hint">
+          张开手掌 → 掌心周围粒子还原<br />握拳 → 暂停吸引<br />拇指与食指捏合 →
+          全图还原
+        </p>
+        <p class="hint">
+          无需摄像头，也可按住画面吸引粒子。<br />图片与视频在本机处理；模型文件需要联网下载。摄像头建议在
+          localhost 或 HTTPS 使用。
+        </p>
+      </div>
+    </aside>
+    <div id="stats">
+      THREE.JS / MEDIAPIPE HANDS<br /><span id="count">0</span> PARTICLES ·
+      LOCAL PROCESSING
+    </div>
+    <script
+      src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"
+      onerror="
+        document.getElementById('error').textContent =
+          'Three.js 加载失败，请检查网络后刷新。'
+      "
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js"
+      onerror="
+        document.getElementById('error').textContent =
+          'MediaPipe 加载失败，仍可使用鼠标与完整还原按钮。'
+      "
+    ></script>
+    <script>
+      (() => {
+        if (!window.THREE) return;
+        const status = document.getElementById("status"),
+          error = document.getElementById("error");
+        let renderer;
+        try {
+          renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false });
+        } catch {
+          error.textContent = "当前浏览器无法创建 WebGL。";
+          return;
+        }
+        renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+        renderer.setSize(innerWidth, innerHeight);
+        document.getElementById("stage").append(renderer.domElement);
+        const scene = new THREE.Scene(),
+          camera = new THREE.PerspectiveCamera(
+            45,
+            innerWidth / innerHeight,
+            0.1,
+            100,
+          );
+        camera.position.z = 8;
+        const clock = new THREE.Clock();
+        let points,
+          original,
+          positions,
+          randoms,
+          amount,
+          sourceCanvas,
+          globalRestore = false,
+          attract = false,
+          pointer = false,
+          center = new THREE.Vector2(0, 0),
+          elapsed = 0,
+          handPower = 1;
+        const material = new THREE.ShaderMaterial({
+          transparent: true,
+          depthWrite: false,
+          vertexColors: true,
+          blending: THREE.AdditiveBlending,
+          vertexShader:
+            "varying vec3 vColor;void main(){vColor=color;vec4 p=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*p;gl_PointSize=clamp(24./-p.z,1.,8.);}",
+          fragmentShader:
+            "varying vec3 vColor;void main(){float a=1.-smoothstep(.25,.5,length(gl_PointCoord-.5));gl_FragColor=vec4(vColor,a*.9);}",
+        });
+        function fit() {
+          const availableWidth =
+            innerWidth > 650 ? innerWidth - 310 : innerWidth;
+          const visibleHeight =
+            innerWidth > 650 ? innerHeight : innerHeight * 0.5;
+          camera.position.z = Math.max(
+            6,
+            4.8 /
+              (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) *
+                Math.min(availableWidth / visibleHeight, 1.6)),
+          );
+          camera.setViewOffset(
+            innerWidth,
+            innerHeight,
+            innerWidth > 650 ? 155 : 0,
+            innerWidth > 650 ? 0 : innerHeight * 0.17,
+            innerWidth,
+            innerHeight,
+          );
+        }
+        function init(c) {
+          sourceCanvas = c;
+          const ctx = c.getContext("2d"),
+            data = ctx.getImageData(0, 0, c.width, c.height).data,
+            step = Math.max(
+              Number(document.getElementById("sample").value),
+              Math.ceil(Math.sqrt((c.width * c.height) / 28000)),
+            ),
+            coords = [],
+            colors = [];
+          for (let y = 0; y < c.height; y += step)
+            for (let x = 0; x < c.width; x += step) {
+              const k = (y * c.width + x) * 4;
+              if (data[k + 3] < 32) continue;
+              coords.push(
+                (x / c.width - 0.5) * 4.8,
+                ((0.5 - y / c.height) * 4.8 * c.height) / c.width,
+                0,
+              );
+              colors.push(data[k] / 255, data[k + 1] / 255, data[k + 2] / 255);
+            }
+          original = new Float32Array(coords);
+          positions = new Float32Array(coords.length);
+          randoms = new Float32Array(coords.length);
+          amount = new Float32Array(coords.length / 3);
+          for (let i = 0; i < positions.length; i++) {
+            positions[i] = (Math.random() - 0.5) * (i % 3 === 2 ? 4 : 9);
+            randoms[i] = positions[i];
+          }
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+          geo.setAttribute(
+            "color",
+            new THREE.Float32BufferAttribute(colors, 3),
+          );
+          if (points) {
+            scene.remove(points);
+            points.geometry.dispose();
+          }
+          points = new THREE.Points(geo, material);
+          scene.add(points);
+          globalRestore = false;
+          document.getElementById("count").textContent = String(amount.length);
+          status.textContent = "图片已粒子化 · 张开手掌或按住画面吸引";
+          document.getElementById("progress").value = 0;
+        }
+        function demo() {
+          const c = document.createElement("canvas");
+          c.width = 600;
+          c.height = 420;
+          const ctx = c.getContext("2d");
+          const g = ctx.createLinearGradient(0, 0, 600, 420);
+          g.addColorStop(0, "#5b76d0");
+          g.addColorStop(1, "#1b224a");
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, 600, 420);
+          ctx.fillStyle = "#ffe6a8";
+          ctx.beginPath();
+          ctx.arc(430, 105, 48, 0, Math.PI * 2);
+          ctx.fill();
+          for (let i = 0; i < 5; i++) {
+            ctx.fillStyle = [
+              "#273f70",
+              "#305582",
+              "#416b90",
+              "#78a3ad",
+              "#a8c3b8",
+            ][i];
+            ctx.beginPath();
+            ctx.moveTo(0, 420);
+            for (let x = 0; x <= 600; x += 12)
+              ctx.lineTo(x, 230 + i * 32 + Math.sin(x * 0.01 + i) * 35);
+            ctx.lineTo(600, 420);
+            ctx.fill();
+          }
+          ctx.fillStyle = "#fff9dc";
+          ctx.font = "24px sans-serif";
+          ctx.fillText("A LITTLE STILLNESS", 28, 45);
+          init(c);
+        }
+        document.getElementById("demo").onclick = demo;
+        document.getElementById("file").onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (!file.type.startsWith("image/")) {
+            error.textContent = "请选择图片文件。";
+            return;
+          }
+          const url = URL.createObjectURL(file);
+          status.textContent = "正在提取像素…";
+          try {
+            const image = new Image();
+            image.src = url;
+            await image.decode();
+            const scale = Math.min(
+              1,
+              1000 / Math.max(image.naturalWidth, image.naturalHeight),
+            );
+            const c = document.createElement("canvas");
+            c.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            c.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            c.getContext("2d").drawImage(image, 0, 0, c.width, c.height);
+            init(c);
+            error.textContent = "";
+          } catch {
+            error.textContent = "图片无法解码，请尝试 PNG、JPEG 或 WebP。";
+          } finally {
+            URL.revokeObjectURL(url);
+          }
+        };
+        document.getElementById("sample").oninput = (e) => {
+          document.getElementById("sample-label").value =
+            e.target.value + " px";
+          if (sourceCanvas) init(sourceCanvas);
+        };
+        document.getElementById("restore").onclick = () => {
+          globalRestore = true;
+          status.textContent = "正在完整还原…";
+        };
+        document.getElementById("scatter").onclick = () => {
+          if (sourceCanvas) init(sourceCanvas);
+        };
+        function updateCenter(x, y) {
+          const rect = renderer.domElement.getBoundingClientRect();
+          const vector = new THREE.Vector3(
+            ((x - rect.left) / rect.width) * 2 - 1,
+            (-(y - rect.top) / rect.height) * 2 + 1,
+            0.5,
+          );
+          vector.unproject(camera);
+          const dir = vector.sub(camera.position).normalize();
+          const distance = -camera.position.z / dir.z;
+          center.copy(
+            camera.position.clone().add(dir.multiplyScalar(distance)),
+          );
+        }
+        renderer.domElement.onpointerdown = (e) => {
+          pointer = true;
+          renderer.domElement.setPointerCapture(e.pointerId);
+          updateCenter(e.clientX, e.clientY);
+        };
+        renderer.domElement.onpointermove = (e) => {
+          if (pointer) updateCenter(e.clientX, e.clientY);
+        };
+        renderer.domElement.onpointerup = renderer.domElement.onpointercancel =
+          () => (pointer = false);
+        const video = document.getElementById("video"),
+          cameraBtn = document.getElementById("camera"),
+          stopBtn = document.getElementById("stop"),
+          gesture = document.getElementById("gesture");
+        let stream = null,
+          hands = null,
+          running = false,
+          session = 0,
+          frameRequest;
+        function stop() {
+          session++;
+          running = false;
+          attract = false;
+          cancelAnimationFrame(frameRequest);
+          if (stream) stream.getTracks().forEach((t) => t.stop());
+          stream = null;
+          video.srcObject = null;
+          const previous = hands;
+          hands = null;
+          if (previous) Promise.resolve(previous.close()).catch(() => {});
+          cameraBtn.disabled = false;
+          stopBtn.disabled = true;
+          cameraBtn.textContent = "启动摄像头";
+          gesture.textContent = "摄像头已停止 · 可以使用触摸或按钮";
+        }
+        stopBtn.onclick = stop;
+        function distance(a, b) {
+          return Math.hypot(a.x - b.x, a.y - b.y);
+        }
+        cameraBtn.onclick = async () => {
+          if (running) return;
+          if (!window.Hands) {
+            error.textContent =
+              "MediaPipe 未加载，请刷新后重试或使用触摸操作。";
+            return;
+          }
+          if (!navigator.mediaDevices?.getUserMedia) {
+            error.textContent =
+              "摄像头不可用，请使用 localhost 或 HTTPS 打开。";
+            return;
+          }
+          const token = ++session;
+          cameraBtn.disabled = true;
+          cameraBtn.textContent = "正在加载…";
+          stopBtn.disabled = false;
+          try {
+            const candidate = await navigator.mediaDevices.getUserMedia({
+              video: { width: 640, height: 480, facingMode: "user" },
+              audio: false,
+            });
+            if (token !== session) {
+              candidate.getTracks().forEach((t) => t.stop());
+              return;
+            }
+            stream = candidate;
+            video.srcObject = stream;
+            await video.play();
+            if (token !== session) return;
+            const engine = new Hands({
+              locateFile: (file) =>
+                "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/" +
+                file,
+            });
+            hands = engine;
+            engine.setOptions({
+              maxNumHands: 1,
+              modelComplexity: 0,
+              minDetectionConfidence: 0.65,
+              minTrackingConfidence: 0.6,
+            });
+            engine.onResults((result) => {
+              if (token !== session) return;
+              const lm = result.multiHandLandmarks?.[0];
+              if (!lm) {
+                attract = false;
+                gesture.textContent = "请将手掌放入摄像头画面";
+                return;
+              }
+              const palm = Math.max(0.02, distance(lm[0], lm[9]));
+              const extended = [8, 12, 16, 20].filter(
+                (t) =>
+                  distance(lm[0], lm[t]) > distance(lm[0], lm[t - 2]) * 1.18,
+              ).length;
+              const pinch = distance(lm[4], lm[8]) / palm < 0.28;
+              attract = extended >= 3 && !pinch;
+              if (pinch) globalRestore = true;
+              const px = (lm[0].x + lm[9].x) / 2,
+                py = (lm[0].y + lm[9].y) / 2;
+              const regionW = innerWidth > 650 ? innerWidth - 310 : innerWidth,
+                regionH = innerWidth > 650 ? innerHeight : innerHeight * 0.55;
+              updateCenter((1 - px) * regionW, py * regionH);
+              handPower = THREE.MathUtils.clamp(palm * 5, 0.4, 2);
+              gesture.textContent = pinch
+                ? "捏合 · 全图还原"
+                : attract
+                  ? "张开手掌 · 吸引场已开启"
+                  : "握拳 / 未张开 · 暂停吸引";
+            });
+            await engine.initialize();
+            if (token !== session) {
+              await engine.close();
+              return;
+            }
+            running = true;
+            cameraBtn.textContent = "摄像头已启动";
+            error.textContent = "";
+            async function track() {
+              if (!running || token !== session) return;
+              try {
+                await engine.send({ image: video });
+              } catch (e) {
+                if (token === session) {
+                  error.textContent = "手势模型运行失败：" + e.message;
+                  stop();
+                }
+                return;
+              }
+              frameRequest = requestAnimationFrame(track);
+            }
+            track();
+          } catch (e) {
+            if (token === session) {
+              error.textContent =
+                e.name === "NotAllowedError"
+                  ? "摄像头权限未授予，仍可使用触摸和还原按钮。"
+                  : "摄像头或模型无法启动：" + e.message;
+              stop();
+            }
+          }
+        };
+        let lastUpdate = 0;
+        function animate() {
+          requestAnimationFrame(animate);
+          const dt = Math.min(clock.getDelta(), 0.04);
+          elapsed += dt;
+          if (points) {
+            let done = 0;
+            const r = Number(document.getElementById("radius").value) * 5;
+            for (let i = 0; i < amount.length; i++) {
+              const k = i * 3;
+              const near = Math.hypot(
+                positions[k] - center.x,
+                positions[k + 1] - center.y,
+              );
+              if (globalRestore || ((attract || pointer) && near < r))
+                amount[i] = Math.min(
+                  1,
+                  amount[i] +
+                    dt * (globalRestore ? 1.2 : (1 - near / r) * handPower),
+                );
+              const a = amount[i],
+                ease = a * a * (3 - 2 * a),
+                float = 1 - ease;
+              for (let j = 0; j < 3; j++) {
+                const target =
+                  original[k + j] * ease +
+                  (randoms[k + j] +
+                    Math.sin(elapsed * 0.5 + i * 0.021 + j) * 0.28) *
+                    float;
+                positions[k + j] +=
+                  (target - positions[k + j]) * (1 - Math.exp(-dt * 8));
+              }
+              done += a;
+            }
+            points.geometry.attributes.position.needsUpdate = true;
+            if (elapsed - lastUpdate > 0.25) {
+              const percent = Math.round((done / amount.length) * 100);
+              document.getElementById("progress").value = percent;
+              if (percent === 100)
+                status.textContent = "还原完成 · 重新散开，继续探索";
+              lastUpdate = elapsed;
+            }
+          }
+          renderer.render(scene, camera);
+        }
+        fit();
+        demo();
+        animate();
+        window.addEventListener("resize", () => {
+          camera.aspect = innerWidth / innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(innerWidth, innerHeight);
+          fit();
+        });
+        window.addEventListener("blur", () => (pointer = false));
+        window.addEventListener("pagehide", () => {
+          stop();
+          renderer.dispose();
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -8,6 +8,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [新哥特式塔楼城市](../../demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v1](../../demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/index.html) |
+| [新哥特式塔楼城市 · gpt-6.1-sol medium](../../demos/neo-gothic-tower-city/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v1](../../demos/neo-gothic-tower-city/runs/gpt-6-1-sol-medium-r01/prompt.md) | [打开](../../demos/neo-gothic-tower-city/runs/gpt-6-1-sol-medium-r01/index.html) |
 | [雾隐之城 · GPT 6 Default](../../demos/neo-gothic-tower-city/runs/gpt-6-default-r01/Readme.md) | GPT 6 / default | 2026-09 | [v1](../../demos/neo-gothic-tower-city/runs/gpt-6-default-r01/prompt.md) | [打开](../../demos/neo-gothic-tower-city/runs/gpt-6-default-r01/index.html) |
 | [雾隐之城 · GPT 6 High](../../demos/neo-gothic-tower-city/runs/gpt-6-high-r01/Readme.md) | GPT 6 / high | 2026-09-14 | [v1](../../demos/neo-gothic-tower-city/runs/gpt-6-high-r01/prompt.md) | [打开](../../demos/neo-gothic-tower-city/runs/gpt-6-high-r01/index.html) |
 | [新哥特式塔楼城市漫游](../../demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r03/Readme.md) | GPT 6 Luna / max | 2026-09-29 | [v1](../../demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r03/prompt.md) | [打开](../../demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r03/index.html) |
