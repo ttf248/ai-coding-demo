@@ -39,11 +39,12 @@
       viewport: ["adaptive", ...Object.keys(sizes)].includes(p.get("viewport"))
         ? p.get("viewport")
         : "adaptive",
-      tab: ["preview", "prompt", "info"].includes(p.get("tab"))
+      tab: ["preview", "prompt", "info", "conditions"].includes(p.get("tab"))
         ? p.get("tab")
         : "preview",
       source: p.get("source") === "raw" ? "raw" : "task",
       relatedOnly: p.get("related") !== "0",
+      differencesOnly: p.get("differencesOnly") === "1",
       mobile: sides.includes(p.get("mobile")) ? p.get("mobile") : "left",
     };
     if (!state.group) {
@@ -87,15 +88,7 @@
     state.focus = "";
   }
   function runLabel(r) {
-    return (
-      U.modelLabel(data, r) +
-      " · " +
-      U.effortLabel(r.effort) +
-      " · " +
-      (r.runId.match(/r(\d+)$/)
-        ? "第 " + Number(r.runId.match(/r(\d+)$/)[1]) + " 轮"
-        : "轮次未记录")
-    );
+    return U.runSummary(data, r);
   }
   const slots = () => (state.layout === "quad" ? sides : sides.slice(0, 2));
   function visibleSides() {
@@ -166,7 +159,7 @@
   function updateURL() {
     const p = new URLSearchParams();
     for (const [k, v] of Object.entries(state))
-      if (k !== "relatedOnly" && v) p.set(k, v);
+      if (k !== "relatedOnly" && v) p.set(k, k === "differencesOnly" ? "1" : v);
     if (!state.relatedOnly) p.set("related", "0");
     history.pushState(null, "", "?" + p.toString());
   }
@@ -187,6 +180,7 @@
     const shells = [...document.querySelectorAll(".viewport-shell")].filter(
       (el) => el.offsetWidth,
     );
+    if (!shells.length) return;
     const common = Math.min(...shells.map((el) => el.clientWidth));
     for (const shell of shells) {
       const frame = shell.querySelector("iframe");
@@ -212,7 +206,10 @@
     }
   }
   function render() {
-    const visible = visibleSides();
+    const visible = state.tab === "conditions" ? [] : visibleSides();
+    document.querySelector(".compare-grid").hidden = state.tab === "conditions";
+    $("conditions-view").hidden = state.tab !== "conditions";
+    document.querySelector(".mobile-tabs").hidden = state.tab === "conditions";
     document.body.dataset.mode = state.layout;
     document.querySelector(".compare-grid").dataset.layout =
       visible.length === 1 ? "single" : state.layout;
@@ -546,7 +543,115 @@
       });
     }
     renderPicker();
+    if (state.tab === "conditions") renderConditions();
     requestAnimationFrame(resizeFrames);
+  }
+  function renderConditions() {
+    const columns = slots().filter((side) => state[side]);
+    const selected = columns.map(getRun);
+    const valid = selected.filter(Boolean);
+    $("differences-only").checked = state.differencesOnly;
+    $("differences-only").disabled = valid.length < 2;
+    $("conditions-notice").textContent =
+      valid.length < 2
+        ? "至少选择两个有效实验，才能筛选条件差异。"
+        : new Set(valid.map((r) => r.id)).size !== valid.length
+          ? "存在重复实验，请更换重复的一侧。"
+          : "以 A 为基准查看输入关系。条件相同不代表公平性能评测，未知信息保持未记录。";
+    const completeness = {
+      complete: "完整输入",
+      recorded: "原始输入已记录",
+      partial: "输入留存不完整",
+      unknown: "未记录",
+    };
+    const fields = [
+      [
+        "主题",
+        (r) => data.topics.find((t) => t.id === r.topicId)?.title || "未记录",
+      ],
+      ["模型", (r) => U.modelLabel(data, r)],
+      ["推理档位", (r) => U.effortLabel(r.effort)],
+      ["轮次", (r) => U.roundLabel(r)],
+      ["日期", (r) => r.date || "未记录"],
+      ["提示词版本", (r) => r.promptId],
+      [
+        "输入关系（与 A）",
+        (r) =>
+          r.id === state.left
+            ? "基准实验"
+            : U.relation(data, getRun("left"), r),
+      ],
+      [
+        "原始输入指纹",
+        (r) =>
+          r.raw.trim() && r.input.completeness !== "unknown"
+            ? r.rawHash
+            : "未记录",
+      ],
+      ["输入留存", (r) => completeness[r.input.completeness] || "未记录"],
+      ["输入说明", (r) => r.input.notes || "未记录"],
+      ["平台与工具", (r) => r.environment.tool || "未记录"],
+      ["上下文说明", (r) => r.environment.notes || "未记录"],
+      ["产物类型", (r) => r.type],
+      [
+        "预览方式",
+        (r) =>
+          ({
+            static: "静态页面",
+            build: "构建预览",
+            external: "外部部署",
+            none: "无预览",
+          })[r.preview.kind],
+      ],
+      [
+        "网络要求",
+        (r) =>
+          ({ offline: "离线可用", required: "需要联网", unknown: "未记录" })[
+            r.preview.network
+          ] || r.preview.network,
+      ],
+      ["技术栈", (r) => r.stack.join(" / ") || "未记录"],
+      ["人工修改与部署适配", (r) => r.changes.join("\n") || "未记录新增改动"],
+    ];
+    const rows = fields.map(([label, value]) => ({
+      label,
+      values: selected.map((r) => (r ? value(r) : "实验不存在")),
+    }));
+    const filtered =
+      state.differencesOnly && valid.length >= 2
+        ? rows.filter((row) => new Set(row.values).size > 1)
+        : rows;
+    $("conditions-table").innerHTML = columns.length
+      ? '<table class="archive-table conditions-table"><caption>所选实验的已知运行条件</caption><thead><tr><th scope="col">条件</th>' +
+        columns
+          .map(
+            (side, i) =>
+              '<th scope="col">' +
+              labels[side] +
+              (side === "left" ? " · 基准" : "") +
+              "<small>" +
+              e(selected[i] ? U.runSummary(data, selected[i]) : "实验不存在") +
+              "</small></th>",
+          )
+          .join("") +
+        "</tr></thead><tbody>" +
+        filtered
+          .map(
+            (row) =>
+              '<tr><th scope="row">' +
+              e(row.label) +
+              "</th>" +
+              row.values
+                .map(
+                  (value) =>
+                    "<td>" + e(value).replaceAll("\n", "<br>") + "</td>",
+                )
+                .join("") +
+              "</tr>",
+          )
+          .join("") +
+        "</tbody></table>"
+      : '<p class="frame-placeholder">请选择实验开始查看运行条件。</p>';
   }
   document.addEventListener("change", (event) => {
     const el = event.target;
@@ -586,6 +691,7 @@
     } else if (el.id === "viewport") state.viewport = el.value;
     else if (el.id === "prompt-source") state.source = el.value;
     else if (el.id === "related-only") state.relatedOnly = el.checked;
+    else if (el.id === "differences-only") state.differencesOnly = el.checked;
     else return;
     updateURL();
     render();

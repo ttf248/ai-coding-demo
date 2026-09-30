@@ -207,12 +207,26 @@
       )?.href || null
     );
   }
+  const roundLabel = (run) => {
+    const match = run.runId.match(/r(\d+)$/);
+    return match ? "第 " + Number(match[1]) + " 轮" : "轮次未记录";
+  };
+  const runSummary = (data, run) =>
+    modelLabel(data, run) +
+    " · " +
+    effortLabel(run.effort) +
+    " · " +
+    roundLabel(run);
   function setupSelection(data) {
     let selected = [];
     try {
-      selected = JSON.parse(sessionStorage.getItem("archive-selection") || "[]")
-        .filter((id) => data.runs.some((r) => r.id === id))
-        .slice(0, 2);
+      const stored = JSON.parse(
+        sessionStorage.getItem("archive-selection") || "[]",
+      );
+      if (Array.isArray(stored))
+        selected = [...new Set(stored)]
+          .filter((id) => data.runs.some((r) => r.id === id))
+          .slice(0, 4);
     } catch {}
     const tray = document.getElementById("compare-tray"),
       dialog = document.getElementById("replace-dialog");
@@ -225,19 +239,41 @@
     }
     function render() {
       tray.hidden = !selected.length;
+      document.body.classList.toggle("has-selection", !!selected.length);
+      const params = new URLSearchParams();
+      selected.forEach((id, i) =>
+        params.set(["left", "right", "third", "fourth"][i], id),
+      );
+      if (selected.length > 2) params.set("layout", "quad");
       tray.innerHTML =
-        "<div><strong>对比栏 · " +
+        '<div class="selection-items"><strong>对比栏 · ' +
         selected.length +
-        "/2</strong><span>" +
+        "/4</strong>" +
         selected
-          .map((id) => escape(data.runs.find((r) => r.id === id).title))
-          .join(" / ") +
-        '</span></div><div class="actions"><button data-clear>清空</button>' +
-        (selected.length === 2
-          ? '<a class="button primary" href="compare.html?left=' +
-            encodeURIComponent(selected[0]) +
-            "&right=" +
-            encodeURIComponent(selected[1]) +
+          .map((id, i) => {
+            const run = data.runs.find((r) => r.id === id);
+            const topic = data.topics.find((t) => t.id === run.topicId);
+            return (
+              '<div class="selection-item"><div><strong>' +
+              "ABCD"[i] +
+              " · " +
+              escape(runSummary(data, run)) +
+              "</strong><small>" +
+              escape(topic.title) +
+              " · 提示词 " +
+              escape(run.promptId) +
+              '</small></div><button data-remove="' +
+              escape(id) +
+              '" aria-label="移除 ' +
+              escape(runSummary(data, run)) +
+              '">×</button></div>'
+            );
+          })
+          .join("") +
+        '</div><div class="actions"><button data-clear>清空</button>' +
+        (selected.length >= 2
+          ? '<a class="button primary" href="compare.html?' +
+            escape(params.toString()) +
             '">开始对比 ↗</a>'
           : "<span>再选一个实验</span>") +
         "</div>";
@@ -247,35 +283,60 @@
         b.textContent = on ? "移出对比" : "加入对比";
       });
     }
-    document.addEventListener("click", (e) => {
-      const b = e.target.closest("[data-compare]");
+    document.addEventListener("click", (event) => {
+      const b = event.target.closest("[data-compare]");
       if (b) {
         const id = b.dataset.compare;
+        if (!data.runs.some((r) => r.id === id)) return;
         if (selected.includes(id)) selected = selected.filter((v) => v !== id);
-        else if (selected.length < 2) selected.push(id);
+        else if (selected.length < 4) selected.push(id);
         else {
           pending = id;
-          dialog.querySelector('[data-slot="0"]').textContent =
-            "替换左侧：" + data.runs.find((r) => r.id === selected[0]).title;
-          dialog.querySelector('[data-slot="1"]').textContent =
-            "替换右侧：" + data.runs.find((r) => r.id === selected[1]).title;
+          dialog.querySelector(".replacement-slots").innerHTML = selected
+            .map(
+              (id, i) =>
+                '<button data-slot="' +
+                i +
+                '">替换 ' +
+                "ABCD"[i] +
+                "：" +
+                escape(
+                  runSummary(
+                    data,
+                    data.runs.find((r) => r.id === id),
+                  ),
+                ) +
+                "</button>",
+            )
+            .join("");
           dialog.showModal();
           return;
         }
         save();
       }
-      if (e.target.closest("[data-clear]")) {
+      const remove = event.target.closest("[data-remove]");
+      if (remove) {
+        selected = selected.filter((id) => id !== remove.dataset.remove);
+        save();
+      }
+      if (event.target.closest("[data-clear]")) {
         selected = [];
         save();
       }
-      const slot = e.target.closest("[data-slot]");
+      const slot = event.target.closest("[data-slot]");
       if (slot && pending) {
         selected[Number(slot.dataset.slot)] = pending;
         pending = null;
         dialog.close();
         save();
       }
-      if (e.target.closest("[data-cancel]")) dialog.close();
+      if (event.target.closest("[data-cancel]")) {
+        pending = null;
+        dialog.close();
+      }
+    });
+    dialog.addEventListener("close", () => {
+      pending = null;
     });
     render();
     return render;
@@ -296,7 +357,7 @@
       '</p><div class="tags"><span>' +
       escape(modelLabel(data, r)) +
       "</span><span>" +
-      escape(r.effort) +
+      escape(effortLabel(r.effort)) +
       "</span><span>提示词 " +
       escape(r.promptId) +
       '</span></div><div class="card-actions">' +
@@ -326,6 +387,8 @@
     diff,
     previewURL,
     setupSelection,
+    roundLabel,
+    runSummary,
     runCard,
   };
 })(typeof window !== "undefined" ? window : globalThis);
