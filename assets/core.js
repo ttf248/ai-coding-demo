@@ -14,6 +14,42 @@
     );
   const modelLabel = (data, run) =>
     data.models.find((m) => m.id === run.modelId)?.label || "未记录";
+  const modelProvider = (data, run) =>
+    data.models.find((m) => m.id === run.modelId)?.provider ||
+    "未记录 / 多轮混合";
+  function compareModelRuns(data, a, b) {
+    const x = data.models.find((m) => m.id === a.modelId);
+    const y = data.models.find((m) => m.id === b.modelId);
+    const providerOrder =
+      Number(!x?.provider) - Number(!y?.provider) ||
+      (x?.provider || "").localeCompare(y?.provider || "", "en");
+    if (providerOrder) return providerOrder;
+    for (
+      let i = 0;
+      i < Math.max(x?.version?.length || 0, y?.version?.length || 0);
+      i++
+    ) {
+      const order = (y?.version?.[i] || 0) - (x?.version?.[i] || 0);
+      if (order) return order;
+    }
+    const efforts = [
+      "default",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+      "ultra",
+      "unknown",
+    ];
+    return (
+      (x?.variant || "").localeCompare(y?.variant || "", "en") ||
+      a.modelId.localeCompare(b.modelId, "en") ||
+      efforts.indexOf(a.effort) - efforts.indexOf(b.effort) ||
+      (b.date || "").localeCompare(a.date || "") ||
+      a.id.localeCompare(b.id, "en", { numeric: true })
+    );
+  }
   const promptFor = (data, run) =>
     data.prompts.find(
       (p) => p.topicId === run.topicId && p.id === run.promptId,
@@ -247,6 +283,8 @@
   global.ArchiveUI = {
     escape,
     modelLabel,
+    modelProvider,
+    compareModelRuns,
     promptFor,
     relation,
     filterRuns,

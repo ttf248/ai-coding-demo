@@ -236,7 +236,7 @@ MIT
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`bluebook--minimax-m2-unknown-r01`
-- 模型：MiniMaxi M2；推理档位：unknown
+- 模型：MiniMax M2；推理档位：unknown
 - 类型：app；预览：build；网络：required
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=bluebook)
 - 输入记录：已保留历史文档；后续多轮输入、上下文和参考资料未完整留存。

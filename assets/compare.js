@@ -58,20 +58,22 @@
   function pool() {
     const anchor = data.runs.find((r) => r.id === state.left);
     const prompt = groupPrompt() || (anchor && U.promptFor(data, anchor));
-    return U.filterRuns(data, {}).filter((r) => {
-      if (state.scope === "all") return true;
-      if (state.scope === "raw")
-        return (
-          anchor &&
-          anchor.raw.trim() &&
-          anchor.input.completeness !== "unknown" &&
-          r.input.completeness !== "unknown" &&
-          r.rawHash === anchor.rawHash
-        );
-      if (!prompt) return true;
-      if (state.scope === "topic") return r.topicId === prompt.topicId;
-      return U.promptFor(data, r)?.hash === prompt.hash;
-    });
+    return U.filterRuns(data, {})
+      .sort((a, b) => U.compareModelRuns(data, a, b))
+      .filter((r) => {
+        if (state.scope === "all") return true;
+        if (state.scope === "raw")
+          return (
+            anchor &&
+            anchor.raw.trim() &&
+            anchor.input.completeness !== "unknown" &&
+            r.input.completeness !== "unknown" &&
+            r.rawHash === anchor.rawHash
+          );
+        if (!prompt) return true;
+        if (state.scope === "topic") return r.topicId === prompt.topicId;
+        return U.promptFor(data, r)?.hash === prompt.hash;
+      });
   }
   function fillGroup() {
     state.scope = "task";
@@ -111,7 +113,17 @@
     $("scope").value = state.scope;
     const q = $("model-search").value.trim().toLocaleLowerCase();
     const runs = pool().filter((r) =>
-      (runLabel(r) + " " + r.title + " " + (r.date || ""))
+      (
+        runLabel(r) +
+        " " +
+        U.modelProvider(data, r) +
+        " " +
+        r.modelId +
+        " " +
+        r.title +
+        " " +
+        (r.date || "")
+      )
         .toLocaleLowerCase()
         .includes(q),
     );
@@ -120,12 +132,25 @@
       `${runs.length} 条实验 · 点击放入 ${labels[side]}`;
     $("model-list").innerHTML =
       runs
-        .map((r) => {
+        .map((r, i) => {
+          const provider = U.modelProvider(data, r);
+          const heading =
+            i === 0 || provider !== U.modelProvider(data, runs[i - 1])
+              ? '<h3 class="model-provider">' +
+                e(provider) +
+                " <small>" +
+                runs.filter((item) => U.modelProvider(data, item) === provider)
+                  .length +
+                " 条实验</small></h3>"
+              : "";
           const occupied = slots()
             .filter((s) => state[s] === r.id)
             .map((s) => labels[s])
             .join(" / ");
-          return `<button class="model-choice" data-choice="${e(r.id)}" ${slots().some((s) => s !== side && state[s] === r.id) ? "disabled" : ""}><strong>${e(runLabel(r))}</strong><span>${e(r.title)} · ${e(r.date || "日期未记录")}</span><small>${occupied ? "已选 " + occupied + " · " : ""}${seen.has(r.id) ? "已浏览 · " : ""}${r.preview.kind === "none" ? "无预览" : r.preview.embed ? "可预览" : "独立打开"} · ${r.input.completeness === "complete" ? "完整输入" : "输入留存不完整"}</small></button>`;
+          return (
+            heading +
+            `<button class="model-choice" data-choice="${e(r.id)}" ${slots().some((s) => s !== side && state[s] === r.id) ? "disabled" : ""}><strong>${e(runLabel(r))}</strong><span>${e(r.title)} · ${e(r.date || "日期未记录")}</span><small>${occupied ? "已选 " + occupied + " · " : ""}${seen.has(r.id) ? "已浏览 · " : ""}${r.preview.kind === "none" ? "无预览" : r.preview.embed ? "可预览" : "独立打开"} · ${r.input.completeness === "complete" ? "完整输入" : "输入留存不完整"}</small></button>`
+          );
         })
         .join("") ||
       '<p class="frame-placeholder">没有匹配实验，请调整范围或搜索。</p>';
@@ -255,7 +280,7 @@
                   ? 1
                   : 2
             : 0;
-        return rank(x) - rank(y);
+        return rank(x) - rank(y) || U.compareModelRuns(data, x, y);
       });
       const options =
         '<option value="">选择实验…</option>' +

@@ -20,6 +20,26 @@ const data = { ...all, runs: all.runs.filter((r) => migrationIds.has(r.id)) };
 const ctx = {};
 vm.runInNewContext(read("assets/core.js"), ctx);
 const U = ctx.ArchiveUI;
+test("comparison groups providers, sorts numeric versions descending and leaves unknown last", () => {
+  const models = [
+    { id: "older", provider: "OpenAI", version: [6, 9], variant: "Sol" },
+    { id: "newer", provider: "OpenAI", version: [6, 10], variant: "Sol" },
+    { id: "other", provider: "Anthropic", version: [4], variant: "" },
+    { id: "unknown", provider: null, version: [], variant: "" },
+  ];
+  const runs = models.map((m) => ({
+    id: m.id,
+    modelId: m.id,
+    effort: "high",
+    date: null,
+  }));
+  assert.deepEqual(
+    runs.sort((a, b) => U.compareModelRuns({ models }, a, b)).map((r) => r.id),
+    ["other", "newer", "older", "unknown"],
+  );
+  assert.equal(U.modelLabel(all, { modelId: "gpt-6-1-sol" }), "GPT 6.1 Sol");
+  assert.equal(U.modelLabel(all, { modelId: "minimax-m2" }), "MiniMax M2");
+});
 test("archive migration preserves record counts and task relations", () => {
   assert.ok(data.topics.length >= 8);
   assert.equal(data.runs.length, 15);

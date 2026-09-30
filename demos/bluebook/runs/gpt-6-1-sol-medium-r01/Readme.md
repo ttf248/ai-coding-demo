@@ -22,7 +22,7 @@ npm ci，然后 npm run dev；npm run build 生成 dist。仓库预览位于 pre
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`bluebook--gpt-6-1-sol-medium-r01`
-- 模型：gpt-6.1-sol；推理档位：medium
+- 模型：GPT 6.1 Sol；推理档位：medium
 - 类型：app；预览：build；网络：offline
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=bluebook)
 - 输入记录：保存用户本轮原始请求、仓库规则与读取的任务原文。当前会话逐个执行，并非独立会话；系统/开发者上下文、工具输出及前序案例上下文未逐字复制，不能视为独立同输入评测。
