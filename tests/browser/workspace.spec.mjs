@@ -15,6 +15,32 @@ test("model picker groups vendors and sorts versions on desktop and mobile", asy
   page,
 }) => {
   await prepare(page);
+  await page.locator("#related-only").uncheck();
+  for (const side of ["left", "right"]) {
+    expect(
+      await page
+        .locator(`#run-${side} optgroup`)
+        .evaluateAll((groups) => groups.map((g) => g.label)),
+    ).toEqual(["Anthropic", "MiniMax", "OpenAI", "未记录 / 多轮混合"]);
+    const ids = await page
+      .locator(`#run-${side} option[value]:not([value=""])`)
+      .evaluateAll((options) => options.map((o) => o.value));
+    const sorted = await page.evaluate(
+      (ids) =>
+        ids.slice().sort((a, b) =>
+          window.ArchiveUI.compareModelRuns(
+            window.ARCHIVE,
+            window.ARCHIVE.runs.find((r) => r.id === a),
+            window.ARCHIVE.runs.find((r) => r.id === b),
+          ),
+        ),
+      ids,
+    );
+    expect(ids).toEqual(sorted);
+    await expect(page.locator(`#run-${side}`)).not.toContainText(
+      " · max · r01",
+    );
+  }
   await page.locator("#pick-models").click();
   await page.locator("#scope").selectOption("all");
   await expect(page.locator(".model-provider")).toHaveText([
@@ -48,7 +74,7 @@ test("model picker groups vendors and sorts versions on desktop and mobile", asy
   await page.locator("#model-search").fill("gpt-6.1-sol");
   await expect(page.locator(".model-provider")).toHaveCount(1);
   await expect(page.locator(".model-choice").first()).toContainText(
-    "GPT 6.1 Sol",
+    "GPT-6.1 Sol",
   );
   await page.locator("#model-search").fill("MiniMax");
   await expect(page.locator(".model-provider")).toHaveCount(1);

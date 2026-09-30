@@ -17,9 +17,7 @@
   const modelProvider = (data, run) =>
     data.models.find((m) => m.id === run.modelId)?.provider ||
     "未记录 / 多轮混合";
-  function compareModelRuns(data, a, b) {
-    const x = data.models.find((m) => m.id === a.modelId);
-    const y = data.models.find((m) => m.id === b.modelId);
+  function compareModels(x, y) {
     const providerOrder =
       Number(!x?.provider) - Number(!y?.provider) ||
       (x?.provider || "").localeCompare(y?.provider || "", "en");
@@ -32,6 +30,42 @@
       const order = (y?.version?.[i] || 0) - (x?.version?.[i] || 0);
       if (order) return order;
     }
+    return (
+      (x?.variant || "").localeCompare(y?.variant || "", "en") ||
+      (x?.id || "").localeCompare(y?.id || "", "en")
+    );
+  }
+  const effortLabel = (effort) =>
+    ({
+      default: "默认",
+      low: "低",
+      medium: "中",
+      high: "高",
+      xhigh: "超高",
+      max: "最大",
+      ultra: "极高",
+      unknown: "档位未记录",
+    })[effort] || effort;
+  function groupedOptions(items, groupFor, optionFor) {
+    let previous = null;
+    let html = "";
+    for (const item of items) {
+      const group = groupFor(item);
+      if (group !== previous) {
+        if (previous !== null) html += "</optgroup>";
+        html += '<optgroup label="' + escape(group) + '">';
+        previous = group;
+      }
+      html += optionFor(item);
+    }
+    return html + (previous !== null ? "</optgroup>" : "");
+  }
+  function compareModelRuns(data, a, b) {
+    const order = compareModels(
+      data.models.find((m) => m.id === a.modelId),
+      data.models.find((m) => m.id === b.modelId),
+    );
+    if (order) return order;
     const efforts = [
       "default",
       "low",
@@ -43,8 +77,6 @@
       "unknown",
     ];
     return (
-      (x?.variant || "").localeCompare(y?.variant || "", "en") ||
-      a.modelId.localeCompare(b.modelId, "en") ||
       efforts.indexOf(a.effort) - efforts.indexOf(b.effort) ||
       (b.date || "").localeCompare(a.date || "") ||
       a.id.localeCompare(b.id, "en", { numeric: true })
@@ -285,6 +317,9 @@
     modelLabel,
     modelProvider,
     compareModelRuns,
+    compareModels,
+    effortLabel,
+    groupedOptions,
     promptFor,
     relation,
     filterRuns,

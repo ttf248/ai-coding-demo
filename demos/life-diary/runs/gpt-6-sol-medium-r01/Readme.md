@@ -14,7 +14,7 @@
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`life-diary--gpt-6-sol-medium-r01`
-- 模型：GPT 6 Sol；推理档位：medium
+- 模型：GPT-6 Sol；推理档位：medium
 - 类型：prototype；预览：static；网络：required
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=life-diary)
 - 输入记录：本轮按存档任务正文原文执行。 本轮由用户统一指定全部主题、模型名 gpt-6-sol、medium 档位及当前会话执行。

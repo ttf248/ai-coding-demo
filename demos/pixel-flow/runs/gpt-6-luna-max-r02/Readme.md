@@ -8,7 +8,7 @@
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`pixel-flow--gpt-6-luna-max-r02`
-- 模型：GPT 6 Luna；推理档位：max
+- 模型：GPT-6 Luna；推理档位：max
 - 类型：prototype；预览：static；网络：required
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=pixel-flow)
 - 输入记录：提示词 v1 中英文原文完整快照；未附加历史对话上下文。

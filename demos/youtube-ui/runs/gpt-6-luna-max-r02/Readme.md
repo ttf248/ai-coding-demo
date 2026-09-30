@@ -10,7 +10,7 @@
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`youtube-ui--gpt-6-luna-max-r02`
-- 模型：GPT 6 Luna；推理档位：max
+- 模型：GPT-6 Luna；推理档位：max
 - 类型：prototype；预览：static；网络：required
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=youtube-ui)
 - 输入记录：原提示词和主题说明已保存；主题说明补足五个页面模块，未提供更详细的 APP 业务规格。

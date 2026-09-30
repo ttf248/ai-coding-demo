@@ -16,7 +16,7 @@
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`bluebook--gpt-5-6-luna-max-r01`
-- 模型：GPT 5.6 Luna；推理档位：max
+- 模型：GPT-5.6 Luna；推理档位：max
 - 类型：app；预览：build；网络：offline
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=bluebook)
 - 输入记录：完整输入记录为提示词 v2 原文；未附加系统提示、图片或多轮输入。

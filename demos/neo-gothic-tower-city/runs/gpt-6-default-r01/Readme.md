@@ -20,7 +20,7 @@
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`neo-gothic-tower-city--gpt-6-default-r01`
-- 模型：GPT 6；推理档位：default
+- 模型：GPT-6；推理档位：default
 - 类型：single-html；预览：static；网络：offline
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=neo-gothic-tower-city)
 - 输入记录：保留文档中的原始输入；其他会话上下文未记录。

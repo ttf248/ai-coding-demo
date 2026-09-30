@@ -42,9 +42,13 @@
     "category",
     data.categories.map((c) => [c.id, c.label]),
   );
-  options(
-    "model",
-    data.models.map((m) => [m.id, m.label]),
+  $("model").insertAdjacentHTML(
+    "beforeend",
+    U.groupedOptions(
+      [...data.models].sort(U.compareModels),
+      (m) => m.provider || "未记录 / 多轮混合",
+      (m) => '<option value="' + e(m.id) + '">' + e(m.label) + "</option>",
+    ),
   );
   options(
     "type",
