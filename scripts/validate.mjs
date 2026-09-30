@@ -67,6 +67,20 @@ for (const key of ["models", "categories"]) {
       `Invalid ${key} entry`,
     );
 }
+for (const model of catalog.models) {
+  check(
+    (model.id === "unknown"
+      ? model.provider === null
+      : typeof model.provider === "string" && model.provider.length > 0) &&
+      Array.isArray(model.version) &&
+      (model.id === "unknown"
+        ? model.version.length === 0
+        : model.version.length > 0) &&
+      model.version.every((part) => Number.isInteger(part) && part >= 0) &&
+      typeof model.variant === "string",
+    `Invalid model display metadata: ${model.id}`,
+  );
+}
 for (const t of catalog.topics) {
   check(t.directory === `demos/${t.id}`, `Topic directory mismatch ${t.id}`);
   check(

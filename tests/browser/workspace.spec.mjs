@@ -11,6 +11,63 @@ async function prepare(page) {
   await page.goto("compare.html?group=bluebook%2Fv1");
 }
 
+test("model picker groups vendors and sorts versions on desktop and mobile", async ({
+  page,
+}) => {
+  await prepare(page);
+  await page.locator("#pick-models").click();
+  await page.locator("#scope").selectOption("all");
+  await expect(page.locator(".model-provider")).toHaveText([
+    /Anthropic/,
+    /MiniMax/,
+    /OpenAI/,
+    /未记录/,
+  ]);
+  const inspect = () =>
+    page.locator(".model-choice").evaluateAll((buttons) => {
+      const d = window.ARCHIVE;
+      return buttons.map((b) => {
+        const r = d.runs.find((r) => r.id === b.dataset.choice);
+        const m = d.models.find((m) => m.id === r.modelId);
+        return { provider: m.provider, version: m.version };
+      });
+    });
+  const rows = await inspect();
+  for (let i = 1; i < rows.length; i++) {
+    const a = rows[i - 1],
+      b = rows[i];
+    if (a.provider !== b.provider) continue;
+    for (let j = 0; j < Math.max(a.version.length, b.version.length); j++) {
+      const diff = (a.version[j] || 0) - (b.version[j] || 0);
+      if (diff) {
+        expect(diff).toBeGreaterThan(0);
+        break;
+      }
+    }
+  }
+  await page.locator("#model-search").fill("gpt-6.1-sol");
+  await expect(page.locator(".model-provider")).toHaveCount(1);
+  await expect(page.locator(".model-choice").first()).toContainText(
+    "GPT 6.1 Sol",
+  );
+  await page.locator("#model-search").fill("MiniMax");
+  await expect(page.locator(".model-provider")).toHaveCount(1);
+  await expect(page.locator(".model-choice").first()).toContainText(
+    "MiniMax M3.1 Flash Preview",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await page
+      .locator("#model-picker")
+      .evaluate((el) => el.scrollWidth <= el.clientWidth),
+  ).toBe(true);
+});
+
 test("prompt workspace supports cycling, searchable selection, four panels and URL restore", async ({
   page,
 }) => {

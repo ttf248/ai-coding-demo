@@ -26,7 +26,7 @@ Tailwind Play CDN 处理样式，Unsplash 提供摄影，Lucide Static 提供图
 ## 当前归档信息（自动生成）
 
 - 实验 ID：`life-diary--gpt-6-1-sol-max-r01`
-- 模型：gpt-6.1-sol；推理档位：max
+- 模型：GPT 6.1 Sol；推理档位：max
 - 类型：prototype；预览：static；网络：required
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=life-diary)
 - 输入记录：保存用户原始要求及基线任务正文；当前会话顺序执行。完整系统上下文与前序工具输出未导出，参见 docs/experiments/gpt-6-1-sol-max。
