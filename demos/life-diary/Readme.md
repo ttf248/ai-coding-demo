@@ -8,6 +8,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [生活情绪日记](../../demos/life-diary/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v1](../../demos/life-diary/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../demos/life-diary/runs/gpt-5-6-luna-max-r01/index.html) |
+| [栖心 · AI 情绪日记原型](../../demos/life-diary/runs/gpt-6-1-sol-max-r01/Readme.md) | gpt-6.1-sol / max | 2026-09-30 | [v1](../../demos/life-diary/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](../../demos/life-diary/runs/gpt-6-1-sol-max-r01/index.html) |
 | [生活情绪日记 · gpt-6.1-sol medium](../../demos/life-diary/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v1](../../demos/life-diary/runs/gpt-6-1-sol-medium-r01/prompt.md) | [打开](../../demos/life-diary/runs/gpt-6-1-sol-medium-r01/index.html) |
 | [生活情绪日记移动端原型](../../demos/life-diary/runs/gpt-6-luna-max-r02/Readme.md) | GPT 6 Luna / max | 2026-09-29 | [v1](../../demos/life-diary/runs/gpt-6-luna-max-r02/prompt.md) | [打开](../../demos/life-diary/runs/gpt-6-luna-max-r02/index.html) |
 | [AI 情绪日记原型](../../demos/life-diary/runs/gpt-6-sol-medium-r01/Readme.md) | GPT 6 Sol / medium | 2026-09-30 | [v1](../../demos/life-diary/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](../../demos/life-diary/runs/gpt-6-sol-medium-r01/index.html) |

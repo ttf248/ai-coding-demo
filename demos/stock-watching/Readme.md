@@ -8,6 +8,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [自选股实战](../../demos/stock-watching/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v1](../../demos/stock-watching/runs/gpt-5-6-luna-max-r01/prompt.md) | 无静态预览 |
+| [行情台 · 多市场自选股](../../demos/stock-watching/runs/gpt-6-1-sol-max-r01/Readme.md) | gpt-6.1-sol / max | 2026-09-30 | [v1](../../demos/stock-watching/runs/gpt-6-1-sol-max-r01/prompt.md) | 无静态预览 |
 | [自选股实战 · gpt-6.1-sol medium](../../demos/stock-watching/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v1](../../demos/stock-watching/runs/gpt-6-1-sol-medium-r01/prompt.md) | 无静态预览 |
 | [自选股 React 与 Go 全栈样例](../../demos/stock-watching/runs/gpt-6-luna-max-r02/Readme.md) | GPT 6 Luna / max | 2026-09-29 | [v1](../../demos/stock-watching/runs/gpt-6-luna-max-r02/prompt.md) | 无静态预览 |
 | [自选股市场看板](../../demos/stock-watching/runs/gpt-6-sol-medium-r01/Readme.md) | GPT 6 Sol / medium | 2026-09-30 | [v1](../../demos/stock-watching/runs/gpt-6-sol-medium-r01/prompt.md) | 无静态预览 |

@@ -29,8 +29,8 @@
 ## 项目统计
 
 - 实验主题：8
-- 实验记录：63
-- 可预览记录：55
+- 实验记录：71
+- 可预览记录：62
 - 技术主题：14
 
 ## 实验目录
@@ -43,6 +43,7 @@
 |---|---|---|---|---|
 | [小蓝书](demos/bluebook/runs/claude-4-0-unknown-r01/Readme.md) | Claude 4.0 / unknown | 2025-05 | [v2](demos/bluebook/runs/claude-4-0-unknown-r01/prompt.md) | [打开](previews/bluebook/claude-4-0-unknown-r01/index.html) |
 | [小蓝书 · 瀑布流社区](demos/bluebook/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v2](demos/bluebook/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](previews/bluebook/gpt-5-6-luna-max-r01/index.html) |
+| [小蓝书 · React 瀑布流社区](demos/bluebook/runs/gpt-6-1-sol-max-r01/Readme.md) | gpt-6.1-sol / max | 2026-09-30 | [v2](demos/bluebook/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](previews/bluebook/gpt-6-1-sol-max-r01/index.html) |
 | [小蓝书 · 瀑布流社区 · gpt-6.1-sol medium](demos/bluebook/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v2](demos/bluebook/runs/gpt-6-1-sol-medium-r01/prompt.md) | [打开](previews/bluebook/gpt-6-1-sol-medium-r01/index.html) |
 | [小蓝书瀑布流社区 v2](demos/bluebook/runs/gpt-6-luna-max-r02/Readme.md) | GPT 6 Luna / max | 2026-09-29 | [v2](demos/bluebook/runs/gpt-6-luna-max-r02/prompt.md) | [打开](previews/bluebook/gpt-6-luna-max-r02/index.html) |
 | [小蓝书瀑布流](demos/bluebook/runs/gpt-6-sol-medium-r01/Readme.md) | GPT 6 Sol / medium | 2026-09-30 | [v2](demos/bluebook/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](previews/bluebook/gpt-6-sol-medium-r01/index.html) |
@@ -60,6 +61,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [生活情绪日记](demos/life-diary/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v1](demos/life-diary/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-5-6-luna-max-r01/index.html) |
+| [栖心 · AI 情绪日记原型](demos/life-diary/runs/gpt-6-1-sol-max-r01/Readme.md) | gpt-6.1-sol / max | 2026-09-30 | [v1](demos/life-diary/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-6-1-sol-max-r01/index.html) |
 | [生活情绪日记 · gpt-6.1-sol medium](demos/life-diary/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v1](demos/life-diary/runs/gpt-6-1-sol-medium-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-6-1-sol-medium-r01/index.html) |
 | [生活情绪日记移动端原型](demos/life-diary/runs/gpt-6-luna-max-r02/Readme.md) | GPT 6 Luna / max | 2026-09-29 | [v1](demos/life-diary/runs/gpt-6-luna-max-r02/prompt.md) | [打开](demos/life-diary/runs/gpt-6-luna-max-r02/index.html) |
 | [AI 情绪日记原型](demos/life-diary/runs/gpt-6-sol-medium-r01/Readme.md) | GPT 6 Sol / medium | 2026-09-30 | [v1](demos/life-diary/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-6-sol-medium-r01/index.html) |
@@ -74,6 +76,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [冥想 iOS App](demos/meditation/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v1](demos/meditation/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/meditation/runs/gpt-5-6-luna-max-r01/index.html) |
+| [静屿 · 冥想 iOS 原型](demos/meditation/runs/gpt-6-1-sol-max-r01/Readme.md) | gpt-6.1-sol / max | 2026-09-30 | [v1](demos/meditation/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/meditation/runs/gpt-6-1-sol-max-r01/index.html) |
 | [冥想 iOS App · gpt-6.1-sol medium](demos/meditation/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v1](demos/meditation/runs/gpt-6-1-sol-medium-r01/prompt.md) | [打开](demos/meditation/runs/gpt-6-1-sol-medium-r01/index.html) |
 | [冥想 iOS App 原型](demos/meditation/runs/gpt-6-luna-max-r02/Readme.md) | GPT 6 Luna / max | 2026-09-29 | [v1](demos/meditation/runs/gpt-6-luna-max-r02/prompt.md) | [打开](demos/meditation/runs/gpt-6-luna-max-r02/index.html) |
 | [冥想 iOS 原型](demos/meditation/runs/gpt-6-sol-medium-r01/Readme.md) | GPT 6 Sol / medium | 2026-09-30 | [v1](demos/meditation/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](demos/meditation/runs/gpt-6-sol-medium-r01/index.html) |
@@ -88,6 +91,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [新哥特式塔楼城市](demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v1](demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/index.html) |
+| [夜潮之城 · 新哥特式塔楼城市](demos/neo-gothic-tower-city/runs/gpt-6-1-sol-max-r01/Readme.md) | gpt-6.1-sol / max | 2026-09-30 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-1-sol-max-r01/index.html) |
 | [新哥特式塔楼城市 · gpt-6.1-sol medium](demos/neo-gothic-tower-city/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-1-sol-medium-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-1-sol-medium-r01/index.html) |
 | [雾隐之城 · GPT 6 Default](demos/neo-gothic-tower-city/runs/gpt-6-default-r01/Readme.md) | GPT 6 / default | 2026-09 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-default-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-default-r01/index.html) |
 | [雾隐之城 · GPT 6 High](demos/neo-gothic-tower-city/runs/gpt-6-high-r01/Readme.md) | GPT 6 / high | 2026-09-14 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-high-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-high-r01/index.html) |
@@ -103,6 +107,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [Pixel Flow](demos/pixel-flow/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v1](demos/pixel-flow/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-5-6-luna-max-r01/index.html) |
+| [Pixel Flow · 手势图片重构](demos/pixel-flow/runs/gpt-6-1-sol-max-r01/Readme.md) | gpt-6.1-sol / max | 2026-09-30 | [v1](demos/pixel-flow/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-1-sol-max-r01/index.html) |
 | [Pixel Flow · gpt-6.1-sol medium](demos/pixel-flow/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v1](demos/pixel-flow/runs/gpt-6-1-sol-medium-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-1-sol-medium-r01/index.html) |
 | [Pixel Flow 图片手势还原](demos/pixel-flow/runs/gpt-6-luna-max-r02/Readme.md) | GPT 6 Luna / max | 2026-09-29 | [v1](demos/pixel-flow/runs/gpt-6-luna-max-r02/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-luna-max-r02/index.html) |
 | [图片粒子与手势还原](demos/pixel-flow/runs/gpt-6-sol-medium-r01/Readme.md) | GPT 6 Sol / medium | 2026-09-30 | [v1](demos/pixel-flow/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-sol-medium-r01/index.html) |
@@ -117,6 +122,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [自选股实战](demos/stock-watching/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v1](demos/stock-watching/runs/gpt-5-6-luna-max-r01/prompt.md) | 无静态预览 |
+| [行情台 · 多市场自选股](demos/stock-watching/runs/gpt-6-1-sol-max-r01/Readme.md) | gpt-6.1-sol / max | 2026-09-30 | [v1](demos/stock-watching/runs/gpt-6-1-sol-max-r01/prompt.md) | 无静态预览 |
 | [自选股实战 · gpt-6.1-sol medium](demos/stock-watching/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v1](demos/stock-watching/runs/gpt-6-1-sol-medium-r01/prompt.md) | 无静态预览 |
 | [自选股 React 与 Go 全栈样例](demos/stock-watching/runs/gpt-6-luna-max-r02/Readme.md) | GPT 6 Luna / max | 2026-09-29 | [v1](demos/stock-watching/runs/gpt-6-luna-max-r02/prompt.md) | 无静态预览 |
 | [自选股市场看板](demos/stock-watching/runs/gpt-6-sol-medium-r01/Readme.md) | GPT 6 Sol / medium | 2026-09-30 | [v1](demos/stock-watching/runs/gpt-6-sol-medium-r01/prompt.md) | 无静态预览 |
@@ -132,6 +138,7 @@
 |---|---|---|---|---|
 | [体素微缩建筑工地](demos/voxel-construction-site/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v1](demos/voxel-construction-site/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-5-6-luna-max-r01/index.html) |
 | [筑境工地 · GPT 5.6 Sol High](demos/voxel-construction-site/runs/gpt-5-6-sol-high-r01/Readme.md) | GPT 5.6 Sol / high | 2026-09-15 | [v1](demos/voxel-construction-site/runs/gpt-5-6-sol-high-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-5-6-sol-high-r01/index.html) |
+| [工作台 07 · 体素施工沙盘](demos/voxel-construction-site/runs/gpt-6-1-sol-max-r01/Readme.md) | gpt-6.1-sol / max | 2026-09-30 | [v1](demos/voxel-construction-site/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-1-sol-max-r01/index.html) |
 | [体素微缩建筑工地 · gpt-6.1-sol medium](demos/voxel-construction-site/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v1](demos/voxel-construction-site/runs/gpt-6-1-sol-medium-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-1-sol-medium-r01/index.html) |
 | [筑间工地 · GPT 6 Astra Low](demos/voxel-construction-site/runs/gpt-6-astra-low-r01/Readme.md) | GPT 6 Astra / low | 2026-09-15 | [v1](demos/voxel-construction-site/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-astra-low-r01/index.html) |
 | [筑物工地 · GPT 6 Astra Xhigh](demos/voxel-construction-site/runs/gpt-6-astra-xhigh-r01/Readme.md) | GPT 6 Astra / xhigh | 2026-09-16 | [v1](demos/voxel-construction-site/runs/gpt-6-astra-xhigh-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-astra-xhigh-r01/index.html) |
@@ -147,6 +154,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [YouTube UI 模块](demos/youtube-ui/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v1](demos/youtube-ui/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-5-6-luna-max-r01/index.html) |
+| [YouTube · 五个功能模块原型](demos/youtube-ui/runs/gpt-6-1-sol-max-r01/Readme.md) | gpt-6.1-sol / max | 2026-09-30 | [v1](demos/youtube-ui/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-1-sol-max-r01/index.html) |
 | [YouTube UI 模块 · gpt-6.1-sol medium](demos/youtube-ui/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v1](demos/youtube-ui/runs/gpt-6-1-sol-medium-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-1-sol-medium-r01/index.html) |
 | [YouTube UI 五模块原型](demos/youtube-ui/runs/gpt-6-luna-max-r02/Readme.md) | GPT 6 Luna / max | 2026-09-29 | [v1](demos/youtube-ui/runs/gpt-6-luna-max-r02/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-luna-max-r02/index.html) |
 | [YouTube UI 模块原型](demos/youtube-ui/runs/gpt-6-sol-medium-r01/Readme.md) | GPT 6 Sol / medium | 2026-09-30 | [v1](demos/youtube-ui/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-sol-medium-r01/index.html) |
