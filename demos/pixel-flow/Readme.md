@@ -8,6 +8,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [Pixel Flow](../../demos/pixel-flow/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v1](../../demos/pixel-flow/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../demos/pixel-flow/runs/gpt-5-6-luna-max-r01/index.html) |
+| [Pixel Flow · gpt-6.1-sol medium](../../demos/pixel-flow/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v1](../../demos/pixel-flow/runs/gpt-6-1-sol-medium-r01/prompt.md) | [打开](../../demos/pixel-flow/runs/gpt-6-1-sol-medium-r01/index.html) |
 | [Pixel Flow 图片手势还原](../../demos/pixel-flow/runs/gpt-6-luna-max-r02/Readme.md) | GPT 6 Luna / max | 2026-09-29 | [v1](../../demos/pixel-flow/runs/gpt-6-luna-max-r02/prompt.md) | [打开](../../demos/pixel-flow/runs/gpt-6-luna-max-r02/index.html) |
 | [图片粒子与手势还原](../../demos/pixel-flow/runs/gpt-6-sol-medium-r01/Readme.md) | GPT 6 Sol / medium | 2026-09-30 | [v1](../../demos/pixel-flow/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](../../demos/pixel-flow/runs/gpt-6-sol-medium-r01/index.html) |
 | [图片粒子化与手势还原应用](../../demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-09-29 | [v1](../../demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](../../demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
