@@ -8,6 +8,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [YouTube UI 模块](../../demos/youtube-ui/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT 5.6 Luna / max | 2026-09-29 | [v1](../../demos/youtube-ui/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../demos/youtube-ui/runs/gpt-5-6-luna-max-r01/index.html) |
+| [YouTube · 五个功能模块原型](../../demos/youtube-ui/runs/gpt-6-1-sol-max-r01/Readme.md) | gpt-6.1-sol / max | 2026-09-30 | [v1](../../demos/youtube-ui/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](../../demos/youtube-ui/runs/gpt-6-1-sol-max-r01/index.html) |
 | [YouTube UI 模块 · gpt-6.1-sol medium](../../demos/youtube-ui/runs/gpt-6-1-sol-medium-r01/Readme.md) | gpt-6.1-sol / medium | 2026-09-30 | [v1](../../demos/youtube-ui/runs/gpt-6-1-sol-medium-r01/prompt.md) | [打开](../../demos/youtube-ui/runs/gpt-6-1-sol-medium-r01/index.html) |
 | [YouTube UI 五模块原型](../../demos/youtube-ui/runs/gpt-6-luna-max-r02/Readme.md) | GPT 6 Luna / max | 2026-09-29 | [v1](../../demos/youtube-ui/runs/gpt-6-luna-max-r02/prompt.md) | [打开](../../demos/youtube-ui/runs/gpt-6-luna-max-r02/index.html) |
 | [YouTube UI 模块原型](../../demos/youtube-ui/runs/gpt-6-sol-medium-r01/Readme.md) | GPT 6 Sol / medium | 2026-09-30 | [v1](../../demos/youtube-ui/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](../../demos/youtube-ui/runs/gpt-6-sol-medium-r01/index.html) |
