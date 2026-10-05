@@ -63,7 +63,7 @@
       )
       .join("") +
     '</select></label><div class="segments" aria-label="主题内容"><button data-topic-view="list">浏览实验</button><button data-topic-view="matrix">档位覆盖</button><button data-topic-view="prompt">任务正文</button></div></div>' +
-    '<section class="topic-context" aria-label="当前任务范围"><div><span class="eyebrow">任务与输入</span><h2 id="topic-context-title"></h2><p id="topic-context-description"></p></div><button data-read-task>阅读任务正文 →</button></section>' +
+    '<section class="topic-context" aria-label="当前任务范围"><h2 id="topic-context-title"></h2><button data-read-task>阅读任务正文 →</button></section>' +
     '<div class="topic-filters" id="topic-filters"><label class="topic-search">搜索实验<input id="topic-search" type="search" placeholder="模型、档位或实验描述" autocomplete="off"></label><label>模型<select id="topic-model"><option value="">全部模型</option>' +
     U.groupedOptions(
       models,
@@ -157,10 +157,7 @@
     const task = prompts.find((p) => p.id === promptId);
     document.getElementById("topic-context-title").textContent = task
       ? task.title + " · " + task.id
-      : prompts.length + " 个任务版本，实验按版本分组";
-    document.getElementById("topic-context-description").textContent = task
-      ? task.text.slice(0, 180) + (task.text.length > 180 ? "…" : "")
-      : "先浏览实现，或选择一个提示词版本缩小范围。同一任务正文的实验也可能有不同原始输入与上下文。";
+      : "任务正文 · " + prompts.length + " 个版本";
     document.getElementById("topic-count").textContent =
       view === "prompt"
         ? prompts.filter((p) => !promptId || p.id === promptId).length +
@@ -281,55 +278,42 @@
             items.length +
             ' 条实验</span></div><a href="compare.html?group=' +
             encodeURIComponent(topic.id + "/" + p.id) +
-            '&tab=prompt">比较此版本 →</a></header><div class="topic-run-grid">' +
+            '&tab=prompt">比较此版本 →</a></header><p class="topic-table-hint">左右滑动查看日期与操作 →</p><div class="topic-table-scroll" tabindex="0" aria-label="实验表格，可横向滚动"><table class="topic-runs-table"><caption class="sr-only">' +
+            e(p.title) +
+            '的实验记录</caption><thead><tr><th scope="col">模型</th><th scope="col">推理档位</th><th scope="col">轮次</th><th scope="col">日期</th><th scope="col">操作</th></tr></thead><tbody>' +
             items
               .map((r) => {
                 const href = U.previewURL(r);
                 return (
-                  '<article class="topic-run-card" id="run-' +
+                  '<tr class="topic-run-row" id="run-' +
                   e(r.id) +
-                  '"><div class="topic-run-top"><span class="eyebrow">' +
-                  e(U.modelProvider(data, r)) +
-                  '</span><span class="pill">' +
-                  e(
-                    r.preview.kind === "none"
-                      ? "无预览"
-                      : r.preview.kind === "external"
-                        ? "外部预览"
-                        : "可预览",
-                  ) +
-                  "</span></div><h3>" +
+                  '"><th scope="row" class="topic-run-model">' +
                   e(U.modelLabel(data, r)) +
-                  '</h3><div class="topic-run-meta"><span>' +
+                  '</th><td class="topic-run-effort">' +
                   e(U.effortLabel(r.effort)) +
-                  "</span><span>" +
+                  "</td><td>" +
                   e(U.roundLabel(r)) +
-                  "</span><time>" +
+                  '</td><td class="topic-run-date"><time>' +
                   e(r.date || "日期未记录") +
-                  "</time></div><p>" +
-                  e(r.description) +
-                  '</p><div class="topic-run-input">' +
-                  e(
-                    r.input.completeness === "recorded"
-                      ? "原始输入已记录"
-                      : "输入或上下文不完整",
-                  ) +
-                  (r.changes.length ? " · 有修改记录" : "") +
-                  '</div><div class="card-actions">' +
+                  '</time></td><td><div class="topic-row-actions">' +
                   (href
-                    ? '<a class="button primary" href="' +
+                    ? '<a href="' +
                       e(href) +
-                      '" target="_blank" rel="noopener">打开预览 ↗</a>'
-                    : "") +
+                      '" target="_blank" rel="noopener">' +
+                      (r.preview.kind === "external"
+                        ? "外部预览 ↗"
+                        : "预览 ↗") +
+                      "</a>"
+                    : '<span class="missing-record">无预览</span>') +
                   '<button data-compare="' +
                   e(r.id) +
                   '" aria-pressed="false">加入对比</button><a href="' +
                   e(r.document) +
-                  '">实验记录</a></div></article>'
+                  '">记录</a></div></td></tr>'
                 );
               })
               .join("") +
-            "</div></section>"
+            "</tbody></table></div></section>"
           );
         })
         .join("") ||

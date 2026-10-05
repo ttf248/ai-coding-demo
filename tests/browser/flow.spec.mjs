@@ -10,7 +10,7 @@ test("topic browsing groups versions, filters experiments and restores state", a
     "aria-pressed",
     "true",
   );
-  await expect(page.locator(".topic-run-card")).toHaveCount(blue.length);
+  await expect(page.locator(".topic-run-row")).toHaveCount(blue.length);
   await expect(page.locator(".topic-run-group")).toHaveCount(2);
   await expect(
     page.locator(".topic-run-group").first().locator(".version-badge"),
@@ -18,24 +18,24 @@ test("topic browsing groups versions, filters experiments and restores state", a
   for (const group of await page.locator(".topic-run-group").all()) {
     const version = await group.locator(".version-badge").textContent();
     const ids = await group
-      .locator(".topic-run-card")
+      .locator(".topic-run-row")
       .evaluateAll((cards) => cards.map((card) => card.id.slice(4)));
     expect(
       ids.every((id) => blue.find((r) => r.id === id).promptId === version),
     ).toBe(true);
   }
   await page.locator("#topic-model").selectOption("gpt-6-1-sol");
-  await expect(page.locator(".topic-run-card")).toHaveCount(2);
+  await expect(page.locator(".topic-run-row")).toHaveCount(2);
   await page.locator("#topic-effort").selectOption("medium");
-  await expect(page.locator(".topic-run-card")).toHaveCount(1);
-  await expect(page.locator(".topic-run-card h3")).toHaveText("GPT-6.1 Sol");
-  await expect(page.locator(".topic-run-meta")).toContainText("medium（中）");
+  await expect(page.locator(".topic-run-row")).toHaveCount(1);
+  await expect(page.locator(".topic-run-model")).toHaveText("GPT-6.1 Sol");
+  await expect(page.locator(".topic-run-effort")).toContainText("medium（中）");
   await page.reload();
   await expect(page.locator("#topic-model")).toHaveValue("gpt-6-1-sol");
   await expect(page.locator("#topic-effort")).toHaveValue("medium");
   await page.locator("#topic-reset").click();
   await page.locator("#topic-search").fill("MiniMax");
-  await expect(page.locator(".topic-run-card")).toHaveCount(
+  await expect(page.locator(".topic-run-row")).toHaveCount(
     blue.filter((r) => r.modelId.startsWith("minimax")).length,
   );
   await page.locator("#topic-search").fill("no-such-experiment");
@@ -50,7 +50,22 @@ test("topic browsing groups versions, filters experiments and restores state", a
   await page.goBack();
   await expect(page.locator("#topic-list")).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.locator(".topic-run-card").first()).toBeVisible();
+  await expect(page.locator(".topic-run-row").first()).toBeVisible();
+  await page
+    .locator(".topic-table-scroll")
+    .first()
+    .evaluate((table) => {
+      table.scrollLeft = table.scrollWidth;
+    });
+  await page.locator("#topic-list [data-compare]").first().click();
+  await expect(page.locator(".selection-item")).toHaveCount(1);
+  await page.locator("[data-clear]").click();
+  await page
+    .locator(".topic-table-scroll")
+    .first()
+    .evaluate((table) => {
+      table.scrollLeft = 0;
+    });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
