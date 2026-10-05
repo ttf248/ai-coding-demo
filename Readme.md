@@ -4,10 +4,12 @@
 
 从 [测试流程](docs/model-test-workflow.md) 开始。完成测试后，在 main 的新会话中按新增实验目录导入结果。
 
+新增待运行主题见 [本地测试案例清单](docs/test-cases.md)。
+
 <!-- catalog:start -->
 ## 项目统计
 
-- 实验主题：8
+- 实验主题：12
 - 实验记录：0
 - 可预览记录：0
 - 技术主题：14
@@ -17,6 +19,30 @@
 ### 小蓝书 · 瀑布流社区
 
 [主题与版本对比](topic.html?id=bluebook) · [主题说明](demos/bluebook/Readme.md)
+
+| 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
+|---|---|---|---|---|
+
+
+### 简化电路实验台
+
+[主题与版本对比](topic.html?id=circuit-lab) · [主题说明](demos/circuit-lab/Readme.md)
+
+| 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
+|---|---|---|---|---|
+
+
+### 奇幻地图生成器
+
+[主题与版本对比](topic.html?id=fantasy-map-generator) · [主题说明](demos/fantasy-map-generator/Readme.md)
+
+| 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
+|---|---|---|---|---|
+
+
+### 彩色流体实验台
+
+[主题与版本对比](topic.html?id=fluid-simulation) · [主题说明](demos/fluid-simulation/Readme.md)
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
@@ -41,6 +67,14 @@
 ### 新哥特式塔楼城市
 
 [主题与版本对比](topic.html?id=neo-gothic-tower-city) · [主题说明](demos/neo-gothic-tower-city/Readme.md)
+
+| 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
+|---|---|---|---|---|
+
+
+### 寻路算法实验室
+
+[主题与版本对比](topic.html?id=pathfinding-lab) · [主题说明](demos/pathfinding-lab/Readme.md)
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
