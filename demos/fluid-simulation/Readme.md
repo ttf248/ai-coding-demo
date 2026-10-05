@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [彩色流体实验台 · GPT-6.1 Sol Low](../../demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](../../demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](../../demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/index.html) |
