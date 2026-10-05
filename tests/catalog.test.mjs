@@ -17,6 +17,26 @@ const all = loadCatalog(),
 const ctx = {};
 vm.runInNewContext(read("assets/core.js"), ctx);
 const U = ctx.ArchiveUI;
+test("stock-watching is archived and excluded from the future test plan", () => {
+  const topic = data.topics.find((t) => t.id === "stock-watching");
+  assert.equal(topic.testingStatus, "archived");
+  assert.equal(topic.testingHistory.at(-1).status, "archived");
+  assert.ok(topic.testingHistory.at(-1).reason.trim());
+  const schema = readJSON("catalog/schema.json");
+  const validate = new Ajv().compile({ ...schema, $ref: "#/$defs/topic" });
+  assert.equal(
+    validate({
+      ...readJSON(topic.directory + "/topic.json"),
+      testingHistory: [],
+    }),
+    false,
+  );
+  assert.ok(
+    data.topics
+      .filter((t) => !U.isTopicArchived(t))
+      .every((t) => t.id !== "stock-watching"),
+  );
+});
 test("catalog references remain valid with zero or more experiments", () => {
   assert.ok(data.topics.length > 0);
   assert.ok(data.prompts.length > 0);

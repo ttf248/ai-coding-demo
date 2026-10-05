@@ -12,6 +12,9 @@
     type: params.get("type") || "",
     prompt: params.get("prompt") || "",
     preview: params.get("preview") || "",
+    testing: ["active", "archived", "all"].includes(params.get("testing"))
+      ? params.get("testing")
+      : "active",
     sort: params.get("sort") || "latest",
     group: params.get("group") || "topics",
     view: params.get("view") || "grid",
@@ -85,7 +88,9 @@
           '</span><span class="pill">' +
           runs.length +
           (runs.length !== all.length ? " / " + all.length : "") +
-          ' 个版本</span></div><h3><a href="topic.html?id=' +
+          " 个版本</span>" +
+          (U.isTopicArchived(t) ? '<span class="pill">已归档</span>' : "") +
+          '</div><h3><a href="topic.html?id=' +
           t.id +
           '">' +
           e(t.title) +
@@ -141,6 +146,7 @@
       "type",
       "prompt",
       "preview",
+      "testing",
       "sort",
     ])
       $(key).value = state[key];
@@ -151,12 +157,20 @@
     history.replaceState(null, "", "?" + search.toString());
     selection();
   }
-  ["q", "category", "model", "type", "prompt", "preview", "sort"].forEach(
-    (key) =>
-      $(key).addEventListener(key === "q" ? "input" : "change", (ev) => {
-        state[key] = ev.target.value;
-        render(true);
-      }),
+  [
+    "q",
+    "category",
+    "model",
+    "type",
+    "prompt",
+    "preview",
+    "testing",
+    "sort",
+  ].forEach((key) =>
+    $(key).addEventListener(key === "q" ? "input" : "change", (ev) => {
+      state[key] = ev.target.value;
+      render(true);
+    }),
   );
   document.querySelectorAll("[data-group]").forEach((b) =>
     b.addEventListener("click", () => {
@@ -183,6 +197,7 @@
         type: "",
         prompt: "",
         preview: "",
+        testing: "active",
         sort: "latest",
       });
       render(true);

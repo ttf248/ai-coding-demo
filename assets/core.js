@@ -14,6 +14,7 @@
     );
   const modelLabel = (data, run) =>
     data.models.find((m) => m.id === run.modelId)?.label || "未记录";
+  const isTopicArchived = (topic) => topic?.testingStatus === "archived";
   const promptFor = (data, run) =>
     data.prompts.find(
       (p) => p.topicId === run.topicId && p.id === run.promptId,
@@ -39,6 +40,9 @@
       .filter((r) => {
         const t = data.topics.find((t) => t.id === r.topicId);
         return (
+          (!state.testing ||
+            state.testing === "all" ||
+            (state.testing === "archived") === isTopicArchived(t)) &&
           (!state.category || t.category === state.category) &&
           (!state.model || r.modelId === state.model) &&
           (!state.type || r.type === state.type) &&
@@ -247,6 +251,7 @@
   global.ArchiveUI = {
     escape,
     modelLabel,
+    isTopicArchived,
     promptFor,
     relation,
     filterRuns,

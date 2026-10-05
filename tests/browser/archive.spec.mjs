@@ -24,7 +24,7 @@ test("catalog and topics render without historical experiments", async ({
     await expect(page.locator(".cards .card")).toHaveCount(
       data.runs.filter((r) => r.topicId === topic.id).length,
     );
-    await expect(page.locator("details")).toHaveCount(
+    await expect(page.locator(".prompt-library details")).toHaveCount(
       data.prompts.filter((p) => p.topicId === topic.id).length,
     );
   }

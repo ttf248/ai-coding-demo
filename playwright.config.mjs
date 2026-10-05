@@ -34,13 +34,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "node scripts/serve.mjs",
+      command: "node scripts/serve.mjs --read-only",
       url: "http://127.0.0.1:43871",
       env: { PORT: "43871" },
       reuseExistingServer: false,
     },
     {
-      command: "node scripts/serve.mjs",
+      command: "node scripts/serve.mjs --read-only",
       url: "http://127.0.0.1:43872/ai-coding-demo/",
       env: { PORT: "43872", SITE_BASE: "/ai-coding-demo/" },
       reuseExistingServer: false,
