@@ -2,6 +2,42 @@ import { test, expect } from "@playwright/test";
 import { loadCatalog } from "../../scripts/lib.mjs";
 const data = loadCatalog();
 const blue = data.runs.filter((r) => r.topicId === "bluebook");
+test("effort names remain visible in topic matrices and comparison selectors", async ({
+  page,
+}) => {
+  await page.goto("topic.html?id=life-diary");
+  await expect(page.locator(".matrix-desktop thead")).toContainText(
+    "medium（中）",
+  );
+  await expect(page.locator(".matrix-desktop thead")).toContainText(
+    "max（最大）",
+  );
+  const medium = data.runs.find(
+    (r) =>
+      r.topicId === "life-diary" &&
+      r.modelId === "gpt-6-1-sol" &&
+      r.effort === "medium",
+  );
+  await page.goto("compare.html?left=" + medium.id + "&tab=info");
+  await expect(
+    page.locator('#run-left option[value="' + medium.id + '"]'),
+  ).toContainText("medium（中）");
+  await expect(
+    page.locator('#run-left option[value="life-diary--gpt-6-1-sol-max-r01"]'),
+  ).toContainText("max（最大）");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("topic.html?id=life-diary");
+  await page
+    .locator(".matrix-model summary")
+    .filter({ hasText: "GPT-6.1 Sol" })
+    .click();
+  await expect(page.locator(".matrix-mobile")).toContainText("medium（中）");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
 async function isolatePreviews(page) {
   await page.route(/\/(previews|demos)\/.*\.html(?:\?.*)?$/, (route) =>
     route.fulfill({

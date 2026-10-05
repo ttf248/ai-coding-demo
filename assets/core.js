@@ -37,13 +37,13 @@
   }
   const effortLabel = (effort) =>
     ({
-      default: "默认",
-      low: "低",
-      medium: "中",
-      high: "高",
-      xhigh: "超高",
-      max: "最大",
-      ultra: "极高",
+      default: "default（默认）",
+      low: "low（低）",
+      medium: "medium（中）",
+      high: "high（高）",
+      xhigh: "xhigh（超高）",
+      max: "max（最大）",
+      ultra: "ultra（极高）",
       unknown: "档位未记录",
     })[effort] || effort;
   function groupedOptions(items, groupFor, optionFor) {

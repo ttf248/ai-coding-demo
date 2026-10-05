@@ -1,6 +1,7 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import { spawn } from "node:child_process";
 import { ROOT } from "./lib.mjs";
 const port = Number(process.env.PORT || 4173);
 const base = process.env.SITE_BASE || "/";
@@ -49,6 +50,21 @@ http
       res.writeHead(400).end("Bad request");
     }
   })
-  .listen(port, "127.0.0.1", () =>
-    console.log(`Archive: http://127.0.0.1:${port}${base}`),
-  );
+  .listen(port, "127.0.0.1", () => {
+    const url = `http://127.0.0.1:${port}${base}`;
+    console.log(`Archive: ${url}`);
+    if (process.argv.includes("--open") && process.platform === "win32") {
+      const browser = spawn(
+        "rundll32.exe",
+        ["url.dll,FileProtocolHandler", url],
+        {
+          stdio: "ignore",
+          windowsHide: true,
+        },
+      );
+      browser.on("error", () =>
+        console.log(`Open this URL in your browser: ${url}`),
+      );
+      browser.unref();
+    }
+  });
