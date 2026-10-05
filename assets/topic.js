@@ -17,16 +17,9 @@
   const models = data.models
     .filter((m) => runs.some((r) => r.modelId === m.id))
     .sort(U.compareModels);
-  const efforts = [
-    "default",
-    "low",
-    "medium",
-    "high",
-    "xhigh",
-    "max",
-    "ultra",
-    "unknown",
-  ].filter((effort) => runs.some((r) => r.effort === effort));
+  const efforts = U.effortOrder.filter((effort) =>
+    runs.some((r) => r.effort === effort),
+  );
   let promptId = prompts.some((p) => p.id === params.get("prompt"))
     ? params.get("prompt")
     : "";
@@ -40,7 +33,7 @@
     ? params.get("effort")
     : "";
   let query = params.get("q") || "";
-  let sort = params.get("sort") === "model" ? "model" : "recent";
+  let sort = params.get("sort") === "recent" ? "recent" : "model";
   root.innerHTML =
     '<a class="back" href="index.html">← 全部主题</a><div class="page-heading"><span class="eyebrow">实验主题 · ' +
     runs.length +
@@ -77,7 +70,7 @@
           '<option value="' + e(v) + '">' + e(U.effortLabel(v)) + "</option>",
       )
       .join("") +
-    '</select></label><label id="topic-sort-field">版本内排序<select id="topic-sort"><option value="recent">日期从新到旧</option><option value="model">厂商 / 模型</option></select></label><button id="topic-reset">清除筛选</button></div>' +
+    '</select></label><label id="topic-sort-field">版本内排序<select id="topic-sort"><option value="model">模型 / 档位从高到低</option><option value="recent">日期从新到旧</option></select></label><button id="topic-reset">清除筛选</button></div>' +
     '<div class="topic-results-heading"><p id="topic-count" role="status"></p><p id="topic-results-help"></p></div><section id="topic-matrix" aria-label="模型与档位实验矩阵" hidden></section><section id="topic-list"><div class="topic-run-groups"></div></section><section id="topic-prompts" class="prompt-library" hidden><h2>任务与版本</h2><div></div></section>';
   const refreshSelection = U.setupSelection(data);
   function entries(items) {
@@ -348,7 +341,7 @@
     if (modelId) p.set("model", modelId);
     if (effort) p.set("effort", effort);
     if (query) p.set("q", query);
-    if (sort !== "recent") p.set("sort", sort);
+    if (sort !== "model") p.set("sort", sort);
     history[replace ? "replaceState" : "pushState"](
       null,
       "",
@@ -405,7 +398,7 @@
     modelId = models.some((m) => m.id === p.get("model")) ? p.get("model") : "";
     effort = efforts.includes(p.get("effort")) ? p.get("effort") : "";
     query = p.get("q") || "";
-    sort = p.get("sort") === "model" ? "model" : "recent";
+    sort = p.get("sort") === "recent" ? "recent" : "model";
     render();
   });
   render();

@@ -2,6 +2,46 @@ import { test, expect } from "@playwright/test";
 import { loadCatalog } from "../../scripts/lib.mjs";
 const data = loadCatalog();
 const blue = data.runs.filter((r) => r.topicId === "bluebook");
+test("topic effort order matches comparison selectors and date sorting remains explicit", async ({
+  page,
+}) => {
+  await page.goto("topic.html?id=bluebook&prompt=v2");
+  await expect(page.locator("#topic-sort")).toHaveValue("model");
+  const solRows = page
+    .locator(".topic-run-row")
+    .filter({
+      has: page.locator(".topic-run-model", { hasText: /^GPT-6\.1 Sol$/ }),
+    });
+  await expect(solRows.locator(".topic-run-effort")).toHaveText([
+    "max（最大）",
+    "medium（中）",
+  ]);
+  await expect(page.locator("#topic-effort option")).toHaveText([
+    "全部档位",
+    "max（最大）",
+    "medium（中）",
+    "档位未记录",
+  ]);
+  await page.locator("#topic-sort").selectOption("recent");
+  await page.reload();
+  await expect(page.locator("#topic-sort")).toHaveValue("recent");
+  const dates = await page.locator(".topic-run-date").allTextContents();
+  expect(dates).toEqual([...dates].sort().reverse());
+  await page.goto(
+    "compare.html?left=bluebook--gpt-6-1-sol-medium-r01&tab=info",
+  );
+  const options = await page
+    .locator("#run-left option")
+    .evaluateAll((options) =>
+      options
+        .filter((o) => o.value.startsWith("bluebook--gpt-6-1-sol-"))
+        .map((o) => o.value),
+    );
+  expect(options).toEqual([
+    "bluebook--gpt-6-1-sol-max-r01",
+    "bluebook--gpt-6-1-sol-medium-r01",
+  ]);
+});
 test("topic browsing groups versions, filters experiments and restores state", async ({
   page,
 }) => {
