@@ -117,7 +117,7 @@
 
 ### 自选股实战
 
-[主题与版本对比](topic.html?id=stock-watching) · [主题说明](demos/stock-watching/Readme.md)
+[主题与版本对比](topic.html?id=stock-watching) · [主题说明](demos/stock-watching/Readme.md) · 已归档，不再参与后续测试
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|

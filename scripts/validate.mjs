@@ -82,6 +82,23 @@ for (const model of catalog.models) {
   );
 }
 for (const t of catalog.topics) {
+  if (t.testingStatus === "archived")
+    check(
+      t.testingHistory?.length > 0,
+      `Archived topic requires history ${t.id}`,
+    );
+  if (t.testingHistory?.length) {
+    check(
+      t.testingHistory.at(-1).status === (t.testingStatus || "active"),
+      `Testing history status mismatch ${t.id}`,
+    );
+    for (const entry of t.testingHistory)
+      check(
+        !Number.isNaN(Date.parse(entry.date)) &&
+          new Date(entry.date).toISOString().slice(0, 10) === entry.date,
+        `Invalid testing history date ${t.id}`,
+      );
+  }
   check(t.directory === `demos/${t.id}`, `Topic directory mismatch ${t.id}`);
   check(
     catalog.categories.some((c) => c.id === t.category),

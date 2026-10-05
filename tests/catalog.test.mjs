@@ -20,6 +20,50 @@ const data = { ...all, runs: all.runs.filter((r) => migrationIds.has(r.id)) };
 const ctx = {};
 vm.runInNewContext(read("assets/core.js"), ctx);
 const U = ctx.ArchiveUI;
+test("archiving a theme requires an auditable history in its schema", () => {
+  const schema = readJSON("catalog/schema.json");
+  const validate = new Ajv().compile({ ...schema, $ref: "#/$defs/topic" });
+  const topic = readJSON(all.topics[0].directory + "/topic.json");
+  assert.equal(validate({ ...topic, testingStatus: "archived" }), false);
+  assert.equal(
+    validate({ ...topic, testingStatus: "archived", testingHistory: [] }),
+    false,
+  );
+  assert.equal(
+    validate({
+      ...topic,
+      testingStatus: "archived",
+      testingHistory: [
+        { status: "archived", date: "2026-10-05", reason: "No more reruns" },
+      ],
+    }),
+    true,
+  );
+});
+test("archived topics leave the active testing scope while historical comparisons stay available", () => {
+  const archivedId = all.topics[0].id;
+  const fixture = {
+    ...all,
+    topics: all.topics.map((t) => ({
+      ...t,
+      testingStatus: t.id === archivedId ? "archived" : "active",
+    })),
+  };
+  assert.ok(
+    U.filterRuns(fixture, { testing: "active" }).every(
+      (r) => r.topicId !== archivedId,
+    ),
+  );
+  assert.equal(
+    U.filterRuns(fixture, { testing: "archived" }).length,
+    all.runs.filter((r) => r.topicId === archivedId).length,
+  );
+  assert.equal(U.filterRuns(fixture, {}).length, all.runs.length);
+  assert.equal(
+    U.filterRuns(fixture, { testing: "all" }).length,
+    all.runs.length,
+  );
+});
 test("model effort grouping takes precedence over dates and keeps unspecified levels separate", () => {
   const models = [
     { id: "model", provider: "OpenAI", version: [6], variant: "" },
