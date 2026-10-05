@@ -1,0 +1,46 @@
+# 奇幻地图生成器 · gpt-6.1-sol / high
+
+## 输入与运行条件
+
+用户指定模型名称 gpt-6.1-sol、档位 high，并要求在当前会话执行。复用本主题任务正文 v1，直接顺序实现，没有委派子代理。完整用户请求与任务正文见 [prompt.md](prompt.md)，仓库规则快照见 [context/AGENTS.md](context/AGENTS.md)，运行条件见 [context/session.json](context/session.json)。未读取其他分支、远程或工作目录中的旧实现。系统与开发者消息及完整工具往返未存档，输入完整性登记为 partial。
+
+## 运行方式
+
+直接用浏览器打开 [index.html](index.html)，或在仓库根目录执行 npm run preview，打开本实验入口。所有 HTML、CSS 与 JavaScript 均内嵌；不需要构建、服务器计算、CDN、远程字体或图片。
+
+## 实现
+
+固定种子的多尺度噪声与岛屿衰减高度场，按高度严格下降追踪水系，汇流洼地绘制内陆湖。支持海平面、粗糙度、升降画笔、平移、滚轮与双指缩放、城镇标签、完整 PNG 导出。
+
+## 首次产物与自检修复
+
+浏览器功能验收前的首次完整版本保存在 [first-pass/index.html](first-pass/index.html)，指纹见 [first-pass/manifest.json](first-pass/manifest.json)。没有追加用户修复指令，也没有人工代码修改。
+
+自检修复：首次绘制的 Canvas lineCap 状态会影响同种子第二次生成的细节。定稿在每次绘制前恢复确定的线端与连接样式，图像指纹复测一致。
+
+## 验证记录
+
+相同种子与参数的高度场及 PNG 指纹一致；不同种子不同地形；海平面更新保留高度场；缩放中心世界坐标正确；画笔修改高度并重算下降水系。PNG 与当前完整地图逐字节一致。
+
+HTTP 和 file:// 均在 Chromium 中检查；390px 触摸模式无页面水平溢出且可编辑。浏览器验收源码见 [验收源码快照](evidence/acceptance.spec.mjs)，覆盖根路径与 GitHub Pages 子路径。桌面与手机画面见 [desktop.png](evidence/desktop.png) 和 [mobile.png](evidence/mobile.png)。硬件与浏览器性能不作公平评测；流体 GPU 验收使用软件渲染器，不代表真实手机帧率。
+
+最终检查：generate、validate、11 项 Node 测试、34 项浏览器回归、首页与实验脚本语法、git diff --check 均通过。结构化验收记录见 [validation.json](evidence/validation.json)。
+
+<!-- archive:start -->
+## 当前归档信息（自动生成）
+
+- 实验 ID：`fantasy-map-generator--gpt-6-1-sol-high-r01`
+- 模型：GPT-6.1 Sol；推理档位：high
+- 类型：single-html；预览：static；网络：offline
+- [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=fantasy-map-generator)
+- 输入记录：保存本轮用户原始请求与执行的 v1 任务正文；context 保存仓库指令和运行条件。未留存完整系统、开发者上下文及工具往返，不能视为严格隔离同题评测。
+- 工具：Codex。用户指定 gpt-6.1-sol / high；按要求在当前会话直接顺序实现，无子代理。Windows PowerShell，Node v22.16.0；未读取历史实现，使用现有独立测试目录。
+- 运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。
+- [实验台](../../../../demos/fantasy-map-generator/runs/gpt-6-1-sol-high-r01/index.html)
+
+### 部署适配记录
+
+- 本轮从 v1 任务正文首次实现；first-pass/index.html 保留浏览器验证前的首次完整产物。
+- 无人工代码修改，无追加用户修复指令；代理自检与修复记录见 Readme.md。
+- 自检修复：首次绘制的 Canvas lineCap 状态会影响同种子第二次生成的细节。定稿在每次绘制前恢复确定的线端与连接样式，图像指纹复测一致。
+<!-- archive:end -->
