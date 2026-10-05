@@ -32,7 +32,15 @@
     : "";
   let view = ["matrix", "list", "prompt"].includes(params.get("view"))
     ? params.get("view")
-    : "matrix";
+    : "list";
+  let modelId = models.some((m) => m.id === params.get("model"))
+    ? params.get("model")
+    : "";
+  let effort = efforts.includes(params.get("effort"))
+    ? params.get("effort")
+    : "";
+  let query = params.get("q") || "";
+  let sort = params.get("sort") === "model" ? "model" : "recent";
   root.innerHTML =
     '<a class="back" href="index.html">← 全部主题</a><div class="page-heading"><span class="eyebrow">实验主题 · ' +
     runs.length +
@@ -54,8 +62,23 @@
           "</option>",
       )
       .join("") +
-    '</select></label><div class="segments" aria-label="主题内容"><button data-topic-view="matrix">实验矩阵</button><button data-topic-view="list">实验列表</button><button data-topic-view="prompt">任务正文</button></div></div>' +
-    '<p id="topic-count" role="status"></p><section id="topic-matrix" aria-label="模型与档位实验矩阵"></section><section id="topic-list" hidden><div class="cards"></div></section><section id="topic-prompts" class="prompt-library" hidden><h2>任务与版本</h2><div></div></section>';
+    '</select></label><div class="segments" aria-label="主题内容"><button data-topic-view="list">浏览实验</button><button data-topic-view="matrix">档位覆盖</button><button data-topic-view="prompt">任务正文</button></div></div>' +
+    '<section class="topic-context" aria-label="当前任务范围"><div><span class="eyebrow">任务与输入</span><h2 id="topic-context-title"></h2><p id="topic-context-description"></p></div><button data-read-task>阅读任务正文 →</button></section>' +
+    '<div class="topic-filters" id="topic-filters"><label class="topic-search">搜索实验<input id="topic-search" type="search" placeholder="模型、档位或实验描述" autocomplete="off"></label><label>模型<select id="topic-model"><option value="">全部模型</option>' +
+    U.groupedOptions(
+      models,
+      (m) => m.provider || "厂商未记录",
+      (m) => '<option value="' + e(m.id) + '">' + e(m.label) + "</option>",
+    ) +
+    '</select></label><label>推理档位<select id="topic-effort"><option value="">全部档位</option>' +
+    efforts
+      .map(
+        (v) =>
+          '<option value="' + e(v) + '">' + e(U.effortLabel(v)) + "</option>",
+      )
+      .join("") +
+    '</select></label><label id="topic-sort-field">版本内排序<select id="topic-sort"><option value="recent">日期从新到旧</option><option value="model">厂商 / 模型</option></select></label><button id="topic-reset">清除筛选</button></div>' +
+    '<div class="topic-results-heading"><p id="topic-count" role="status"></p><p id="topic-results-help"></p></div><section id="topic-matrix" aria-label="模型与档位实验矩阵" hidden></section><section id="topic-list"><div class="topic-run-groups"></div></section><section id="topic-prompts" class="prompt-library" hidden><h2>任务与版本</h2><div></div></section>';
   const refreshSelection = U.setupSelection(data);
   function entries(items) {
     return items
@@ -88,20 +111,81 @@
       .join("");
   }
   function render() {
-    const matched = runs.filter((r) => !promptId || r.promptId === promptId);
+    const matched = runs
+      .filter(
+        (r) =>
+          (!promptId || r.promptId === promptId) &&
+          (!modelId || r.modelId === modelId) &&
+          (!effort || r.effort === effort) &&
+          (!query ||
+            [
+              U.modelLabel(data, r),
+              U.modelProvider(data, r),
+              r.modelId,
+              r.effort,
+              U.effortLabel(r.effort),
+              r.description,
+              r.title,
+              r.id,
+            ]
+              .join(" ")
+              .toLowerCase()
+              .includes(query.trim().toLowerCase())),
+      )
+      .sort(
+        (a, b) =>
+          (sort === "recent"
+            ? (b.date || "").localeCompare(a.date || "")
+            : 0) || U.compareModelRuns(data, a, b),
+      );
+    const visibleModels = models.filter((m) =>
+      matched.some((r) => r.modelId === m.id),
+    );
+    const visibleEfforts = efforts.filter((v) =>
+      matched.some((r) => r.effort === v),
+    );
     document.getElementById("topic-prompt").value = promptId;
+    document.getElementById("topic-model").value = modelId;
+    document.getElementById("topic-effort").value = effort;
+    document.getElementById("topic-sort").value = sort;
+    document.getElementById("topic-search").value = query;
+    document.getElementById("topic-filters").hidden = view === "prompt";
+    document.getElementById("topic-sort-field").hidden = view !== "list";
+    document.querySelector(".topic-context").hidden = view === "prompt";
+    document.getElementById("topic-reset").disabled =
+      !modelId && !effort && !query;
+    const task = prompts.find((p) => p.id === promptId);
+    document.getElementById("topic-context-title").textContent = task
+      ? task.title + " · " + task.id
+      : prompts.length + " 个任务版本，实验按版本分组";
+    document.getElementById("topic-context-description").textContent = task
+      ? task.text.slice(0, 180) + (task.text.length > 180 ? "…" : "")
+      : "先浏览实现，或选择一个提示词版本缩小范围。同一任务正文的实验也可能有不同原始输入与上下文。";
     document.getElementById("topic-count").textContent =
-      matched.length +
-      " 条实验 · " +
-      (promptId || "全部提示词版本") +
-      " · 无记录不代表能力评价";
+      view === "prompt"
+        ? prompts.filter((p) => !promptId || p.id === promptId).length +
+          " 个任务版本"
+        : matched.length +
+          " / " +
+          runs.length +
+          " 条实验 · " +
+          visibleModels.length +
+          " 个模型";
+    document.getElementById("topic-results-help").textContent =
+      view === "matrix"
+        ? "空白档位表示未归档实验，不代表能力评价。"
+        : view === "list"
+          ? "打开预览查看实现，加入对比查看输入与结果差异。"
+          : "保留历史任务版本，完整原始输入在各条实验记录中。";
     for (const key of ["matrix", "list", "prompt"]) {
       document.getElementById(
         key === "prompt" ? "topic-prompts" : "topic-" + key,
       ).hidden = view !== key;
       root
-        .querySelector('[data-topic-view="' + key + '"]')
-        .setAttribute("aria-pressed", String(view === key));
+        .querySelectorAll('[data-topic-view="' + key + '"]')
+        .forEach((button) =>
+          button.setAttribute("aria-pressed", String(view === key)),
+        );
     }
     const cells = (model, effort) =>
       matched
@@ -113,13 +197,13 @@
       " · " +
       e(promptId || "全部版本") +
       '</caption><thead><tr><th scope="col">模型 / 推理档位</th>' +
-      efforts
+      visibleEfforts
         .map(
           (effort) => '<th scope="col">' + e(U.effortLabel(effort)) + "</th>",
         )
         .join("") +
       "</tr></thead><tbody>" +
-      models
+      visibleModels
         .map(
           (m) =>
             '<tr><th scope="row"><small>' +
@@ -127,7 +211,7 @@
             "</small>" +
             e(m.label) +
             "</th>" +
-            efforts
+            visibleEfforts
               .map((effort) => {
                 const items = cells(m, effort);
                 return (
@@ -137,7 +221,9 @@
                   e(effort) +
                   '">' +
                   (items.length
-                    ? "<details><summary>" +
+                    ? "<details" +
+                      (items.length === 1 ? " open" : "") +
+                      "><summary>" +
                       items.length +
                       " 条实验</summary>" +
                       entries(items) +
@@ -152,7 +238,7 @@
         .join("") +
       "</tbody></table></div>" +
       '<div class="matrix-mobile">' +
-      models
+      visibleModels
         .map(
           (m) =>
             '<details class="matrix-model"><summary>' +
@@ -160,7 +246,8 @@
             " · " +
             matched.filter((r) => r.modelId === m.id).length +
             " 条实验</summary>" +
-            efforts
+            visibleEfforts
+              .filter((v) => cells(m, v).length)
               .map((effort) => {
                 const items = cells(m, effort);
                 return (
@@ -178,15 +265,78 @@
         )
         .join("") +
       "</div>";
-    document.querySelector("#topic-list .cards").innerHTML =
-      matched
-        .map((r) =>
-          U.runCard(data, r).replace(
-            '<article class="card"',
-            '<article class="card" id="run-' + e(r.id) + '"',
-          ),
-        )
-        .join("") || "<p>此版本暂无实验记录。</p>";
+    document.querySelector("#topic-list .topic-run-groups").innerHTML =
+      prompts
+        .slice()
+        .reverse()
+        .filter((p) => matched.some((r) => r.promptId === p.id))
+        .map((p) => {
+          const items = matched.filter((r) => r.promptId === p.id);
+          return (
+            '<section class="topic-run-group"><header><div><span class="version-badge">' +
+            e(p.id) +
+            "</span><h2>" +
+            e(p.title) +
+            '</h2><span class="topic-group-count">' +
+            items.length +
+            ' 条实验</span></div><a href="compare.html?group=' +
+            encodeURIComponent(topic.id + "/" + p.id) +
+            '&tab=prompt">比较此版本 →</a></header><div class="topic-run-grid">' +
+            items
+              .map((r) => {
+                const href = U.previewURL(r);
+                return (
+                  '<article class="topic-run-card" id="run-' +
+                  e(r.id) +
+                  '"><div class="topic-run-top"><span class="eyebrow">' +
+                  e(U.modelProvider(data, r)) +
+                  '</span><span class="pill">' +
+                  e(
+                    r.preview.kind === "none"
+                      ? "无预览"
+                      : r.preview.kind === "external"
+                        ? "外部预览"
+                        : "可预览",
+                  ) +
+                  "</span></div><h3>" +
+                  e(U.modelLabel(data, r)) +
+                  '</h3><div class="topic-run-meta"><span>' +
+                  e(U.effortLabel(r.effort)) +
+                  "</span><span>" +
+                  e(U.roundLabel(r)) +
+                  "</span><time>" +
+                  e(r.date || "日期未记录") +
+                  "</time></div><p>" +
+                  e(r.description) +
+                  '</p><div class="topic-run-input">' +
+                  e(
+                    r.input.completeness === "recorded"
+                      ? "原始输入已记录"
+                      : "输入或上下文不完整",
+                  ) +
+                  (r.changes.length ? " · 有修改记录" : "") +
+                  '</div><div class="card-actions">' +
+                  (href
+                    ? '<a class="button primary" href="' +
+                      e(href) +
+                      '" target="_blank" rel="noopener">打开预览 ↗</a>'
+                    : "") +
+                  '<button data-compare="' +
+                  e(r.id) +
+                  '" aria-pressed="false">加入对比</button><a href="' +
+                  e(r.document) +
+                  '">实验记录</a></div></article>'
+                );
+              })
+              .join("") +
+            "</div></section>"
+          );
+        })
+        .join("") ||
+      '<div class="topic-empty"><h2>没有符合条件的实验</h2><p>试试其他模型、档位或搜索词，也可以清除筛选。</p><button data-reset-filters>清除筛选</button></div>';
+    if (!matched.length)
+      document.getElementById("topic-matrix").innerHTML =
+        '<p class="topic-empty">没有符合条件的实验，请调整筛选。</p>';
     document.querySelector("#topic-prompts > div").innerHTML = prompts
       .filter((p) => !promptId || p.id === promptId)
       .map(
@@ -208,21 +358,55 @@
       .join("");
     refreshSelection();
   }
-  function updateURL() {
+  function updateURL(replace = false) {
     const p = new URLSearchParams({ id: topic.id, view });
     if (promptId) p.set("prompt", promptId);
-    history.pushState(null, "", "?" + p.toString());
+    if (modelId) p.set("model", modelId);
+    if (effort) p.set("effort", effort);
+    if (query) p.set("q", query);
+    if (sort !== "recent") p.set("sort", sort);
+    history[replace ? "replaceState" : "pushState"](
+      null,
+      "",
+      "?" + p.toString(),
+    );
   }
   root.addEventListener("change", (event) => {
-    if (event.target.id !== "topic-prompt") return;
-    promptId = event.target.value;
+    switch (event.target.id) {
+      case "topic-prompt":
+        promptId = event.target.value;
+        break;
+      case "topic-model":
+        modelId = event.target.value;
+        break;
+      case "topic-effort":
+        effort = event.target.value;
+        break;
+      case "topic-sort":
+        sort = event.target.value;
+        break;
+      default:
+        return;
+    }
     updateURL();
     render();
   });
+  root.addEventListener("input", (event) => {
+    if (event.target.id !== "topic-search") return;
+    query = event.target.value;
+    updateURL(true);
+    render();
+  });
   root.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-topic-view]");
+    if (event.target.closest("#topic-reset, [data-reset-filters]")) {
+      modelId = effort = query = "";
+      updateURL();
+      render();
+      return;
+    }
+    const button = event.target.closest("[data-topic-view], [data-read-task]");
     if (!button) return;
-    view = button.dataset.topicView;
+    view = button.dataset.topicView || "prompt";
     updateURL();
     render();
   });
@@ -233,7 +417,11 @@
       : "";
     view = ["matrix", "list", "prompt"].includes(p.get("view"))
       ? p.get("view")
-      : "matrix";
+      : "list";
+    modelId = models.some((m) => m.id === p.get("model")) ? p.get("model") : "";
+    effort = efforts.includes(p.get("effort")) ? p.get("effort") : "";
+    query = p.get("q") || "";
+    sort = p.get("sort") === "model" ? "model" : "recent";
     render();
   });
   render();

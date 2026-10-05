@@ -98,7 +98,7 @@ test("topic detail and prompt comparison restore URLs without executing demos", 
   page,
 }) => {
   await page.goto("topic.html?id=voxel-construction-site");
-  await expect(page.locator(".cards .card")).toHaveCount(voxel.length);
+  await expect(page.locator(".topic-run-card")).toHaveCount(voxel.length);
   await page.locator('[data-topic-view="prompt"]').click();
   await page.locator("#topic-prompts summary").first().click();
   await expect(page.locator("details pre")).toContainText("InstancedMesh");
