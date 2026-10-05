@@ -31,8 +31,8 @@
 ## 项目统计
 
 - 实验主题：12
-- 实验记录：79
-- 可预览记录：70
+- 实验记录：83
+- 可预览记录：74
 - 技术主题：14
 
 ## 实验目录
@@ -64,6 +64,7 @@
 |---|---|---|---|---|
 | [circuit-lab · gpt-6.1-sol high](demos/circuit-lab/runs/gpt-6-1-sol-high-r01/Readme.md) | GPT-6.1 Sol / high | 2026-10-05 | [v1](demos/circuit-lab/runs/gpt-6-1-sol-high-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-1-sol-high-r01/index.html) |
 | [简化电路实验台 · GPT-6.1 Sol Low](demos/circuit-lab/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](demos/circuit-lab/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-1-sol-low-r01/index.html) |
+| [直流电路实验台 · gpt-6.1-sol max](demos/circuit-lab/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-10-05 | [v1](demos/circuit-lab/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-1-sol-max-r01/index.html) |
 
 ### 奇幻地图生成器
 
@@ -73,6 +74,7 @@
 |---|---|---|---|---|
 | [fantasy-map-generator · gpt-6.1-sol high](demos/fantasy-map-generator/runs/gpt-6-1-sol-high-r01/Readme.md) | GPT-6.1 Sol / high | 2026-10-05 | [v1](demos/fantasy-map-generator/runs/gpt-6-1-sol-high-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-1-sol-high-r01/index.html) |
 | [奇幻地图生成器 · GPT-6.1 Sol Low](demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/index.html) |
+| [奇幻岛屿地图 · gpt-6.1-sol max](demos/fantasy-map-generator/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-10-05 | [v1](demos/fantasy-map-generator/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-1-sol-max-r01/index.html) |
 
 ### 彩色流体实验台
 
@@ -82,6 +84,7 @@
 |---|---|---|---|---|
 | [fluid-simulation · gpt-6.1-sol high](demos/fluid-simulation/runs/gpt-6-1-sol-high-r01/Readme.md) | GPT-6.1 Sol / high | 2026-10-05 | [v1](demos/fluid-simulation/runs/gpt-6-1-sol-high-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-1-sol-high-r01/index.html) |
 | [彩色流体实验台 · GPT-6.1 Sol Low](demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/index.html) |
+| [彩色流体实验台 · gpt-6.1-sol max](demos/fluid-simulation/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-10-05 | [v1](demos/fluid-simulation/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-1-sol-max-r01/index.html) |
 
 ### 生活情绪日记
 
@@ -137,6 +140,7 @@
 |---|---|---|---|---|
 | [pathfinding-lab · gpt-6.1-sol high](demos/pathfinding-lab/runs/gpt-6-1-sol-high-r01/Readme.md) | GPT-6.1 Sol / high | 2026-10-05 | [v1](demos/pathfinding-lab/runs/gpt-6-1-sol-high-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-1-sol-high-r01/index.html) |
 | [寻路算法实验室 · GPT-6.1 Sol Low](demos/pathfinding-lab/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](demos/pathfinding-lab/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-1-sol-low-r01/index.html) |
+| [寻路算法实验室 · gpt-6.1-sol max](demos/pathfinding-lab/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-10-05 | [v1](demos/pathfinding-lab/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-1-sol-max-r01/index.html) |
 
 ### Pixel Flow
 
