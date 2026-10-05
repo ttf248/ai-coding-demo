@@ -10,6 +10,8 @@
 
 详见 [维护指南](docs/maintenance.md) 和 [仓库规则](AGENTS.md)。
 
+新增待运行主题见 [本地测试案例清单](docs/test-cases.md)。
+
 ## 🗓️ 开发记录
 
 - **2025-02**：从股票自选系统开始，进行前后端拆分、接口、数据生成和响应式界面的多轮 AI 迭代。
@@ -28,7 +30,7 @@
 <!-- catalog:start -->
 ## 项目统计
 
-- 实验主题：8
+- 实验主题：12
 - 实验记录：71
 - 可预览记录：62
 - 技术主题：14
@@ -53,6 +55,30 @@
 | [小蓝书瀑布流 · Mock 数据版](demos/bluebook/runs/minimax-m3-1-flash-preview-max-r02/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-09-29 | [v2](demos/bluebook/runs/minimax-m3-1-flash-preview-max-r02/prompt.md) | [打开](previews/bluebook/minimax-m3-1-flash-preview-max-r02/index.html) |
 | [小蓝书瀑布流 · minimax-m3 / max](demos/bluebook/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/bluebook/runs/minimax-m3-max-r01/prompt.md) | [打开](previews/bluebook/minimax-m3-max-r01/index.html) |
 | [小蓝书瀑布流 v2 · minimax-m3 / max](demos/bluebook/runs/minimax-m3-max-r02/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v2](demos/bluebook/runs/minimax-m3-max-r02/prompt.md) | [打开](previews/bluebook/minimax-m3-max-r02/index.html) |
+
+### 简化电路实验台
+
+[主题与版本对比](topic.html?id=circuit-lab) · [主题说明](demos/circuit-lab/Readme.md)
+
+| 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
+|---|---|---|---|---|
+
+
+### 奇幻地图生成器
+
+[主题与版本对比](topic.html?id=fantasy-map-generator) · [主题说明](demos/fantasy-map-generator/Readme.md)
+
+| 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
+|---|---|---|---|---|
+
+
+### 彩色流体实验台
+
+[主题与版本对比](topic.html?id=fluid-simulation) · [主题说明](demos/fluid-simulation/Readme.md)
+
+| 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
+|---|---|---|---|---|
+
 
 ### 生活情绪日记
 
@@ -99,6 +125,14 @@
 | [新哥特式塔楼城市](demos/neo-gothic-tower-city/runs/gpt-6-sol-medium-r01/Readme.md) | GPT-6 Sol / medium | 2026-09-30 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-sol-medium-r01/index.html) |
 | [新哥特式塔楼城市 3D 漫游](demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-09-29 | [v1](demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 | [新哥特式塔楼城市 · 漫游](demos/neo-gothic-tower-city/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/neo-gothic-tower-city/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/minimax-m3-max-r01/index.html) |
+
+### 寻路算法实验室
+
+[主题与版本对比](topic.html?id=pathfinding-lab) · [主题说明](demos/pathfinding-lab/Readme.md)
+
+| 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
+|---|---|---|---|---|
+
 
 ### Pixel Flow
 
