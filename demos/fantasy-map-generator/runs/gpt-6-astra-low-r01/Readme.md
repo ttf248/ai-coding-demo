@@ -1,0 +1,40 @@
+# fantasy-map-generator · GPT 6 Astra Low
+
+确定性岛屿地形生成、下降河流、地形画笔与 PNG 导出。
+
+## 输入与运行
+
+[完整输入](prompt.md)，任务正文 v1。模型与档位由用户指定为 gpt-6-astra / low。本轮四个案例在同一当前会话顺序完成，无子代理；用户明确允许沿用当前会话。输入完整性标记 partial，因为未逐字归档系统与工具上下文。
+
+直接打开 [index.html](index.html)，或在仓库根运行 npm run preview 后访问本目录。不需要网络或构建。
+
+## 首次产物与修复
+
+[first-output/index.html](first-output/index.html) 为浏览器验收前快照；后续验证与修复另行记录，不覆盖该快照。无人工修改。
+
+## 验证与局限
+
+验证同种子图像一致、不同种子改变地图；升高画笔在缩放后修改对应地形，河流每一步严格下降；PNG 下载与触摸画笔通过。地形采用 160×120 网格；洼地以小型内陆湖表示，不计算长期侵蚀或完整水文蓄水过程。
+
+验证覆盖 HTTP 根路径、Pages 子路径、file:// 直接打开与 390px 无水平溢出；浏览器为 Playwright Chromium，流体测试启用软件 WebGL。测试脚本：tests/browser/astra-low-labs.spec.mjs。
+
+[桌面运行截图](preview.png)。截图为操作后的界面，不是生成器输入。
+
+验收中未修改案例源码，index.html 与首次快照一致。测试代码修正了并联预设导线数断言（实际为 5），并为既有首页回归补上分页加载步骤；没有修改站点交互。
+
+<!-- archive:start -->
+## 当前归档信息（自动生成）
+
+- 实验 ID：`fantasy-map-generator--gpt-6-astra-low-r01`
+- 模型：GPT-6 Astra；推理档位：low
+- 类型：single-html；预览：static；网络：offline
+- [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=fantasy-map-generator)
+- 输入记录：保存本轮用户原文与实际读取的 v1 任务全文；系统/开发者上下文及完整工具交互未逐字归档，因此为 partial。
+- 工具：Codex。模型名称 gpt-6-astra、档位 low 由用户明确指定。按用户要求沿用当前会话与当前工作目录，未创建新克隆或新会话；顺序独立执行，未使用子代理。未读取其他分支、远程或其他工作目录的历史实现。
+- 运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。
+- [实验台](../../../../demos/fantasy-map-generator/runs/gpt-6-astra-low-r01/index.html)
+
+### 部署适配记录
+
+- 本轮首次实现；first-output/index.html 保留进入浏览器验收前的首份产物。
+<!-- archive:end -->
