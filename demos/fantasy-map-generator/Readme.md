@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [奇幻地图生成器 · GPT-6.1 Sol Low](../../demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](../../demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](../../demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/index.html) |

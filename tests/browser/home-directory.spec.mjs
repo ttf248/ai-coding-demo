@@ -27,10 +27,16 @@ test("homepage exposes archived topics and keeps its directory compact", async (
     "page",
   );
   await page.locator('[data-testing="all"]').click();
+  while (await page.locator("#load-more").isVisible()) {
+    await page.locator("#load-more").click();
+  }
   await expect(page.locator(".topic-card")).toHaveCount(data.topics.length);
   await page.locator('[data-view="grid"]').click();
   await expect(page.locator("#project-grid")).not.toHaveClass(/list/);
   await page.locator('[data-view="list"]').click();
+  while (await page.locator("#load-more").isVisible()) {
+    await page.locator("#load-more").click();
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
