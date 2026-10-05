@@ -17,7 +17,7 @@
       : "active",
     sort: params.get("sort") || "latest",
     group: params.get("group") || "topics",
-    view: params.get("view") || "grid",
+    view: params.get("view") || "list",
   };
   let visible = 9;
   $("stats").innerHTML = [
@@ -74,6 +74,22 @@
       const topics = [...new Set(matched.map((r) => r.topicId))].map((id) =>
         data.topics.find((t) => t.id === id),
       );
+      if (!state.model && !state.type && !state.prompt && !state.preview) {
+        topics.push(
+          ...data.topics.filter(
+            (t) =>
+              !data.runs.some((r) => r.topicId === t.id) &&
+              (state.testing === "all" ||
+                U.isTopicArchived(t) === (state.testing === "archived")) &&
+              (!state.category || t.category === state.category) &&
+              (!state.q ||
+                [t.title, t.description, t.id]
+                  .join(" ")
+                  .toLowerCase()
+                  .includes(state.q.toLowerCase())),
+          ),
+        );
+      }
       if (state.sort === "title")
         topics.sort((a, b) => a.title.localeCompare(b.title, "zh-CN"));
       items = topics.map((t) => {
@@ -128,7 +144,7 @@
               "&right=" +
               encodeURIComponent(recommended.id) +
               '">双栏对比</a>'
-            : "<span>最近 " + e(first.date || "未记录") + "</span>") +
+            : "<span>最近 " + e(first?.date || "暂无实验") + "</span>") +
           "</div></article>"
         );
       });
@@ -201,6 +217,18 @@
         );
       })
       .join("");
+    document.querySelectorAll("[data-testing]").forEach((link) => {
+      const key = link.dataset.testing;
+      const count = data.topics.filter(
+        (t) => key === "all" || U.isTopicArchived(t) === (key === "archived"),
+      ).length;
+      link.textContent =
+        { active: "参与测试", archived: "已归档", all: "全部案例" }[key] +
+        " · " +
+        count;
+      if (key === state.testing) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    });
     const search = new URLSearchParams();
     Object.entries(state).forEach(([k, v]) => {
       if (v) search.set(k, v);
@@ -235,6 +263,13 @@
       render();
     }),
   );
+  document.querySelectorAll("[data-testing]").forEach((link) =>
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      state.testing = link.dataset.testing;
+      render(true);
+    }),
+  );
   $("load-more").addEventListener("click", () => {
     visible += 9;
     render();
@@ -265,7 +300,6 @@
     state.type ||
     state.prompt ||
     state.preview ||
-    state.testing !== "active" ||
     state.sort !== "latest"
   );
   $("recent-list").innerHTML = U.filterRuns(data, { testing: "active" })
