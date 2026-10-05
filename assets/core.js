@@ -46,6 +46,24 @@
       ultra: "ultra（极高）",
       unknown: "档位未记录",
     })[effort] || effort;
+  // Explicit levels first; default and nonstandard labels have no inferred strength.
+  const effortOrder = Object.freeze([
+    "max",
+    "xhigh",
+    "high",
+    "medium",
+    "low",
+    "ultra",
+    "default",
+    "unknown",
+  ]);
+  function compareEfforts(a, b) {
+    const rank = (value) => {
+      const index = effortOrder.indexOf(value);
+      return index < 0 ? effortOrder.indexOf("ultra") : index;
+    };
+    return rank(a) - rank(b) || String(a).localeCompare(String(b), "en");
+  }
   function groupedOptions(items, groupFor, optionFor) {
     let previous = null;
     let html = "";
@@ -66,19 +84,11 @@
       data.models.find((m) => m.id === b.modelId),
     );
     if (order) return order;
-    const efforts = [
-      "default",
-      "low",
-      "medium",
-      "high",
-      "xhigh",
-      "max",
-      "ultra",
-      "unknown",
-    ];
+    const round = (r) => Number((r.runId || r.id).match(/r(\d+)$/)?.[1] || 0);
     return (
-      efforts.indexOf(a.effort) - efforts.indexOf(b.effort) ||
+      compareEfforts(a.effort, b.effort) ||
       (b.date || "").localeCompare(a.date || "") ||
+      round(b) - round(a) ||
       a.id.localeCompare(b.id, "en", { numeric: true })
     );
   }
@@ -380,6 +390,8 @@
     compareModelRuns,
     compareModels,
     effortLabel,
+    effortOrder,
+    compareEfforts,
     groupedOptions,
     promptFor,
     relation,

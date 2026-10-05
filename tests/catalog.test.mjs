@@ -20,6 +20,61 @@ const data = { ...all, runs: all.runs.filter((r) => migrationIds.has(r.id)) };
 const ctx = {};
 vm.runInNewContext(read("assets/core.js"), ctx);
 const U = ctx.ArchiveUI;
+test("model effort grouping takes precedence over dates and keeps unspecified levels separate", () => {
+  const models = [
+    { id: "model", provider: "OpenAI", version: [6], variant: "" },
+  ];
+  const runs = [
+    "unknown",
+    "default",
+    "ultra",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+  ].map((effort, i) => ({
+    id: effort + "-r01",
+    runId: effort + "-r01",
+    modelId: "model",
+    effort,
+    date: `2026-09-${String(28 - i).padStart(2, "0")}`,
+  }));
+  assert.deepEqual(
+    runs
+      .sort((a, b) => U.compareModelRuns({ models }, a, b))
+      .map((r) => r.effort),
+    ["max", "xhigh", "high", "medium", "low", "ultra", "default", "unknown"],
+  );
+  const repeats = [
+    {
+      ...runs[0],
+      id: "model-max-r01",
+      runId: "model-max-r01",
+      date: "2026-09-20",
+    },
+    {
+      ...runs[0],
+      id: "model-max-r02",
+      runId: "model-max-r02",
+      date: "2026-09-20",
+    },
+    {
+      ...runs[0],
+      id: "model-max-r03",
+      runId: "model-max-r03",
+      date: "2026-09-19",
+    },
+  ];
+  assert.deepEqual(
+    repeats
+      .sort((a, b) => U.compareModelRuns({ models }, a, b))
+      .map((r) => r.runId),
+    ["model-max-r02", "model-max-r01", "model-max-r03"],
+  );
+  assert.ok(U.compareEfforts("custom", "max") > 0);
+  assert.ok(U.compareEfforts("custom", "unknown") < 0);
+});
 test("comparison groups providers, sorts numeric versions descending and leaves unknown last", () => {
   const models = [
     { id: "older", provider: "OpenAI", version: [6, 9], variant: "Sol" },
