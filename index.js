@@ -12,6 +12,9 @@
     type: params.get("type") || "",
     prompt: params.get("prompt") || "",
     preview: params.get("preview") || "",
+    testing: ["active", "archived", "all"].includes(params.get("testing"))
+      ? params.get("testing")
+      : "active",
     sort: params.get("sort") || "latest",
     group: params.get("group") || "topics",
     view: params.get("view") || "grid",
@@ -89,7 +92,9 @@
           '</span><span class="pill">' +
           runs.length +
           (runs.length !== all.length ? " / " + all.length : "") +
-          ' 个版本</span></div><h3><a href="topic.html?id=' +
+          " 个版本</span>" +
+          (U.isTopicArchived(t) ? '<span class="pill">已归档</span>' : "") +
+          '</div><h3><a href="topic.html?id=' +
           t.id +
           '">' +
           e(t.title) +
@@ -160,6 +165,7 @@
       "type",
       "prompt",
       "preview",
+      "testing",
       "sort",
     ])
       $(key).value = state[key];
@@ -170,10 +176,14 @@
       "type",
       "prompt",
       "preview",
+      "testing",
       "sort",
     ]
       .filter(
-        (key) => state[key] && !(key === "sort" && state[key] === "latest"),
+        (key) =>
+          state[key] &&
+          !(key === "sort" && state[key] === "latest") &&
+          !(key === "testing" && state[key] === "active"),
       )
       .map((key) => {
         const label =
@@ -198,12 +208,20 @@
     history.replaceState(null, "", "?" + search.toString());
     selection();
   }
-  ["q", "category", "model", "type", "prompt", "preview", "sort"].forEach(
-    (key) =>
-      $(key).addEventListener(key === "q" ? "input" : "change", (ev) => {
-        state[key] = ev.target.value;
-        render(true);
-      }),
+  [
+    "q",
+    "category",
+    "model",
+    "type",
+    "prompt",
+    "preview",
+    "testing",
+    "sort",
+  ].forEach((key) =>
+    $(key).addEventListener(key === "q" ? "input" : "change", (ev) => {
+      state[key] = ev.target.value;
+      render(true);
+    }),
   );
   document.querySelectorAll("[data-group]").forEach((b) =>
     b.addEventListener("click", () => {
@@ -230,6 +248,7 @@
         type: "",
         prompt: "",
         preview: "",
+        testing: "active",
         sort: "latest",
       });
       render(true);
@@ -239,16 +258,17 @@
     const button = event.target.closest("[data-remove-filter]");
     if (!button) return;
     const key = button.dataset.removeFilter;
-    state[key] = key === "sort" ? "latest" : "";
+    state[key] = key === "sort" ? "latest" : key === "testing" ? "active" : "";
     render(true);
   });
   $("advanced-filters").open = !!(
     state.type ||
     state.prompt ||
     state.preview ||
+    state.testing !== "active" ||
     state.sort !== "latest"
   );
-  $("recent-list").innerHTML = U.filterRuns(data, {})
+  $("recent-list").innerHTML = U.filterRuns(data, { testing: "active" })
     .slice(0, 5)
     .map(
       (r) =>

@@ -22,6 +22,25 @@
 
 ## 新增实验
 
+### 停止案例的后续测试
+
+归档以整个主题为单位，在 `topic.json` 保存 `testingStatus`（`active` / `archived`）及 `testingHistory`（状态、操作日期、原因）。未设置的既有主题默认参与后续测试；这不是对历史状态的推测。与单次实验的 `run.status` 分开：后者不决定整个主题是否继续重跑。
+
+本地双击 `preview.bat`，在主题页点击“归档主题”，填写原因并保存；恢复时点击“恢复测试”。操作写入仓库并更新生成站点，需正常提交才会同步到其他机器。线上静态托管只展示状态，不提供写入操作。更改静态服务器代码后需要重启 BAT。
+
+也可以执行：
+
+```sh
+npm run topic:status -- archive --topic pixel-flow --reason "此主题不再用于后续模型测试"
+npm run topic:status -- restore --topic pixel-flow --reason "重新纳入测试"
+npm run topics:active
+npm run topic:status -- list --all
+```
+
+上面归档命令仅为示例，不表示该案例已归档。归档和恢复自动更新生成文件，不提交或推送。批量实验只选择参与主题；自动化需要纯 JSON 时执行 `node scripts/topic-status.mjs list --json`。已归档主题默认禁止 `new:demo`；用户明确要求一次性追加时可传 `--allow-archived`，新增实验记录例外而不解除归档。
+
+首页默认显示参与主题，可通过“后续测试”筛选查看已归档或全部主题。归档主题仍能直接打开、预览、查看原始输入及加入对比；目录完整性检查与站点回归继续覆盖历史产物。
+
 首次维护使用 Node 22+，在根目录执行 `npm ci`。已有实验的预览不需要安装依赖即可通过静态服务器打开。
 
 Windows 本地预览：双击根目录的 `preview.bat`，自动启动静态服务器并打开 `http://127.0.0.1:4173/`。保持命令窗口打开，按 Ctrl+C 停止服务。只需安装 Node.js 22+，无需安装 npm 依赖或重新构建；首页、主题页、对比页与已提交的 previews 均可预览。需要独立后端的实验仍按各自说明运行。脚本不提交或推送代码。

@@ -17,6 +17,7 @@
   const modelProvider = (data, run) =>
     data.models.find((m) => m.id === run.modelId)?.provider ||
     "未记录 / 多轮混合";
+  const isTopicArchived = (topic) => topic?.testingStatus === "archived";
   function compareModels(x, y) {
     const providerOrder =
       Number(!x?.provider) - Number(!y?.provider) ||
@@ -117,6 +118,9 @@
       .filter((r) => {
         const t = data.topics.find((t) => t.id === r.topicId);
         return (
+          (!state.testing ||
+            state.testing === "all" ||
+            (state.testing === "archived") === isTopicArchived(t)) &&
           (!state.category || t.category === state.category) &&
           (!state.model || r.modelId === state.model) &&
           (!state.type || r.type === state.type) &&
@@ -359,7 +363,11 @@
       " / " +
       escape(r.date || "未记录") +
       '</span><span class="pill">' +
-      escape(r.preview.kind === "none" ? "档案" : "可预览") +
+      escape(
+        (isTopicArchived(data.topics.find((t) => t.id === r.topicId))
+          ? "已归档 · "
+          : "") + (r.preview.kind === "none" ? "档案" : "可预览"),
+      ) +
       "</span></div><h3>" +
       escape(r.title) +
       "</h3><p>" +
@@ -387,6 +395,7 @@
     escape,
     modelLabel,
     modelProvider,
+    isTopicArchived,
     compareModelRuns,
     compareModels,
     effortLabel,

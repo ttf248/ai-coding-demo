@@ -9,12 +9,15 @@ import {
   loadCatalog,
 } from "./lib.mjs";
 const { values } = parseArgs({
-  options: Object.fromEntries(
-    ["topic", "title", "model", "effort", "type", "prompt"].map((k) => [
-      k,
-      { type: "string" },
-    ]),
-  ),
+  options: {
+    "allow-archived": { type: "boolean" },
+    ...Object.fromEntries(
+      ["topic", "title", "model", "effort", "type", "prompt"].map((k) => [
+        k,
+        { type: "string" },
+      ]),
+    ),
+  },
 });
 const {
   topic,
@@ -41,6 +44,13 @@ if (
 )
   throw Error("Unknown type");
 const catalog = loadCatalog();
+if (
+  catalog.topics.find((t) => t.id === topic)?.testingStatus === "archived" &&
+  !values["allow-archived"]
+)
+  throw Error(
+    "This topic is archived and excluded from future testing. Restore it first, or explicitly use --allow-archived for a one-off run.",
+  );
 if (!catalog.models.some((m) => m.id === model))
   throw Error("Register model in catalog/models.json first.");
 const base = `demos/${topic}`;
@@ -119,7 +129,11 @@ writeJSON(`${dir}/run.json`, {
     notes: "待补充",
   },
   environment: { tool: null, notes: "未记录" },
-  changes: [],
+  changes:
+    values["allow-archived"] &&
+    catalog.topics.find((t) => t.id === topic)?.testingStatus === "archived"
+      ? ["显式追加已归档主题实验；主题归档状态保持不变。"]
+      : [],
   preview: {
     kind: "none",
     pages: [],

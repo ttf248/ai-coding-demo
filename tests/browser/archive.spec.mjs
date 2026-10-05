@@ -54,7 +54,14 @@ test("directory counts, filters, sort, views, pagination and selection", async (
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("./");
   await expect(page.locator("#project-grid .card")).toHaveCount(
-    Math.min(9, data.topics.length),
+    Math.min(
+      9,
+      data.topics.filter(
+        (t) =>
+          t.testingStatus !== "archived" &&
+          data.runs.some((r) => r.topicId === t.id),
+      ).length,
+    ),
   );
   await expect(page.locator("#stats")).toContainText(String(data.runs.length));
   await page.locator('[data-group="runs"]').click();
