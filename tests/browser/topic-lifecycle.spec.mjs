@@ -30,8 +30,7 @@ test("archived topics are separately browsable and historical experiments remain
   await expect(
     page.locator('.topic-card h3 a[href="topic.html?id=bluebook"]'),
   ).toHaveCount(0);
-  await page.locator("#advanced-filters summary").click();
-  await page.locator("#testing").selectOption("archived");
+  await page.locator('[data-testing="archived"]').click();
   await expect(page.locator(".topic-card")).toHaveCount(
     fixture.topics.filter(
       (t) =>
@@ -42,7 +41,10 @@ test("archived topics are separately browsable and historical experiments remain
   await expect(page.locator(".topic-card").first()).toContainText("已归档");
   await page.reload();
   await expect(page.locator("#testing")).toHaveValue("archived");
-  await expect(page.locator("#advanced-filters")).toHaveAttribute("open", "");
+  await expect(page.locator('[data-testing="archived"]')).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   await page.locator('.topic-card h3 a[href="topic.html?id=bluebook"]').click();
   await expect(page.locator(".topic-testing-status")).toContainText(
     "不再参与后续测试",
