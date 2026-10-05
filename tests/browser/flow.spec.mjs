@@ -2,10 +2,75 @@ import { test, expect } from "@playwright/test";
 import { loadCatalog } from "../../scripts/lib.mjs";
 const data = loadCatalog();
 const blue = data.runs.filter((r) => r.topicId === "bluebook");
+test("topic browsing groups versions, filters experiments and restores state", async ({
+  page,
+}) => {
+  await page.goto("topic.html?id=bluebook");
+  await expect(page.locator('[data-topic-view="list"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator(".topic-run-card")).toHaveCount(blue.length);
+  await expect(page.locator(".topic-run-group")).toHaveCount(2);
+  await expect(
+    page.locator(".topic-run-group").first().locator(".version-badge"),
+  ).toHaveText("v2");
+  for (const group of await page.locator(".topic-run-group").all()) {
+    const version = await group.locator(".version-badge").textContent();
+    const ids = await group
+      .locator(".topic-run-card")
+      .evaluateAll((cards) => cards.map((card) => card.id.slice(4)));
+    expect(
+      ids.every((id) => blue.find((r) => r.id === id).promptId === version),
+    ).toBe(true);
+  }
+  await page.locator("#topic-model").selectOption("gpt-6-1-sol");
+  await expect(page.locator(".topic-run-card")).toHaveCount(2);
+  await page.locator("#topic-effort").selectOption("medium");
+  await expect(page.locator(".topic-run-card")).toHaveCount(1);
+  await expect(page.locator(".topic-run-card h3")).toHaveText("GPT-6.1 Sol");
+  await expect(page.locator(".topic-run-meta")).toContainText("medium（中）");
+  await page.reload();
+  await expect(page.locator("#topic-model")).toHaveValue("gpt-6-1-sol");
+  await expect(page.locator("#topic-effort")).toHaveValue("medium");
+  await page.locator("#topic-reset").click();
+  await page.locator("#topic-search").fill("MiniMax");
+  await expect(page.locator(".topic-run-card")).toHaveCount(
+    blue.filter((r) => r.modelId.startsWith("minimax")).length,
+  );
+  await page.locator("#topic-search").fill("no-such-experiment");
+  await expect(page.locator("#topic-list .topic-empty")).toBeVisible();
+  await page.locator("[data-reset-filters]").click();
+  await page.locator("#topic-prompt").selectOption("v1");
+  await expect(page.locator(".topic-run-group")).toHaveCount(1);
+  await expect(page.locator("#topic-context-title")).toContainText("v1");
+  await page.locator("[data-read-task]").click();
+  await expect(page.locator("#topic-prompts")).toBeVisible();
+  await expect(page.locator("#topic-filters")).toBeHidden();
+  await page.goBack();
+  await expect(page.locator("#topic-list")).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".topic-run-card").first()).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `test-results/topic-redesign-mobile-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.locator("#topic-prompt").selectOption("");
+  await page.screenshot({
+    path: `test-results/topic-redesign-desktop-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+});
 test("effort names remain visible in topic matrices and comparison selectors", async ({
   page,
 }) => {
-  await page.goto("topic.html?id=life-diary");
+  await page.goto("topic.html?id=life-diary&view=matrix");
   await expect(page.locator(".matrix-desktop thead")).toContainText(
     "medium（中）",
   );
@@ -26,7 +91,7 @@ test("effort names remain visible in topic matrices and comparison selectors", a
     page.locator('#run-left option[value="life-diary--gpt-6-1-sol-max-r01"]'),
   ).toContainText("max（最大）");
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("topic.html?id=life-diary");
+  await page.goto("topic.html?id=life-diary&view=matrix");
   await page
     .locator(".matrix-model summary")
     .filter({ hasText: "GPT-6.1 Sol" })
@@ -81,7 +146,7 @@ test("compact homepage supports removable filters, URL restore and recent experi
 test("topic matrix filters versions, exposes repeat runs and switches to a mobile list", async ({
   page,
 }) => {
-  await page.goto("topic.html?id=bluebook");
+  await page.goto("topic.html?id=bluebook&view=matrix");
   await expect(page.locator(".matrix-desktop [data-matrix-run]")).toHaveCount(
     blue.length,
   );
