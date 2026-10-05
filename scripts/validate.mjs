@@ -100,6 +100,15 @@ for (const t of catalog.topics) {
       );
   }
   check(t.directory === `demos/${t.id}`, `Topic directory mismatch ${t.id}`);
+  if (t.thumbnail) {
+    check(exists(t.thumbnail.path), `Missing topic thumbnail ${t.id}`);
+    check(
+      catalog.runs.some(
+        (r) => r.id === t.thumbnail.sourceRunId && r.topicId === t.id,
+      ),
+      `Invalid topic thumbnail source ${t.id}`,
+    );
+  }
   check(
     catalog.categories.some((c) => c.id === t.category),
     `Unknown category ${t.id}`,

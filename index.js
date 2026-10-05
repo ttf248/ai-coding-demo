@@ -17,7 +17,7 @@
       : "active",
     sort: params.get("sort") || "latest",
     group: params.get("group") || "topics",
-    view: params.get("view") || "list",
+    view: params.get("view") || "grid",
   };
   let visible = 9;
   $("stats").innerHTML = [
@@ -96,6 +96,37 @@
         const runs = matched.filter((r) => r.topicId === t.id),
           all = data.runs.filter((r) => r.topicId === t.id),
           first = runs[0];
+        const latest = [...runs].sort(
+          (a, b) =>
+            (b.date || "").localeCompare(a.date || "") ||
+            U.compareModelRuns(data, a, b),
+        )[0];
+        const previewRun =
+          latest && U.previewURL(latest)
+            ? latest
+            : runs.find((r) => U.previewURL(r));
+        const coverRun =
+          t.thumbnail &&
+          data.runs.find((r) => r.id === t.thumbnail.sourceRunId);
+        const cover =
+          coverRun && runs.some((r) => r.id === coverRun.id)
+            ? '<figure class="topic-cover"><img src="' +
+              e(t.thumbnail.path) +
+              '" alt="' +
+              e(
+                t.title +
+                  " · " +
+                  U.runSummary(data, coverRun) +
+                  " 实际预览截图",
+              ) +
+              '" loading="lazy" width="720" height="420"><figcaption>实际截图 · ' +
+              e(
+                U.modelLabel(data, coverRun) +
+                  " · " +
+                  U.effortLabel(coverRun.effort),
+              ) +
+              "</figcaption></figure>"
+            : "";
         const recommended =
           runs.find(
             (r) =>
@@ -103,7 +134,11 @@
               U.promptFor(data, r)?.hash === U.promptFor(data, first)?.hash,
           ) || runs[1];
         return (
-          '<article class="card topic-card"><div class="card-top"><span class="eyebrow">' +
+          '<article class="card topic-card' +
+          (cover ? " has-cover" : "") +
+          '">' +
+          cover +
+          '<div class="topic-body"><div class="card-top"><span class="eyebrow">' +
           e(data.categories.find((c) => c.id === t.category).label) +
           '</span><span class="pill">' +
           runs.length +
@@ -118,14 +153,17 @@
           e(t.description) +
           '</p><p class="topic-metrics">' +
           new Set(runs.map((r) => r.modelId)).size +
-          " 个模型 · 最近 " +
+          " 个模型 · " +
+          e(latest?.date || "日期未记录") +
+          '</p><div class="latest-run"><span>最新实验</span><strong>' +
           e(
-            runs
-              .map((r) => r.date || "")
-              .sort()
-              .at(-1) || "日期未记录",
+            latest
+              ? U.modelLabel(data, latest) +
+                  " · " +
+                  U.effortLabel(latest.effort)
+              : "尚无实验记录",
           ) +
-          '</p><details class="topic-models"><summary>查看模型范围</summary><div class="tags">' +
+          '</strong></div><details class="topic-models"><summary>全部模型</summary><div class="tags">' +
           [
             ...new Set(
               [...runs]
@@ -135,7 +173,15 @@
           ]
             .map((m) => "<span>" + e(m) + "</span>")
             .join("") +
-          '</div></details><div class="card-actions"><a href="topic.html?id=' +
+          '</div></details><div class="card-actions">' +
+          (previewRun
+            ? '<a class="preview-link" href="' +
+              e(U.previewURL(previewRun)) +
+              '" target="_blank" rel="noopener" aria-label="打开预览：' +
+              e(t.title + " · " + U.runSummary(data, previewRun)) +
+              '">打开预览 ↗</a>'
+            : '<span class="no-preview">暂无可用预览</span>') +
+          '<a href="topic.html?id=' +
           t.id +
           '">查看实验 →</a>' +
           (recommended
@@ -143,9 +189,15 @@
               encodeURIComponent(first.id) +
               "&right=" +
               encodeURIComponent(recommended.id) +
-              '">双栏对比</a>'
-            : "<span>最近 " + e(first?.date || "暂无实验") + "</span>") +
-          "</div></article>"
+              '" title="' +
+              e(
+                U.runSummary(data, first) +
+                  " / " +
+                  U.runSummary(data, recommended),
+              ) +
+              '">对比版本</a>'
+            : "") +
+          "</div></div></article>"
         );
       });
     }
@@ -205,7 +257,11 @@
         const label =
           key === "q"
             ? "搜索：" + state[key]
-            : $(key).selectedOptions[0]?.textContent || state[key];
+            : key === "testing"
+              ? { active: "参与测试", archived: "已归档", all: "全部案例" }[
+                  state[key]
+                ]
+              : $(key).selectedOptions?.[0]?.textContent || state[key];
         return (
           '<button data-remove-filter="' +
           key +
@@ -233,7 +289,7 @@
     Object.entries(state).forEach(([k, v]) => {
       if (v) search.set(k, v);
     });
-    history.replaceState(null, "", "?" + search.toString());
+    history.replaceState(null, "", "?" + search.toString() + location.hash);
     selection();
   }
   [
@@ -297,10 +353,10 @@
     render(true);
   });
   $("advanced-filters").open = !!(
+    state.category ||
     state.type ||
     state.prompt ||
-    state.preview ||
-    state.sort !== "latest"
+    state.preview
   );
   $("recent-list").innerHTML = U.filterRuns(data, { testing: "active" })
     .slice(0, 5)
@@ -343,6 +399,12 @@
     $("guide-empty").hidden = !!list.length;
   }
   $("guide-search").addEventListener("input", guides);
+  document
+    .querySelector('nav a[href="#guides"]')
+    .addEventListener("click", () => {
+      $("guides").open = true;
+    });
+  if (location.hash === "#guides") $("guides").open = true;
   guides();
   render();
 })();

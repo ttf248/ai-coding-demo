@@ -97,6 +97,7 @@ test("directory counts, filters, sort, views, pagination and selection", async (
     "href",
     /left=.*&right=/,
   );
+  await page.locator("#guides > summary").click();
   await page.locator("#guide-search").fill("typescript");
   await expect(page.locator(".guide")).toHaveCount(1);
   expect(errors).toEqual([]);
