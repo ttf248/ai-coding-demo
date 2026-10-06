@@ -16,6 +16,13 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
   page,
 }) => {
   await page.goto("./");
+  await expect(page.locator("#provider option")).toHaveText([
+    "全部厂商",
+    "Anthropic",
+    "MiniMax",
+    "OpenAI",
+    "未记录 / 多轮混合",
+  ]);
   expect(
     await page
       .locator("#model optgroup")
@@ -40,6 +47,12 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
   await page.locator("#model").selectOption("gpt-6-1-sol");
   await page.reload();
   await expect(page.locator("#model")).toHaveValue("gpt-6-1-sol");
+  await page.locator("#provider").selectOption("MiniMax");
+  await expect(page.locator('[data-remove-filter="provider"]')).toContainText(
+    "MiniMax",
+  );
+  await page.reload();
+  await expect(page.locator("#provider")).toHaveValue("MiniMax");
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(

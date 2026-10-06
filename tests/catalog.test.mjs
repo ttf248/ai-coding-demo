@@ -160,6 +160,29 @@ test("archive migration preserves record counts and task relations", () => {
 });
 test("combined filters operate on runs before topic grouping", () => {
   assert.equal(U.filterRuns(data, { model: "gpt-6-astra" }).length, 2);
+  const minimaxRuns = data.runs.filter(
+    (run) =>
+      data.models.find((model) => model.id === run.modelId)?.provider ===
+      "MiniMax",
+  );
+  assert.equal(
+    U.filterRuns(data, { provider: "MiniMax" }).length,
+    minimaxRuns.length,
+  );
+  assert.equal(
+    U.filterRuns(data, {
+      provider: "MiniMax",
+      model: "minimax-m3-1-flash-preview",
+    }).length,
+    minimaxRuns.filter((run) => run.modelId === "minimax-m3-1-flash-preview")
+      .length,
+  );
+  assert.equal(
+    U.filterRuns(data, { provider: "unknown" }).length,
+    data.runs.filter(
+      (run) => !data.models.find((model) => model.id === run.modelId)?.provider,
+    ).length,
+  );
   assert.equal(
     U.filterRuns(data, { q: "ASTRA", type: "single-html", preview: "yes" })
       .length,
