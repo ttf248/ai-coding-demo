@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>寻路算法实验室</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#182031; --line:#26314a; --text:#e6ecf7; --muted:#94a3b8;
+    --accent:#60a5fa; --visited:#1e3a5f; --frontier:#b45309; --path:#22c55e;
+    --wall:#0b0f18; --cost:#7c3aed; --start:#38bdf8; --end:#f43f5e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;}
+  header{padding:14px 16px 8px;}
+  h1{margin:0;font-size:18px}
+  header p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.5}
+  main{padding:0 16px 24px;max-width:1100px;margin:0 auto;display:grid;gap:14px}
+  .board{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+  .wrap{position:relative;width:100%;aspect-ratio:30/20;touch-action:none;border-radius:8px;overflow:hidden}
+  canvas{display:block;width:100%;height:100%}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:12px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .grow{flex:1 1 auto;min-width:0}
+  label{font-size:13px;color:var(--muted)}
+  button,select,input[type=range]{font:inherit;font-size:14px;color:var(--text);background:#1f2937;border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+  button{cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#08111f;border-color:transparent;font-weight:600}
+  button[aria-pressed=true]{background:var(--accent);color:#08111f;border-color:transparent;font-weight:600}
+  input[type=range]{padding:0;flex:1 1 120px;min-width:90px;accent-color:var(--accent)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+  .stat{background:#131b2b;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .stat b{display:block;font-size:16px;margin-top:2px}
+  .stat span{font-size:12px;color:var(--muted)}
+  .status{font-size:13px;padding:8px 10px;border-radius:8px;background:#131b2b;border:1px solid var(--line)}
+  .status.ok{border-color:#14532d;color:#86efac}
+  .status.bad{border-color:#7f1d1d;color:#fca5a5}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted)}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-2px}
+  .note{font-size:12px;color:var(--muted);line-height:1.6}
+  @media (max-width:520px){
+    header h1{font-size:16px}
+    .panel{padding:10px}
+    .row>button,.row>select{flex:1 1 44%}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>寻路算法实验室</h1>
+  <p>在网格上绘制障碍与高代价地形，拖动起终点，比较 BFS / Dijkstra / A* 的搜索过程。全部计算在浏览器本地完成。</p>
+</header>
+<main>
+  <section class="board">
+    <div class="wrap"><canvas id="grid"></canvas></div>
+  </section>
+
+  <section class="panel">
+    <div class="row">
+      <label for="algo">算法</label>
+      <select id="algo">
+        <option value="bfs">BFS · 按步数</option>
+        <option value="dijkstra">Dijkstra · 按代价</option>
+        <option value="astar" selected>A* · 曼哈顿距离</option>
+      </select>
+      <label for="preset">预设地图</label>
+      <select id="preset"></select>
+      <button id="run" class="primary">运行</button>
+      <button id="stepBtn">单步</button>
+      <button id="clear">清除搜索</button>
+      <button id="reset">重置地图</button>
+    </div>
+
+    <div class="row">
+      <label for="tool">画笔</label>
+      <button data-tool="wall" aria-pressed="true">障碍墙</button>
+      <button data-tool="cost" aria-pressed="false">高代价地形</button>
+      <button data-tool="erase" aria-pressed="false">擦除</button>
+      <button id="resetEnds">重置起终点</button>
+    </div>
+
+    <div class="row">
+      <label for="speed">速度 <span id="speedVal">80</span> 步/秒</label>
+      <input id="speed" type="range" min="2" max="500" value="80">
+    </div>
+
+    <div class="stats">
+      <div class="stat"><span>已访问节点</span><b id="sVisited">0</b></div>
+      <div class="stat"><span>搜索前沿</span><b id="sFrontier">0</b></div>
+      <div class="stat"><span>路径步数</span><b id="sSteps">—</b></div>
+      <div class="stat"><span>总代价</span><b id="sCost">—</b></div>
+    </div>
+
+    <div id="status" class="status">就绪。绘制障碍后点击“运行”。</div>
+
+    <div class="legend">
+      <span><i style="background:var(--wall);border:1px solid #334155"></i>障碍</span>
+      <span><i style="background:var(--cost)"></i>高代价地形（进入代价 5）</span>
+      <span><i style="background:var(--visited)"></i>已访问</span>
+      <span><i style="background:var(--frontier)"></i>搜索前沿</span>
+      <span><i style="background:var(--path)"></i>最终路径</span>
+      <span><i style="background:var(--start)"></i>起点</span>
+      <span><i style="background:var(--end)"></i>终点</span>
+    </div>
+    <p class="note">规则：四方向移动；起点代价不计入；普通格进入代价 1，高代价格 5。BFS 只按步数搜索（忽略地形代价），Dijkstra 与 A* 按地形代价搜索。编辑地图或拖动起终点会自动停止并清除当前搜索。</p>
+  </section>
+</main>
+<script>
+(function(){
+  "use strict";
+  var COLS=30, ROWS=20, COST_HIGH=5;
+  var cv=document.getElementById('grid'), ctx=cv.getContext('2d');
+  var $=function(id){return document.getElementById(id);};
+
+  var terrain=new Uint8Array(COLS*ROWS);      // 0 普通 1 障碍 2 高代价
+  var start=1*ROWS+10, end=28*ROWS+10;
+  var tool='wall', dragging=null, lastPaint=-1;
+
+  var algo="astar", speed=80, acc=0, lastT=0;
+  var frontier=new Map(), closed=new Map(), order=0;
+  var path=null, statusText='就绪。绘制障碍后点击“运行”。', statusKind='';
+  var running=false, finished=false, started=false;
+
+  function idx(c,r){return r*COLS+c;}
+  function colOf(i){return i%COLS;}
+  function rowOf(i){return (i/ROWS)|0;}
+  function terrainCost(i){return terrain[i]===2?COST_HIGH:1;}
+
+  /* ---------- 预设 ---------- */
+  function fill(v){terrain.fill(v);}
+  function box(c0,r0,c1,r1,v){
+    for(var r=Math.max(0,r0);r<=Math.min(ROWS-1,r1);r++)
+      for(var c=Math.max(0,c0);c<=Math.min(COLS-1,c1);c++) terrain[idx(c,r)]=v;
+  }
+  var PRESETS={
+    open:{name:'空旷网格',apply:function(){fill(0);start=idx(1,10);end=idx(28,10);}},
+    maze:{name:'迷宫（带缺口）',apply:function(){
+      fill(0);
+      for(var c=3;c<COLS-1;c+=5){
+        var gap=2+((c*3)%(ROWS-4));
+        for(var r=1;r<ROWS-1;r++) if(r!==gap&&r!==gap+1) terrain[idx(c,r)]=1;
+      }
+      start=idx(1,10);end=idx(28,10);
+    }},
+    weighted:{name:'加权地形',apply:function(){
+      fill(0);
+      box(12,4,20,15,2);   // 高代价条带：直穿 27 步、代价 63；绕行 39 步、代价 39
+      box(3,1,6,2,1);
+      box(24,17,27,18,1);
+      start=idx(1,10);end=idx(28,10);
+    }},
+    corridor:{name:'蛇形走廊',apply:function(){
+      fill(1);
+      for(var r=1;r<ROWS-1;r++){
+        if(r%4===1){ for(var c=1;c<COLS-2;c++) terrain[idx(c,r)]=0; }
+        else { var keep=((r/4)|0)%2===0?COLS-2:1; terrain[idx(keep,r)]=0;
+               var k2=((r/4)|0)%2===0?1:COLS-2; terrain[idx(k2,r)]=0; }
+      }
+      for(var c=0;c<COLS;c++){terrain[idx(c,0)]=1;terrain[idx(c,ROWS-1)]=1;}
+      start=idx(1,1);end=idx(COLS-2,ROWS-2);
+    }},
+    blocked:{name:'封闭终点（不可达）',apply:function(){
+      fill(0);
+      start=idx(1,10);end=idx(28,10);
+      var c=28,r=10;
+      var ring=[[c-1,r],[c+1,r],[c,r-1],[c,r+1]];
+      for(var d=0;d<ring.length;d++) terrain[idx(ring[d][0],ring[d][1])]=1;
+    }}
+  };
+
+  /* ---------- 搜索 ---------- */
+  function resetSearch(){
+    frontier=new Map(); closed=new Map(); order=0; path=null;
+    running=false; finished=false; started=false; acc=0;
+  }
+  function h(i){return Math.abs(colOf(i)-colOf(end))+Math.abs(rowOf(i)-rowOf(end));}
+  function popBest(){
+    var bestKey=null,best=null;
+    frontier.forEach(function(v,k){
+      if(best===null || v.f<best.f || (v.f===best.f && v.g<best.g)){best=v;bestKey=k;}
+    });
+    if(bestKey===null) return null;
+    frontier.delete(bestKey);
+    return {key:bestKey,g:best.g,from:best.from};
+  }
+  function neighbours(i){
+    var c=colOf(i), r=rowOf(i), out=[];
+    if(c>0)out.push(i-1); if(c<COLS-1)out.push(i+1);
+    if(r>0)out.push(i-COLS); if(r<ROWS-1)out.push(i+COLS);
+    return out;
+  }
+  function startSearch(autoRun){
+    if(start===end){ setStatus('起点与终点相同，无需搜索。',''); syncRunButton(); return; }
+    if(terrain[start]===1||terrain[end]===1){ setStatus('起点或终点被障碍覆盖，请先擦除。','bad'); syncRunButton(); return; }
+    resetSearch();
+    started=true;
+    frontier.set(start,{g:0,f:algo==='astar'?h(start):0,from:-1});
+    running=autoRun!==false; finished=false;
+    setStatus(running?('搜索中（'+$('algo').selectedOptions[0].textContent+'）…'):'已就绪，点击“单步”开始逐格推进。','');
+    syncRunButton();
+  }
+  function searchStep(){
+    if(finished) return false;
+    var cur=popBest();
+    if(cur===null){
+      finished=true; running=false;
+      setStatus('搜索结束：终点不可达。已访问 '+closed.size+' 个节点。','bad');
+      syncRunButton(); return false;
+    }
+    if(closed.has(cur.key)) return true;
+    closed.set(cur.key,{order:order++,from:cur.from,g:cur.g});
+    if(cur.key===end){
+      buildPath(cur.key);
+      finished=true; running=false;
+      setStatus('搜索结束：找到路径，'+path.steps+' 步，总代价 '+path.cost+'。','ok');
+      syncRunButton(); return false;
+    }
+    var ns=neighbours(cur.key);
+    for(var i=0;i<ns.length;i++){
+      var nb=ns[i];
+      if(terrain[nb]===1||closed.has(nb)) continue;
+      var ng=cur.g+(algo==='bfs'?1:terrainCost(nb));
+      var ex=frontier.get(nb);
+      if(ex&&ex.g<=ng) continue;
+      frontier.set(nb,{g:ng,f:algo==='astar'?ng+h(nb):ng,from:cur.key});
+    }
+    return true;
+  }
+  function buildPath(key){
+    var cells=[],k=key,e;
+    while(k!==-1){
+      cells.push(k);
+      e=closed.get(k);
+      k=e&&typeof e.from==='number'?e.from:-1;
+    }
+    cells.reverse();
+    var cost=0;
+    for(var i=1;i<cells.length;i++) cost+=terrainCost(cells[i]);
+    path={cells:cells,steps:cells.length-1,cost:cost};
+  }
+
+  /* ---------- 渲染 ---------- */
+  var dpr=1, cell=10;
+  function resize(){
+    var r=cv.parentNode.getBoundingClientRect();
+    dpr=Math.min(window.devicePixelRatio||1,2);
+    var w=Math.max(1,Math.floor(r.width)), h=Math.max(1,Math.floor(r.height));
+    cv.width=Math.floor(w*dpr); cv.height=Math.floor(h*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    cell=Math.min(w/COLS,h/ROWS);
+    render();
+  }
+  function render(){
+    var r=cv.parentNode.getBoundingClientRect();
+    var w=r.width,h=r.height;
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle='#0b0f18'; ctx.fillRect(0,0,w,h);
+    var s=cell, ox=(w-s*COLS)/2, oy=(h-s*ROWS)/2;
+    // 地形
+    for(var i=0;i<terrain.length;i++){
+      var c=colOf(i), rr=rowOf(i), x=ox+c*s, y=oy+rr*s;
+      if(terrain[i]===1){ ctx.fillStyle='#5a6a85'; ctx.fillRect(x+0.5,y+0.5,s-1,s-1); continue; }
+      if(terrain[i]===2){
+        ctx.fillStyle='#3b2a63'; ctx.fillRect(x+0.5,y+0.5,s-1,s-1);
+        ctx.fillStyle='#8b5cf6';
+        ctx.beginPath(); ctx.arc(x+s/2,y+s/2,Math.max(1,s*0.16),0,6.284); ctx.fill();
+        continue;
+      }
+      ctx.fillStyle='#141b2b'; ctx.fillRect(x+0.5,y+0.5,s-1,s-1);
+    }
+    // 已访问（按访问顺序渐变）
+    closed.forEach(function(e,k){
+      var c=colOf(k), rr=rowOf(k), t=Math.min(1,e.order/Math.max(1,closed.size-1));
+      ctx.fillStyle='rgba(59,130,246,'+(0.18+0.42*t)+')';
+      ctx.fillRect(ox+c*s+0.5,oy+rr*s+0.5,s-1,s-1);
+    });
+    // 前沿
+    frontier.forEach(function(v,k){
+      var c=colOf(k), rr=rowOf(k);
+      ctx.fillStyle='rgba(217,119,6,0.85)';
+      ctx.fillRect(ox+c*s+1,oy+rr*s+1,s-2,s-2);
+    });
+    // 路径
+    if(path){
+      ctx.strokeStyle='#22c55e'; ctx.lineWidth=Math.max(2,s*0.32);
+      ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.beginPath();
+      for(var i=0;i<path.cells.length;i++){
+        var k=path.cells[i], x=ox+(colOf(k)+0.5)*s, y=oy+(rowOf(k)+0.5)*s;
+        if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+    // 起终点
+    marker(ox,oy,s,start,'#38bdf8');
+    marker(ox,oy,s,end,'#f43f5e');
+    // 网格线
+    ctx.strokeStyle='rgba(148,163,184,0.12)'; ctx.lineWidth=1;
+    ctx.beginPath();
+    for(var c2=1;c2<COLS;c2++){ctx.moveTo(ox+c2*s,oy);ctx.lineTo(ox+c2*s,oy+s*ROWS);}
+    for(var r2=1;r2<ROWS;r2++){ctx.moveTo(ox,oy+r2*s);ctx.lineTo(ox+s*COLS,oy+r2*s);}
+    ctx.stroke();
+    updateStats();
+  }
+  function marker(ox,oy,s,i,color){
+    var x=ox+(colOf(i)+0.5)*s, y=oy+(rowOf(i)+0.5)*s;
+    ctx.fillStyle=color;
+    ctx.beginPath(); ctx.arc(x,y,Math.max(3,s*0.34),0,6.284); ctx.fill();
+    ctx.strokeStyle='#0f1420'; ctx.lineWidth=1.5; ctx.stroke();
+  }
+  function updateStats(){
+    $('sVisited').textContent=closed.size;
+    $('sFrontier').textContent=frontier.size;
+    $('sSteps').textContent=path?path.steps:'—';
+    $('sCost').textContent=path?path.cost:'—';
+  }
+  function setStatus(t,kind){statusText=t;statusKind=kind||'';var el=$('status');el.textContent=t;el.className='status'+(kind?' '+kind:'');}
+
+  /* ---------- 交互 ---------- */
+  function posToCell(ev){
+    var r=cv.getBoundingClientRect();
+    var s=cell, ox=(r.width-s*COLS)/2, oy=(r.height-s*ROWS)/2;
+    var x=(ev.clientX-r.left-ox)/s, y=(ev.clientY-r.top-oy)/s;
+    if(x<0||y<0||x>=COLS||y>=ROWS) return -1;
+    return idx(Math.floor(x),Math.floor(y));
+  }
+  function paint(i){
+    if(i<0||i===start||i===end) return;   // 起终点不可被覆盖
+    var before=terrain[i];
+    terrain[i]= tool==='wall'?1:tool==='cost'?2:0;
+    if(before!==terrain[i]){ onMapEdited(); }
+  }
+  function onMapEdited(){
+    if(closed.size||frontier.size||path){ resetSearch(); setStatus('地图已修改，搜索结果已清除。',''); }
+    render();
+  }
+  cv.addEventListener('pointerdown',function(ev){
+    cv.setPointerCapture(ev.pointerId);
+    var i=posToCell(ev);
+    if(i<0) return;
+    if(i===start){ dragging='start'; render(); return; }
+    if(i===end){ dragging='end'; render(); return; }
+    dragging='paint'; lastPaint=-1; paint(i); lastPaint=i; render();
+  });
+  cv.addEventListener('pointermove',function(ev){
+    if(dragging===null) return;
+    var i=posToCell(ev); if(i<0) return;
+    if(dragging==='paint'){
+      if(i!==lastPaint){ paint(i); lastPaint=i; render(); }
+      return;
+    }
+    var other = dragging==='start' ? end : start;
+    if(i===other||i===(dragging==='start'?start:end)) return;
+    if(terrain[i]===1) return;   // 起终点不能落在障碍上
+    if(dragging==='start') start=i; else end=i;
+    onMapEdited();
+  });
+  function endDrag(){ if(dragging!==null){ dragging=null; lastPaint=-1; } }
+  cv.addEventListener('pointerup',endDrag);
+  cv.addEventListener('pointercancel',endDrag);
+
+  function syncRunButton(){ $('run').textContent = running?'暂停':(finished?'重新运行':'运行'); }
+  $('run').addEventListener('click',function(){
+    if(running){ running=false; acc=0; setStatus('已暂停。可继续或单步。',''); syncRunButton(); return; }
+    if(!started||finished) startSearch(true);
+    else { running=true; setStatus('搜索中…',''); syncRunButton(); }
+  });
+  $('stepBtn').addEventListener('click',function(){
+    running=false; acc=0; syncRunButton();
+    if(finished){ setStatus('搜索已结束，请先“清除搜索”再单步。',''); return; }
+    if(!started) startSearch(false);
+    searchStep(); render();
+  });
+  $('clear').addEventListener('click',function(){
+    resetSearch(); setStatus('已清除搜索结果，地图保留。',''); syncRunButton(); render();
+  });
+  $('reset').addEventListener('click',function(){ applyPreset($('preset').value); });
+  $('resetEnds').addEventListener('click',function(){
+    start=idx(1,10); end=idx(28,10); onMapEdited();
+    setStatus('起终点已重置。','');
+  });
+  $('algo').addEventListener('change',function(){
+    algo=this.value; onMapEdited();
+    setStatus('算法已切换为 '+$('algo').selectedOptions[0].textContent+'，请重新运行。','');
+  });
+  $('speed').addEventListener('input',function(){ speed=+this.value; $('speedVal').textContent=speed; });
+  document.querySelectorAll('[data-tool]').forEach(function(b){
+    b.addEventListener('click',function(){
+      tool=b.dataset.tool;
+      document.querySelectorAll('[data-tool]').forEach(function(o){o.setAttribute('aria-pressed',String(o===b));});
+    });
+  });
+  function applyPreset(key){
+    var p=PRESETS[key]||PRESETS.open;
+    p.apply();
+    if(terrain[start]===1) terrain[start]=0;
+    if(terrain[end]===1) terrain[end]=0;
+    resetSearch();
+    setStatus('已加载预设：'+p.name);
+    syncRunButton(); render();
+  }
+  (function(){
+    var sel=$('preset');
+    Object.keys(PRESETS).forEach(function(k){
+      var o=document.createElement('option'); o.value=k; o.textContent=PRESETS[k].name; sel.appendChild(o);
+    });
+    sel.addEventListener('change',function(){ applyPreset(this.value); });
+    applyPreset('open');
+  })();
+
+  /* ---------- 主循环 ---------- */
+  function frame(t){
+    if(running){
+      var dt=(t-lastT)/1000; lastT=t; acc+=dt*speed;
+      var guard=0;
+      while(acc>=1&&running&&guard<500){ acc-=1; searchStep(); guard++; }
+    } else { lastT=t; acc=0; }
+    render();
+    requestAnimationFrame(frame);
+  }
+  if(window.ResizeObserver) new ResizeObserver(resize).observe(cv.parentNode);
+  window.addEventListener('resize',resize);
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
