@@ -7,11 +7,9 @@ test("topic effort order matches comparison selectors and date sorting remains e
 }) => {
   await page.goto("topic.html?id=bluebook&prompt=v2");
   await expect(page.locator("#topic-sort")).toHaveValue("model");
-  const solRows = page
-    .locator(".topic-run-row")
-    .filter({
-      has: page.locator(".topic-run-model", { hasText: /^GPT-6\.1 Sol$/ }),
-    });
+  const solRows = page.locator(".topic-run-row").filter({
+    has: page.locator(".topic-run-model", { hasText: /^GPT-6\.1 Sol$/ }),
+  });
   await expect(solRows.locator(".topic-run-effort")).toHaveText([
     "max（最大）",
     "medium（中）",
@@ -196,6 +194,50 @@ test("compact homepage supports removable filters, URL restore and recent experi
     decodeURIComponent(location.hash.slice(1)),
   );
   await expect(page.locator('[id="' + target + '"]')).toBeVisible();
+});
+
+test("homepage vendor filtering composes with model filtering and restores from URL", async ({
+  page,
+}) => {
+  await page.goto("./?group=runs");
+  const activeRuns = data.runs.filter(
+    (run) =>
+      data.topics.find((topic) => topic.id === run.topicId)?.testingStatus !==
+      "archived",
+  );
+  const minimaxRuns = activeRuns.filter(
+    (run) =>
+      data.models.find((model) => model.id === run.modelId)?.provider ===
+      "MiniMax",
+  );
+  await page.locator("#provider").selectOption("MiniMax");
+  await expect(page.locator("#result-count")).toContainText(
+    `${minimaxRuns.length} 条匹配记录`,
+  );
+  await expect(page).toHaveURL(/provider=MiniMax/);
+
+  const modelRuns = minimaxRuns.filter(
+    (run) => run.modelId === "minimax-m3-1-flash-preview",
+  );
+  await page.locator("#model").selectOption("minimax-m3-1-flash-preview");
+  await expect(page.locator("#result-count")).toContainText(
+    `${modelRuns.length} 条匹配记录`,
+  );
+  await page.reload();
+  await expect(page.locator("#provider")).toHaveValue("MiniMax");
+  await expect(page.locator("#model")).toHaveValue(
+    "minimax-m3-1-flash-preview",
+  );
+
+  await page.locator('[data-remove-filter="provider"]').click();
+  await expect(page.locator("#provider")).toHaveValue("");
+  await expect(page.locator("#result-count")).toContainText(
+    `${modelRuns.length} 条匹配记录`,
+  );
+  await page.locator('[data-remove-filter="model"]').click();
+  await expect(page.locator("#result-count")).toContainText(
+    `${activeRuns.length} 条匹配记录`,
+  );
 });
 
 test("topic matrix filters versions, exposes repeat runs and switches to a mobile list", async ({

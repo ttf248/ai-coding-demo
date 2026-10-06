@@ -68,6 +68,29 @@ test("homepage covers use registered run screenshots and direct previews", async
   await expect(page.locator("#guide-search")).toBeVisible();
 });
 
+test("recent update cards keep text within their bounds on desktop and mobile", async ({
+  page,
+}) => {
+  await page.goto("./");
+  const textOverflows = await page
+    .locator("#recent-list a")
+    .evaluateAll((links) =>
+      links.some((link) => {
+        const bounds = link.getBoundingClientRect();
+        return [...link.querySelectorAll("span, strong, small, time")].some(
+          (element) => element.getBoundingClientRect().right > bounds.right + 1,
+        );
+      }),
+    );
+  expect(textOverflows).toBe(false);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
+
 test("active topic grouping shows a screenshot for every active topic", async ({
   page,
 }) => {

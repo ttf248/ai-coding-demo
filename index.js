@@ -8,6 +8,7 @@
   const state = {
     q: params.get("q") || "",
     category: params.get("category") || "",
+    provider: params.get("provider") || "",
     model: params.get("model") || "",
     type: params.get("type") || "",
     prompt: params.get("prompt") || "",
@@ -45,6 +46,21 @@
     "category",
     data.categories.map((c) => [c.id, c.label]),
   );
+  const providers = [
+    ...new Set(data.models.map((model) => model.provider || "unknown")),
+  ].sort((a, b) => {
+    if (a === b) return 0;
+    if (a === "unknown") return 1;
+    if (b === "unknown") return -1;
+    return a.localeCompare(b, "en");
+  });
+  options(
+    "provider",
+    providers.map((provider) => [
+      provider,
+      provider === "unknown" ? "未记录 / 多轮混合" : provider,
+    ]),
+  );
   $("model").insertAdjacentHTML(
     "beforeend",
     U.groupedOptions(
@@ -74,7 +90,13 @@
       const topics = [...new Set(matched.map((r) => r.topicId))].map((id) =>
         data.topics.find((t) => t.id === id),
       );
-      if (!state.model && !state.type && !state.prompt && !state.preview) {
+      if (
+        !state.provider &&
+        !state.model &&
+        !state.type &&
+        !state.prompt &&
+        !state.preview
+      ) {
         topics.push(
           ...data.topics.filter(
             (t) =>
@@ -237,6 +259,7 @@
     for (const key of [
       "q",
       "category",
+      "provider",
       "model",
       "type",
       "prompt",
@@ -248,6 +271,7 @@
     $("active-filters").innerHTML = [
       "q",
       "category",
+      "provider",
       "model",
       "type",
       "prompt",
@@ -303,6 +327,7 @@
   [
     "q",
     "category",
+    "provider",
     "model",
     "type",
     "prompt",
@@ -343,6 +368,7 @@
       Object.assign(state, {
         q: "",
         category: "",
+        provider: "",
         model: "",
         type: "",
         prompt: "",
@@ -378,11 +404,15 @@
         e(r.id) +
         '"><span>' +
         e(data.topics.find((t) => t.id === r.topicId).title) +
-        "</span><strong>" +
-        e(U.runSummary(data, r)) +
-        "</strong><small>" +
+        '</span><strong class="recent-model">' +
+        e(U.modelLabel(data, r)) +
+        "</strong><small><span>" +
+        e(U.effortLabel(r.effort)) +
+        " · " +
+        e(U.roundLabel(r)) +
+        "</span><time>" +
         e(r.date || "日期未记录") +
-        "</small></a>",
+        "</time></small></a>",
     )
     .join("");
   function guides() {

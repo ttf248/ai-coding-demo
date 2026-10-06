@@ -14,6 +14,8 @@
     );
   const modelLabel = (data, run) =>
     data.models.find((m) => m.id === run.modelId)?.label || "未记录";
+  const modelProviderId = (data, run) =>
+    data.models.find((m) => m.id === run.modelId)?.provider || "unknown";
   const modelProvider = (data, run) =>
     data.models.find((m) => m.id === run.modelId)?.provider ||
     "未记录 / 多轮混合";
@@ -122,6 +124,7 @@
             state.testing === "all" ||
             (state.testing === "archived") === isTopicArchived(t)) &&
           (!state.category || t.category === state.category) &&
+          (!state.provider || modelProviderId(data, r) === state.provider) &&
           (!state.model || r.modelId === state.model) &&
           (!state.type || r.type === state.type) &&
           (!state.prompt || `${r.topicId}/${r.promptId}` === state.prompt) &&
@@ -132,6 +135,7 @@
               t.title,
               r.title,
               r.description,
+              modelProvider(data, r),
               modelLabel(data, r),
               r.effort,
               ...r.tags,
@@ -422,6 +426,7 @@
   global.ArchiveUI = {
     escape,
     modelLabel,
+    modelProviderId,
     modelProvider,
     isTopicArchived,
     compareModelRuns,
