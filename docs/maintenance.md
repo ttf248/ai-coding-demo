@@ -66,6 +66,8 @@ node --input-type=module -e "import {read,hash} from './scripts/lib.mjs'; consol
 
 静态单文件和原型设置 `preview.kind: "static"`，入口相对于实验目录。新单文件入口用 `index.html`。多页面配置 `pages`，每项包含 `id`、`label`、`path`，`defaultPage` 指向其中一项。
 
+run 可选 `screenshot`，路径相对于本 run 目录，登记已经生成的 PNG 实际运行截图。首页按主题聚合时，在当前筛选结果中显示日期最新且有截图的 run；按 run 聚合时显示各自已登记的截图。没有 run 截图时才回退到主题 `thumbnail`。
+
 ```json
 {"kind":"static","pages":[{"id":"index","label":"主页面","path":"index.html"}],"defaultPage":"index","network":"required","embed":true,"externalUrl":null}
 ```

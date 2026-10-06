@@ -26,6 +26,11 @@ HTTP 和 file:// 均在 Chromium 中检查；390px 触摸模式无页面水平�
 
 最终检查：generate、validate、11 项 Node 测试、34 项浏览器回归、首页与实验脚本语法、git diff --check 均通过。结构化验收记录见 [validation.json](evidence/validation.json)。
 
+## 预览截图
+
+![最终入口运行截图](preview-2026-10-06.png)
+
+由本实验最终版 `index.html` 在 Chromium 1440 × 1050 桌面视口生成；流体案例先注入双色笔迹并暂停，以展示交互后的模拟画面。
 <!-- archive:start -->
 ## 当前归档信息（自动生成）
 
