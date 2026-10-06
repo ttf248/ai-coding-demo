@@ -81,11 +81,39 @@
     ]),
   );
   const selection = U.setupSelection(data);
+  // Keep screenshot attribution available without placing text over the artwork.
+  function galleryFigure(html) {
+    return html.replace(
+      /<figcaption>([\s\S]*?)<\/figcaption>/g,
+      '<figcaption><details class="screenshot-source"><summary>截图来源</summary><p>$1</p></details></figcaption>',
+    );
+  }
+  function placeholder(title) {
+    return (
+      '<div class="topic-placeholder"><span>' +
+      e(title) +
+      "</span><small>暂无截图</small></div>"
+    );
+  }
   function render(reset = false) {
     if (reset) visible = 9;
     const matched = U.filterRuns(data, state);
     let items;
-    if (state.group === "runs") items = matched.map((r) => U.runCard(data, r));
+    if (state.group === "runs")
+      items = matched.map((r) => {
+        const html = galleryFigure(U.runCard(data, r))
+          .replace(
+            '<div class="card-top">',
+            '<div class="run-body"><div class="card-top">',
+          )
+          .replace("</article>", "</div></article>");
+        return r.screenshot
+          ? html
+          : html.replace(
+              '<article class="card run-card">',
+              '<article class="card run-card">' + placeholder(r.title),
+            );
+      });
     else {
       const topics = [...new Set(matched.map((r) => r.topicId))].map((id) =>
         data.topics.find((t) => t.id === id),
@@ -167,13 +195,10 @@
           '<article class="card topic-card' +
           (cover ? " has-cover" : "") +
           '">' +
-          cover +
+          (cover ? galleryFigure(cover) : placeholder(t.title)) +
           '<div class="topic-body"><div class="card-top"><span class="eyebrow">' +
           e(data.categories.find((c) => c.id === t.category).label) +
-          '</span><span class="pill">' +
-          runs.length +
-          (runs.length !== all.length ? " / " + all.length : "") +
-          " 个版本</span>" +
+          "</span>" +
           (U.isTopicArchived(t) ? '<span class="pill">已归档</span>' : "") +
           '</div><h3><a href="topic.html?id=' +
           t.id +
@@ -184,8 +209,12 @@
           '</p><p class="topic-metrics">' +
           new Set(runs.map((r) => r.modelId)).size +
           " 个模型 · " +
+          runs.length +
+          (runs.length !== all.length ? " / " + all.length : "") +
+          " 个版本" +
+          '</p><details class="experiment-info"><summary>实验信息</summary><div class="latest-run"><span>最新实验 · ' +
           e(latest?.date || "日期未记录") +
-          '</p><div class="latest-run"><span>最新实验</span><strong>' +
+          "</span><strong>" +
           e(
             latest
               ? U.modelLabel(data, latest) +
@@ -203,14 +232,20 @@
           ]
             .map((m) => "<span>" + e(m) + "</span>")
             .join("") +
-          '</div></details><div class="card-actions">' +
+          "</div></details>" +
+          (previewRun
+            ? '<p class="preview-source">预览来源 · ' +
+              e(U.runSummary(data, previewRun)) +
+              "</p>"
+            : "") +
+          '</details><div class="card-actions">' +
           (previewRun
             ? '<a class="preview-link" href="' +
               e(U.previewURL(previewRun)) +
               '" target="_blank" rel="noopener" aria-label="打开预览：' +
               e(t.title + " · " + U.runSummary(data, previewRun)) +
               '">打开预览 ↗</a>'
-            : '<span class="no-preview">暂无可用预览</span>') +
+            : '<span class="no-preview">仅档案</span>') +
           '<a href="topic.html?id=' +
           t.id +
           '">查看实验 →</a>' +
@@ -387,6 +422,10 @@
     render(true);
   });
   $("advanced-filters").open = !!(
+    state.provider ||
+    state.model ||
+    state.group !== "topics" ||
+    state.view !== "grid" ||
     state.category ||
     state.type ||
     state.prompt ||
@@ -442,6 +481,18 @@
     .addEventListener("click", () => {
       $("guides").open = true;
     });
+  const mobileNav = matchMedia("(max-width: 700px)");
+  const navMore = document.querySelector(".nav-more");
+  const updateNav = () => {
+    navMore.open = !mobileNav.matches;
+  };
+  mobileNav.addEventListener("change", updateNav);
+  updateNav();
+  document.querySelectorAll(".nav-more a").forEach((link) =>
+    link.addEventListener("click", () => {
+      if (mobileNav.matches) navMore.open = false;
+    }),
+  );
   if (location.hash === "#guides") $("guides").open = true;
   guides();
   render();

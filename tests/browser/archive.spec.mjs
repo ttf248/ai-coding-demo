@@ -44,6 +44,7 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
     "GPT-5.6 Sol",
     "未记录 / 多轮混合",
   ]);
+  await page.locator("#advanced-filters > summary").click();
   await page.locator("#model").selectOption("gpt-6-1-sol");
   await page.reload();
   await expect(page.locator("#model")).toHaveValue("gpt-6-1-sol");
@@ -77,6 +78,7 @@ test("directory counts, filters, sort, views, pagination and selection", async (
     ),
   );
   await expect(page.locator("#stats")).toContainText(String(data.runs.length));
+  await page.locator("#advanced-filters > summary").click();
   await page.locator('[data-group="runs"]').click();
   await expect(page.locator("#project-grid .card")).toHaveCount(
     Math.min(9, data.runs.length),
@@ -90,7 +92,6 @@ test("directory counts, filters, sort, views, pagination and selection", async (
     Math.min(9, data.runs.filter((r) => r.modelId === "gpt-6-astra").length),
   );
   await page.locator("#model").selectOption("gpt-6-astra");
-  await page.locator("#advanced-filters summary").click();
   await page.locator("#sort").selectOption("title");
   await page.locator('[data-view="list"]').click();
   await expect(page.locator("#project-grid")).toHaveClass(/list/);
