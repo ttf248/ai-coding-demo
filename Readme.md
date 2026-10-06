@@ -31,8 +31,8 @@
 ## 项目统计
 
 - 实验主题：12
-- 实验记录：87
-- 可预览记录：78
+- 实验记录：91
+- 可预览记录：82
 - 技术主题：14
 
 ## 实验目录
@@ -66,6 +66,7 @@
 | [简化电路实验台 · GPT-6.1 Sol Low](demos/circuit-lab/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](demos/circuit-lab/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-1-sol-low-r01/index.html) |
 | [直流电路实验台 · gpt-6.1-sol max](demos/circuit-lab/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-10-05 | [v1](demos/circuit-lab/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-1-sol-max-r01/index.html) |
 | [circuit-lab · GPT 6 Astra Low](demos/circuit-lab/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-10-06 | [v1](demos/circuit-lab/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-astra-low-r01/index.html) |
+| [简化电路实验台](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-06 | [v1](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 奇幻地图生成器
 
@@ -77,6 +78,7 @@
 | [奇幻地图生成器 · GPT-6.1 Sol Low](demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/index.html) |
 | [奇幻岛屿地图 · gpt-6.1-sol max](demos/fantasy-map-generator/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-10-05 | [v1](demos/fantasy-map-generator/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-1-sol-max-r01/index.html) |
 | [fantasy-map-generator · GPT 6 Astra Low](demos/fantasy-map-generator/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-10-06 | [v1](demos/fantasy-map-generator/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-astra-low-r01/index.html) |
+| [奇幻地图生成器](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-06 | [v1](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 彩色流体实验台
 
@@ -88,6 +90,7 @@
 | [彩色流体实验台 · GPT-6.1 Sol Low](demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/index.html) |
 | [彩色流体实验台 · gpt-6.1-sol max](demos/fluid-simulation/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-10-05 | [v1](demos/fluid-simulation/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-1-sol-max-r01/index.html) |
 | [fluid-simulation · GPT 6 Astra Low](demos/fluid-simulation/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-10-06 | [v1](demos/fluid-simulation/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-astra-low-r01/index.html) |
+| [彩色流体实验台](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-06 | [v1](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 生活情绪日记
 
@@ -145,6 +148,7 @@
 | [寻路算法实验室 · GPT-6.1 Sol Low](demos/pathfinding-lab/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](demos/pathfinding-lab/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-1-sol-low-r01/index.html) |
 | [寻路算法实验室 · gpt-6.1-sol max](demos/pathfinding-lab/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-10-05 | [v1](demos/pathfinding-lab/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-1-sol-max-r01/index.html) |
 | [pathfinding-lab · GPT 6 Astra Low](demos/pathfinding-lab/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-10-06 | [v1](demos/pathfinding-lab/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-astra-low-r01/index.html) |
+| [寻路算法实验室](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-06 | [v1](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### Pixel Flow
 
