@@ -105,11 +105,19 @@
           latest && U.previewURL(latest)
             ? latest
             : runs.find((r) => U.previewURL(r));
+        const screenshotRun = [...runs]
+          .filter((r) => U.screenshotURL(r))
+          .sort(
+            (a, b) =>
+              (b.date || "").localeCompare(a.date || "") ||
+              U.compareModelRuns(data, a, b),
+          )[0];
         const coverRun =
           t.thumbnail &&
           data.runs.find((r) => r.id === t.thumbnail.sourceRunId);
-        const cover =
-          coverRun && runs.some((r) => r.id === coverRun.id)
+        const cover = screenshotRun
+          ? U.screenshotFigure(data, screenshotRun, "topic-cover")
+          : coverRun && runs.some((r) => r.id === coverRun.id)
             ? '<figure class="topic-cover"><img src="' +
               e(t.thumbnail.path) +
               '" alt="' +

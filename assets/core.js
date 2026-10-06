@@ -221,6 +221,32 @@
       )?.href || null
     );
   }
+  function screenshotURL(run) {
+    return run?.screenshot ? `${run.directory}/${run.screenshot}` : null;
+  }
+  function screenshotFigure(data, run, className) {
+    const src = screenshotURL(run);
+    if (!src) return "";
+    const topic = data.topics.find((item) => item.id === run.topicId);
+    const label = runSummary(data, run);
+    return (
+      '<figure class="' +
+      escape(className) +
+      '" data-screenshot-run="' +
+      escape(run.id) +
+      '"><a href="' +
+      escape(src) +
+      '" target="_blank" rel="noopener" aria-label="打开截图：' +
+      escape(topic.title + " · " + label) +
+      '"><img src="' +
+      escape(src) +
+      '" alt="' +
+      escape(topic.title + " · " + label + " 实际运行截图") +
+      '" loading="lazy" decoding="async" width="1440" height="1050"></a><figcaption>实际截图 · ' +
+      escape(label) +
+      "</figcaption></figure>"
+    );
+  }
   const roundLabel = (run) => {
     const match = run.runId.match(/r(\d+)$/);
     return match ? "第 " + Number(match[1]) + " 轮" : "轮次未记录";
@@ -358,7 +384,9 @@
   function runCard(data, r) {
     const href = previewURL(r);
     return (
-      '<article class="card"><div class="card-top"><span class="eyebrow">' +
+      '<article class="card run-card">' +
+      screenshotFigure(data, r, "run-card-screenshot") +
+      '<div class="card-top"><span class="eyebrow">' +
       escape(r.type) +
       " / " +
       escape(r.date || "未记录") +
@@ -407,6 +435,8 @@
     filterRuns,
     diff,
     previewURL,
+    screenshotURL,
+    screenshotFigure,
     setupSelection,
     roundLabel,
     runSummary,

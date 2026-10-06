@@ -89,6 +89,11 @@
           " · " +
           (r.preview.kind === "none" ? "无预览" : "可预览") +
           '</small><div class="card-actions">' +
+          (U.screenshotURL(r)
+            ? '<a href="' +
+              e(U.screenshotURL(r)) +
+              '" target="_blank" rel="noopener">截图 ↗</a>'
+            : "") +
           (href
             ? '<a href="' +
               e(href) +
@@ -289,6 +294,11 @@
                   '</td><td class="topic-run-date"><time>' +
                   e(r.date || "日期未记录") +
                   '</time></td><td><div class="topic-row-actions">' +
+                  (U.screenshotURL(r)
+                    ? '<a href="' +
+                      e(U.screenshotURL(r)) +
+                      '" target="_blank" rel="noopener">截图 ↗</a>'
+                    : "") +
                   (href
                     ? '<a href="' +
                       e(href) +

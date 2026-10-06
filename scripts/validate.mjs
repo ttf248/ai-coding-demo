@@ -166,6 +166,11 @@ for (const r of catalog.runs) {
     `Original input changed: ${r.id}. Preserve history; create a new run for changed input.`,
   );
   check(exists(r.document), `Missing Readme ${r.id}`);
+  if (r.screenshot)
+    check(
+      exists(`${r.directory}/${r.screenshot}`),
+      `Missing run screenshot ${r.id}`,
+    );
   if (r.date) {
     const [year, month = 1, day = 1] = r.date.split("-").map(Number);
     const d = new Date(Date.UTC(year, month - 1, day));
