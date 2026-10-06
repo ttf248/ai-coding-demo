@@ -165,18 +165,19 @@ async function isolatePreviews(page) {
   );
 }
 
-test("compact homepage supports removable filters, URL restore and recent experiment links", async ({
+test("gallery homepage supports removable filters, URL restore and recent experiment links", async ({
   page,
 }) => {
   await page.goto("./");
   await expect(page.locator("#advanced-filters")).not.toHaveAttribute("open");
+  await openHomeControls(page);
   await page.locator("#model").selectOption("gpt-6-1-sol");
   await expect(page.locator('[data-remove-filter="model"]')).toContainText(
     "GPT-6.1 Sol",
   );
   await page.locator('[data-remove-filter="model"]').click();
   await expect(page.locator("#model")).toHaveValue("");
-  await page.locator("#advanced-filters summary").click();
+  await openHomeControls(page);
   await page.locator("#preview").selectOption("no");
   await page.reload();
   await expect(page.locator("#advanced-filters")).toHaveAttribute("open", "");
@@ -210,6 +211,7 @@ test("homepage vendor filtering composes with model filtering and restores from 
       data.models.find((model) => model.id === run.modelId)?.provider ===
       "MiniMax",
   );
+  await openHomeControls(page);
   await page.locator("#provider").selectOption("MiniMax");
   await expect(page.locator("#result-count")).toContainText(
     `${minimaxRuns.length} 条匹配记录`,
@@ -219,6 +221,7 @@ test("homepage vendor filtering composes with model filtering and restores from 
   const modelRuns = minimaxRuns.filter(
     (run) => run.modelId === "minimax-m3-1-flash-preview",
   );
+  await openHomeControls(page);
   await page.locator("#model").selectOption("minimax-m3-1-flash-preview");
   await expect(page.locator("#result-count")).toContainText(
     `${modelRuns.length} 条匹配记录`,
@@ -419,3 +422,8 @@ test("conditions compare all selected experiments, filter differences and restor
   await page.goto("compare.html?left=missing-run&tab=conditions");
   await expect(page.locator("#conditions-table")).toContainText("实验不存在");
 });
+
+async function openHomeControls(page) {
+  if ((await page.locator("#advanced-filters").getAttribute("open")) === null)
+    await page.locator("#advanced-filters > summary").click();
+}

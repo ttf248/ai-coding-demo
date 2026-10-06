@@ -22,6 +22,7 @@ test("homepage covers use registered run screenshots and direct previews", async
       )[0];
     return {
       path: `${run.directory}/${run.screenshot}`,
+      modelId: run.modelId,
       label:
         window.ArchiveUI.modelLabel(window.ARCHIVE, run) +
         " · " +
@@ -46,14 +47,27 @@ test("homepage covers use registered run screenshots and direct previews", async
   const response = await page.request.get(previewHref);
   expect(response.ok()).toBe(true);
   const otherModel = data.models.find(
-    (m) => m.id !== source.modelId && data.runs.some((r) => r.modelId === m.id),
+    (m) =>
+      m.id !== source.modelId &&
+      data.runs.some((r) => r.modelId === m.id && r.topicId === topic.id),
   );
+  await openHomeControls(page);
   await page.locator("#model").selectOption(otherModel.id);
-  const filteredScreenshot = data.runs.find(
-    (run) =>
-      run.topicId === topic.id &&
-      run.modelId === otherModel.id &&
-      run.screenshot,
+  const filteredScreenshot = await page.evaluate(
+    ({ topicId, modelId }) =>
+      window.ARCHIVE.runs
+        .filter(
+          (run) =>
+            run.topicId === topicId &&
+            run.modelId === modelId &&
+            run.screenshot,
+        )
+        .sort(
+          (a, b) =>
+            (b.date || "").localeCompare(a.date || "") ||
+            window.ArchiveUI.compareModelRuns(window.ARCHIVE, a, b),
+        )[0],
+    { topicId: topic.id, modelId: otherModel.id },
   );
   if (filteredScreenshot) {
     await expect(card.locator(".topic-cover img")).toHaveAttribute(
@@ -62,6 +76,7 @@ test("homepage covers use registered run screenshots and direct previews", async
     );
   } else {
     await expect(card.locator(".topic-cover")).toHaveCount(0);
+    await expect(card.locator(".topic-placeholder")).toContainText("暂无截图");
   }
   await page.locator("nav a[href='#guides']").click();
   await expect(page.locator("#guides")).toHaveAttribute("open", "");
@@ -158,6 +173,7 @@ test("homepage grid and list keep preview controls within a mobile viewport", as
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("./?testing=active&sort=latest&group=topics&view=grid");
   for (const view of ["grid", "list"]) {
+    await openHomeControls(page);
     await page.locator('[data-view="' + view + '"]').click();
     expect(
       await page.evaluate(
@@ -166,6 +182,7 @@ test("homepage grid and list keep preview controls within a mobile viewport", as
     ).toBe(true);
     const card = page.locator(".topic-card").first();
     await expect(card.locator(".preview-link")).toBeVisible();
+    await card.locator(".experiment-info > summary").click();
     await expect(card.locator(".latest-run strong")).not.toBeEmpty();
   }
   await page.reload();
@@ -173,7 +190,7 @@ test("homepage grid and list keep preview controls within a mobile viewport", as
   await page.locator("#sort").selectOption("title");
   await page.reload();
   await expect(page.locator("#sort")).toHaveValue("title");
-  await expect(page.locator("#advanced-filters")).not.toHaveAttribute("open");
+  await expect(page.locator("#advanced-filters")).toHaveAttribute("open", "");
 });
 
 test("homepage exposes archived topics and keeps its directory compact", async ({
@@ -205,8 +222,10 @@ test("homepage exposes archived topics and keeps its directory compact", async (
     await page.locator("#load-more").click();
   }
   await expect(page.locator(".topic-card")).toHaveCount(data.topics.length);
+  await openHomeControls(page);
   await page.locator('[data-view="grid"]').click();
   await expect(page.locator("#project-grid")).not.toHaveClass(/list/);
+  await openHomeControls(page);
   await page.locator('[data-view="list"]').click();
   while (await page.locator("#load-more").isVisible()) {
     await page.locator("#load-more").click();
@@ -222,4 +241,35 @@ test("homepage exposes archived topics and keeps its directory compact", async (
     .click();
   await expect(page).toHaveURL(/topic.html\?id=stock-watching/);
   expect(errors).toEqual([]);
+});
+
+async function openHomeControls(page) {
+  if ((await page.locator("#advanced-filters").getAttribute("open")) === null)
+    await page.locator("#advanced-filters > summary").click();
+}
+
+test("gallery prioritizes artwork and reveals metadata and navigation on demand", async ({
+  page,
+}) => {
+  await page.goto("./?testing=active&sort=latest&group=topics&view=grid");
+  const first = page.locator(".topic-card").first();
+  expect((await first.boundingBox()).y).toBeLessThan(480);
+  await expect(page.locator("#provider")).toBeHidden();
+  await expect(first.locator(".latest-run")).toBeHidden();
+  await expect(first.locator(".screenshot-source p")).toBeHidden();
+  await first.locator(".screenshot-source summary").click();
+  await expect(first.locator("figcaption")).toContainText("实际截图");
+  await first.locator(".experiment-info > summary").click();
+  await expect(first.locator(".preview-source")).toContainText("预览来源");
+  await expect(page.locator('nav a[href="#guides"]')).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect((await first.boundingBox()).y).toBeLessThan(520);
+  await expect(page.locator('nav a[href="#guides"]')).toBeHidden();
+  await page.locator(".nav-more > summary").click();
+  await page.locator('nav a[href="#guides"]').click();
+  await expect(page.locator("#guides")).toHaveAttribute("open", "");
+  await expect(page.locator(".nav-more")).not.toHaveAttribute("open");
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(390);
 });
