@@ -17,6 +17,7 @@ test("topic effort order matches comparison selectors and date sorting remains e
   await expect(page.locator("#topic-effort option")).toHaveText([
     "全部档位",
     "max（最大）",
+    "xhigh（超高）",
     "medium（中）",
     "档位未记录",
   ]);
