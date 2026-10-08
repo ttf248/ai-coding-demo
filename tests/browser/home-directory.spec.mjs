@@ -256,8 +256,7 @@ test("gallery prioritizes artwork and reveals metadata and navigation on demand"
   expect((await first.boundingBox()).y).toBeLessThan(480);
   await expect(page.locator("#provider")).toBeHidden();
   await expect(first.locator(".latest-run")).toBeHidden();
-  await expect(first.locator(".screenshot-source p")).toBeHidden();
-  await first.locator(".screenshot-source summary").click();
+  await expect(first.locator(".topic-cover figcaption")).toBeVisible();
   await expect(first.locator("figcaption")).toContainText("实际截图");
   await first.locator(".experiment-info > summary").click();
   await expect(first.locator(".preview-source")).toContainText("预览来源");
@@ -272,4 +271,139 @@ test("gallery prioritizes artwork and reveals metadata and navigation on demand"
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(390);
+});
+
+test("cover preview keeps screenshot, selected version and direct entry aligned", async ({
+  page,
+}) => {
+  await page.goto("./");
+  const card = page.locator(".topic-card").first();
+  const id = await card.locator("figure").getAttribute("data-screenshot-run");
+  const src = await card.locator("figure img").getAttribute("src");
+  const href = await card.locator(".preview-link").getAttribute("href");
+  await card.locator(".cover-preview").click();
+  await expect(page.locator("#preview-dialog")).toBeVisible();
+  await expect(page.locator("#preview-version")).toHaveValue(id);
+  await expect(page.locator("#preview-stage img")).toHaveAttribute("src", src);
+  await expect(page.locator("#preview-open")).toHaveAttribute("href", href);
+  await expect(page.locator("iframe")).toHaveCount(0);
+  await page.locator('[data-preview-mode="live"]').click();
+  await expect(page.locator("#preview-stage iframe")).toHaveAttribute(
+    "src",
+    href,
+  );
+  const next = data.runs.find(
+    (run) =>
+      run.topicId === id.split("--")[0] &&
+      run.id !== id &&
+      run.screenshot &&
+      run.preview.embed,
+  );
+  await page.locator("#preview-version").selectOption(next.id);
+  await expect(page.locator("#preview-stage iframe")).toHaveCount(1);
+  await page.locator('[data-preview-mode="image"]').click();
+  await expect(page.locator("iframe")).toHaveCount(0);
+  await expect(page.locator("#preview-stage img")).toHaveAttribute(
+    "src",
+    `${next.directory}/${next.screenshot}`,
+  );
+  await page.locator('[data-preview-mode="live"]').click();
+  await page.locator("#preview-close").click();
+  await expect(page.locator("#preview-dialog")).not.toBeVisible();
+  await expect(page.locator("iframe")).toHaveCount(0);
+  await expect(card.locator(".cover-preview")).toBeFocused();
+  await card.locator(".cover-preview").press("Enter");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#preview-stage")).toBeEmpty();
+});
+
+test("quick controls and preview versions follow filters on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("./?model=gpt-6-astra&testing=active");
+  await page.locator("#advanced-filters > summary").click();
+  await expect(page.locator('[data-view="list"]')).toBeVisible();
+  await page.locator("#preview-only").click();
+  await expect(page.locator("#preview-only")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.reload();
+  await expect(page.locator("#preview-only")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.locator(".cover-preview").first().click();
+  const ids = await page
+    .locator("#preview-version option")
+    .evaluateAll((options) => options.map((o) => o.value));
+  expect(ids.length).toBeGreaterThan(0);
+  expect(
+    ids.every(
+      (id) => data.runs.find((run) => run.id === id).modelId === "gpt-6-astra",
+    ),
+  ).toBe(true);
+  const bounds = await page.locator("#preview-dialog").boundingBox();
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(844);
+  expect(
+    await page
+      .locator("#preview-dialog")
+      .evaluate((el) => el.scrollWidth <= el.clientWidth),
+  ).toBe(true);
+  await page.locator('[data-preview-mode="live"]').click();
+  await expect(page.locator("iframe")).toHaveCount(1);
+  await page.locator("#preview-close").click();
+  await expect(page.locator("iframe")).toHaveCount(0);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(390);
+});
+
+test("preview distinguishes missing screenshots, archive records and external entries", async ({
+  page,
+}) => {
+  await page.goto("./?testing=all");
+  // Exercise each declared preview state without loading an external service.
+  await page.evaluate(() => {
+    const run = window.ARCHIVE.runs.find(
+      (r) => r.id === document.querySelector(".cover-preview").dataset.preview,
+    );
+    run.screenshot = null;
+    run.preview = { kind: "none", pages: [], embed: false };
+  });
+  await page.locator("#q").fill(" ");
+  await page.locator(".cover-preview").first().click();
+  const id = await page.locator("#preview-version").inputValue();
+  const unavailable = await page.evaluate(
+    (current) =>
+      window.ARCHIVE.runs.find(
+        (r) =>
+          r.topicId === current.split("--")[0] && r.preview.kind === "none",
+      ).id,
+    id,
+  );
+  await page.locator("#preview-version").selectOption(unavailable);
+  await expect(page.locator("#preview-stage")).toContainText("暂无截图");
+  await page.locator('[data-preview-mode="live"]').click();
+  await expect(page.locator("#preview-stage")).toContainText("暂无在线预览");
+  await expect(page.locator("#preview-open")).toBeHidden();
+  await expect(page.locator("iframe")).toHaveCount(0);
+  await page.evaluate((id) => {
+    window.ARCHIVE.runs.find((r) => r.id === id).preview = {
+      kind: "external",
+      externalUrl: "https://example.com/",
+      embed: false,
+    };
+  }, unavailable);
+  await page.locator('[data-preview-mode="image"]').click();
+  await page.locator('[data-preview-mode="live"]').click();
+  await expect(page.locator("#preview-stage")).toContainText("请独立打开");
+  await expect(page.locator("#preview-open")).toHaveAttribute(
+    "href",
+    "https://example.com/",
+  );
+  await expect(page.locator("iframe")).toHaveCount(0);
 });
