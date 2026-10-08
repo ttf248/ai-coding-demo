@@ -96,6 +96,7 @@ test("directory counts, filters, sort, views, pagination and selection", async (
   await page.locator('[data-view="list"]').click();
   await expect(page.locator("#project-grid")).toHaveClass(/list/);
   await page.locator("#category").selectOption("prompt");
+  await page.locator("#q").fill("no-catalog-entry-matches-this-query");
   await expect(page.locator("#empty")).toBeVisible();
   await page.locator("#empty [data-reset]").click();
   await page.locator("#load-more").click();
