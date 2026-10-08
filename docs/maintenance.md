@@ -66,7 +66,7 @@ node --input-type=module -e "import {read,hash} from './scripts/lib.mjs'; consol
 
 静态单文件和原型设置 `preview.kind: "static"`，入口相对于实验目录。新单文件入口用 `index.html`。多页面配置 `pages`，每项包含 `id`、`label`、`path`，`defaultPage` 指向其中一项。
 
-run 可选 `screenshot`，路径相对于本 run 目录，登记已经生成的 PNG 实际运行截图。首页按主题聚合时，在当前筛选结果中显示日期最新且有截图的 run；按 run 聚合时显示各自已登记的截图。没有 run 截图时才回退到主题 `thumbnail`。
+新建或迁移可运行的 ready run 时，应登记一张代表性的桌面实际运行截图：PNG 放在本 run 目录，`run.json` 的 `screenshot` 填相对路径。迁移时优先复制源记录已有的实测截图；没有截图但入口可运行时，使用 HTTP 页面补拍。不要把占位图或主题缩略图登记成本 run 的截图。首页按主题聚合时，在当前筛选结果中显示日期最新且有截图的 run；按 run 聚合时显示各自已登记的截图。没有 run 截图时才回退到主题 `thumbnail`。
 
 ```json
 {"kind":"static","pages":[{"id":"index","label":"主页面","path":"index.html"}],"defaultPage":"index","network":"required","embed":true,"externalUrl":null}
@@ -119,6 +119,8 @@ npm run test:browser
 技术主题继续放 `docs/{slug}/`，包含 `Readme.md` 与示例，并在 `catalog/guides.json` 登记明确入口，不从文件名猜测。
 
 V2 的旧路径对照保存在 [迁移清单](../catalog/migration-v2.json)，旧目录不做重定向。历史输入中的路径属于证据，保留；当前有效文档和代码链接必须更新。迁移不能顺带改善历史 demo 的视觉或逻辑，必要部署适配写入 `changes`。
+
+迁移已完成的实验时，源码、原始输入、验收记录和真实预览截图一并迁移。截图保存在对应 run 目录并登记 `screenshot`，同时核对 `Readme.md`、生成目录和首页都能访问。源记录只有验收报告截图时，可将其中对应本实验的实际运行截图复制到 run 目录；截图缺失而预览可运行时再补拍，不制作示意图冒充结果。
 
 ## 模型展示与对比排序
 
