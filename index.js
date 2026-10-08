@@ -231,9 +231,10 @@
           '</p><p class="topic-metrics">' +
           new Set(runs.map((r) => r.modelId)).size +
           " 个模型 · " +
+          (runs.length !== all.length ? "匹配 " : "") +
           runs.length +
-          (runs.length !== all.length ? " / " + all.length : "") +
           " 个版本" +
+          (runs.length !== all.length ? " / 共 " + all.length + " 个" : "") +
           '</p><details class="experiment-info"><summary>实验信息</summary><div class="latest-run"><span>最新实验 · ' +
           e(latest?.date || "日期未记录") +
           "</span><strong>" +
@@ -270,7 +271,7 @@
             : '<span class="no-preview">仅档案</span>') +
           '<a href="topic.html?id=' +
           t.id +
-          '">查看实验 →</a>' +
+          '">查看版本 →</a>' +
           (recommended
             ? '<a class="button" href="compare.html?left=' +
               encodeURIComponent(first.id) +
@@ -329,13 +330,9 @@
       "aria-pressed",
       String(state.preview === "yes"),
     );
-    const filterCount = [
-      "provider",
-      "model",
-      "type",
-      "prompt",
-      "preview",
-    ].filter((key) => state[key]).length;
+    const filterCount = ["provider", "type", "prompt", "preview"].filter(
+      (key) => state[key],
+    ).length;
     $("filter-count").textContent = filterCount ? "· " + filterCount : "";
     $("active-filters").innerHTML = [
       "q",
@@ -461,7 +458,6 @@
   });
   $("advanced-filters").open = !!(
     state.provider ||
-    state.model ||
     state.group !== "topics" ||
     state.view !== "grid" ||
     state.category ||
