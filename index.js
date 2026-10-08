@@ -81,11 +81,29 @@
     ]),
   );
   const selection = U.setupSelection(data);
-  // Keep screenshot attribution available without placing text over the artwork.
-  function galleryFigure(html) {
-    return html.replace(
-      /<figcaption>([\s\S]*?)<\/figcaption>/g,
-      '<figcaption><details class="screenshot-source"><summary>截图来源</summary><p>$1</p></details></figcaption>',
+  const previewScopes = new Map();
+  function galleryFigure(run, className, source = U.screenshotURL(run)) {
+    if (!source) return "";
+    return (
+      '<figure class="' +
+      className +
+      '" data-screenshot-run="' +
+      e(run.id) +
+      '"><button class="cover-preview" data-preview="' +
+      e(run.id) +
+      '" aria-label="放大预览：' +
+      e(run.title + " · " + U.runSummary(data, run)) +
+      '"><img src="' +
+      e(source) +
+      '" alt="' +
+      e(run.title + " 实际运行截图") +
+      '" loading="lazy" decoding="async" width="1440" height="1050">' +
+      '<span class="cover-hint">放大预览 ↗</span></button>' +
+      "<figcaption><span>实际截图</span><strong>" +
+      e(U.modelLabel(data, run)) +
+      "</strong><span> · " +
+      e(U.effortLabel(run.effort)) +
+      "</span></figcaption></figure>"
     );
   }
   function placeholder(title) {
@@ -98,10 +116,16 @@
   function render(reset = false) {
     if (reset) visible = 9;
     const matched = U.filterRuns(data, state);
+    previewScopes.clear();
     let items;
     if (state.group === "runs")
       items = matched.map((r) => {
-        const html = galleryFigure(U.runCard(data, r))
+        previewScopes.set(r.id, { runs: [r], source: U.screenshotURL(r) });
+        const html = U.runCard(data, r)
+          .replace(
+            U.screenshotFigure(data, r, "run-card-screenshot"),
+            galleryFigure(r, "run-card-screenshot"),
+          )
           .replace(
             '<div class="card-top">',
             '<div class="run-body"><div class="card-top">',
@@ -151,7 +175,7 @@
             (b.date || "").localeCompare(a.date || "") ||
             U.compareModelRuns(data, a, b),
         )[0];
-        const previewRun =
+        let previewRun =
           latest && U.previewURL(latest)
             ? latest
             : runs.find((r) => U.previewURL(r));
@@ -165,26 +189,24 @@
         const coverRun =
           t.thumbnail &&
           data.runs.find((r) => r.id === t.thumbnail.sourceRunId);
-        const cover = screenshotRun
-          ? U.screenshotFigure(data, screenshotRun, "topic-cover")
-          : coverRun && runs.some((r) => r.id === coverRun.id)
-            ? '<figure class="topic-cover"><img src="' +
-              e(t.thumbnail.path) +
-              '" alt="' +
-              e(
-                t.title +
-                  " · " +
-                  U.runSummary(data, coverRun) +
-                  " 实际预览截图",
-              ) +
-              '" loading="lazy" width="720" height="420"><figcaption>实际截图 · ' +
-              e(
-                U.modelLabel(data, coverRun) +
-                  " · " +
-                  U.effortLabel(coverRun.effort),
-              ) +
-              "</figcaption></figure>"
-            : "";
+        const displayedRun =
+          screenshotRun ||
+          (coverRun && runs.some((r) => r.id === coverRun.id)
+            ? coverRun
+            : null);
+        const source = screenshotRun
+          ? U.screenshotURL(screenshotRun)
+          : displayedRun
+            ? t.thumbnail.path
+            : null;
+        const cover = displayedRun
+          ? galleryFigure(displayedRun, "topic-cover", source)
+          : "";
+        // The direct entry and the cover must refer to the same experiment.
+        if (displayedRun)
+          previewRun = U.previewURL(displayedRun) ? displayedRun : null;
+        const inspectRun = displayedRun || previewRun || first;
+        if (inspectRun) previewScopes.set(inspectRun.id, { runs, source });
         const recommended =
           runs.find(
             (r) =>
@@ -195,7 +217,7 @@
           '<article class="card topic-card' +
           (cover ? " has-cover" : "") +
           '">' +
-          (cover ? galleryFigure(cover) : placeholder(t.title)) +
+          (cover || placeholder(t.title)) +
           '<div class="topic-body"><div class="card-top"><span class="eyebrow">' +
           e(data.categories.find((c) => c.id === t.category).label) +
           "</span>" +
@@ -244,7 +266,7 @@
               e(U.previewURL(previewRun)) +
               '" target="_blank" rel="noopener" aria-label="打开预览：' +
               e(t.title + " · " + U.runSummary(data, previewRun)) +
-              '">打开预览 ↗</a>'
+              '">运行体验 ↗</a>'
             : '<span class="no-preview">仅档案</span>') +
           '<a href="topic.html?id=' +
           t.id +
@@ -303,6 +325,18 @@
       "sort",
     ])
       $(key).value = state[key];
+    $("preview-only").setAttribute(
+      "aria-pressed",
+      String(state.preview === "yes"),
+    );
+    const filterCount = [
+      "provider",
+      "model",
+      "type",
+      "prompt",
+      "preview",
+    ].filter((key) => state[key]).length;
+    $("filter-count").textContent = filterCount ? "· " + filterCount : "";
     $("active-filters").innerHTML = [
       "q",
       "category",
@@ -398,6 +432,10 @@
     visible += 9;
     render();
   });
+  $("preview-only").addEventListener("click", () => {
+    state.preview = state.preview === "yes" ? "" : "yes";
+    render(true);
+  });
   document.querySelectorAll("[data-reset]").forEach((b) =>
     b.addEventListener("click", () => {
       Object.assign(state, {
@@ -431,6 +469,157 @@
     state.prompt ||
     state.preview
   );
+  const previewDialog = $("preview-dialog");
+  let previewRuns = [],
+    previewMode = "image",
+    previewTrigger = null;
+  let fallbackSource = null,
+    fallbackRunId = null;
+  function renderPreview() {
+    const run = previewRuns.find(
+      (item) => item.id === $("preview-version").value,
+    );
+    if (!run) return;
+    const topic = data.topics.find((item) => item.id === run.topicId);
+    const href = U.previewURL(run);
+    const screenshot =
+      U.screenshotURL(run) ||
+      (run.id === fallbackRunId ? fallbackSource : null);
+    $("preview-title").textContent = topic.title;
+    $("preview-caption").textContent =
+      U.runSummary(data, run) +
+      " · " +
+      (run.date || "日期未记录") +
+      " · 提示词 " +
+      run.promptId;
+    $("preview-record").href =
+      "topic.html?id=" +
+      encodeURIComponent(run.topicId) +
+      "&view=list#run-" +
+      encodeURIComponent(run.id);
+    $("preview-open").hidden = !href;
+    if (href) $("preview-open").href = href;
+    else $("preview-open").removeAttribute("href");
+    $("preview-original").hidden = !screenshot || previewMode !== "image";
+    if (screenshot) $("preview-original").href = screenshot;
+    else $("preview-original").removeAttribute("href");
+    document.querySelectorAll("[data-preview-mode]").forEach((button) => {
+      button.setAttribute(
+        "aria-pressed",
+        String(button.dataset.previewMode === previewMode),
+      );
+    });
+    const stage = $("preview-stage");
+    stage.replaceChildren();
+    $("preview-status").textContent = "";
+    if (previewMode === "image") {
+      if (screenshot) {
+        const img = document.createElement("img");
+        img.alt =
+          topic.title + " · " + U.runSummary(data, run) + " 实际运行截图";
+        img.src = screenshot;
+        img.addEventListener("error", () => {
+          if (img.isConnected)
+            $("preview-status").textContent =
+              "截图加载失败，可查看原图或运行体验。";
+        });
+        stage.append(img);
+        $("preview-status").textContent =
+          "已记录的实际截图 · 点击运行体验可操作作品";
+      } else
+        stage.innerHTML =
+          '<div class="preview-message"><h3>此版本暂无截图</h3><p>' +
+          (href
+            ? "可以切换到「运行体验」，或独立打开作品。"
+            : "此实验仅保留档案，可查看实验记录与原始输入。") +
+          "</p></div>";
+      return;
+    }
+    if (!href || !run.preview.embed) {
+      stage.innerHTML =
+        '<div class="preview-message"><h3>' +
+        (href ? "请独立打开此作品" : "此版本暂无在线预览") +
+        "</h3><p>" +
+        (href
+          ? "此作品通过外部页面提供体验。"
+          : "可查看实验记录中的源码、提示词与运行说明。") +
+        "</p></div>";
+      return;
+    }
+    const frame = document.createElement("iframe");
+    frame.title = topic.title + " · " + U.runSummary(data, run);
+    frame.setAttribute(
+      "sandbox",
+      "allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-downloads allow-popups",
+    );
+    frame.setAttribute("allow", "fullscreen; autoplay; clipboard-write");
+    frame.src = href;
+    $("preview-status").textContent = "正在加载作品… 若未显示，可独立打开";
+    frame.addEventListener("load", () => {
+      if (frame.isConnected)
+        $("preview-status").textContent =
+          "可直接操作作品 · 切换版本或关闭将结束当前体验";
+    });
+    stage.append(frame);
+  }
+  $("project-grid").addEventListener("click", (event) => {
+    const trigger = event.target.closest("[data-preview]");
+    if (!trigger) return;
+    const scope = previewScopes.get(trigger.dataset.preview);
+    if (!scope) return;
+    previewTrigger = trigger;
+    previewRuns = [...scope.runs].sort((a, b) =>
+      U.compareModelRuns(data, a, b),
+    );
+    fallbackRunId = trigger.dataset.preview;
+    fallbackSource = scope.source;
+    previewMode = "image";
+    $("preview-version").innerHTML = U.groupedOptions(
+      previewRuns,
+      (run) => U.modelProvider(data, run),
+      (run) =>
+        '<option value="' +
+        e(run.id) +
+        '">' +
+        e(
+          U.runSummary(data, run) +
+            " · " +
+            run.promptId +
+            " · " +
+            (run.date || "日期未记录"),
+        ) +
+        "</option>",
+    );
+    $("preview-version").value = trigger.dataset.preview;
+    renderPreview();
+    previewDialog.showModal();
+    document.body.classList.add("preview-open");
+  });
+  $("preview-version").addEventListener("change", renderPreview);
+  document.querySelectorAll("[data-preview-mode]").forEach((button) =>
+    button.addEventListener("click", () => {
+      if (previewMode === button.dataset.previewMode) return;
+      previewMode = button.dataset.previewMode;
+      renderPreview();
+    }),
+  );
+  $("preview-close").addEventListener("click", () => previewDialog.close());
+  previewDialog.addEventListener("click", (event) => {
+    if (event.target !== previewDialog) return;
+    const rect = previewDialog.getBoundingClientRect();
+    if (
+      event.clientX < rect.left ||
+      event.clientX > rect.right ||
+      event.clientY < rect.top ||
+      event.clientY > rect.bottom
+    )
+      previewDialog.close();
+  });
+  previewDialog.addEventListener("close", () => {
+    $("preview-stage").replaceChildren();
+    document.body.classList.remove("preview-open");
+    previewTrigger?.focus({ preventScroll: true });
+  });
   $("recent-list").innerHTML = U.filterRuns(data, { testing: "active" })
     .slice(0, 5)
     .map(
