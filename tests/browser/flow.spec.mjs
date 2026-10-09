@@ -26,6 +26,7 @@ test("topic effort order matches comparison selectors and date sorting remains e
     "全部档位",
     "max（最大）",
     "xhigh（超高）",
+    "high（高）",
     "medium（中）",
     "档位未记录",
   ]);

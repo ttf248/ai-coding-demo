@@ -21,7 +21,13 @@ test("model picker groups vendors and sorts versions on desktop and mobile", asy
       await page
         .locator(`#run-${side} optgroup`)
         .evaluateAll((groups) => groups.map((g) => g.label)),
-    ).toEqual(["Anthropic", "MiniMax", "OpenAI", "未记录 / 多轮混合"]);
+    ).toEqual([
+      "Anthropic",
+      "GitHub Copilot",
+      "MiniMax",
+      "OpenAI",
+      "未记录 / 多轮混合",
+    ]);
     const ids = await page
       .locator(`#run-${side} option[value]:not([value=""])`)
       .evaluateAll((options) => options.map((o) => o.value));
@@ -45,6 +51,7 @@ test("model picker groups vendors and sorts versions on desktop and mobile", asy
   await page.locator("#scope").selectOption("all");
   await expect(page.locator(".model-provider")).toHaveText([
     /Anthropic/,
+    /GitHub Copilot/,
     /MiniMax/,
     /OpenAI/,
     /未记录/,

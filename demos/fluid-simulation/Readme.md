@@ -7,6 +7,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
+| [彩色流体实验台](../../demos/fluid-simulation/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](../../demos/fluid-simulation/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](../../demos/fluid-simulation/runs/gemini-3-8-flash-high-r01/index.html) |
 | [fluid-simulation · gpt-6.1-sol high](../../demos/fluid-simulation/runs/gpt-6-1-sol-high-r01/Readme.md) | GPT-6.1 Sol / high | 2026-10-05 | [v1](../../demos/fluid-simulation/runs/gpt-6-1-sol-high-r01/prompt.md) | [打开](../../demos/fluid-simulation/runs/gpt-6-1-sol-high-r01/index.html) |
 | [彩色流体实验台 · GPT-6.1 Sol Low](../../demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](../../demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](../../demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/index.html) |
 | [彩色流体实验台 · gpt-6.1-sol max](../../demos/fluid-simulation/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-10-05 | [v1](../../demos/fluid-simulation/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](../../demos/fluid-simulation/runs/gpt-6-1-sol-max-r01/index.html) |

@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>体素微缩建筑工地沙盘 · WebGL</title>
+  <!-- Three.js r160 CDN -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: #0d0f17;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      user-select: none;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    .hud-title-card {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      z-index: 20;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      padding: 10px 16px;
+      border-radius: 8px;
+      max-width: 340px;
+      pointer-events: auto;
+    }
+    .hud-title-card h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hud-title-card p {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+    .hud-dock {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 8px 16px;
+      border-radius: 30px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      max-width: 95vw;
+      overflow-x: auto;
+      pointer-events: auto;
+    }
+    .btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f8fafc;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      background: rgba(251, 191, 36, 0.25);
+      border-color: #fbbf24;
+      color: #fef08a;
+    }
+    .btn.active {
+      background: #d97706;
+      border-color: #fbbf24;
+      color: #fff;
+      font-weight: bold;
+    }
+    .hud-hint {
+      position: absolute;
+      bottom: 64px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: #94a3b8;
+      background: rgba(0,0,0,0.6);
+      padding: 3px 8px;
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <div class="hud-title-card">
+    <h1>🏗️ 体素微缩建筑工地沙盘</h1>
+    <p>桌面微缩场景 · 机械作业循环 · 4套昼夜系统 · 暴雨粒子反光 · 双沙盘切换</p>
+  </div>
+
+  <div class="hud-hint">
+    拖拽鼠标或滑屏环视 · 滚轮缩放 · [空格键] 触发暴雨天气
+  </div>
+
+  <div class="hud-dock">
+    <button class="btn" id="btn-scene" onclick="toggleScene()">🔄 切换沙盘 (基坑/地下盾构)</button>
+    <button class="btn" id="btn-tod" onclick="cycleTimeOfDay()">🌅 昼夜: 正午</button>
+    <button class="btn" id="btn-rain" onclick="toggleRain()">🌧️ 模拟暴雨 (空格)</button>
+    <button class="btn" id="btn-speed" onclick="cycleSpeed()">⚡ 运行速度: 1.0x</button>
+    <button class="btn active" id="btn-orbit" onclick="toggleAutoOrbit()">🎥 自动环视: 开</button>
+  </div>
+
+  <script>
+    // Three.js Scene Setup
+    const container = document.getElementById("canvas-container");
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x1a202c, 0.003);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 1200);
+    camera.position.set(130, 95, 140);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    container.appendChild(renderer.domElement);
+
+    // Global Lights
+    const ambientLight = new THREE.AmbientLight(0xdbeafe, 1.2);
+    scene.add(ambientLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 2.8);
+    sunLight.position.set(120, 180, 90);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 10;
+    sunLight.shadow.camera.far = 400;
+    const d = 110;
+    sunLight.shadow.camera.left = -d;
+    sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d;
+    sunLight.shadow.camera.bottom = -d;
+    sunLight.shadow.bias = -0.0005;
+    scene.add(sunLight);
+
+    // Night Construction Floodlights
+    const floodLight1 = new THREE.SpotLight(0xfff3d4, 0, 150, Math.PI / 4, 0.4);
+    floodLight1.position.set(-45, 60, -35);
+    scene.add(floodLight1);
+
+    const floodLight2 = new THREE.SpotLight(0xffe8ba, 0, 150, Math.PI / 4, 0.4);
+    floodLight2.position.set(35, 60, 35);
+    scene.add(floodLight2);
+
+    // Materials Palette (Voxel Styled)
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x3d2716, roughness: 0.85, metalness: 0.05 });
+    const deskMat = new THREE.MeshStandardMaterial({ color: 0x22170f, roughness: 0.7, metalness: 0.1 });
+    const paperMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.9 });
+    const brassMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.35, metalness: 0.85 });
+    const dirtMat = new THREE.MeshStandardMaterial({ color: 0x785028, roughness: 0.95 });
+    const concreteMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.85 });
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
+    const yellowPaintMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4, metalness: 0.2 });
+    const safetyOrangeMat = new THREE.MeshStandardMaterial({ color: 0xe11d48, roughness: 0.4 });
+    const glowWindowMat = new THREE.MeshBasicMaterial({ color: 0xffe29a });
+
+    // 1. Desktop Setting (Desk Surface & Stationery Props)
+    const tableGeo = new THREE.BoxGeometry(280, 14, 230);
+    const tableMesh = new THREE.Mesh(tableGeo, deskMat);
+    tableMesh.position.y = -7.1;
+    tableMesh.receiveShadow = true;
+    scene.add(tableMesh);
+
+    // Blueprints Scatter on Corner
+    const bpGeo = new THREE.BoxGeometry(45, 0.4, 32);
+    const bpMesh = new THREE.Mesh(bpGeo, paperMat);
+    bpMesh.position.set(-85, 0.3, 75);
+    bpMesh.rotation.y = 0.25;
+    bpMesh.receiveShadow = true;
+    scene.add(bpMesh);
+
+    // Miniature Hard Hat Ornament
+    const hatGroup = new THREE.Group();
+    hatGroup.position.set(-105, 1.8, 65);
+    const hatDome = new THREE.Mesh(new THREE.SphereGeometry(3.5, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2), yellowPaintMat);
+    const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.2, 0.4, 12), yellowPaintMat);
+    hatGroup.add(hatDome);
+    hatGroup.add(hatBrim);
+    scene.add(hatGroup);
+
+    // Steel Tape Measure & Spirit Level
+    const levelGeo = new THREE.BoxGeometry(26, 3, 2.5);
+    const levelMesh = new THREE.Mesh(levelGeo, brassMat);
+    levelMesh.position.set(85, 1.6, 75);
+    levelMesh.rotation.y = -0.3;
+    scene.add(levelMesh);
+
+    // 2. Construction Sandbox Base
+    const sandboxGroup = new THREE.Group();
+    scene.add(sandboxGroup);
+
+    // Sandbox Frame Border
+    const frameGeo = new THREE.BoxGeometry(174, 3, 134);
+    const frameMesh = new THREE.Mesh(frameGeo, woodMat);
+    frameMesh.position.y = 1.5;
+    frameMesh.receiveShadow = true;
+    sandboxGroup.add(frameMesh);
+
+    // Ground Plate
+    const groundGeo = new THREE.BoxGeometry(168, 2, 128);
+    const groundMesh = new THREE.Mesh(groundGeo, concreteMat);
+    groundMesh.position.y = 2.5;
+    groundMesh.receiveShadow = true;
+    sandboxGroup.add(groundMesh);
+
+    // Road Loop
+    const roadLoopGeo = new THREE.BoxGeometry(140, 0.3, 100);
+    const roadMesh = new THREE.Mesh(roadLoopGeo, roadMat);
+    roadMesh.position.set(0, 3.6, 0);
+    roadMesh.receiveShadow = true;
+    sandboxGroup.add(roadMesh);
+
+    // Excavation Pit (Depression)
+    const pitGeo = new THREE.BoxGeometry(50, 6, 45);
+    const pitMesh = new THREE.Mesh(pitGeo, dirtMat);
+    pitMesh.position.set(-40, 1.5, -20);
+    pitMesh.receiveShadow = true;
+    sandboxGroup.add(pitMesh);
+
+    // Soil Mounds (Stepped Voxels)
+    const soilBoxGeo = new THREE.BoxGeometry(40, 10, 30);
+    const soilMound = new THREE.Mesh(soilBoxGeo, dirtMat);
+    soilMound.position.set(45, 7.5, -30);
+    soilMound.castShadow = true;
+    soilMound.receiveShadow = true;
+    sandboxGroup.add(soilMound);
+
+    // 3. Buildings in Progress & Prefab Offices
+    // Prefab Office 2-Story (Blue & White Box)
+    const officeGroup = new THREE.Group();
+    officeGroup.position.set(45, 8.5, 30);
+    const officeBody = new THREE.Mesh(new THREE.BoxGeometry(32, 12, 18), new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.6 }));
+    officeBody.castShadow = true;
+    officeGroup.add(officeBody);
+    // Office Windows
+    for (let i = -1; i <= 1; i++) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(5, 3.5, 0.4), glowWindowMat);
+      win.position.set(i * 9, 1, 9.2);
+      officeGroup.add(win);
+    }
+    sandboxGroup.add(officeGroup);
+
+    // Building in Progress with Columns & Scaffoldings
+    const bldgGroup = new THREE.Group();
+    bldgGroup.position.set(-5, 14, 25);
+    const floor1 = new THREE.Mesh(new THREE.BoxGeometry(40, 2.5, 30), concreteMat);
+    floor1.castShadow = true;
+    const floor2 = new THREE.Mesh(new THREE.BoxGeometry(40, 2.5, 30), concreteMat);
+    floor2.position.y = 12;
+    floor2.castShadow = true;
+    bldgGroup.add(floor1);
+    bldgGroup.add(floor2);
+
+    // Columns
+    for (let cx = -15; cx <= 15; cx += 15) {
+      for (let cz = -10; cz <= 10; cz += 20) {
+        const col = new THREE.Mesh(new THREE.BoxGeometry(3, 12, 3), concreteMat);
+        col.position.set(cx, 6, cz);
+        col.castShadow = true;
+        bldgGroup.add(col);
+      }
+    }
+    sandboxGroup.add(bldgGroup);
+
+    // InstancedMesh: Scaffolding Bars
+    const scaffoldBarGeo = new THREE.CylinderGeometry(0.3, 0.3, 20, 6);
+    const scaffoldMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8, roughness: 0.3 });
+    const scaffoldMesh = new THREE.InstancedMesh(scaffoldBarGeo, scaffoldMat, 32);
+    const dummy = new THREE.Object3D();
+    let scCount = 0;
+    for (let sx = -22; sx <= 22; sx += 11) {
+      for (let sz = -17; sz <= 17; sz += 34) {
+        dummy.position.set(-5 + sx, 10, 25 + sz);
+        dummy.rotation.set(0, 0, 0);
+        dummy.updateMatrix();
+        scaffoldMesh.setMatrixAt(scCount++, dummy.matrix);
+      }
+    }
+    scaffoldMesh.instanceMatrix.needsUpdate = true;
+    sandboxGroup.add(scaffoldMesh);
+
+    // 4. Animated Construction Machinery
+    // A. Tower Crane (Rotates Jib + Hoisting Load)
+    const craneGroup = new THREE.Group();
+    craneGroup.position.set(-15, 3.5, -25);
+
+    // Mast
+    const mast = new THREE.Mesh(new THREE.BoxGeometry(4, 75, 4), yellowPaintMat);
+    mast.position.y = 37.5;
+    mast.castShadow = true;
+    craneGroup.add(mast);
+
+    // Cabin & Turntable
+    const jibGroup = new THREE.Group();
+    jibGroup.position.y = 75;
+
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(6, 6, 7), yellowPaintMat);
+    cabin.position.set(0, 0, 2);
+    jibGroup.add(cabin);
+
+    // Long Jib & Counter Jib
+    const jib = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 75), yellowPaintMat);
+    jib.position.set(0, 2.5, 25);
+    jib.castShadow = true;
+    jibGroup.add(jib);
+
+    const counterJib = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 25), yellowPaintMat);
+    counterJib.position.set(0, 2.5, -20);
+    const counterWeight = new THREE.Mesh(new THREE.BoxGeometry(5, 5, 6), concreteMat);
+    counterWeight.position.set(0, 2.5, -28);
+    jibGroup.add(counterJib);
+    jibGroup.add(counterWeight);
+
+    // Hoist Cable & Bucket
+    const cableGeo = new THREE.CylinderGeometry(0.1, 0.1, 30, 4);
+    const cable = new THREE.Mesh(cableGeo, new THREE.MeshBasicMaterial({ color: 0x111827 }));
+    cable.position.set(0, -14, 40);
+    jibGroup.add(cable);
+
+    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 1.8, 3.5, 8), yellowPaintMat);
+    bucket.position.set(0, -29, 40);
+    bucket.castShadow = true;
+    jibGroup.add(bucket);
+
+    craneGroup.add(jibGroup);
+    sandboxGroup.add(craneGroup);
+
+    // B. Excavator in Pit (Digging Action)
+    const excavatorGroup = new THREE.Group();
+    excavatorGroup.position.set(-42, 4.5, -22);
+
+    const tracks = new THREE.Mesh(new THREE.BoxGeometry(10, 3, 14), roadMat);
+    excavatorGroup.add(tracks);
+
+    const excCabGroup = new THREE.Group();
+    excCabGroup.position.y = 2.5;
+    const excBody = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 10), yellowPaintMat);
+    excBody.castShadow = true;
+    excCabGroup.add(excBody);
+
+    // Excavator Arm (Boom + Dipper + Bucket)
+    const arm1 = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 12), yellowPaintMat);
+    arm1.position.set(0, 4, -5);
+    arm1.rotation.x = -0.5;
+    arm1.castShadow = true;
+    excCabGroup.add(arm1);
+
+    const arm2 = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 10), yellowPaintMat);
+    arm2.position.set(0, 8, -12);
+    arm2.rotation.x = 0.8;
+    arm2.castShadow = true;
+    excCabGroup.add(arm2);
+
+    const scoop = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 4), roadMat);
+    scoop.position.set(0, 5, -16);
+    excCabGroup.add(scoop);
+
+    excavatorGroup.add(excCabGroup);
+    sandboxGroup.add(excavatorGroup);
+
+    // C. Dump Truck (Cycling Along Access Road)
+    const truckGroup = new THREE.Group();
+    truckGroup.position.set(0, 4.8, -40);
+
+    const truckChassis = new THREE.Mesh(new THREE.BoxGeometry(8, 2, 16), roadMat);
+    const truckCabin = new THREE.Mesh(new THREE.BoxGeometry(7.5, 6, 5), yellowPaintMat);
+    truckCabin.position.set(0, 3.5, 5);
+    truckCabin.castShadow = true;
+
+    const truckBed = new THREE.Mesh(new THREE.BoxGeometry(8, 4, 10), safetyOrangeMat);
+    truckBed.position.set(0, 3, -2.5);
+    truckBed.castShadow = true;
+
+    // Dirt Load in Bed
+    const truckDirt = new THREE.Mesh(new THREE.BoxGeometry(7, 2.5, 8.5), dirtMat);
+    truckDirt.position.set(0, 4, -2.5);
+
+    truckGroup.add(truckChassis);
+    truckGroup.add(truckCabin);
+    truckGroup.add(truckBed);
+    truckGroup.add(truckDirt);
+    sandboxGroup.add(truckGroup);
+
+    // Voxel Workers
+    const workerGeo = new THREE.BoxGeometry(1.6, 3.5, 1.4);
+    const workerMat = new THREE.MeshStandardMaterial({ color: 0xe11d48, roughness: 0.5 });
+    const workerMesh = new THREE.InstancedMesh(workerGeo, workerMat, 8);
+    const workerPositions = [
+      [-32, 6, -15], [-20, 6, 25], [5, 17, 22], [40, 5, 20],
+      [35, 14, -25], [-50, 4, 35], [10, 4, -40], [-10, 4, 5]
+    ];
+    workerPositions.forEach((pos, idx) => {
+      dummy.position.set(pos[0], pos[1], pos[2]);
+      dummy.rotation.set(0, Math.random() * Math.PI, 0);
+      dummy.updateMatrix();
+      workerMesh.setMatrixAt(idx, dummy.matrix);
+    });
+    workerMesh.instanceMatrix.needsUpdate = true;
+    sandboxGroup.add(workerMesh);
+
+    // 5. Rain Particle System
+    const rainCount = 1200;
+    const rainGeo = new THREE.BufferGeometry();
+    const rainPositions = new Float32Array(rainCount * 3);
+    for (let i = 0; i < rainCount; i++) {
+      rainPositions[i * 3 + 0] = (Math.random() - 0.5) * 200;
+      rainPositions[i * 3 + 1] = Math.random() * 120 + 10;
+      rainPositions[i * 3 + 2] = (Math.random() - 0.5) * 160;
+    }
+    rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPositions, 3));
+    const rainMat = new THREE.PointsMaterial({
+      color: 0x93c5fd,
+      size: 1.2,
+      transparent: true,
+      opacity: 0.0 // Initially off
+    });
+    const rainPoints = new THREE.Points(rainGeo, rainMat);
+    scene.add(rainPoints);
+
+    // Dust Particles
+    const dustCount = 200;
+    const dustGeo = new THREE.BufferGeometry();
+    const dustPositions = new Float32Array(dustCount * 3);
+    for (let i = 0; i < dustCount; i++) {
+      dustPositions[i * 3 + 0] = (Math.random() - 0.5) * 120;
+      dustPositions[i * 3 + 1] = Math.random() * 25 + 5;
+      dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 100;
+    }
+    dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPositions, 3));
+    const dustMat = new THREE.PointsMaterial({ color: 0xd97706, size: 1.0, transparent: true, opacity: 0.4 });
+    const dustPoints = new THREE.Points(dustGeo, dustMat);
+    scene.add(dustPoints);
+
+    // 6. Interaction & Simulation States
+    let simSpeed = 1.0;
+    let isRaining = false;
+    let autoOrbit = true;
+    let timeOfDayIdx = 1; // 0: Dawn, 1: Noon, 2: Dusk, 3: Midnight
+    const TOD_NAMES = ["黎明", "正午", "黄昏", "午夜"];
+    let currentScene = 0; // 0: Base Construction, 1: Metro Shield Underground
+
+    // Truck Waypoint Circuit
+    const waypoints = [
+      { x: -30, z: -35 },
+      { x: 35, z: -35 },
+      { x: 35, z: 20 },
+      { x: -30, z: 20 }
+    ];
+    let truckProgress = 0;
+
+    function cycleTimeOfDay() {
+      timeOfDayIdx = (timeOfDayIdx + 1) % 4;
+      document.getElementById("btn-tod").innerText = `🌅 昼夜: ${TOD_NAMES[timeOfDayIdx]}`;
+      applyTimeOfDay();
+    }
+
+    function applyTimeOfDay() {
+      if (timeOfDayIdx === 0) { // Dawn
+        scene.fog.color.setHex(0xfbcfe8);
+        ambientLight.color.setHex(0xf472b6);
+        ambientLight.intensity = 0.9;
+        sunLight.color.setHex(0xfde047);
+        sunLight.intensity = 2.0;
+        sunLight.position.set(160, 40, 50);
+        floodLight1.intensity = 0;
+        floodLight2.intensity = 0;
+      } else if (timeOfDayIdx === 1) { // Noon
+        scene.fog.color.setHex(0x1a202c);
+        ambientLight.color.setHex(0xdbeafe);
+        ambientLight.intensity = 1.2;
+        sunLight.color.setHex(0xfffaed);
+        sunLight.intensity = 2.8;
+        sunLight.position.set(120, 180, 90);
+        floodLight1.intensity = 0;
+        floodLight2.intensity = 0;
+      } else if (timeOfDayIdx === 2) { // Dusk
+        scene.fog.color.setHex(0x451a03);
+        ambientLight.color.setHex(0xfb923c);
+        ambientLight.intensity = 0.8;
+        sunLight.color.setHex(0xea580c);
+        sunLight.intensity = 1.6;
+        sunLight.position.set(-140, 30, 40);
+        floodLight1.intensity = 1.5;
+        floodLight2.intensity = 1.5;
+      } else { // Midnight
+        scene.fog.color.setHex(0x050811);
+        ambientLight.color.setHex(0x1e293b);
+        ambientLight.intensity = 0.35;
+        sunLight.color.setHex(0x60a5fa);
+        sunLight.intensity = 0.4;
+        sunLight.position.set(0, 140, 0);
+        floodLight1.intensity = 4.0;
+        floodLight2.intensity = 4.0;
+      }
+    }
+
+    function toggleRain() {
+      isRaining = !isRaining;
+      const btn = document.getElementById("btn-rain");
+      btn.classList.toggle("active", isRaining);
+      rainMat.opacity = isRaining ? 0.75 : 0.0;
+      groundMesh.material.roughness = isRaining ? 0.25 : 0.85; // Wet reflection
+      tableMesh.material.roughness = isRaining ? 0.35 : 0.7;
+    }
+
+    function cycleSpeed() {
+      if (simSpeed === 1.0) simSpeed = 2.0;
+      else if (simSpeed === 2.0) simSpeed = 0.5;
+      else simSpeed = 1.0;
+      document.getElementById("btn-speed").innerText = `⚡ 运行速度: ${simSpeed.toFixed(1)}x`;
+    }
+
+    function toggleAutoOrbit() {
+      autoOrbit = !autoOrbit;
+      document.getElementById("btn-orbit").classList.toggle("active", autoOrbit);
+      document.getElementById("btn-orbit").innerText = `🎥 自动环视: ${autoOrbit ? '开' : '关'}`;
+    }
+
+    function toggleScene() {
+      currentScene = currentScene === 0 ? 1 : 0;
+      if (currentScene === 1) {
+        // Underground Tunnel Shield Scenario: Lower central bldg & bring up large shield tunnel rings
+        bldgGroup.visible = false;
+        soilMound.scale.set(1.4, 1.5, 1.2);
+        document.getElementById("btn-scene").innerText = "🔄 模式: 地下盾构与隧道";
+      } else {
+        bldgGroup.visible = true;
+        soilMound.scale.set(1.0, 1.0, 1.0);
+        document.getElementById("btn-scene").innerText = "🔄 模式: 地表基坑与楼房";
+      }
+    }
+
+    // Keydown for Spacebar
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        toggleRain();
+      }
+    });
+
+    // Camera Orbit Dragging
+    let isDragging = false;
+    let prevMouseX = 0, prevMouseY = 0;
+    let cameraSpherical = { radius: 210, theta: 0.8, phi: 1.05 };
+
+    window.addEventListener("mousedown", (e) => {
+      isDragging = true;
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - prevMouseX;
+      const dy = e.clientY - prevMouseY;
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
+
+      cameraSpherical.theta -= dx * 0.005;
+      cameraSpherical.phi = Math.max(0.3, Math.min(Math.PI / 2 - 0.05, cameraSpherical.phi - dy * 0.005));
+    });
+
+    window.addEventListener("mouseup", () => isDragging = false);
+
+    // Touch Support
+    window.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 1) {
+        isDragging = true;
+        prevMouseX = e.touches[0].clientX;
+        prevMouseY = e.touches[0].clientY;
+      }
+    });
+
+    window.addEventListener("touchmove", (e) => {
+      if (!isDragging || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - prevMouseX;
+      const dy = e.touches[0].clientY - prevMouseY;
+      prevMouseX = e.touches[0].clientX;
+      prevMouseY = e.touches[0].clientY;
+
+      cameraSpherical.theta -= dx * 0.006;
+      cameraSpherical.phi = Math.max(0.3, Math.min(Math.PI / 2 - 0.05, cameraSpherical.phi - dy * 0.006));
+    });
+
+    window.addEventListener("touchend", () => isDragging = false);
+
+    // Wheel Zoom
+    window.addEventListener("wheel", (e) => {
+      cameraSpherical.radius = Math.max(80, Math.min(380, cameraSpherical.radius + e.deltaY * 0.12));
+    });
+
+    // Animation Loop
+    let clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta() * simSpeed;
+      const time = clock.getElapsedTime() * simSpeed;
+
+      // 1. Crane Jib Rotation & Hoist Cycle
+      jibGroup.rotation.y = Math.sin(time * 0.4) * 0.8;
+      bucket.position.y = -29 + Math.sin(time * 1.2) * 8;
+      cable.scale.y = 1.0 + Math.sin(time * 1.2) * 0.3;
+
+      // 2. Excavator Cab & Arm Digging
+      excCabGroup.rotation.y = Math.sin(time * 0.8) * 0.6;
+      arm1.rotation.x = -0.5 + Math.sin(time * 1.4) * 0.2;
+      arm2.rotation.x = 0.8 + Math.cos(time * 1.4) * 0.25;
+
+      // 3. Dump Truck Loop Path
+      truckProgress = (truckProgress + delta * 0.12) % 4.0;
+      const leg = Math.floor(truckProgress);
+      const frac = truckProgress - leg;
+      const pA = waypoints[leg];
+      const pB = waypoints[(leg + 1) % 4];
+
+      truckGroup.position.x = pA.x + (pB.x - pA.x) * frac;
+      truckGroup.position.z = pA.y ? pA.y : (pA.z + (pB.z - pA.z) * frac);
+      const angle = Math.atan2(pB.x - pA.x, pB.z - pA.z);
+      truckGroup.rotation.y = angle;
+
+      // 4. Rain Particles Downfall
+      if (isRaining) {
+        const rPos = rainGeo.attributes.position.array;
+        for (let i = 0; i < rainCount; i++) {
+          rPos[i * 3 + 1] -= delta * 90;
+          if (rPos[i * 3 + 1] < 2) {
+            rPos[i * 3 + 1] = 110;
+          }
+        }
+        rainGeo.attributes.position.needsUpdate = true;
+      }
+
+      // 5. Dust Floating
+      const dPos = dustGeo.attributes.position.array;
+      for (let i = 0; i < dustCount; i++) {
+        dPos[i * 3 + 0] += Math.sin(time + i) * 0.05;
+        dPos[i * 3 + 1] += Math.cos(time + i) * 0.03;
+      }
+      dustGeo.attributes.position.needsUpdate = true;
+
+      // 6. Camera Position & Auto Orbit
+      if (autoOrbit && !isDragging) {
+        cameraSpherical.theta += 0.0025 * simSpeed;
+      }
+      camera.position.x = cameraSpherical.radius * Math.sin(cameraSpherical.phi) * Math.sin(cameraSpherical.theta);
+      camera.position.y = cameraSpherical.radius * Math.cos(cameraSpherical.phi);
+      camera.position.z = cameraSpherical.radius * Math.sin(cameraSpherical.phi) * Math.cos(cameraSpherical.theta);
+      camera.lookAt(0, 15, 0);
+
+      renderer.render(scene, camera);
+    }
+
+    // Resize
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+  </script>
+</body>
+</html>

@@ -7,6 +7,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
+| [奇幻地图生成器](../../demos/fantasy-map-generator/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](../../demos/fantasy-map-generator/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](../../demos/fantasy-map-generator/runs/gemini-3-8-flash-high-r01/index.html) |
 | [fantasy-map-generator · gpt-6.1-sol high](../../demos/fantasy-map-generator/runs/gpt-6-1-sol-high-r01/Readme.md) | GPT-6.1 Sol / high | 2026-10-05 | [v1](../../demos/fantasy-map-generator/runs/gpt-6-1-sol-high-r01/prompt.md) | [打开](../../demos/fantasy-map-generator/runs/gpt-6-1-sol-high-r01/index.html) |
 | [奇幻地图生成器 · GPT-6.1 Sol Low](../../demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](../../demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](../../demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/index.html) |
 | [奇幻岛屿地图 · gpt-6.1-sol max](../../demos/fantasy-map-generator/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-10-05 | [v1](../../demos/fantasy-map-generator/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](../../demos/fantasy-map-generator/runs/gpt-6-1-sol-max-r01/index.html) |
