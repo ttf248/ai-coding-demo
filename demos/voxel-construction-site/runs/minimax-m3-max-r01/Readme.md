@@ -32,6 +32,10 @@
 - 空格触发 4 秒暴雨；雨后地面材质不变（按任务正文要求）
 - 桌面 60 FPS 稳定，无穿模
 
+## 预览截图
+
+![最终入口运行截图](preview-2026-10-09.png)
+
 <!-- archive:start -->
 ## 当前归档信息（自动生成）
 
@@ -49,4 +53,5 @@
 - 工人与钢筋堆使用 InstancedMesh 实例化批渲染。
 - 暴雨与尘土使用 Points 粒子 + 自定义 Shader；昼夜用插值平滑过渡。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/voxel-construction-site/runs/minimax-m3-max-r01；按原实验轮次导入。
+- 2026-10-09：修正 Three.js r160 CDN 地址版本号（r160 → 0.160.0），恢复 HTTP 预览入口加载。
 <!-- archive:end -->

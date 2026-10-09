@@ -18,6 +18,10 @@
 
 [首版快照说明](evidence/README.md) · [验证与限制](evidence/validation.md)。首版代码保留，修复没有覆盖首版快照。
 
+## 预览截图
+
+![最终入口运行截图](preview-2026-10-09.png)
+
 <!-- archive:start -->
 ## 当前归档信息（自动生成）
 
