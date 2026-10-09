@@ -23,7 +23,7 @@
 - 输入记录：完整输入即主题任务正文 v1。原文为角色/流程式提示词，未随附具体 APP 需求文本；按主题题意将「视频社区 App（YouTube 风格）」作为需求执行，此处如实标注。
 - 工具：GitHub Copilot CLI（VS Code）。model-test-base 独立克隆中由当前会话直接执行；模型 kimi-k3，档位 high；未委派子代理。
 - 运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。
-- 费用记录：GitHub Copilot 批次合计 $5.89 USD（11 个案例；原始消耗 883 GitHub Copilot credits，换算比例 10 USD / 1500 GitHub Copilot credits；批次 github-copilot-kimi-k3-high-2026-10-09；未记录单案例费用）
+- 费用记录：GitHub Copilot 批次合计 $5.05 USD（11 个案例；原始消耗 883 GitHub Copilot credits，换算比例 40 USD / 7000 GitHub Copilot credits；批次 github-copilot-kimi-k3-high-2026-10-09；未记录单案例费用）
 - [视频 App UI 参考图](../../../../demos/youtube-ui/runs/kimi-k3-high-r01/index.html)
 
 ### 部署适配记录
