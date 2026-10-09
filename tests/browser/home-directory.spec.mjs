@@ -431,9 +431,9 @@ test("complexity is the home default across pagination, views and shared sorting
   expect(await ids()).toEqual(expected.slice(0, 9));
   await page.locator("#load-more").click();
   expect(await ids()).toEqual(expected);
-  await page.locator("#sort").selectOption("latest");
+  await page.locator("#sort").selectOption("recent");
   await page.reload();
-  await expect(page.locator("#sort")).toHaveValue("latest");
+  await expect(page.locator("#sort")).toHaveValue("recent");
   await page.locator("#sort").selectOption("complexity");
   await page.locator('[data-group="runs"]').click();
   await expect(
@@ -448,4 +448,56 @@ test("complexity is the home default across pagination, views and shared sorting
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("legacy latest links use complexity and card badges stay grouped", async ({
+  page,
+}) => {
+  await page.goto(
+    "./index.html?testing=active&sort=latest&group=topics&view=grid",
+  );
+  await expect(page.locator("#sort")).toHaveValue("complexity");
+  const firstIds = await page
+    .locator(".topic-card h3 a")
+    .evaluateAll((links) =>
+      links.slice(0, 2).map((a) => new URL(a.href).searchParams.get("id")),
+    );
+  expect(firstIds.sort()).toEqual([
+    "fluid-simulation",
+    "voxel-construction-site",
+  ]);
+  expect(new URL(page.url()).searchParams.get("sort")).toBe("complexity");
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 960 });
+    for (const group of ["topics", "runs"]) {
+      await page.locator('[data-group="' + group + '"]').click();
+      await page.locator("#q").fill("体素");
+      await expect(
+        page.locator(".card-badges .execution-mode-chip").first(),
+      ).toBeVisible();
+      const aligned = await page
+        .locator("#project-grid .card-top")
+        .evaluateAll((rows) =>
+          rows.every((row) => {
+            const box = row.getBoundingClientRect(),
+              tags = [...row.querySelectorAll(".card-badges > span")];
+            return tags.every((tag) => {
+              const r = tag.getBoundingClientRect();
+              return (
+                r.left >= box.left - 1 &&
+                r.right <= box.right + 1 &&
+                r.top >= box.top - 1 &&
+                r.bottom <= box.bottom + 1
+              );
+            });
+          }),
+        );
+      expect(aligned).toBe(true);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+    }
+  }
 });

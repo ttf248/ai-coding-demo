@@ -16,7 +16,7 @@
     testing: ["active", "archived", "all"].includes(params.get("testing"))
       ? params.get("testing")
       : "active",
-    sort: ["complexity", "latest", "title"].includes(params.get("sort"))
+    sort: ["complexity", "recent", "title"].includes(params.get("sort"))
       ? params.get("sort")
       : "complexity",
     group: params.get("group") || "topics",
@@ -124,10 +124,13 @@
       items = matched.map((r) => {
         previewScopes.set(r.id, { runs: [r], source: U.screenshotURL(r) });
         const html = U.runCard(data, r)
+          .replace(U.executionModeBadge(r), "")
           .replace(
-            '<div class="card-top">',
-            '<div class="card-top">' +
-              U.complexityBadge(data.topics.find((t) => t.id === r.topicId)),
+            /(<div class="card-top"><span class="eyebrow">[\s\S]*?<\/span>)([\s\S]*?)(<\/div><h3>)/,
+            '$1<div class="card-badges">' +
+              U.executionModeBadge(r) +
+              U.complexityBadge(data.topics.find((t) => t.id === r.topicId)) +
+              "$2</div>$3",
           )
           .replace(
             U.screenshotFigure(data, r, "run-card-screenshot"),
@@ -226,11 +229,11 @@
           (cover || placeholder(t.title)) +
           '<div class="topic-body"><div class="card-top"><span class="eyebrow">' +
           e(data.categories.find((c) => c.id === t.category).label) +
-          "</span>" +
+          '</span><div class="card-badges">' +
           (U.isTopicArchived(t) ? '<span class="pill">已归档</span>' : "") +
           U.executionModeBadge(previewRun) +
           U.complexityBadge(t) +
-          '</div><h3><a href="topic.html?id=' +
+          '</div></div><h3><a href="topic.html?id=' +
           t.id +
           '">' +
           e(t.title) +
@@ -356,7 +359,7 @@
       .filter(
         (key) =>
           state[key] &&
-          !(key === "sort" && ["complexity", "latest"].includes(state[key])) &&
+          !(key === "sort" && ["complexity", "recent"].includes(state[key])) &&
           !(key === "testing" && state[key] === "active"),
       )
       .map((key) => {
