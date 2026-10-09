@@ -7,6 +7,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
+| [circuit-lab](../../demos/circuit-lab/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](../../demos/circuit-lab/runs/claude-haiku-45-default-r01/prompt.md) | [打开](../../demos/circuit-lab/runs/claude-haiku-45-default-r01/index.html) |
 | [简化电路实验台](../../demos/circuit-lab/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](../../demos/circuit-lab/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](../../demos/circuit-lab/runs/gemini-3-8-flash-high-r01/index.html) |
 | [circuit-lab · gpt-6.1-sol high](../../demos/circuit-lab/runs/gpt-6-1-sol-high-r01/Readme.md) | GPT-6.1 Sol / high | 2026-10-05 | [v1](../../demos/circuit-lab/runs/gpt-6-1-sol-high-r01/prompt.md) | [打开](../../demos/circuit-lab/runs/gpt-6-1-sol-high-r01/index.html) |
 | [简化电路实验台 · GPT-6.1 Sol Low](../../demos/circuit-lab/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](../../demos/circuit-lab/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](../../demos/circuit-lab/runs/gpt-6-1-sol-low-r01/index.html) |

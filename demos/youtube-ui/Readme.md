@@ -7,6 +7,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
+| [youtube-ui](../../demos/youtube-ui/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](../../demos/youtube-ui/runs/claude-haiku-45-default-r01/prompt.md) | [打开](../../demos/youtube-ui/runs/claude-haiku-45-default-r01/index.html) |
 | [YouTube UI 模块](../../demos/youtube-ui/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](../../demos/youtube-ui/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](../../demos/youtube-ui/runs/gemini-3-8-flash-high-r01/index.html) |
 | [YouTube UI 模块](../../demos/youtube-ui/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v1](../../demos/youtube-ui/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../demos/youtube-ui/runs/gpt-5-6-luna-max-r01/index.html) |
 | [YouTube · 五个功能模块原型](../../demos/youtube-ui/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v1](../../demos/youtube-ui/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](../../demos/youtube-ui/runs/gpt-6-1-sol-max-r01/index.html) |

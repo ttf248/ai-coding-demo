@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neo-Gothic Tower City - 3D Animation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Arial', sans-serif; overflow: hidden; background: #000; }
+        #canvas { display: block; width: 100vw; height: 100vh; }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            font-size: 14px;
+            z-index: 100;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
+            line-height: 1.6;
+        }
+        .info-panel {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 3px solid #8b5cf6;
+            max-width: 300px;
+        }
+        .control-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 300px;
+            border-left: 3px solid #06b6d4;
+        }
+        #stats {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #0f0;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="ui">
+        <div class="info-panel">
+            <div><strong>🏰 Neo-Gothic Tower City</strong></div>
+            <div style="font-size: 12px; color: #aaa; margin-top: 5px;">Interactive 3D Experience</div>
+        </div>
+    </div>
+    <div class="control-hint">
+        <strong>Controls:</strong><br>
+        🖱️ Drag to rotate<br>
+        🔍 Scroll to zoom<br>
+        WASD to move<br>
+        Space/Shift for up/down
+    </div>
+    <div id="stats"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@r128/build/three.module.js"
+        }
+    }
+    </script>
+
+    <script type="module">
+    import * as THREE from 'three';
+
+    // Scene setup
+    const canvas = document.getElementById('canvas');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowShadowMap;
+    
+    // Camera position
+    camera.position.set(0, 150, 250);
+    camera.lookAt(0, 100, 0);
+    
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
+    scene.add(ambientLight);
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    directionalLight.position.set(200, 300, 200);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.far = 1000;
+    directionalLight.shadow.camera.left = -500;
+    directionalLight.shadow.camera.right = 500;
+    directionalLight.shadow.camera.top = 500;
+    directionalLight.shadow.camera.bottom = -500;
+    scene.add(directionalLight);
+    
+    // Fog for atmosphere
+    scene.fog = new THREE.Fog(0x1a1a2e, 800, 2000);
+    scene.background = new THREE.Color(0x0a0e27);
+    
+    // ===== ARCHITECTURE HELPER =====
+    class NeoGothicTower {
+        constructor(x, z, height, width = 40) {
+            this.group = new THREE.Group();
+            this.group.position.set(x, 0, z);
+            
+            // Main tower body
+            const bodyGeom = new THREE.BoxGeometry(width, height, width);
+            const stoneMaterial = new THREE.MeshStandardMaterial({
+                color: 0x6b6b7a,
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            const body = new THREE.Mesh(bodyGeom, stoneMaterial);
+            body.position.y = height / 2;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            this.group.add(body);
+            
+            // Pointed roof (spire)
+            const spireGeom = new THREE.ConeGeometry(width / 2, height * 0.4, 16);
+            const spire = new THREE.Mesh(spireGeom, stoneMaterial);
+            spire.position.y = height + height * 0.2;
+            spire.castShadow = true;
+            spire.receiveShadow = true;
+            this.group.add(spire);
+            
+            // Gothic arched windows
+            this.addGothicWindows(width, height);
+            
+            // Buttresses (支扶壁)
+            this.addButtresses(width, height);
+            
+            // Crenellations (城垛)
+            this.addCrenellations(width, height);
+        }
+        
+        addGothicWindows(width, height) {
+            const windowCount = Math.floor(height / 30);
+            const windowWidth = width * 0.15;
+            const windowHeight = width * 0.3;
+            
+            const windowMaterial = new THREE.MeshStandardMaterial({
+                color: 0x1a1a3e,
+                emissive: 0x4444ff,
+                emissiveIntensity: 0.3,
+                metalness: 0.8
+            });
+            
+            for (let i = 0; i < windowCount; i++) {
+                const yPos = 30 + i * 35;
+                
+                // Arched window top
+                const archGeom = new THREE.ConeGeometry(windowWidth / 2, windowHeight * 0.4, 8);
+                const arch = new THREE.Mesh(archGeom, windowMaterial);
+                arch.position.set(width / 2 + 2, yPos + windowHeight * 0.3, 0);
+                arch.rotation.z = Math.PI / 2;
+                arch.castShadow = true;
+                this.group.add(arch);
+                
+                // Window body
+                const winGeom = new THREE.BoxGeometry(4, windowHeight, windowWidth);
+                const window = new THREE.Mesh(winGeom, windowMaterial);
+                window.position.set(width / 2 + 2, yPos, 0);
+                window.castShadow = true;
+                this.group.add(window);
+            }
+        }
+        
+        addButtresses(width, height) {
+            const buttMaterial = new THREE.MeshStandardMaterial({
+                color: 0x5a5a68,
+                roughness: 0.9
+            });
+            
+            const buttressWidth = width * 0.2;
+            const buttressDepth = width * 0.15;
+            
+            const positions = [
+                [width / 2 + 2, 0, width / 2 + 2],
+                [-(width / 2 + 2), 0, width / 2 + 2],
+                [width / 2 + 2, 0, -(width / 2 + 2)],
+                [-(width / 2 + 2), 0, -(width / 2 + 2)]
+            ];
+            
+            positions.forEach(pos => {
+                const buttGeom = new THREE.BoxGeometry(buttressWidth, height * 0.8, buttressDepth);
+                const butt = new THREE.Mesh(buttGeom, buttMaterial);
+                butt.position.set(pos[0], pos[1] + height * 0.4, pos[2]);
+                butt.castShadow = true;
+                butt.receiveShadow = true;
+                this.group.add(butt);
+            });
+        }
+        
+        addCrenellations(width, height) {
+            const creneelMaterial = new THREE.MeshStandardMaterial({
+                color: 0x4a4a58,
+                roughness: 0.8
+            });
+            
+            const creneelCount = 8;
+            const creneelWidth = width / creneelCount;
+            
+            for (let i = 0; i < creneelCount; i++) {
+                const xPos = -width / 2 + creneelWidth * i + creneelWidth / 2;
+                const creneelGeom = new THREE.BoxGeometry(creneelWidth * 0.6, width * 0.15, width * 0.1);
+                const creneel = new THREE.Mesh(creneelGeom, creneelMaterial);
+                creneel.position.set(xPos, height + width * 0.075, 0);
+                creneel.castShadow = true;
+                this.group.add(creneel);
+            }
+        }
+    }
+    
+    // ===== CREATE CITY =====
+    const towers = [];
+    const towerConfigs = [
+        { x: -100, z: -100, h: 250, w: 45 },
+        { x: 100, z: -120, h: 280, w: 50 },
+        { x: 0, z: 0, h: 320, w: 55 },    // Central tower
+        { x: -150, z: 100, h: 220, w: 40 },
+        { x: 120, z: 150, h: 240, w: 42 },
+        { x: 0, z: -250, h: 200, w: 38 },
+        { x: -180, z: -50, h: 210, w: 40 },
+        { x: 180, z: 50, h: 230, w: 43 }
+    ];
+    
+    towerConfigs.forEach(config => {
+        const tower = new NeoGothicTower(config.x, config.z, config.h, config.w);
+        scene.add(tower.group);
+        towers.push(tower.group);
+    });
+    
+    // ===== GROUND/PLAZA =====
+    const groundGeom = new THREE.PlaneGeometry(800, 800);
+    const groundMaterial = new THREE.MeshStandardMaterial({
+        color: 0x2a2a3e,
+        roughness: 0.9
+    });
+    const ground = new THREE.Mesh(groundGeom, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    ground.position.y = -0.5;
+    scene.add(ground);
+    
+    // ===== PARTICLE EFFECTS =====
+    class ParticleSystem {
+        constructor(count = 1000) {
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const velocities = new Float32Array(count * 3);
+            
+            for (let i = 0; i < count * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 600;
+                positions[i + 1] = Math.random() * 300;
+                positions[i + 2] = (Math.random() - 0.5) * 600;
+                
+                velocities[i] = (Math.random() - 0.5) * 0.3;
+                velocities[i + 1] = Math.random() * 0.5 - 0.2;
+                velocities[i + 2] = (Math.random() - 0.5) * 0.3;
+            }
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.userData.velocities = velocities;
+            
+            const material = new THREE.PointsMaterial({
+                color: 0x4488ff,
+                size: 2,
+                sizeAttenuation: true,
+                transparent: true,
+                opacity: 0.6
+            });
+            
+            this.mesh = new THREE.Points(geometry, material);
+            this.positionAttribute = geometry.getAttribute('position');
+        }
+        
+        update() {
+            const positions = this.positionAttribute.array;
+            const velocities = this.mesh.geometry.userData.velocities;
+            
+            for (let i = 0; i < positions.length; i += 3) {
+                positions[i] += velocities[i];
+                positions[i + 1] += velocities[i + 1];
+                positions[i + 2] += velocities[i + 2];
+                
+                // Wrap around
+                if (positions[i] > 300) positions[i] = -300;
+                if (positions[i] < -300) positions[i] = 300;
+                if (positions[i + 1] > 300) positions[i + 1] = 0;
+                if (positions[i + 1] < 0) positions[i + 1] = 300;
+                if (positions[i + 2] > 300) positions[i + 2] = -300;
+                if (positions[i + 2] < -300) positions[i + 2] = 300;
+            }
+            
+            this.positionAttribute.needsUpdate = true;
+        }
+    }
+    
+    // Water/wave particles
+    const waterParticles = new ParticleSystem(800);
+    waterParticles.mesh.position.y = 0;
+    scene.add(waterParticles.mesh);
+    
+    // Flame particles
+    const flameParticles = new ParticleSystem(400);
+    flameParticles.mesh.material.color.setHex(0xff6600);
+    flameParticles.mesh.material.opacity = 0.4;
+    flameParticles.mesh.position.set(0, 350, 0);
+    scene.add(flameParticles.mesh);
+    
+    // ===== CAMERA CONTROLS =====
+    const controls = {
+        rotationX: 0,
+        rotationY: 0,
+        moveForward: false,
+        moveBackward: false,
+        moveLeft: false,
+        moveRight: false,
+        moveUp: false,
+        moveDown: false
+    };
+    
+    let isMouseDown = false;
+    let previousMousePosition = { x: 0, y: 0 };
+    
+    document.addEventListener('mousedown', (e) => {
+        isMouseDown = true;
+        previousMousePosition = { x: e.clientX, y: e.clientY };
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (isMouseDown) {
+            const deltaX = e.clientX - previousMousePosition.x;
+            const deltaY = e.clientY - previousMousePosition.y;
+            
+            controls.rotationY += deltaX * 0.005;
+            controls.rotationX += deltaY * 0.005;
+            
+            controls.rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, controls.rotationX));
+            
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        }
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isMouseDown = false;
+    });
+    
+    document.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const direction = camera.getWorldDirection(new THREE.Vector3());
+        const speed = e.deltaY > 0 ? 5 : -5;
+        camera.position.addScaledVector(direction, speed);
+    });
+    
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'w') controls.moveForward = true;
+        if (e.key === 's') controls.moveBackward = true;
+        if (e.key === 'a') controls.moveLeft = true;
+        if (e.key === 'd') controls.moveRight = true;
+        if (e.key === ' ') controls.moveUp = true;
+        if (e.key === 'Shift') controls.moveDown = true;
+    });
+    
+    document.addEventListener('keyup', (e) => {
+        if (e.key === 'w') controls.moveForward = false;
+        if (e.key === 's') controls.moveBackward = false;
+        if (e.key === 'a') controls.moveLeft = false;
+        if (e.key === 'd') controls.moveRight = false;
+        if (e.key === ' ') controls.moveUp = false;
+        if (e.key === 'Shift') controls.moveDown = false;
+    });
+    
+    // ===== ANIMATION LOOP =====
+    let frameCount = 0;
+    const stats = document.getElementById('stats');
+    
+    function animate() {
+        requestAnimationFrame(animate);
+        frameCount++;
+        
+        // Update camera rotation
+        camera.rotation.order = 'YXZ';
+        camera.rotation.y = controls.rotationY;
+        camera.rotation.x = controls.rotationX;
+        
+        // Camera movement
+        const moveSpeed = 2;
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        
+        const right = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        right.crossVectors(camera.up, direction).normalize();
+        
+        if (controls.moveForward) camera.position.addScaledVector(direction, moveSpeed);
+        if (controls.moveBackward) camera.position.addScaledVector(direction, -moveSpeed);
+        if (controls.moveRight) camera.position.addScaledVector(right, moveSpeed);
+        if (controls.moveLeft) camera.position.addScaledVector(right, -moveSpeed);
+        if (controls.moveUp) camera.position.y += moveSpeed;
+        if (controls.moveDown) camera.position.y -= moveSpeed;
+        
+        // Rotate towers slightly
+        towers.forEach((tower, i) => {
+            tower.rotation.y += 0.0001 * (i % 2 === 0 ? 1 : -1);
+        });
+        
+        // Update particles
+        waterParticles.update();
+        flameParticles.update();
+        
+        // Flame particles rise
+        flameParticles.mesh.position.y = 350 + Math.sin(frameCount * 0.01) * 10;
+        
+        // Stats
+        if (frameCount % 10 === 0) {
+            const fps = Math.round(1000 / 16.67);
+            stats.textContent = `FPS: ${fps}\nPos: ${camera.position.x.toFixed(0)}, ${camera.position.y.toFixed(0)}, ${camera.position.z.toFixed(0)}`;
+        }
+        
+        renderer.render(scene, camera);
+    }
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+    
+    animate();
+    </script>
+</body>
+</html>
