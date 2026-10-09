@@ -244,3 +244,46 @@ test("built previews match source and output fingerprints", () => {
     assert.equal(info.outputHash, treeHash(directory), r.id);
   }
 });
+
+test("complexity sorting handles ties, unknown ratings and filtered dates", () => {
+  const topics = [
+    { id: "a", title: "A", complexity: { level: 5 } },
+    { id: "b", title: "B", complexity: { level: 5 } },
+    { id: "c", title: "C", complexity: { level: 2 } },
+    { id: "d", title: "D", complexity: null },
+    { id: "e", title: "E" },
+  ];
+  const runs = [
+    { id: "a1", topicId: "a", date: "2020-01-01", tags: [], stack: [] },
+    { id: "b1", topicId: "b", date: "2021-01-01", tags: [], stack: [] },
+    { id: "c1", topicId: "c", date: "2026-01-01", tags: [], stack: [] },
+  ];
+  assert.deepEqual(
+    topics
+      .slice()
+      .sort((a, b) => U.compareTopics(a, b, runs, "complexity"))
+      .map((t) => t.id),
+    ["b", "a", "c", "d", "e"],
+  );
+  assert.deepEqual(
+    topics
+      .slice(0, 2)
+      .sort((a, b) => U.compareTopics(a, b, [], "complexity"))
+      .map((t) => t.id),
+    ["a", "b"],
+  );
+  assert.equal(
+    Array.from(
+      U.filterRuns({ topics, runs }, { sort: "complexity" }),
+      (r) => r.id,
+    ).join(","),
+    "b1,a1,c1",
+  );
+  assert.equal(
+    Array.from(
+      U.filterRuns({ topics, runs }, { sort: "latest" }),
+      (r) => r.id,
+    ).join(","),
+    "c1,b1,a1",
+  );
+});

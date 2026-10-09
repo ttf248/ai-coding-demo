@@ -144,6 +144,34 @@
     }
     return "同主题 · 不同输入";
   }
+  function compareComplexity(a, b) {
+    return (b?.complexity?.level || 0) - (a?.complexity?.level || 0);
+  }
+  function complexityBadge(topic) {
+    if (!topic?.complexity) return "";
+    return (
+      '<span class="pill" title="' +
+      escape(topic.complexity.reason) +
+      '">复杂度 ' +
+      topic.complexity.level +
+      "/5</span>"
+    );
+  }
+  function compareTopics(a, b, runs, sort) {
+    if (sort === "title")
+      return (
+        a.title.localeCompare(b.title, "zh-CN") || a.id.localeCompare(b.id)
+      );
+    const latest = (topic) =>
+      runs
+        .filter((r) => r.topicId === topic.id)
+        .reduce((date, r) => ((r.date || "") > date ? r.date : date), "");
+    return (
+      (sort === "complexity" ? compareComplexity(a, b) : 0) ||
+      latest(b).localeCompare(latest(a)) ||
+      a.id.localeCompare(b.id)
+    );
+  }
   function filterRuns(data, state) {
     const query = (state.q || "").trim().toLocaleLowerCase();
     return data.runs
@@ -179,7 +207,13 @@
       .sort((a, b) =>
         state.sort === "title"
           ? a.title.localeCompare(b.title, "zh-CN") || a.id.localeCompare(b.id)
-          : (b.date || "").localeCompare(a.date || "") ||
+          : (state.sort === "complexity"
+              ? compareComplexity(
+                  data.topics.find((t) => t.id === a.topicId),
+                  data.topics.find((t) => t.id === b.topicId),
+                )
+              : 0) ||
+            (b.date || "").localeCompare(a.date || "") ||
             a.id.localeCompare(b.id),
       );
   }
@@ -472,6 +506,9 @@
     groupedOptions,
     promptFor,
     relation,
+    compareComplexity,
+    compareTopics,
+    complexityBadge,
     filterRuns,
     diff,
     previewURL,
