@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新哥特式塔楼城市 · 可漫游 3D</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;overflow:hidden;background:#06080f;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;}
+  #scene{position:fixed;inset:0;display:block;}
+  #hud{position:fixed;left:14px;top:14px;z-index:10;color:#cfd6e4;background:rgba(10,14,24,.72);border:1px solid rgba(120,140,180,.25);border-radius:12px;padding:12px 16px;font-size:12px;line-height:1.9;max-width:320px;backdrop-filter:blur(6px);}
+  #hud h1{font-size:15px;color:#e8ddc0;letter-spacing:2px;margin-bottom:4px;}
+  #hud .k{color:#8fa3c8;}
+  #hud button{font:inherit;font-size:12px;margin-top:6px;margin-right:6px;padding:4px 10px;border:1px solid rgba(150,170,210,.4);background:rgba(40,52,80,.6);color:#dfe6f2;border-radius:6px;cursor:pointer;}
+  #hud button:hover{border-color:#e8ddc0;color:#e8ddc0;}
+  #loading{position:fixed;inset:0;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;color:#cfd6e4;z-index:20;background:#06080f;font-size:14px;letter-spacing:1px;}
+  #loading .ring{width:42px;height:42px;border-radius:50%;border:3px solid rgba(150,170,210,.25);border-top-color:#e8ddc0;animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #fatal{display:none;position:fixed;inset:0;z-index:30;background:#06080f;color:#f0b0a8;padding:40px;font-size:15px;line-height:2;}
+  #fps{position:fixed;right:14px;top:14px;z-index:10;color:#7f8ba0;font-size:11px;background:rgba(10,14,24,.6);padding:4px 8px;border-radius:6px;}
+  @media (max-width:760px){#hud{max-width:250px;font-size:11px;}}
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="hud">
+  <h1>新哥特式塔楼城市</h1>
+  <div><span class="k">拖拽</span> 环视 · <span class="k">滚轮/双指</span> 缩放</div>
+  <div><span class="k">WASD / 方向键</span> 漫游 · <span class="k">空格</span> 切换自动巡航</div>
+  <div id="todo"></div>
+  <button id="tourBtn">开始自动巡航</button>
+  <button id="dayBtn">切换昼/夜</button>
+</div>
+<div id="fps"></div>
+<div id="loading"><div class="ring"></div><p>正在建造塔楼城市…</p><p id="loadNote" style="font-size:11px;color:#7f8ba0"></p></div>
+<div id="fatal"></div>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+const fatalEl=document.getElementById('fatal');
+function fatal(msg){
+  document.getElementById('loading').style.display='none';
+  fatalEl.style.display='block';
+  fatalEl.innerHTML='⚠ 场景无法启动（『待确认』项）：<br>'+msg+'<br><span style="color:#8fa3c8;font-size:13px">本页面需要网络加载 Three.js CDN，且浏览器需支持 ES Module 与 WebGL。</span>';
+}
+window.addEventListener('error',e=>{ if(!started) fatal(e.message||'脚本加载失败'); });
+let started=false;
+
+let THREE, OrbitControls;
+try{
+  THREE=await import('three');
+  ({OrbitControls}=await import('three/addons/controls/OrbitControls.js'));
+}catch(err){ fatal('Three.js 模块加载失败：'+err.message); throw err; }
+
+started=true;
+document.getElementById('loading').style.display='none';
+
+/* ---------- 基础 ---------- */
+const canvas=document.getElementById('scene');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0a0f1e);
+scene.fog=new THREE.FogExp2(0x0a0f1e,0.0055);
+const camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,0.1,900);
+camera.position.set(0,34,120);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.target.set(0,22,0);
+controls.enableDamping=true;
+controls.maxPolarAngle=Math.PI*0.52;
+controls.minDistance=6; controls.maxDistance=320;
+
+/* ---------- 光照（昼夜两套） ---------- */
+const moon=new THREE.DirectionalLight(0x93a7d8,0.55);
+moon.position.set(-120,160,60);
+moon.castShadow=true;
+moon.shadow.mapSize.set(2048,2048);
+moon.shadow.camera.left=-160;moon.shadow.camera.right=160;
+moon.shadow.camera.top=160;moon.shadow.camera.bottom=-160;
+scene.add(moon);
+const ambient=new THREE.AmbientLight(0x2a3350,0.9);
+scene.add(ambient);
+const sun=new THREE.DirectionalLight(0xffe0b0,0);
+sun.position.set(80,140,40); scene.add(sun);
+
+/* ---------- 材质 ---------- */
+const stoneMat=new THREE.MeshStandardMaterial({color:0x8a8578,roughness:0.9});
+const stoneDark=new THREE.MeshStandardMaterial({color:0x5d594f,roughness:0.95});
+const roofMat=new THREE.MeshStandardMaterial({color:0x33415e,roughness:0.6,metalness:0.25});
+const windowMat=new THREE.MeshStandardMaterial({color:0x131a2a,emissive:0xffb45e,emissiveIntensity:1.4});
+const windowMatDay=new THREE.Color(0x131a2a);
+
+/* ---------- 程序化石材纹理（canvas 生成，避免外部贴图） ---------- */
+function stoneTexture(){
+  const c=document.createElement('canvas'); c.width=c.height=256;
+  const g=c.getContext('2d');
+  g.fillStyle='#8a8578'; g.fillRect(0,0,256,256);
+  for(let i=0;i<900;i++){
+    g.fillStyle=`rgba(${40+Math.random()*40|0},${40+Math.random()*40|0},${36+Math.random()*36|0},${0.05+Math.random()*0.1})`;
+    g.fillRect(Math.random()*256,Math.random()*256,2+Math.random()*8,2+Math.random()*6);
+  }
+  g.strokeStyle='rgba(50,48,42,0.35)';
+  for(let y=0;y<256;y+=32){ g.beginPath(); g.moveTo(0,y); g.lineTo(256,y); g.stroke(); }
+  const t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  return t;
+}
+stoneMat.map=stoneTexture();
+
+/* ---------- 城市生成 ---------- */
+const city=new THREE.Group();
+scene.add(city);
+// 地面与海岸
+const ground=new THREE.Mesh(new THREE.CylinderGeometry(150,160,8,48),stoneDark);
+ground.position.y=-4; ground.receiveShadow=true; city.add(ground);
+const plaza=new THREE.Mesh(new THREE.CircleGeometry(42,40),new THREE.MeshStandardMaterial({color:0x6e6a5f,roughness:1}));
+plaza.rotation.x=-Math.PI/2; plaza.position.y=0.02; plaza.receiveShadow=true; city.add(plaza);
+
+function addTower(x,z,r,h,spireH){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(r*0.82,r,h,8),stoneMat);
+  body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
+  // 顶部回廊
+  const gallery=new THREE.Mesh(new THREE.CylinderGeometry(r*1.05,r*1.05,h*0.06,8),stoneDark);
+  gallery.position.y=h*0.97; gallery.castShadow=true; g.add(gallery);
+  // 尖顶
+  const spire=new THREE.Mesh(new THREE.ConeGeometry(r*0.95,spireH,8),roofMat);
+  spire.position.y=h+spireH/2; spire.castShadow=true; g.add(spire);
+  const finial=new THREE.Mesh(new THREE.SphereGeometry(r*0.12,8,8),new THREE.MeshStandardMaterial({color:0xd8c58a,metalness:0.8,roughness:0.3}));
+  finial.position.y=h+spireH+r*0.1; g.add(finial);
+  // 尖拱窗（发光）
+  const rows=Math.max(2,Math.floor(h/14));
+  for(let i=0;i<rows;i++){
+    const wy=h*0.18+i*(h*0.68/rows);
+    for(let k=0;k<4;k++){
+      const a=k*Math.PI/2+Math.PI/4;
+      const win=new THREE.Mesh(new THREE.PlaneGeometry(r*0.34,h*0.09),windowMat);
+      win.position.set(Math.cos(a)*(r*0.83+0.05),wy,Math.sin(a)*(r*0.83+0.05));
+      win.lookAt(Math.cos(a)*100,wy,Math.sin(a)*100);
+      g.add(win);
+      const arch=new THREE.Mesh(new THREE.CircleGeometry(r*0.17,12,0,Math.PI),windowMat);
+      arch.position.set(Math.cos(a)*(r*0.83+0.05),wy+h*0.045,Math.sin(a)*(r*0.83+0.05));
+      arch.lookAt(Math.cos(a)*100,wy,Math.sin(a)*100);
+      g.add(arch);
+    }
+  }
+  // 小尖塔（角柱）
+  for(let k=0;k<4;k++){
+    const a=k*Math.PI/2;
+    const pin=new THREE.Mesh(new THREE.ConeGeometry(r*0.22,r*1.6,6),roofMat);
+    pin.position.set(Math.cos(a)*r*0.95,h+r*0.6,Math.sin(a)*r*0.95);
+    g.add(pin);
+  }
+  g.position.set(x,0,z);
+  city.add(g);
+  return g;
+}
+function addHall(x,z,w,h,d,rot){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),stoneMat);
+  body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
+  const roof=new THREE.Mesh(new THREE.CylinderGeometry(0.01,d*0.72,w,3,1),roofMat);
+  roof.rotation.z=Math.PI/2; roof.rotation.x=Math.PI; roof.position.y=h+d*0.36;
+  roof.castShadow=true; g.add(roof);
+  // 扶壁
+  for(let i=-1;i<=1;i++){
+    const b=new THREE.Mesh(new THREE.BoxGeometry(1.2,h*0.75,1.6),stoneDark);
+    b.position.set(i*w*0.38,h*0.375,d/2+0.6); b.castShadow=true; g.add(b);
+    const b2=b.clone(); b2.position.z=-d/2-0.6; g.add(b2);
+  }
+  g.position.set(x,0,z); g.rotation.y=rot||0;
+  city.add(g);
+  return g;
+}
+// 主教堂式塔群（真实比例：主塔 78m，副塔 40–55m，街道宽 8–12m）
+addTower(0,0,7,78,30);
+addTower(-16,10,5,52,20);
+addTower(16,10,5,52,20);
+addTower(-26,-12,4.2,44,16);
+addTower(26,-12,4.2,44,16);
+addTower(0,-26,5,58,22);
+addTower(-42,16,3.6,36,14);
+addTower(42,16,3.6,36,14);
+addTower(-20,38,3.2,30,12);
+addTower(20,38,3.2,30,12);
+addHall(0,20,26,14,14,0);
+addHall(-34,-30,20,11,12,0.4);
+addHall(34,-30,20,11,12,-0.4);
+// 城墙与垛口
+const wall=new THREE.Mesh(new THREE.CylinderGeometry(70,72,9,48,1,true),stoneMat);
+wall.position.y=4.5; wall.castShadow=true; city.add(wall);
+for(let i=0;i<48;i++){
+  const a=i/48*Math.PI*2;
+  const merlon=new THREE.Mesh(new THREE.BoxGeometry(2.2,1.6,1),stoneDark);
+  merlon.position.set(Math.cos(a)*70,9.6,Math.sin(a)*70);
+  merlon.lookAt(0,9.6,0); city.add(merlon);
+}
+
+/* ---------- 海洋（顶点波浪） ---------- */
+const seaGeo=new THREE.PlaneGeometry(900,900,90,90);
+const seaMat=new THREE.MeshStandardMaterial({color:0x10233d,roughness:0.35,metalness:0.55,transparent:true,opacity:0.94});
+const sea=new THREE.Mesh(seaGeo,seaMat);
+sea.rotation.x=-Math.PI/2; sea.position.y=-6.5;
+scene.add(sea);
+const seaBase=seaGeo.attributes.position.array.slice();
+
+/* ---------- 火焰粒子（火盆） ---------- */
+const firePoints=[];
+function addBrazier(x,z){
+  const bowl=new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.5,1.1,10),stoneDark);
+  bowl.position.set(x,0.55,z); city.add(bowl);
+  const light=new THREE.PointLight(0xff9040,12,26,2);
+  light.position.set(x,2.2,z); city.add(light);
+  const n=40;
+  const geo=new THREE.BufferGeometry();
+  const pos=new Float32Array(n*3), life=new Float32Array(n);
+  for(let i=0;i<n;i++){ pos[i*3]=x; pos[i*3+1]=1.2; pos[i*3+2]=z; life[i]=Math.random(); }
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const mat=new THREE.PointsMaterial({color:0xffa050,size:0.55,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false});
+  const pts=new THREE.Points(geo,mat);
+  scene.add(pts);
+  firePoints.push({pts,life,x,z,light});
+}
+addBrazier(-8,14); addBrazier(8,14); addBrazier(-8,-14); addBrazier(8,-14);
+addBrazier(-30,0); addBrazier(30,0);
+
+/* ---------- 月亮与星空 ---------- */
+const moonMesh=new THREE.Mesh(new THREE.SphereGeometry(14,24,24),new THREE.MeshBasicMaterial({color:0xdfe6f5}));
+moonMesh.position.set(-190,210,-160); scene.add(moonMesh);
+{
+  const n=900, pos=new Float32Array(n*3);
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, e=Math.random()*Math.PI*0.45+0.08, r=420;
+    pos[i*3]=Math.cos(a)*Math.cos(e)*r; pos[i*3+1]=Math.sin(e)*r; pos[i*3+2]=Math.sin(a)*Math.cos(e)*r;
+  }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xbcc8e8,size:1.1,sizeAttenuation:false})));
+}
+
+/* ---------- 漫游与巡航 ---------- */
+const keys={};
+addEventListener('keydown',e=>{ keys[e.code]=true; if(e.code==='Space'){e.preventDefault();toggleTour();} });
+addEventListener('keyup',e=>{ keys[e.code]=false; });
+let touring=false, tourT=0;
+function toggleTour(){ touring=!touring; document.getElementById('tourBtn').textContent=touring?'停止自动巡航':'开始自动巡航'; }
+document.getElementById('tourBtn').onclick=toggleTour;
+let isNight=true;
+document.getElementById('dayBtn').onclick=()=>{
+  isNight=!isNight;
+  if(isNight){
+    scene.background.set(0x0a0f1e); scene.fog.color.set(0x0a0f1e);
+    moon.intensity=0.55; sun.intensity=0; ambient.intensity=0.9; ambient.color.set(0x2a3350);
+    windowMat.emissiveIntensity=1.4; moonMesh.visible=true;
+  }else{
+    scene.background.set(0x9db8d8); scene.fog.color.set(0x9db8d8);
+    moon.intensity=0; sun.intensity=1.6; ambient.intensity=0.5; ambient.color.set(0xcfd8e8);
+    windowMat.emissiveIntensity=0.05; moonMesh.visible=false;
+  }
+};
+
+/* ---------- 主循环 ---------- */
+const clock=new THREE.Clock();
+const fpsEl=document.getElementById('fps');
+let fpsAcc=0, fpsN=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.05);
+  const t=clock.elapsedTime;
+  // 海浪
+  const p=seaGeo.attributes.position;
+  for(let i=0;i<p.count;i++){
+    const x=seaBase[i*3], y=seaBase[i*3+1];
+    p.array[i*3+2]=Math.sin(x*0.05+t*1.1)*1.6+Math.cos(y*0.04+t*0.8)*1.2;
+  }
+  p.needsUpdate=true;
+  seaGeo.computeVertexNormals();
+  // 火焰
+  firePoints.forEach(f=>{
+    const pa=f.pts.geometry.attributes.position;
+    for(let i=0;i<f.life.length;i++){
+      f.life[i]+=dt*1.4;
+      if(f.life[i]>1){ f.life[i]=0; pa.array[i*3]=f.x+(Math.random()-0.5)*0.6; pa.array[i*3+1]=1.1; pa.array[i*3+2]=f.z+(Math.random()-0.5)*0.6; }
+      pa.array[i*3+1]+=dt*(1.6+f.life[i]);
+      pa.array[i*3]+=Math.sin(t*6+i)*dt*0.25;
+    }
+    pa.needsUpdate=true;
+    f.light.intensity=10+Math.sin(t*9+f.x)*2.5;
+    f.pts.material.opacity=0.75+Math.sin(t*7+f.z)*0.15;
+  });
+  // 漫游
+  const speed=(keys.ShiftLeft?28:12)*dt;
+  const fwd=new THREE.Vector3(); camera.getWorldDirection(fwd); fwd.y=0; fwd.normalize();
+  const right=new THREE.Vector3().crossVectors(fwd,new THREE.Vector3(0,1,0));
+  if(keys.KeyW||keys.ArrowUp){ camera.position.addScaledVector(fwd,speed); controls.target.addScaledVector(fwd,speed); }
+  if(keys.KeyS||keys.ArrowDown){ camera.position.addScaledVector(fwd,-speed); controls.target.addScaledVector(fwd,-speed); }
+  if(keys.KeyA||keys.ArrowLeft){ camera.position.addScaledVector(right,-speed); controls.target.addScaledVector(right,-speed); }
+  if(keys.KeyD||keys.ArrowRight){ camera.position.addScaledVector(right,speed); controls.target.addScaledVector(right,speed); }
+  // 自动巡航：绕塔群的缓速轨道 + 高度起伏
+  if(touring){
+    tourT+=dt*0.06;
+    const r=105+Math.sin(tourT*0.7)*25;
+    camera.position.set(Math.cos(tourT)*r, 26+Math.sin(tourT*0.9)*14, Math.sin(tourT)*r);
+    controls.target.set(0,30,0);
+  }
+  controls.update();
+  renderer.render(scene,camera);
+  fpsAcc+=dt; fpsN++;
+  if(fpsAcc>0.5){ fpsEl.textContent=(fpsN/fpsAcc).toFixed(0)+' FPS'; fpsAcc=0; fpsN=0; }
+}
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+animate();
+</script>
+<script>
+// CDN/环境缺漏标示（任务要求：遇缺漏先标『待确认』并继续）
+if(!('importShim' in window) && !HTMLScriptElement.supports || !HTMLScriptElement.supports('importmap')){
+  document.getElementById('loadNote').textContent='『待确认』当前浏览器不支持 importmap，请使用新版 Chrome/Edge/Firefox。';
+}
+</script>
+</body>
+</html>

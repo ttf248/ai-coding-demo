@@ -31,8 +31,8 @@
 ## 项目统计
 
 - 实验主题：12
-- 实验记录：124
-- 可预览记录：115
+- 实验记录：135
+- 可预览记录：126
 - 技术主题：14
 
 ## 实验目录
@@ -52,6 +52,7 @@
 | [小蓝书 · 瀑布流社区 · GPT 6 Astra xhigh](demos/bluebook/runs/gpt-6-astra-xhigh-r01/Readme.md) | GPT-6 Astra / xhigh | 2026-10-08 | [v2](demos/bluebook/runs/gpt-6-astra-xhigh-r01/prompt.md) | [打开](previews/bluebook/gpt-6-astra-xhigh-r01/index.html) |
 | [小蓝书瀑布流社区 v2](demos/bluebook/runs/gpt-6-luna-max-r02/Readme.md) | GPT-6 Luna / max | 2026-09-29 | [v2](demos/bluebook/runs/gpt-6-luna-max-r02/prompt.md) | [打开](previews/bluebook/gpt-6-luna-max-r02/index.html) |
 | [小蓝书瀑布流](demos/bluebook/runs/gpt-6-sol-medium-r01/Readme.md) | GPT-6 Sol / medium | 2026-09-30 | [v2](demos/bluebook/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](previews/bluebook/gpt-6-sol-medium-r01/index.html) |
+| [小蓝书 · 瀑布流社区](demos/bluebook/runs/kimi-k3-high-r01/Readme.md) | Kimi K3 / high | 2026-10-09 | [v2](demos/bluebook/runs/kimi-k3-high-r01/prompt.md) | [打开](previews/bluebook/kimi-k3-high-r01/index.html) |
 | [小蓝书 · MiniMax M2.1](demos/bluebook/runs/minimax-m2-1-unknown-r01/Readme.md) | MiniMax M2.1 / unknown | 2025-12 | [v1](demos/bluebook/runs/minimax-m2-1-unknown-r01/prompt.md) | [打开](previews/bluebook/minimax-m2-1-unknown-r01/index.html) |
 | [小蓝书 · MiniMaxi M2](demos/bluebook/runs/minimax-m2-unknown-r01/Readme.md) | MiniMax M2 / unknown | 2025-11 | [v1](demos/bluebook/runs/minimax-m2-unknown-r01/prompt.md) | [打开](previews/bluebook/minimax-m2-unknown-r01/index.html) |
 | [小蓝书瀑布流 · 本地图片资源版](demos/bluebook/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-09-29 | [v1](demos/bluebook/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](previews/bluebook/minimax-m3-1-flash-preview-max-r01/index.html) |
@@ -72,6 +73,7 @@
 | [简化电路实验台 · 自主设计版](demos/circuit-lab/runs/gpt-6-1-sol-xhigh-r01/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-09 | [v1](demos/circuit-lab/runs/gpt-6-1-sol-xhigh-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-1-sol-xhigh-r01/index.html) |
 | [circuit-lab · GPT 6 Astra Low](demos/circuit-lab/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-10-06 | [v1](demos/circuit-lab/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-astra-low-r01/index.html) |
 | [简化电路实验台 · GPT 6 Astra xhigh](demos/circuit-lab/runs/gpt-6-astra-xhigh-r01/Readme.md) | GPT-6 Astra / xhigh | 2026-10-08 | [v1](demos/circuit-lab/runs/gpt-6-astra-xhigh-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-astra-xhigh-r01/index.html) |
+| [简化电路实验台](demos/circuit-lab/runs/kimi-k3-high-r01/Readme.md) | Kimi K3 / high | 2026-10-09 | [v1](demos/circuit-lab/runs/kimi-k3-high-r01/prompt.md) | [打开](demos/circuit-lab/runs/kimi-k3-high-r01/index.html) |
 | [简化电路实验台](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-06 | [v1](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 奇幻地图生成器
@@ -87,6 +89,7 @@
 | [奇幻地图生成器 · 自主设计版](demos/fantasy-map-generator/runs/gpt-6-1-sol-xhigh-r01/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-09 | [v1](demos/fantasy-map-generator/runs/gpt-6-1-sol-xhigh-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-1-sol-xhigh-r01/index.html) |
 | [fantasy-map-generator · GPT 6 Astra Low](demos/fantasy-map-generator/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-10-06 | [v1](demos/fantasy-map-generator/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-astra-low-r01/index.html) |
 | [奇幻地图生成器 · GPT 6 Astra xhigh](demos/fantasy-map-generator/runs/gpt-6-astra-xhigh-r01/Readme.md) | GPT-6 Astra / xhigh | 2026-10-08 | [v1](demos/fantasy-map-generator/runs/gpt-6-astra-xhigh-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-astra-xhigh-r01/index.html) |
+| [奇幻地图生成器](demos/fantasy-map-generator/runs/kimi-k3-high-r01/Readme.md) | Kimi K3 / high | 2026-10-09 | [v1](demos/fantasy-map-generator/runs/kimi-k3-high-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/kimi-k3-high-r01/index.html) |
 | [奇幻地图生成器](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-06 | [v1](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 彩色流体实验台
@@ -102,6 +105,7 @@
 | [彩色流体实验台 · 自主设计版](demos/fluid-simulation/runs/gpt-6-1-sol-xhigh-r01/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-09 | [v1](demos/fluid-simulation/runs/gpt-6-1-sol-xhigh-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-1-sol-xhigh-r01/index.html) |
 | [fluid-simulation · GPT 6 Astra Low](demos/fluid-simulation/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-10-06 | [v1](demos/fluid-simulation/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-astra-low-r01/index.html) |
 | [彩色流体实验台 · GPT 6 Astra xhigh](demos/fluid-simulation/runs/gpt-6-astra-xhigh-r01/Readme.md) | GPT-6 Astra / xhigh | 2026-10-08 | [v1](demos/fluid-simulation/runs/gpt-6-astra-xhigh-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-astra-xhigh-r01/index.html) |
+| [彩色流体实验台](demos/fluid-simulation/runs/kimi-k3-high-r01/Readme.md) | Kimi K3 / high | 2026-10-09 | [v1](demos/fluid-simulation/runs/kimi-k3-high-r01/prompt.md) | [打开](demos/fluid-simulation/runs/kimi-k3-high-r01/index.html) |
 | [彩色流体实验台](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-06 | [v1](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 生活情绪日记
@@ -118,6 +122,7 @@
 | [生活情绪日记 · GPT 6 Astra xhigh](demos/life-diary/runs/gpt-6-astra-xhigh-r01/Readme.md) | GPT-6 Astra / xhigh | 2026-10-08 | [v1](demos/life-diary/runs/gpt-6-astra-xhigh-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-6-astra-xhigh-r01/index.html) |
 | [生活情绪日记移动端原型](demos/life-diary/runs/gpt-6-luna-max-r02/Readme.md) | GPT-6 Luna / max | 2026-09-29 | [v1](demos/life-diary/runs/gpt-6-luna-max-r02/prompt.md) | [打开](demos/life-diary/runs/gpt-6-luna-max-r02/index.html) |
 | [AI 情绪日记原型](demos/life-diary/runs/gpt-6-sol-medium-r01/Readme.md) | GPT-6 Sol / medium | 2026-09-30 | [v1](demos/life-diary/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-6-sol-medium-r01/index.html) |
+| [生活情绪日记](demos/life-diary/runs/kimi-k3-high-r01/Readme.md) | Kimi K3 / high | 2026-10-09 | [v1](demos/life-diary/runs/kimi-k3-high-r01/prompt.md) | [打开](demos/life-diary/runs/kimi-k3-high-r01/canghe_app_prototype.html) |
 | [AI 情绪日记与生活助手 App 原型](demos/life-diary/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-09-29 | [v1](demos/life-diary/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/life-diary/runs/minimax-m3-1-flash-preview-max-r01/canghe_app_prototype.html) |
 | [藏盒 · AI 情绪日记与生活助手](demos/life-diary/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/life-diary/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/life-diary/runs/minimax-m3-max-r01/index.html) |
 | [生活情绪日记](demos/life-diary/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](demos/life-diary/runs/unknown-unknown-r01/prompt.md) | [打开](demos/life-diary/runs/unknown-unknown-r01/index.html) |
@@ -136,6 +141,7 @@
 | [冥想 iOS App · GPT 6 Astra xhigh](demos/meditation/runs/gpt-6-astra-xhigh-r01/Readme.md) | GPT-6 Astra / xhigh | 2026-10-08 | [v1](demos/meditation/runs/gpt-6-astra-xhigh-r01/prompt.md) | [打开](demos/meditation/runs/gpt-6-astra-xhigh-r01/index.html) |
 | [冥想 iOS App 原型](demos/meditation/runs/gpt-6-luna-max-r02/Readme.md) | GPT-6 Luna / max | 2026-09-29 | [v1](demos/meditation/runs/gpt-6-luna-max-r02/prompt.md) | [打开](demos/meditation/runs/gpt-6-luna-max-r02/index.html) |
 | [冥想 iOS 原型](demos/meditation/runs/gpt-6-sol-medium-r01/Readme.md) | GPT-6 Sol / medium | 2026-09-30 | [v1](demos/meditation/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](demos/meditation/runs/gpt-6-sol-medium-r01/index.html) |
+| [冥想 iOS App](demos/meditation/runs/kimi-k3-high-r01/Readme.md) | Kimi K3 / high | 2026-10-09 | [v1](demos/meditation/runs/kimi-k3-high-r01/prompt.md) | [打开](demos/meditation/runs/kimi-k3-high-r01/index.html) |
 | [冥想 iOS App 全量原型](demos/meditation/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-09-29 | [v1](demos/meditation/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/meditation/runs/minimax-m3-1-flash-preview-max-r01/meditation_app_prototype.html) |
 | [静境 · 冥想 iOS App 原型](demos/meditation/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/meditation/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/meditation/runs/minimax-m3-max-r01/index.html) |
 | [冥想 iOS App](demos/meditation/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](demos/meditation/runs/unknown-unknown-r01/prompt.md) | [打开](demos/meditation/runs/unknown-unknown-r01/index.html) |
@@ -156,6 +162,7 @@
 | [雾隐之城 · GPT 6 High](demos/neo-gothic-tower-city/runs/gpt-6-high-r01/Readme.md) | GPT-6 / high | 2026-09-14 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-high-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-high-r01/index.html) |
 | [新哥特式塔楼城市漫游](demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r03/Readme.md) | GPT-6 Luna / max | 2026-09-29 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r03/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r03/index.html) |
 | [新哥特式塔楼城市](demos/neo-gothic-tower-city/runs/gpt-6-sol-medium-r01/Readme.md) | GPT-6 Sol / medium | 2026-09-30 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-sol-medium-r01/index.html) |
+| [新哥特式塔楼城市](demos/neo-gothic-tower-city/runs/kimi-k3-high-r01/Readme.md) | Kimi K3 / high | 2026-10-09 | [v1](demos/neo-gothic-tower-city/runs/kimi-k3-high-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/kimi-k3-high-r01/index.html) |
 | [新哥特式塔楼城市 3D 漫游](demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-09-29 | [v1](demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 | [新哥特式塔楼城市 · 漫游](demos/neo-gothic-tower-city/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/neo-gothic-tower-city/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/minimax-m3-max-r01/index.html) |
 
@@ -172,6 +179,7 @@
 | [寻路算法实验室 · 自主设计版](demos/pathfinding-lab/runs/gpt-6-1-sol-xhigh-r01/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-09 | [v1](demos/pathfinding-lab/runs/gpt-6-1-sol-xhigh-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-1-sol-xhigh-r01/index.html) |
 | [pathfinding-lab · GPT 6 Astra Low](demos/pathfinding-lab/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-10-06 | [v1](demos/pathfinding-lab/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-astra-low-r01/index.html) |
 | [寻路算法实验室 · GPT 6 Astra xhigh](demos/pathfinding-lab/runs/gpt-6-astra-xhigh-r01/Readme.md) | GPT-6 Astra / xhigh | 2026-10-08 | [v1](demos/pathfinding-lab/runs/gpt-6-astra-xhigh-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-astra-xhigh-r01/index.html) |
+| [寻路算法实验室](demos/pathfinding-lab/runs/kimi-k3-high-r01/Readme.md) | Kimi K3 / high | 2026-10-09 | [v1](demos/pathfinding-lab/runs/kimi-k3-high-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/kimi-k3-high-r01/index.html) |
 | [寻路算法实验室](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-06 | [v1](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### Pixel Flow
@@ -188,6 +196,7 @@
 | [Pixel Flow · GPT 6 Astra xhigh](demos/pixel-flow/runs/gpt-6-astra-xhigh-r01/Readme.md) | GPT-6 Astra / xhigh | 2026-10-08 | [v1](demos/pixel-flow/runs/gpt-6-astra-xhigh-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-astra-xhigh-r01/index.html) |
 | [Pixel Flow 图片手势还原](demos/pixel-flow/runs/gpt-6-luna-max-r02/Readme.md) | GPT-6 Luna / max | 2026-09-29 | [v1](demos/pixel-flow/runs/gpt-6-luna-max-r02/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-luna-max-r02/index.html) |
 | [图片粒子与手势还原](demos/pixel-flow/runs/gpt-6-sol-medium-r01/Readme.md) | GPT-6 Sol / medium | 2026-09-30 | [v1](demos/pixel-flow/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-sol-medium-r01/index.html) |
+| [Pixel Flow](demos/pixel-flow/runs/kimi-k3-high-r01/Readme.md) | Kimi K3 / high | 2026-10-09 | [v1](demos/pixel-flow/runs/kimi-k3-high-r01/prompt.md) | [打开](demos/pixel-flow/runs/kimi-k3-high-r01/index.html) |
 | [图片粒子化与手势还原应用](demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-09-29 | [v1](demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 | [Pixel Flow · 图片粒子化与手势还原](demos/pixel-flow/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/pixel-flow/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/minimax-m3-max-r01/index.html) |
 | [Pixel Flow](demos/pixel-flow/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-12 | [v1](demos/pixel-flow/runs/unknown-unknown-r01/prompt.md) | 无静态预览 |
@@ -224,6 +233,7 @@
 | [体素微缩建筑工地 · GPT 6 Astra xhigh](demos/voxel-construction-site/runs/gpt-6-astra-xhigh-r02/Readme.md) | GPT-6 Astra / xhigh | 2026-10-08 | [v1](demos/voxel-construction-site/runs/gpt-6-astra-xhigh-r02/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-astra-xhigh-r02/index.html) |
 | [体素工地 WebGL2 沙盘](demos/voxel-construction-site/runs/gpt-6-luna-max-r02/Readme.md) | GPT-6 Luna / max | 2026-09-29 | [v1](demos/voxel-construction-site/runs/gpt-6-luna-max-r02/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-luna-max-r02/index.html) |
 | [体素微缩建筑工地](demos/voxel-construction-site/runs/gpt-6-sol-medium-r01/Readme.md) | GPT-6 Sol / medium | 2026-09-30 | [v1](demos/voxel-construction-site/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-sol-medium-r01/index.html) |
+| [体素微缩建筑工地](demos/voxel-construction-site/runs/kimi-k3-high-r01/Readme.md) | Kimi K3 / high | 2026-10-09 | [v1](demos/voxel-construction-site/runs/kimi-k3-high-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/kimi-k3-high-r01/index.html) |
 | [体素微缩建筑工地沙盘](demos/voxel-construction-site/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-09-29 | [v1](demos/voxel-construction-site/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 | [体素微缩建筑工地 · 沙盘](demos/voxel-construction-site/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/voxel-construction-site/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/minimax-m3-max-r01/index.html) |
 
@@ -241,6 +251,7 @@
 | [YouTube UI 模块 · GPT 6 Astra xhigh](demos/youtube-ui/runs/gpt-6-astra-xhigh-r01/Readme.md) | GPT-6 Astra / xhigh | 2026-10-08 | [v1](demos/youtube-ui/runs/gpt-6-astra-xhigh-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-astra-xhigh-r01/index.html) |
 | [YouTube UI 五模块原型](demos/youtube-ui/runs/gpt-6-luna-max-r02/Readme.md) | GPT-6 Luna / max | 2026-09-29 | [v1](demos/youtube-ui/runs/gpt-6-luna-max-r02/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-luna-max-r02/index.html) |
 | [YouTube UI 模块原型](demos/youtube-ui/runs/gpt-6-sol-medium-r01/Readme.md) | GPT-6 Sol / medium | 2026-09-30 | [v1](demos/youtube-ui/runs/gpt-6-sol-medium-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-sol-medium-r01/index.html) |
+| [YouTube UI 模块](demos/youtube-ui/runs/kimi-k3-high-r01/Readme.md) | Kimi K3 / high | 2026-10-09 | [v1](demos/youtube-ui/runs/kimi-k3-high-r01/prompt.md) | [打开](demos/youtube-ui/runs/kimi-k3-high-r01/index.html) |
 | [YouTube UI 模块化设计稿](demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-09-29 | [v1](demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 | [YouTube · UI 模块设计参考](demos/youtube-ui/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/youtube-ui/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/minimax-m3-max-r01/index.html) |
 | [YouTube UI 模块](demos/youtube-ui/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](demos/youtube-ui/runs/unknown-unknown-r01/prompt.md) | [打开](demos/youtube-ui/runs/unknown-unknown-r01/youtube-app-creator.html) |

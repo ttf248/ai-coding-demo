@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixel Flow · 图片粒子化与手势还原</title>
+<style>
+  :root{--bg:#0b0e14;--panel:#151a24;--ink:#e6e9ef;--muted:#8b94a3;--line:#262f3f;--accent:#5b8def;--ok:#34c98e;--danger:#f25555;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--ink);font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;}
+  header{padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+  header h1{font-size:18px;margin-right:auto;}
+  #status{font-size:13px;padding:4px 10px;border-radius:6px;background:#1c2431;color:var(--muted);}
+  #status.err{background:#3a1d1d;color:var(--danger);}
+  #status.ok{background:#153427;color:var(--ok);}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);align-items:center;font-size:13px;}
+  button{font:inherit;font-size:13px;padding:6px 12px;border:1px solid var(--line);background:#1c2431;border-radius:6px;cursor:pointer;color:var(--ink);}
+  button:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  button:disabled{opacity:.45;cursor:not-allowed;}
+  label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  main{flex:1;display:flex;gap:10px;padding:10px;flex-wrap:wrap;}
+  #stage{flex:1 1 560px;min-width:0;position:relative;background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  #gl{display:block;width:100%;height:580px;}
+  #cam{position:absolute;right:10px;bottom:10px;width:180px;border-radius:10px;border:1px solid var(--line);transform:scaleX(-1);background:#000;}
+  #handHint{position:absolute;left:10px;bottom:10px;font-size:12px;color:var(--muted);background:rgba(10,14,20,.7);padding:6px 10px;border-radius:8px;line-height:1.8;}
+  #loader{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(5,8,14,.75);z-index:5;flex-direction:column;gap:12px;color:var(--ink);font-size:14px;}
+  #loader .ring{width:38px;height:38px;border-radius:50%;border:3px solid rgba(120,150,220,.25);border-top-color:var(--accent);animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  aside{flex:0 1 280px;min-width:240px;display:flex;flex-direction:column;gap:10px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;}
+  .card h2{font-size:14px;margin-bottom:8px;color:var(--muted);}
+  .ctl{display:block;margin:8px 0;}
+  .ctl span{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:2px;}
+  .ctl input[type=range]{width:100%;}
+  .hint{font-size:12px;color:var(--muted);line-height:1.8;}
+  .stat{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed var(--line);font-size:12px;}
+  .stat:last-child{border-bottom:none;}
+  footer{padding:8px 14px;font-size:12px;color:var(--muted);}
+  @media (max-width:760px){#gl{height:440px;}#cam{width:120px;}aside{flex:1 1 100%;min-width:0;}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Pixel Flow · 图片粒子化与手势还原</h1>
+  <div id="status">请先上传一张图片</div>
+</header>
+<div class="toolbar">
+  <input type="file" id="fileInput" accept="image/*" hidden>
+  <button id="uploadBtn" class="primary">上传图片</button>
+  <button id="camBtn">开启摄像头与手势追踪</button>
+  <button id="scatterBtn" disabled>打散粒子</button>
+  <button id="restoreBtn" disabled>一键还原</button>
+  <label>采样率 <b id="sampleVal">4</b><input type="range" id="sampleRate" min="2" max="10" value="4" style="width:80px"></label>
+  <label><input type="checkbox" id="mouseFallback" checked> 无摄像头时用鼠标模拟手掌</label>
+</div>
+<main>
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <video id="cam" autoplay playsinline muted></video>
+    <div id="handHint">🖐 张开手掌：吸引粒子还原图片<br>✊ 握拳：驱散粒子<br> attraction 区域跟随掌心移动</div>
+    <div id="loader"><div class="ring"></div><p>正在加载手部追踪模型…</p></div>
+  </div>
+  <aside>
+    <div class="card">
+      <h2>状态</h2>
+      <div class="stat"><span>粒子数量</span><b id="stParticles">0</b></div>
+      <div class="stat"><span>还原进度</span><b id="stProgress">0%</b></div>
+      <div class="stat"><span>手势</span><b id="stGesture">未检测</b></div>
+      <div class="stat"><span>摄像头</span><b id="stCamera">未开启</b></div>
+    </div>
+    <div class="card hint">
+      使用说明：上传本地图片后，图片会被采样为 Three.js 粒子并随机飘散；开启摄像头后由 MediaPipe Hands 实时追踪手部关键点——张开手掌产生跟随掌心的吸引区域，粒子被吸引并回到原始位置；握拳暂停吸引并驱散附近粒子。摄像头需 HTTPS 或 localhost 环境；勾选「鼠标模拟」可在无摄像头时体验同样逻辑。
+    </div>
+    <div class="card hint">
+      技术：Canvas 提取像素 → BufferGeometry 顶点粒子（位置/颜色/原始坐标）→ 每帧按力场更新速度与位置；手势由 21 个关键点的指尖-腕距比例判定。
+    </div>
+  </aside>
+</main>
+<footer>单文件应用 · Three.js + MediaPipe Hands（CDN）· 摄像头画面仅本地处理</footer>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.min.js"></script>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}
+</script>
+<script type="module">
+const statusEl=document.getElementById('status');
+function setStatus(msg,cls){ statusEl.textContent=msg; statusEl.className=cls||''; }
+
+let THREE;
+try{ THREE=await import('three'); }
+catch(err){ setStatus('Three.js 加载失败（需要网络访问 CDN）：'+err.message,'err'); throw err; }
+
+/* ---------- Three.js 场景 ---------- */
+const canvas=document.getElementById('gl');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+const camera3=new THREE.PerspectiveCamera(50,1,0.1,100);
+camera3.position.z=42;
+function resize(){
+  const r=canvas.getBoundingClientRect();
+  renderer.setSize(r.width,r.height,false);
+  camera3.aspect=r.width/r.height;
+  camera3.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(canvas);
+resize();
+
+/* ---------- 粒子系统 ---------- */
+let points=null, P={count:0, cur:null, tgt:null, vel:null, col:null, imgW:0, imgH:0};
+let restoring=0; // 0..1 全局吸引强度
+function buildParticles(img){
+  if(points){ scene.remove(points); points.geometry.dispose(); points.material.dispose(); points=null; }
+  const sample=parseInt(document.getElementById('sampleRate').value,10);
+  const maxH=100;
+  const scale=Math.min(1, maxH/img.height);
+  const w=Math.round(img.width*scale), h=Math.round(img.height*scale);
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const g=c.getContext('2d');
+  g.drawImage(img,0,0,w,h);
+  const data=g.getImageData(0,0,w,h).data;
+  const xs=[], ys=[], cols=[];
+  for(let y=0;y<h;y+=sample) for(let x=0;x<w;x+=sample){
+    const i=(y*w+x)*4;
+    if(data[i+3]<128) continue;
+    xs.push(x); ys.push(y);
+    cols.push(data[i]/255, data[i+1]/255, data[i+2]/255);
+  }
+  const n=xs.length;
+  P.count=n; P.imgW=w; P.imgH=h;
+  P.cur=new Float32Array(n*3); P.tgt=new Float32Array(n*3); P.vel=new Float32Array(n*3);
+  const worldH=34, worldW=worldH*w/h;
+  for(let i=0;i<n;i++){
+    P.tgt[i*3]=  (xs[i]/w-0.5)*worldW;
+    P.tgt[i*3+1]=(0.5-ys[i]/h)*worldH;
+    P.tgt[i*3+2]=0;
+    // 初始：随机分布的飘散粒子流
+    P.cur[i*3]=  (Math.random()-0.5)*70;
+    P.cur[i*3+1]=(Math.random()-0.5)*50;
+    P.cur[i*3+2]=(Math.random()-0.5)*30;
+    P.vel[i*3]=  (Math.random()-0.5)*0.2;
+    P.vel[i*3+1]=(Math.random()-0.5)*0.2;
+    P.vel[i*3+2]=(Math.random()-0.5)*0.1;
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(P.cur,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(cols),3));
+  const mat=new THREE.PointsMaterial({size:0.35,vertexColors:true,sizeAttenuation:true,transparent:true,opacity:0.95});
+  points=new THREE.Points(geo,mat);
+  scene.add(points);
+  document.getElementById('stParticles').textContent=n;
+  document.getElementById('scatterBtn').disabled=false;
+  document.getElementById('restoreBtn').disabled=false;
+  setStatus('图片已粒子化：'+n+' 个粒子。开启摄像头或用鼠标体验手势还原','ok');
+}
+function scatter(){
+  for(let i=0;i<P.count;i++){
+    P.vel[i*3]+= (Math.random()-0.5)*1.4;
+    P.vel[i*3+1]+=(Math.random()-0.5)*1.4;
+    P.vel[i*3+2]+=(Math.random()-0.5)*0.7;
+  }
+}
+
+/* ---------- 手势 / 吸引区域 ---------- */
+const attractor={x:0,y:0,active:false,mode:'none'}; // mode: attract | repel | none
+let handOnScreen=false;
+
+function detectGesture(lm){
+  // 张掌判定：四指尖到腕部距离 / 掌长 的比例
+  const wrist=lm[0], midBase=lm[9];
+  const palm=Math.hypot(midBase.x-wrist.x, midBase.y-wrist.y);
+  let open=0;
+  [8,12,16,20].forEach(t=>{
+    const d=Math.hypot(lm[t].x-wrist.x, lm[t].y-wrist.y);
+    if(d>palm*1.6) open++;
+  });
+  return open>=3 ? 'open' : open<=1 ? 'fist' : 'half';
+}
+
+/* ---------- MediaPipe ---------- */
+let handsReady=false, cameraOn=false;
+document.getElementById('camBtn').onclick=async function(){
+  this.disabled=true;
+  document.getElementById('loader').style.display='flex';
+  try{
+    if(typeof Hands==='undefined') throw new Error('MediaPipe Hands 脚本未加载（需网络）');
+    const stream=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480},audio:false});
+    const video=document.getElementById('cam');
+    video.srcObject=stream;
+    await video.play();
+    const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`});
+    hands.setOptions({maxNumHands:1,modelComplexity:0,minDetectionConfidence:0.6,minTrackingConfidence:0.5});
+    hands.onResults(res=>{
+      if(res.multiHandLandmarks && res.multiHandLandmarks.length){
+        const lm=res.multiHandLandmarks[0];
+        // 掌心：腕部与四指根部的均值
+        const cx=(lm[0].x+lm[5].x+lm[9].x+lm[13].x+lm[17].x)/5;
+        const cy=(lm[0].y+lm[5].y+lm[9].y+lm[13].y+lm[17].y)/5;
+        // 镜像：视频已水平翻转显示，坐标同步镜像
+        attractor.x=(1-cx-0.5)*60;
+        attractor.y=(0.5-cy)*40;
+        handOnScreen=true;
+        const g=detectGesture(lm);
+        if(g==='open'){ attractor.mode='attract'; document.getElementById('stGesture').textContent='🖐 张开 · 吸引还原'; }
+        else if(g==='fist'){ attractor.mode='repel'; document.getElementById('stGesture').textContent='✊ 握拳 · 驱散'; }
+        else { attractor.mode='none'; document.getElementById('stGesture').textContent='✋ 半开 · 悬停'; }
+      }else{
+        handOnScreen=false; attractor.mode='none';
+        document.getElementById('stGesture').textContent='未检测';
+      }
+    });
+    handsReady=true; cameraOn=true;
+    document.getElementById('stCamera').textContent='运行中';
+    document.getElementById('loader').style.display='none';
+    setStatus('手部追踪已开启：张开手掌吸引粒子，握拳驱散','ok');
+    const pump=async()=>{
+      if(cameraOn){ await hands.send({image:video}); requestAnimationFrame(pump); }
+    };
+    pump();
+  }catch(err){
+    document.getElementById('loader').style.display='none';
+    this.disabled=false;
+    document.getElementById('stCamera').textContent='不可用';
+    setStatus('摄像头/追踪不可用：'+err.message+'（摄像头需 HTTPS 或 localhost；可勾选鼠标模拟体验）','err');
+  }
+};
+
+/* ---------- 鼠标模拟 ---------- */
+const stage=document.getElementById('stage');
+let mouseIn=false, mouseDown=false;
+stage.addEventListener('pointermove',e=>{
+  const r=canvas.getBoundingClientRect();
+  attractor.x=((e.clientX-r.left)/r.width-0.5)*60;
+  attractor.y=(0.5-(e.clientY-r.top)/r.height)*40;
+  mouseIn=true;
+});
+stage.addEventListener('pointerdown',()=>{ mouseDown=true; });
+stage.addEventListener('pointerup',()=>{ mouseDown=false; });
+stage.addEventListener('pointerleave',()=>{ mouseIn=false; mouseDown=false; });
+
+/* ---------- 控制 ---------- */
+document.getElementById('uploadBtn').onclick=()=>document.getElementById('fileInput').click();
+document.getElementById('fileInput').onchange=e=>{
+  const f=e.target.files[0];
+  if(!f) return;
+  const img=new Image();
+  img.onload=()=>buildParticles(img);
+  img.onerror=()=>setStatus('图片读取失败，请换一张','err');
+  img.src=URL.createObjectURL(f);
+};
+document.getElementById('sampleRate').oninput=function(){
+  document.getElementById('sampleVal').textContent=this.value;
+  const f=document.getElementById('fileInput').files[0];
+  if(f){ const img=new Image(); img.onload=()=>buildParticles(img); img.src=URL.createObjectURL(f); }
+};
+document.getElementById('scatterBtn').onclick=()=>{ scatter(); restoring=0; setStatus('粒子已打散',''); };
+document.getElementById('restoreBtn').onclick=()=>{ setStatus('一键还原中…','ok'); window.forceRestore=3; };
+
+/* ---------- 主循环 ---------- */
+const clock=new THREE.Clock();
+let frameCount=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const t=clock.getElapsedTime();
+  if(points){
+    // 吸引模式裁决：手势优先，其次鼠标模拟
+    let mode='none', ax=attractor.x, ay=attractor.y;
+    if(cameraOn && handOnScreen) mode=attractor.mode;
+    else if(document.getElementById('mouseFallback').checked && mouseIn) mode=mouseDown?'repel':'attract';
+    if(window.forceRestore>0){ mode='attract-global'; window.forceRestore-=0.016; }
+    const R=14; // 吸引区域半径
+    let restored=0;
+    for(let i=0;i<P.count;i++){
+      const ix=i*3;
+      const tx=P.tgt[ix], ty=P.tgt[ix+1], tz=P.tgt[ix+2];
+      // 环境漂浮
+      P.vel[ix]  += Math.sin(t*0.7+i*0.13)*0.0022;
+      P.vel[ix+1]+= Math.cos(t*0.6+i*0.17)*0.0022;
+      P.vel[ix+2]+= Math.sin(t*0.5+i*0.07)*0.0012;
+      const dx0=P.cur[ix]-tx, dy0=P.cur[ix+1]-ty, dz0=P.cur[ix+2]-tz;
+      const distHome=Math.sqrt(dx0*dx0+dy0*dy0+dz0*dz0);
+      if(distHome<0.35) restored++;
+      if(mode==='attract'||mode==='attract-global'){
+        let inZone=true, boost=1;
+        if(mode==='attract'){
+          const zx=P.cur[ix]-ax, zy=P.cur[ix+1]-ay;
+          const zd=Math.sqrt(zx*zx+zy*zy);
+          inZone=zd<R;
+          boost=1+(1-zd/R)*2.2; // 越靠近掌心加速越强
+        }
+        if(inZone){
+          P.vel[ix]  -=dx0*0.012*boost;
+          P.vel[ix+1]-=dy0*0.012*boost;
+          P.vel[ix+2]-=dz0*0.012*boost;
+        }
+      }else if(mode==='repel'){
+        const zx=P.cur[ix]-ax, zy=P.cur[ix+1]-ay;
+        const zd=Math.sqrt(zx*zx+zy*zy);
+        if(zd<R){
+          const f=(1-zd/R)*0.5;
+          P.vel[ix]+=zx/zd*f; P.vel[ix+1]+=zy/zd*f;
+          P.vel[ix]-=dx0*0.004; // 缓慢回到原位（暂停吸引）
+        }
+      }else{
+        // 无手势：微弱回位拉力，保持图像轮廓可辨
+        P.vel[ix]  -=dx0*0.0012;
+        P.vel[ix+1]-=dy0*0.0012;
+        P.vel[ix+2]-=dz0*0.0012;
+      }
+      // 阻尼 + 积分
+      P.vel[ix]*=0.94; P.vel[ix+1]*=0.94; P.vel[ix+2]*=0.94;
+      P.cur[ix]+=P.vel[ix]; P.cur[ix+1]+=P.vel[ix+1]; P.cur[ix+2]+=P.vel[ix+2];
+    }
+    points.geometry.attributes.position.needsUpdate=true;
+    if((frameCount++%15)===0 && P.count>0)
+      document.getElementById('stProgress').textContent=Math.round(restored/P.count*100)+'%';
+  }
+  renderer.render(scene,camera3);
+}
+animate();
+</script>
+</body>
+</html>
