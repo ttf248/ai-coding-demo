@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [新哥特式塔楼城市 · 3D 动画网页](../../demos/neo-gothic-tower-city/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](../../demos/neo-gothic-tower-city/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](../../demos/neo-gothic-tower-city/runs/claude-haiku-5-5-max-r01/index.html) |

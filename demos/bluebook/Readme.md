@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [小蓝书瀑布流页面 · React + TypeScript 构建](../../demos/bluebook/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v2](../../demos/bluebook/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](../../previews/bluebook/claude-haiku-5-5-max-r01/index.html) |

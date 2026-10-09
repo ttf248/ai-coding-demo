@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [体素工地沙盘 · WebGL 单文件网页](../../demos/voxel-construction-site/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](../../demos/voxel-construction-site/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](../../demos/voxel-construction-site/runs/claude-haiku-5-5-max-r01/index.html) |

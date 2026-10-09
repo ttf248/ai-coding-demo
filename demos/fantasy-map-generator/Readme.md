@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [奇幻地图生成器 · 单文件网页](../../demos/fantasy-map-generator/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](../../demos/fantasy-map-generator/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](../../demos/fantasy-map-generator/runs/claude-haiku-5-5-max-r01/index.html) |

@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [图片粒子化与手势还原 · Web 应用](../../demos/pixel-flow/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](../../demos/pixel-flow/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](../../demos/pixel-flow/runs/claude-haiku-5-5-max-r01/index.html) |
