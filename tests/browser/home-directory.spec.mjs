@@ -407,3 +407,45 @@ test("preview distinguishes missing screenshots, archive records and external en
   );
   await expect(page.locator("iframe")).toHaveCount(0);
 });
+
+test("complexity is the home default across pagination, views and shared sorting", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.locator("#sort")).toHaveValue("complexity");
+  const expected = await page.evaluate(() => {
+    const d = window.ARCHIVE,
+      U = window.ArchiveUI;
+    const runs = U.filterRuns(d, { testing: "active", sort: "complexity" });
+    return d.topics
+      .filter((t) => !U.isTopicArchived(t))
+      .sort((a, b) => U.compareTopics(a, b, runs, "complexity"))
+      .map((t) => t.id);
+  });
+  const ids = () =>
+    page
+      .locator(".topic-card h3 a")
+      .evaluateAll((links) =>
+        links.map((a) => new URL(a.href).searchParams.get("id")),
+      );
+  expect(await ids()).toEqual(expected.slice(0, 9));
+  await page.locator("#load-more").click();
+  expect(await ids()).toEqual(expected);
+  await page.locator("#sort").selectOption("latest");
+  await page.reload();
+  await expect(page.locator("#sort")).toHaveValue("latest");
+  await page.locator("#sort").selectOption("complexity");
+  await page.locator('[data-group="runs"]').click();
+  await expect(
+    page
+      .locator("#project-grid .pill")
+      .filter({ hasText: "复杂度 5/5" })
+      .first(),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});

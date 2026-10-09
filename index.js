@@ -16,7 +16,9 @@
     testing: ["active", "archived", "all"].includes(params.get("testing"))
       ? params.get("testing")
       : "active",
-    sort: params.get("sort") || "latest",
+    sort: ["complexity", "latest", "title"].includes(params.get("sort"))
+      ? params.get("sort")
+      : "complexity",
     group: params.get("group") || "topics",
     view: params.get("view") || "grid",
   };
@@ -123,6 +125,11 @@
         previewScopes.set(r.id, { runs: [r], source: U.screenshotURL(r) });
         const html = U.runCard(data, r)
           .replace(
+            '<div class="card-top">',
+            '<div class="card-top">' +
+              U.complexityBadge(data.topics.find((t) => t.id === r.topicId)),
+          )
+          .replace(
             U.screenshotFigure(data, r, "run-card-screenshot"),
             galleryFigure(r, "run-card-screenshot"),
           )
@@ -164,8 +171,7 @@
           ),
         );
       }
-      if (state.sort === "title")
-        topics.sort((a, b) => a.title.localeCompare(b.title, "zh-CN"));
+      topics.sort((a, b) => U.compareTopics(a, b, matched, state.sort));
       items = topics.map((t) => {
         const runs = matched.filter((r) => r.topicId === t.id),
           all = data.runs.filter((r) => r.topicId === t.id),
@@ -223,6 +229,7 @@
           "</span>" +
           (U.isTopicArchived(t) ? '<span class="pill">已归档</span>' : "") +
           U.executionModeBadge(previewRun) +
+          U.complexityBadge(t) +
           '</div><h3><a href="topic.html?id=' +
           t.id +
           '">' +
@@ -349,7 +356,7 @@
       .filter(
         (key) =>
           state[key] &&
-          !(key === "sort" && state[key] === "latest") &&
+          !(key === "sort" && ["complexity", "latest"].includes(state[key])) &&
           !(key === "testing" && state[key] === "active"),
       )
       .map((key) => {
@@ -445,7 +452,7 @@
         prompt: "",
         preview: "",
         testing: "active",
-        sort: "latest",
+        sort: "complexity",
       });
       render(true);
     }),
@@ -454,7 +461,8 @@
     const button = event.target.closest("[data-remove-filter]");
     if (!button) return;
     const key = button.dataset.removeFilter;
-    state[key] = key === "sort" ? "latest" : key === "testing" ? "active" : "";
+    state[key] =
+      key === "sort" ? "complexity" : key === "testing" ? "active" : "";
     render(true);
   });
   $("advanced-filters").open = !!(
