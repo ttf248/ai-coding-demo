@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>奇幻岛屿地图生成器</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a1a; color: #e0e0e0; }
+        .container { display: flex; height: 100vh; }
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .map-area { flex: 1; position: relative; overflow: hidden; background: #0d0d0d; }
+        #mapCanvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+        .controls { width: 100%; max-width: 320px; background: #222; border-left: 1px solid #444; overflow-y: auto; padding: 16px; }
+        .control-group { margin-bottom: 20px; }
+        .control-group label { display: block; font-size: 12px; font-weight: bold; color: #999; margin-bottom: 8px; text-transform: uppercase; }
+        input[type="text"], input[type="number"], input[type="range"], select { width: 100%; padding: 8px; background: #333; border: 1px solid #555; color: #e0e0e0; border-radius: 4px; font-size: 14px; margin-bottom: 8px; }
+        input[type="text"]:focus, input[type="number"]:focus, select:focus { outline: none; border-color: #0084ff; }
+        button { width: 100%; padding: 10px; background: #0084ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 8px; transition: 0.2s; }
+        button:hover { background: #006dd9; }
+        button:active { opacity: 0.8; }
+        .status { font-size: 12px; color: #0084ff; margin-top: 8px; }
+        .legend { margin-top: 20px; border-top: 1px solid #444; padding-top: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+        .legend-color { width: 20px; height: 20px; border-radius: 2px; }
+        .tabs { display: flex; border-bottom: 1px solid #444; margin-bottom: 16px; }
+        .tab { flex: 1; padding: 10px; background: #1a1a1a; border: none; color: #999; cursor: pointer; font-size: 12px; transition: 0.2s; }
+        .tab.active { color: #0084ff; border-bottom: 2px solid #0084ff; background: #222; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .slider-row { display: flex; align-items: center; gap: 8px; }
+        .slider-row input[type="range"] { flex: 1; }
+        .slider-row span { font-size: 12px; color: #999; min-width: 40px; }
+        .brush-preview { width: 100%; height: 60px; background: #333; border: 1px solid #555; border-radius: 4px; margin-top: 8px; position: relative; overflow: hidden; }
+        .brush-preview canvas { width: 100%; height: 100%; }
+        .town-list { background: #333; border: 1px solid #555; border-radius: 4px; max-height: 120px; overflow-y: auto; padding: 8px; }
+        .town-item { display: flex; justify-content: space-between; align-items: center; padding: 4px; font-size: 12px; border-bottom: 1px solid #444; }
+        .town-item:last-child { border-bottom: none; }
+        .town-item button { width: auto; padding: 4px 8px; margin: 0; font-size: 10px; }
+        @media (max-width: 768px) {
+            .container { flex-direction: column; }
+            .controls { width: 100%; max-width: none; max-height: 200px; }
+            .main { height: auto; }
+            .map-area { min-height: 300px; }
+        }
+        @media (max-width: 480px) {
+            .controls { max-height: 150px; padding: 12px; }
+            button { padding: 8px; font-size: 12px; }
+            .map-area { min-height: 250px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="main">
+        <div class="map-area">
+            <canvas id="mapCanvas"></canvas>
+        </div>
+    </div>
+    <div class="controls">
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('generate')">生成</button>
+            <button class="tab" onclick="switchTab('edit')">编辑</button>
+            <button class="tab" onclick="switchTab('export')">导出</button>
+        </div>
+
+        <!-- 生成标签页 -->
+        <div id="generate" class="tab-content active">
+            <div class="control-group">
+                <label>种子值</label>
+                <input type="text" id="seed" value="default" placeholder="输入种子值...">
+                <button onclick="app.generateMap()">🔄 重新生成</button>
+            </div>
+
+            <div class="control-group">
+                <label>海平面 ({{ seaLevel }})</label>
+                <div class="slider-row">
+                    <input type="range" id="seaLevel" min="0.1" max="0.7" step="0.05" value="0.4" onchange="app.updateSeaLevel()">
+                    <span id="seaLevelVal">0.4</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>地形粗糙度 ({{ roughness }})</label>
+                <div class="slider-row">
+                    <input type="range" id="roughness" min="0.2" max="1.0" step="0.1" value="0.6" onchange="app.updateRoughness()">
+                    <span id="roughnessVal">0.6</span>
+                </div>
+            </div>
+
+            <button onclick="app.generateMap()">✨ 生成新地图</button>
+            <button onclick="app.reset()">🔁 重置全部</button>
+            <div class="status" id="status"></div>
+        </div>
+
+        <!-- 编辑标签页 -->
+        <div id="edit" class="tab-content">
+            <div class="control-group">
+                <label>画笔工具</label>
+                <select id="brushMode" onchange="app.setBrushMode(this.value)">
+                    <option value="raise">升高地形</option>
+                    <option value="lower">降低地形</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>画笔大小</label>
+                <div class="slider-row">
+                    <input type="range" id="brushSize" min="5" max="50" step="5" value="15" onchange="app.updateBrushSize()">
+                    <span id="brushSizeVal">15</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>画笔强度</label>
+                <div class="slider-row">
+                    <input type="range" id="brushStrength" min="0.01" max="0.1" step="0.01" value="0.05" onchange="app.updateBrushStrength()">
+                    <span id="brushStrengthVal">0.05</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>预览</label>
+                <div class="brush-preview"><canvas id="brushPreview" width="100" height="60"></canvas></div>
+            </div>
+
+            <p style="font-size: 12px; color: #999; margin-top: 12px;">💡 在地图上点击并拖动来编辑地形</p>
+        </div>
+
+        <!-- 导出标签页 -->
+        <div id="export" class="tab-content">
+            <div class="control-group">
+                <label>城镇标签</label>
+                <input type="text" id="townName" placeholder="输入城镇名称...">
+                <button onclick="app.addTown()">📍 添加城镇</button>
+                <div class="town-list" id="townList"></div>
+            </div>
+
+            <div class="control-group">
+                <label>导出选项</label>
+                <select id="exportScale">
+                    <option value="1">1x (800x600)</option>
+                    <option value="2">2x (1600x1200)</option>
+                    <option value="3">3x (2400x1800)</option>
+                </select>
+            </div>
+
+            <button onclick="app.exportPNG()">💾 导出为PNG</button>
+            <button onclick="app.generateShareLink()">🔗 生成分享链接</button>
+            <div class="status" id="exportStatus"></div>
+        </div>
+
+        <!-- 地形图例 -->
+        <div class="legend">
+            <div style="font-weight: bold; margin-bottom: 8px; font-size: 12px;">🗺️ 地形图例</div>
+            <div class="legend-item"><div class="legend-color" style="background: #1a4d7a;"></div> 深海</div>
+            <div class="legend-item"><div class="legend-color" style="background: #2a7ab8;"></div> 浅海</div>
+            <div class="legend-item"><div class="legend-color" style="background: #d4a574;"></div> 海滩</div>
+            <div class="legend-item"><div class="legend-color" style="background: #6ba83d;"></div> 平原</div>
+            <div class="legend-item"><div class="legend-color" style="background: #3d7a2d;"></div> 森林</div>
+            <div class="legend-item"><div class="legend-color" style="background: #888;"></div> 山脉</div>
+            <div class="legend-item"><div class="legend-color" style="background: #f0f0f0;"></div> 雪峰</div>
+        </div>
+    </div>
+</div>
+
+<script>
+const app = {
+    canvas: null,
+    ctx: null,
+    brushCanvas: null,
+    brushCtx: null,
+    width: 800,
+    height: 600,
+    heightmap: [],
+    rivers: [],
+    towns: [],
+    seaLevel: 0.4,
+    roughness: 0.6,
+    brushMode: 'raise',
+    brushSize: 15,
+    brushStrength: 0.05,
+    seed: 'default',
+    isDrawing: false,
+    scale: 1,
+
+    init() {
+        this.canvas = document.getElementById('mapCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.brushCanvas = document.getElementById('brushPreview');
+        this.brushCtx = this.brushCanvas.getContext('2d');
+        
+        this.resizeCanvas();
+        window.addEventListener('resize', () => this.resizeCanvas());
+        this.canvas.addEventListener('mousedown', (e) => this.startDrawing(e));
+        this.canvas.addEventListener('mousemove', (e) => this.draw(e));
+        this.canvas.addEventListener('mouseup', () => this.stopDrawing());
+        this.canvas.addEventListener('touchstart', (e) => this.startDrawing(e));
+        this.canvas.addEventListener('touchmove', (e) => this.draw(e));
+        this.canvas.addEventListener('touchend', () => this.stopDrawing());
+        
+        this.generateMap();
+    },
+
+    resizeCanvas() {
+        const container = this.canvas.parentElement;
+        this.canvas.width = container.clientWidth;
+        this.canvas.height = container.clientHeight;
+        this.width = Math.min(800, this.canvas.width * 0.8);
+        this.height = Math.min(600, this.canvas.height * 0.8);
+        this.render();
+    },
+
+    seededRandom(seed) {
+        const x = Math.sin(seed++) * 10000;
+        return x - Math.floor(x);
+    },
+
+    perlin(x, y, seed) {
+        const xi = Math.floor(x);
+        const yi = Math.floor(y);
+        const xf = x - xi;
+        const yf = y - yi;
+        
+        const n00 = this.seededRandom(xi + yi * 73 + seed);
+        const n10 = this.seededRandom(xi + 1 + yi * 73 + seed);
+        const n01 = this.seededRandom(xi + (yi + 1) * 73 + seed);
+        const n11 = this.seededRandom(xi + 1 + (yi + 1) * 73 + seed);
+        
+        const u = xf * xf * (3 - 2 * xf);
+        const v = yf * yf * (3 - 2 * yf);
+        
+        const nx0 = n00 * (1 - u) + n10 * u;
+        const nx1 = n01 * (1 - u) + n11 * u;
+        return nx0 * (1 - v) + nx1 * v;
+    },
+
+    generateHeightmap() {
+        const seedVal = parseInt(this.seed.charCodeAt(0) * 1000) || 42;
+        this.heightmap = [];
+        
+        for (let y = 0; y < this.height; y++) {
+            this.heightmap[y] = [];
+            for (let x = 0; x < this.width; x++) {
+                let height = 0;
+                let amplitude = 1;
+                let frequency = 0.02;
+                let maxValue = 0;
+                
+                for (let i = 0; i < 5; i++) {
+                    height += this.perlin(x * frequency, y * frequency, seedVal + i) * amplitude;
+                    maxValue += amplitude;
+                    amplitude *= this.roughness;
+                    frequency *= 2;
+                }
+                
+                this.heightmap[y][x] = height / maxValue;
+            }
+        }
+    },
+
+    generateRivers() {
+        this.rivers = [];
+        const waterTiles = [];
+        
+        for (let y = 1; y < this.height - 1; y++) {
+            for (let x = 1; x < this.width - 1; x++) {
+                if (this.heightmap[y][x] > this.seaLevel && this.heightmap[y][x] < 0.6) {
+                    let minH = this.heightmap[y][x];
+                    let dirs = [];
+                    const neighbors = [
+                        {dx: 0, dy: -1}, {dx: 1, dy: 0}, 
+                        {dx: 0, dy: 1}, {dx: -1, dy: 0}
+                    ];
+                    
+                    for (const n of neighbors) {
+                        const ny = y + n.dy, nx = x + n.dx;
+                        if (ny >= 0 && ny < this.height && nx >= 0 && nx < this.width) {
+                            const h = this.heightmap[ny][nx];
+                            if (h < minH) { minH = h; dirs = [n]; }
+                            else if (h === minH) dirs.push(n);
+                        }
+                    }
+                    
+                    if (dirs.length > 0 && minH < this.heightmap[y][x]) {
+                        const d = dirs[Math.floor(Math.random() * dirs.length)];
+                        this.rivers.push({x, y, dx: d.dx, dy: d.dy});
+                    }
+                }
+            }
+        }
+    },
+
+    generateMap() {
+        this.generateHeightmap();
+        this.generateRivers();
+        this.render();
+        document.getElementById('status').textContent = '✅ 地图生成完成';
+        setTimeout(() => { document.getElementById('status').textContent = ''; }, 2000);
+    },
+
+    getTerrainColor(height) {
+        if (height < this.seaLevel - 0.1) return '#1a4d7a';
+        if (height < this.seaLevel) return '#2a7ab8';
+        if (height < this.seaLevel + 0.05) return '#d4a574';
+        if (height < this.seaLevel + 0.15) return '#6ba83d';
+        if (height < this.seaLevel + 0.25) return '#3d7a2d';
+        if (height < this.seaLevel + 0.35) return '#888';
+        return '#f0f0f0';
+    },
+
+    render() {
+        this.ctx.fillStyle = '#0d0d0d';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        const sx = this.canvas.width / 2 - this.width / 2;
+        const sy = this.canvas.height / 2 - this.height / 2;
+        
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                this.ctx.fillStyle = this.getTerrainColor(this.heightmap[y][x]);
+                this.ctx.fillRect(sx + x, sy + y, 1, 1);
+            }
+        }
+        
+        this.ctx.strokeStyle = '#4a7ab8';
+        this.ctx.lineWidth = 1;
+        for (const river of this.rivers) {
+            let x = river.x, y = river.y;
+            for (let i = 0; i < 50 && x >= 0 && x < this.width && y >= 0 && y < this.height; i++) {
+                this.ctx.fillStyle = '#4a7ab8';
+                this.ctx.fillRect(sx + x, sy + y, 2, 2);
+                x += river.dx; y += river.dy;
+            }
+        }
+        
+        for (const town of this.towns) {
+            this.ctx.fillStyle = '#ff6b6b';
+            this.ctx.beginPath();
+            this.ctx.arc(sx + town.x, sy + town.y, 5, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.fillStyle = '#fff';
+            this.ctx.font = '10px Arial';
+            this.ctx.fillText(town.name, sx + town.x + 8, sy + town.y - 2);
+        }
+    },
+
+    startDrawing(e) {
+        this.isDrawing = true;
+        this.draw(e);
+    },
+
+    draw(e) {
+        if (!this.isDrawing) return;
+        const rect = this.canvas.getBoundingClientRect();
+        const sx = this.canvas.width / 2 - this.width / 2;
+        const sy = this.canvas.height / 2 - this.height / 2;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const x = Math.floor((clientX - rect.left - sx) / this.scale);
+        const y = Math.floor((clientY - rect.top - sy) / this.scale);
+        
+        for (let dy = -this.brushSize; dy < this.brushSize; dy++) {
+            for (let dx = -this.brushSize; dx < this.brushSize; dx++) {
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > this.brushSize) continue;
+                const nx = x + dx, ny = y + dy;
+                if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height) {
+                    const factor = (1 - dist / this.brushSize) * this.brushStrength;
+                    if (this.brushMode === 'raise') this.heightmap[ny][nx] += factor;
+                    else this.heightmap[ny][nx] -= factor;
+                    this.heightmap[ny][nx] = Math.max(0, Math.min(1, this.heightmap[ny][nx]));
+                }
+            }
+        }
+        this.generateRivers();
+        this.render();
+    },
+
+    stopDrawing() { this.isDrawing = false; },
+
+    updateSeaLevel() {
+        this.seaLevel = parseFloat(document.getElementById('seaLevel').value);
+        document.getElementById('seaLevelVal').textContent = this.seaLevel.toFixed(2);
+        this.generateRivers();
+        this.render();
+    },
+
+    updateRoughness() {
+        this.roughness = parseFloat(document.getElementById('roughness').value);
+        document.getElementById('roughnessVal').textContent = this.roughness.toFixed(2);
+    },
+
+    setBrushMode(mode) { this.brushMode = mode; },
+
+    updateBrushSize() {
+        this.brushSize = parseInt(document.getElementById('brushSize').value);
+        document.getElementById('brushSizeVal').textContent = this.brushSize;
+        this.drawBrushPreview();
+    },
+
+    updateBrushStrength() {
+        this.brushStrength = parseFloat(document.getElementById('brushStrength').value);
+        document.getElementById('brushStrengthVal').textContent = this.brushStrength.toFixed(2);
+        this.drawBrushPreview();
+    },
+
+    drawBrushPreview() {
+        this.brushCtx.fillStyle = '#333';
+        this.brushCtx.fillRect(0, 0, this.brushCanvas.width, this.brushCanvas.height);
+        this.brushCtx.fillStyle = this.brushMode === 'raise' ? '#2a7ab8' : '#ff6b6b';
+        const cx = this.brushCanvas.width / 2, cy = this.brushCanvas.height / 2;
+        for (let i = 0; i < this.brushSize; i++) {
+            for (let j = 0; j < this.brushSize; j++) {
+                const dist = Math.sqrt((i - this.brushSize/2)**2 + (j - this.brushSize/2)**2);
+                if (dist < this.brushSize/2) {
+                    this.brushCtx.globalAlpha = 1 - dist / (this.brushSize/2);
+                    this.brushCtx.fillRect(cx - this.brushSize/4 + i, cy - this.brushSize/4 + j, 1, 1);
+                }
+            }
+        }
+        this.brushCtx.globalAlpha = 1;
+    },
+
+    addTown() {
+        const name = document.getElementById('townName').value.trim();
+        if (!name) { alert('请输入城镇名称'); return; }
+        if (this.towns.length >= 20) { alert('最多20个城镇'); return; }
+        const x = Math.floor(Math.random() * this.width);
+        const y = Math.floor(Math.random() * this.height);
+        this.towns.push({name, x, y});
+        document.getElementById('townName').value = '';
+        this.updateTownList();
+        this.render();
+    },
+
+    updateTownList() {
+        const list = document.getElementById('townList');
+        list.innerHTML = this.towns.map((t, i) => 
+            `<div class="town-item">${t.name} <button onclick="app.removeTown(${i})">✕</button></div>`
+        ).join('');
+    },
+
+    removeTown(i) { this.towns.splice(i, 1); this.updateTownList(); this.render(); },
+
+    exportPNG() {
+        const scale = parseInt(document.getElementById('exportScale').value);
+        const expCanvas = document.createElement('canvas');
+        expCanvas.width = this.width * scale;
+        expCanvas.height = this.height * scale;
+        const expCtx = expCanvas.getContext('2d');
+        
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                expCtx.fillStyle = this.getTerrainColor(this.heightmap[y][x]);
+                expCtx.fillRect(x * scale, y * scale, scale, scale);
+            }
+        }
+        
+        const link = document.createElement('a');
+        link.href = expCanvas.toDataURL();
+        link.download = `fantasy-map-${Date.now()}.png`;
+        link.click();
+        document.getElementById('exportStatus').textContent = '✅ 导出成功';
+        setTimeout(() => { document.getElementById('exportStatus').textContent = ''; }, 2000);
+    },
+
+    generateShareLink() {
+        const params = new URLSearchParams({
+            seed: this.seed,
+            seaLevel: this.seaLevel,
+            roughness: this.roughness
+        });
+        const link = window.location.origin + window.location.pathname + '?' + params.toString();
+        alert('分享链接:\n' + link);
+    },
+
+    reset() {
+        this.seed = 'default';
+        this.seaLevel = 0.4;
+        this.roughness = 0.6;
+        this.towns = [];
+        document.getElementById('seed').value = this.seed;
+        document.getElementById('seaLevel').value = this.seaLevel;
+        document.getElementById('roughness').value = this.roughness;
+        document.getElementById('seaLevelVal').textContent = this.seaLevel;
+        document.getElementById('roughnessVal').textContent = this.roughness;
+        this.updateTownList();
+        this.generateMap();
+    }
+};
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(tab).classList.add('active');
+    event.target.classList.add('active');
+}
+
+window.addEventListener('load', () => app.init());
+</script>
+</body>
+</html>

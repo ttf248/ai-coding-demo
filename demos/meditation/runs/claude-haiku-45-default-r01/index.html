@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZenMind - 冥想应用</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        
+        /* iOS 风格滚动 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+        }
+        
+        /* 过渡动画 */
+        .page-transition {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* 脉冲动画 */
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        /* 播放按钮 */
+        .play-button {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        .play-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+        }
+        
+        .play-button:active {
+            transform: scale(0.95);
+        }
+        
+        /* 进度环 */
+        .progress-ring {
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        
+        .progress-ring__circle {
+            stroke-dasharray: 251.2;
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 0.35s;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-b from-slate-50 to-slate-100">
+    <div id="app"></div>
+
+    <script>
+        // 简单的应用状态管理
+        const app = {
+            currentPage: 'home',
+            currentMeditation: null,
+            progress: 0,
+            isPlaying: false,
+            timer: null,
+            duration: 0,
+            
+            navigate(page, data = {}) {
+                this.currentPage = page;
+                this.currentMeditation = data.meditation || null;
+                this.render();
+            },
+            
+            render() {
+                const root = document.getElementById('app');
+                
+                switch(this.currentPage) {
+                    case 'home':
+                        root.innerHTML = this.renderHome();
+                        this.attachHomeEvents();
+                        break;
+                    case 'meditation':
+                        root.innerHTML = this.renderMeditationDetail();
+                        this.attachMeditationEvents();
+                        break;
+                    case 'session':
+                        root.innerHTML = this.renderSession();
+                        this.attachSessionEvents();
+                        break;
+                    case 'progress':
+                        root.innerHTML = this.renderProgress();
+                        this.attachProgressEvents();
+                        break;
+                }
+            },
+            
+            renderHome() {
+                return `
+                    <div class="min-h-screen bg-gradient-to-b from-indigo-50 via-white to-purple-50 overflow-y-auto">
+                        <!-- 状态栏 -->
+                        <div class="h-12 bg-white/80 backdrop-blur flex items-center justify-between px-6 fixed top-0 left-0 right-0 z-10">
+                            <h1 class="text-xl font-bold text-gray-800">ZenMind</h1>
+                            <button class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="pt-20 pb-8 px-6">
+                            <!-- 欢迎部分 -->
+                            <div class="text-center mb-10">
+                                <h2 class="text-3xl font-bold text-gray-800 mb-2">今天冥想了吗？</h2>
+                                <p class="text-gray-500">每一次呼吸都是新的开始</p>
+                            </div>
+
+                            <!-- 推荐冥想 -->
+                            <div class="mb-8">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">为你推荐</h3>
+                                <div class="space-y-4">
+                                    ${this.getMeditations().map((med, idx) => `
+                                        <div onclick="app.navigate('meditation', {meditation: ${idx}})" 
+                                             class="bg-white rounded-2xl shadow-md p-4 cursor-pointer hover:shadow-lg transition-all hover:scale-105">
+                                            <div class="flex items-start justify-between">
+                                                <div class="flex-1">
+                                                    <h4 class="font-semibold text-gray-800">${med.title}</h4>
+                                                    <p class="text-sm text-gray-500 mt-1">${med.duration}分钟 • ${med.level}</p>
+                                                    <p class="text-xs text-gray-400 mt-2">${med.description}</p>
+                                                </div>
+                                                <div class="text-2xl ml-4">${med.emoji}</div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <!-- 功能菜单 -->
+                            <div class="grid grid-cols-2 gap-4 mb-8">
+                                <button onclick="app.navigate('progress')" 
+                                        class="bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all">
+                                    <div class="text-3xl mb-2">📊</div>
+                                    <div class="font-semibold">我的进度</div>
+                                    <div class="text-xs mt-1 opacity-80">12天连续</div>
+                                </button>
+                                <button class="bg-gradient-to-br from-green-400 to-green-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all">
+                                    <div class="text-3xl mb-2">🎁</div>
+                                    <div class="font-semibold">每日任务</div>
+                                    <div class="text-xs mt-1 opacity-80">完成1个</div>
+                                </button>
+                            </div>
+
+                            <!-- 排行榜预览 -->
+                            <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl p-6">
+                                <h3 class="font-semibold text-gray-800 mb-4">🏆 本周冥想达人</h3>
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-full bg-yellow-300 flex items-center justify-center text-sm font-bold">1</div>
+                                            <div>
+                                                <div class="text-sm font-semibold text-gray-700">小明</div>
+                                                <div class="text-xs text-gray-500">420分钟</div>
+                                            </div>
+                                        </div>
+                                        <span class="text-xl">👑</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-bold">2</div>
+                                            <div>
+                                                <div class="text-sm font-semibold text-gray-700">小红</div>
+                                                <div class="text-xs text-gray-500">380分钟</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+            
+            renderMeditationDetail() {
+                const med = this.getMeditations()[this.currentMeditation];
+                if (!med) return '<div>未找到冥想内容</div>';
+                
+                return `
+                    <div class="min-h-screen bg-gradient-to-b from-indigo-50 to-purple-50 overflow-y-auto">
+                        <!-- 顶部导航 -->
+                        <div class="h-14 bg-white/80 backdrop-blur flex items-center px-6 fixed top-0 left-0 right-0 z-10">
+                            <button onclick="app.navigate('home')" class="text-2xl">←</button>
+                            <h1 class="flex-1 text-center font-semibold text-gray-800">${med.title}</h1>
+                            <div class="w-6"></div>
+                        </div>
+
+                        <div class="pt-20 pb-8 px-6">
+                            <!-- 冥想封面 -->
+                            <div class="bg-gradient-to-br from-indigo-400 to-purple-600 rounded-3xl aspect-square mb-8 shadow-lg flex items-center justify-center text-8xl">
+                                ${med.emoji}
+                            </div>
+
+                            <!-- 冥想信息 -->
+                            <div class="bg-white rounded-2xl p-6 mb-6 shadow-md">
+                                <h2 class="text-2xl font-bold text-gray-800 mb-3">${med.title}</h2>
+                                <p class="text-gray-600 mb-4">${med.description}</p>
+                                <div class="grid grid-cols-3 gap-4">
+                                    <div class="text-center">
+                                        <div class="text-2xl font-bold text-indigo-600">${med.duration}</div>
+                                        <div class="text-xs text-gray-500">分钟</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="text-2xl font-bold text-indigo-600">${med.level}</div>
+                                        <div class="text-xs text-gray-500">难度</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="text-2xl font-bold text-indigo-600">⭐${med.rating}</div>
+                                        <div class="text-xs text-gray-500">评分</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 特点 -->
+                            <div class="bg-white rounded-2xl p-6 mb-8 shadow-md">
+                                <h3 class="font-semibold text-gray-800 mb-4">这个冥想的特点</h3>
+                                <div class="space-y-3">
+                                    ${med.benefits.map(b => `
+                                        <div class="flex gap-3 items-start">
+                                            <div class="text-lg">✓</div>
+                                            <div class="text-sm text-gray-600">${b}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <!-- 开始按钮 -->
+                            <button onclick="app.navigate('session', {meditation: ${this.currentMeditation}})"
+                                    class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-2xl py-4 font-semibold shadow-lg hover:shadow-xl transition-all text-lg">
+                                ▶ 开始冥想
+                            </button>
+                        </div>
+                    </div>
+                `;
+            },
+            
+            renderSession() {
+                const med = this.getMeditations()[this.currentMeditation];
+                const radius = 40;
+                const circumference = 2 * Math.PI * radius;
+                const offset = circumference - (this.progress / 100) * circumference;
+                
+                return `
+                    <div class="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex flex-col items-center justify-center overflow-hidden">
+                        <!-- 关闭按钮 -->
+                        <button onclick="app.stopSession()" class="absolute top-8 right-6 text-white text-3xl z-10">✕</button>
+
+                        <!-- 进度圆环 -->
+                        <div class="mb-12 relative w-48 h-48">
+                            <svg class="w-full h-full progress-ring" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="40" fill="none" stroke="#334155" stroke-width="2"/>
+                                <circle cx="50" cy="50" r="40" fill="none" stroke="#6366f1" stroke-width="2" 
+                                        class="progress-ring__circle" stroke-dashoffset="${offset}" stroke-linecap="round"/>
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <div class="text-4xl font-bold text-white">${this.progress}%</div>
+                                <div class="text-sm text-indigo-300 mt-1">${Math.round(this.duration * this.progress / 100)} / ${this.duration}分钟</div>
+                            </div>
+                        </div>
+
+                        <!-- 冥想标题 -->
+                        <h1 class="text-3xl font-bold text-white text-center mb-4">${med.title}</h1>
+                        <p class="text-indigo-300 text-center mb-12">${med.description}</p>
+
+                        <!-- 控制按钮 -->
+                        <div class="flex gap-6 mb-8">
+                            <button onclick="app.stopSession()" 
+                                    class="w-16 h-16 rounded-full bg-slate-700 hover:bg-slate-600 text-white flex items-center justify-center text-2xl transition-all">
+                                ⏹
+                            </button>
+                            <button onclick="app.togglePlayPause()" 
+                                    class="play-button">
+                                <span class="text-4xl text-white">${this.isPlaying ? '⏸' : '▶'}</span>
+                            </button>
+                            <button class="w-16 h-16 rounded-full bg-slate-700 hover:bg-slate-600 text-white flex items-center justify-center text-2xl transition-all">
+                                🔕
+                            </button>
+                        </div>
+
+                        <!-- 背景音效指示 -->
+                        <div class="text-center text-white/60 text-sm">
+                            <div class="mb-4 flex justify-center gap-2">
+                                <div class="w-1 h-6 bg-indigo-500 rounded-full animate-pulse"></div>
+                                <div class="w-1 h-8 bg-indigo-500 rounded-full animate-pulse" style="animation-delay: 0.1s;"></div>
+                                <div class="w-1 h-6 bg-indigo-500 rounded-full animate-pulse" style="animation-delay: 0.2s;"></div>
+                            </div>
+                            背景音效：森林雨声
+                        </div>
+
+                        <!-- 计时显示 -->
+                        <div class="absolute bottom-8 left-0 right-0 text-center">
+                            <div class="text-white/40 text-sm">
+                                继续专注，感受当下
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+            
+            renderProgress() {
+                return `
+                    <div class="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 overflow-y-auto">
+                        <!-- 顶部导航 -->
+                        <div class="h-14 bg-white/80 backdrop-blur flex items-center px-6 fixed top-0 left-0 right-0 z-10">
+                            <button onclick="app.navigate('home')" class="text-2xl">←</button>
+                            <h1 class="flex-1 text-center font-semibold text-gray-800">我的进度</h1>
+                            <div class="w-6"></div>
+                        </div>
+
+                        <div class="pt-20 pb-8 px-6">
+                            <!-- 统计卡片 -->
+                            <div class="bg-gradient-to-br from-indigo-400 to-purple-600 rounded-2xl p-8 text-white mb-8 shadow-lg">
+                                <div class="flex justify-between items-start mb-6">
+                                    <div>
+                                        <div class="text-sm opacity-90">总冥想时长</div>
+                                        <div class="text-4xl font-bold">18.5</div>
+                                        <div class="text-sm opacity-75">小时</div>
+                                    </div>
+                                    <div class="text-6xl">🧘</div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <div class="text-2xl font-bold">47</div>
+                                        <div class="text-xs opacity-75">完成次数</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-2xl font-bold">12</div>
+                                        <div class="text-xs opacity-75">连续天数</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-2xl font-bold">98%</div>
+                                        <div class="text-xs opacity-75">坚持率</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 周进度 -->
+                            <div class="bg-white rounded-2xl p-6 mb-6 shadow-md">
+                                <h3 class="font-semibold text-gray-800 mb-4">本周冥想</h3>
+                                <div class="space-y-4">
+                                    ${['周一', '周二', '周三', '周四', '周五', '周六', '周日'].map((day, idx) => {
+                                        const minutes = [15, 20, 10, 0, 25, 30, 20][idx];
+                                        return `
+                                            <div class="flex items-center gap-3">
+                                                <div class="text-sm text-gray-600 w-12">${day}</div>
+                                                <div class="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                                                    <div class="bg-gradient-to-r from-indigo-400 to-purple-500 h-full" style="width: ${minutes}px;"></div>
+                                                </div>
+                                                <div class="text-sm font-semibold text-gray-700 w-12">${minutes}分</div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+
+                            <!-- 成就 -->
+                            <div class="bg-white rounded-2xl p-6 shadow-md">
+                                <h3 class="font-semibold text-gray-800 mb-4">🏆 成就</h3>
+                                <div class="grid grid-cols-3 gap-4">
+                                    <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                                        <div class="text-3xl mb-2">🥇</div>
+                                        <div class="text-xs font-semibold text-gray-700">初心者</div>
+                                    </div>
+                                    <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                                        <div class="text-3xl mb-2">🎯</div>
+                                        <div class="text-xs font-semibold text-gray-700">7天连续</div>
+                                    </div>
+                                    <div class="text-center p-4 bg-gray-100 rounded-lg opacity-50">
+                                        <div class="text-3xl mb-2">👑</div>
+                                        <div class="text-xs font-semibold text-gray-600">30天连续</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+            
+            getMeditations() {
+                return [
+                    {
+                        title: '5分钟早晨冥想',
+                        emoji: '☀️',
+                        duration: 5,
+                        level: '初级',
+                        rating: 4.8,
+                        description: '轻柔的晨间指引，唤醒身心',
+                        benefits: ['增强专注力', '改善情绪', '提升能量']
+                    },
+                    {
+                        title: '深度放松冥想',
+                        emoji: '🌙',
+                        duration: 15,
+                        level: '中级',
+                        rating: 4.9,
+                        description: '舒缓身心，释放压力',
+                        benefits: ['减少焦虑', '改善睡眠', '缓解疼痛']
+                    },
+                    {
+                        title: '专注力冥想',
+                        emoji: '🎯',
+                        duration: 10,
+                        level: '初级',
+                        rating: 4.7,
+                        description: '提升工作效率和思维清晰度',
+                        benefits: ['增强专注', '提高效率', '减少分心']
+                    },
+                    {
+                        title: '慈悲心冥想',
+                        emoji: '💚',
+                        duration: 20,
+                        level: '高级',
+                        rating: 4.9,
+                        description: '培养内心的爱与慈悲',
+                        benefits: ['增强同理心', '改善人际关系', '提升幸福感']
+                    }
+                ];
+            },
+            
+            togglePlayPause() {
+                this.isPlaying = !this.isPlaying;
+                
+                if (this.isPlaying) {
+                    this.duration = this.getMeditations()[this.currentMeditation].duration * 60;
+                    let elapsed = 0;
+                    
+                    this.timer = setInterval(() => {
+                        elapsed++;
+                        this.progress = Math.round((elapsed / this.duration) * 100);
+                        this.render();
+                        
+                        if (this.progress >= 100) {
+                            this.completeSession();
+                        }
+                    }, 1000);
+                } else {
+                    clearInterval(this.timer);
+                    this.render();
+                }
+            },
+            
+            stopSession() {
+                clearInterval(this.timer);
+                this.isPlaying = false;
+                this.progress = 0;
+                this.duration = 0;
+                this.navigate('home');
+            },
+            
+            completeSession() {
+                clearInterval(this.timer);
+                const med = this.getMeditations()[this.currentMeditation];
+                alert(`🎉 完成了 ${med.title}！\n继续保持，你真棒！`);
+                this.navigate('home');
+            },
+            
+            attachHomeEvents() {
+                // Home 页面事件已在 HTML 中内联
+            },
+            
+            attachMeditationEvents() {
+                // Meditation 详情页事件已在 HTML 中内联
+            },
+            
+            attachSessionEvents() {
+                // Session 页面事件已在 HTML 中内联
+                if (!this.isPlaying) {
+                    this.togglePlayPause();
+                }
+            },
+            
+            attachProgressEvents() {
+                // Progress 页面事件已在 HTML 中内联
+            }
+        };
+
+        // 初始化应用
+        app.render();
+    </script>
+</body>
+</html>

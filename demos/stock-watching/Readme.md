@@ -11,6 +11,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
+| [stock-watching](../../demos/stock-watching/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](../../demos/stock-watching/runs/claude-haiku-45-default-r01/prompt.md) | 无静态预览 |
 | [自选股实战](../../demos/stock-watching/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v1](../../demos/stock-watching/runs/gpt-5-6-luna-max-r01/prompt.md) | 无静态预览 |
 | [行情台 · 多市场自选股](../../demos/stock-watching/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v1](../../demos/stock-watching/runs/gpt-6-1-sol-max-r01/prompt.md) | 无静态预览 |
 | [自选股实战 · gpt-6.1-sol medium](../../demos/stock-watching/runs/gpt-6-1-sol-medium-r01/Readme.md) | GPT-6.1 Sol / medium | 2026-09-30 | [v1](../../demos/stock-watching/runs/gpt-6-1-sol-medium-r01/prompt.md) | 无静态预览 |

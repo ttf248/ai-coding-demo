@@ -7,6 +7,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
+| [pixel-flow](../../demos/pixel-flow/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](../../demos/pixel-flow/runs/claude-haiku-45-default-r01/prompt.md) | [打开](../../demos/pixel-flow/runs/claude-haiku-45-default-r01/public/index.html) |
 | [Pixel Flow 图片粒子化与手势还原](../../demos/pixel-flow/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](../../demos/pixel-flow/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](../../demos/pixel-flow/runs/gemini-3-8-flash-high-r01/index.html) |
 | [Pixel Flow](../../demos/pixel-flow/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v1](../../demos/pixel-flow/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../demos/pixel-flow/runs/gpt-5-6-luna-max-r01/index.html) |
 | [Pixel Flow · 手势图片重构](../../demos/pixel-flow/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v1](../../demos/pixel-flow/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](../../demos/pixel-flow/runs/gpt-6-1-sol-max-r01/index.html) |

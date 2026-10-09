@@ -8,6 +8,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [小蓝书](../../demos/bluebook/runs/claude-4-0-unknown-r01/Readme.md) | Claude 4.0 / unknown | 2025-05 | [v2](../../demos/bluebook/runs/claude-4-0-unknown-r01/prompt.md) | [打开](../../previews/bluebook/claude-4-0-unknown-r01/index.html) |
+| [bluebook](../../demos/bluebook/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](../../demos/bluebook/runs/claude-haiku-45-default-r01/prompt.md) | [打开](../../previews/bluebook/claude-haiku-45-default-r01/index.html) |
 | [小蓝书 · 瀑布流社区](../../demos/bluebook/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v2](../../demos/bluebook/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](../../demos/bluebook/runs/gemini-3-8-flash-high-r01/index.html) |
 | [小蓝书 · 瀑布流社区](../../demos/bluebook/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v2](../../demos/bluebook/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../previews/bluebook/gpt-5-6-luna-max-r01/index.html) |
 | [小蓝书 · React 瀑布流社区](../../demos/bluebook/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v2](../../demos/bluebook/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](../../previews/bluebook/gpt-6-1-sol-max-r01/index.html) |
