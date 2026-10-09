@@ -27,6 +27,9 @@ test("homepage exposes archived topics and keeps its directory compact", async (
     "page",
   );
   await page.locator('[data-testing="all"]').click();
+  if (data.topics.length > 9) {
+    await page.locator("#load-more").click();
+  }
   await expect(page.locator(".topic-card")).toHaveCount(data.topics.length);
   await page.locator('[data-view="grid"]').click();
   await expect(page.locator("#project-grid")).not.toHaveClass(/list/);

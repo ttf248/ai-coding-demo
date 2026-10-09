@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>小蓝书 · 瀑布流社区</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React 18 and ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#fe2c55',
+            'brand-dark': '#e02449',
+            page: '#f5f5f5',
+          },
+          borderRadius: {
+            card: '8px',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #f5f5f5;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-transition {
+      transition: transform 0.25s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.25s ease;
+    }
+    .card-transition:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 20px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+    }
+    .card-transition:active {
+      transform: scale(0.98);
+    }
+    @keyframes heartBeat {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.35); }
+      70% { transform: scale(0.88); }
+      100% { transform: scale(1); }
+    }
+    .animate-heart {
+      animation: heartBeat 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .page-fade-in {
+      animation: fadeIn 0.4s ease-out forwards;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+    // Mini Zustand-like reactive store
+    function createStore(initialState) {
+      let state = initialState;
+      const listeners = new Set();
+      return {
+        getState: () => state,
+        setState: (fn) => {
+          state = typeof fn === 'function' ? fn(state) : { ...state, ...fn };
+          listeners.forEach(l => l(state));
+        },
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        }
+      };
+    }
+
+    // Mock Data Generator
+    const SAMPLE_TOPICS = ["旅行探店", "日常穿搭", "摄影灵感", "深夜食堂", "自律打卡", "数码好物", "居所美学", "手作日常"];
+    const AUTHORS = [
+      { name: "阿澈不咕咕", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" },
+      { name: "浅野早苗", avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80" },
+      { name: "林间旅人", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80" },
+      { name: "极光观测者", avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&auto=format&fit=crop&q=80" },
+      { name: "猫与咖啡", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80" },
+      { name: "山丘慢行", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80" }
+    ];
+
+    const TITLES = [
+      "周末逃离城市计划！藏在川西的避世治愈系小木屋全攻略",
+      "今天也是元气满满的拿铁星人，分享独家冷萃比例与杯具合集",
+      "私藏东京街头胶片色彩配方，这组光影太迷人了～",
+      "30天极简生活实验：丢掉这60件物品后我的心情变化",
+      "秋日山系徒步穿搭：防风夹克与复古越野鞋的搭配灵感",
+      "用手账记录生活微小确幸：三丽鸥联名胶带与水彩速写",
+      "复古黑胶唱片店探访记：在午后阳光里聆听爵士乐的浪漫",
+      "自制日式照烧鸡肉便当，简单三步解锁下厨幸福感",
+      "独居女孩的60㎡日式原木风温馨小窝，进门就不想离开",
+      "雨后初晴的青苔庭院，听雨滴落入石灯笼的声音",
+      "桌搭分享：极简实木升降桌与4K显示器的治愈系工作角",
+      "新手烤箱烘焙初体验：一次成功的焦香巴斯克乳酪蛋糕"
+    ];
+
+    const IMAGES = [
+      { w: 600, h: 800, url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600&auto=format&fit=crop&q=80" },
+      { w: 600, h: 900, url: "https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=600&auto=format&fit=crop&q=80" },
+      { w: 600, h: 700, url: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600&auto=format&fit=crop&q=80" },
+      { w: 600, h: 850, url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&auto=format&fit=crop&q=80" },
+      { w: 600, h: 750, url: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=600&auto=format&fit=crop&q=80" },
+      { w: 600, h: 950, url: "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=600&auto=format&fit=crop&q=80" },
+      { w: 600, h: 650, url: "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=600&auto=format&fit=crop&q=80" },
+      { w: 600, h: 820, url: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&auto=format&fit=crop&q=80" },
+      { w: 600, h: 780, url: "https://images.unsplash.com/photo-1511556532299-8f662fc26c06?w=600&auto=format&fit=crop&q=80" },
+      { w: 600, h: 880, url: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=600&auto=format&fit=crop&q=80" }
+    ];
+
+    let idCounter = 1;
+    function generateItems(count) {
+      const items = [];
+      for (let i = 0; i < count; i++) {
+        const img = IMAGES[idCounter % IMAGES.length];
+        const author = AUTHORS[idCounter % AUTHORS.length];
+        const title = TITLES[idCounter % TITLES.length];
+        const topic = SAMPLE_TOPICS[idCounter % SAMPLE_TOPICS.length];
+        items.push({
+          id: idCounter++,
+          title: `【${topic}】${title}`,
+          imageUrl: img.url,
+          aspectRatio: img.h / img.w,
+          authorName: author.name,
+          authorAvatar: author.avatar,
+          likes: Math.floor(Math.random() * 880) + 12,
+          isLiked: false,
+          likeAnimating: false,
+        });
+      }
+      return items;
+    }
+
+    // SVG Icons
+    const Icons = {
+      Search: () => (
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      ),
+      Plus: () => (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+        </svg>
+      ),
+      Heart: ({ filled, animated }) => (
+        <svg className={`w-4 h-4 transition-colors ${filled ? 'text-brand fill-current' : 'text-gray-400 fill-none'} ${animated ? 'animate-heart' : ''}`}
+          stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+        </svg>
+      ),
+      Spinner: () => (
+        <svg className="animate-spin w-5 h-5 text-brand" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      ),
+      Refresh: () => (
+        <svg className="w-4 h-4 text-gray-500 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      )
+    };
+
+    // Lazy Image Component with Fallback
+    function LazyImage({ src, alt, aspectRatio }) {
+      const [isLoaded, setIsLoaded] = useState(false);
+      const [isError, setIsError] = useState(false);
+      const imgRef = useRef(null);
+
+      const fallbackSvg = "data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22300%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23eaeaea%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20fill%3D%22%23999999%22%20font-size%3D%2214%22%3E%E5%9B%BE%E7%89%87%E5%8A%A0%E8%BD%BD%E5%A4%B1%E8%B4%A5%3C%2Ftext%3E%3C%2Fsvg%3E";
+
+      return (
+        <div 
+          className="relative w-full overflow-hidden bg-gray-100 rounded-t-card"
+          style={{ paddingBottom: `${aspectRatio * 100}%` }}
+        >
+          {!isLoaded && !isError && (
+            <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
+              <span className="text-xs text-gray-400">加载中...</span>
+            </div>
+          )}
+          <img
+            ref={imgRef}
+            src={isError ? fallbackSvg : src}
+            alt={alt}
+            loading="lazy"
+            onLoad={() => setIsLoaded(true)}
+            onError={() => {
+              setIsError(true);
+              setIsLoaded(true);
+            }}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+          />
+        </div>
+      );
+    }
+
+    // Card Component
+    function WaterfallCard({ item, onLike }) {
+      return (
+        <div className="bg-white rounded-card overflow-hidden shadow-sm card-transition cursor-pointer mb-3.5 flex flex-col">
+          <LazyImage src={item.imageUrl} alt={item.title} aspectRatio={item.aspectRatio} />
+          <div className="p-2.5 flex-1 flex flex-col justify-between">
+            <h3 className="text-sm font-medium text-gray-800 line-clamp-2 leading-snug mb-2">
+              {item.title}
+            </h3>
+            <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
+              <div className="flex items-center space-x-1.5 min-w-0">
+                <img
+                  src={item.authorAvatar}
+                  alt={item.authorName}
+                  className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+                  onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80"; }}
+                />
+                <span className="truncate max-w-[80px] sm:max-w-[110px] text-gray-600">{item.authorName}</span>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLike(item.id);
+                }}
+                className="flex items-center space-x-1 hover:text-brand transition-colors p-1 -m-1 focus:outline-none"
+              >
+                <Icons.Heart filled={item.isLiked} animated={item.likeAnimating} />
+                <span className={`text-xs ${item.isLiked ? 'text-brand font-medium' : 'text-gray-500'}`}>
+                  {item.likes}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Main App
+    function App() {
+      const [items, setItems] = useState([]);
+      const [searchQuery, setSearchQuery] = useState("");
+      const [isLoading, setIsLoading] = useState(false);
+      const [isRefreshing, setIsRefreshing] = useState(false);
+      const [columnCount, setColumnCount] = useState(2);
+      const [showPublishModal, setShowPublishModal] = useState(false);
+      const [newTitle, setNewTitle] = useState("");
+      const [pullDistance, setPullDistance] = useState(0);
+
+      const touchStartY = useRef(0);
+      const containerRef = useRef(null);
+
+      // Setup columns based on window width
+      useEffect(() => {
+        const updateColumns = () => {
+          const w = window.innerWidth;
+          if (w >= 1024) setColumnCount(4);
+          else if (w >= 640) setColumnCount(3);
+          else setColumnCount(2);
+        };
+        updateColumns();
+        window.addEventListener("resize", updateColumns);
+        return () => window.removeEventListener("resize", updateColumns);
+      }, []);
+
+      // Initial 20 items
+      useEffect(() => {
+        setIsLoading(true);
+        setTimeout(() => {
+          setItems(generateItems(20));
+          setIsLoading(false);
+        }, 300);
+      }, []);
+
+      // Infinite scroll listener
+      useEffect(() => {
+        const handleScroll = () => {
+          if (isLoading || isRefreshing) return;
+          const scrollBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 250;
+          if (scrollBottom) {
+            setIsLoading(true);
+            setTimeout(() => {
+              setItems(prev => [...prev, ...generateItems(10)]);
+              setIsLoading(false);
+            }, 600);
+          }
+        };
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
+      }, [isLoading, isRefreshing]);
+
+      // Pull to refresh handlers
+      const handleTouchStart = (e) => {
+        if (window.scrollY === 0) {
+          touchStartY.current = e.touches[0].clientY;
+        } else {
+          touchStartY.current = 0;
+        }
+      };
+
+      const handleTouchMove = (e) => {
+        if (touchStartY.current <= 0 || window.scrollY > 0) return;
+        const currentY = e.touches[0].clientY;
+        const distance = currentY - touchStartY.current;
+        if (distance > 0) {
+          setPullDistance(Math.min(distance * 0.45, 75));
+        }
+      };
+
+      const handleTouchEnd = () => {
+        if (pullDistance > 45) {
+          setIsRefreshing(true);
+          setPullDistance(50);
+          setTimeout(() => {
+            idCounter = 1;
+            setItems(generateItems(20));
+            setIsRefreshing(false);
+            setPullDistance(0);
+          }, 800);
+        } else {
+          setPullDistance(0);
+        }
+        touchStartY.current = 0;
+      };
+
+      // Like interaction
+      const handleLike = (id) => {
+        setItems(prev => prev.map(item => {
+          if (item.id === id) {
+            const nextLiked = !item.isLiked;
+            return {
+              ...item,
+              isLiked: nextLiked,
+              likes: nextLiked ? item.likes + 1 : item.likes - 1,
+              likeAnimating: nextLiked
+            };
+          }
+          return item;
+        }));
+
+        setTimeout(() => {
+          setItems(prev => prev.map(item => item.id === id ? { ...item, likeAnimating: false } : item));
+        }, 400);
+      };
+
+      // Filtered items
+      const filteredItems = useMemo(() => {
+        if (!searchQuery.trim()) return items;
+        return items.filter(it => it.title.toLowerCase().includes(searchQuery.toLowerCase()) || it.authorName.toLowerCase().includes(searchQuery.toLowerCase()));
+      }, [items, searchQuery]);
+
+      // Split into waterfall columns
+      const columns = useMemo(() => {
+        const cols = Array.from({ length: columnCount }, () => []);
+        filteredItems.forEach((item, index) => {
+          cols[index % columnCount].push(item);
+        });
+        return cols;
+      }, [filteredItems, columnCount]);
+
+      // Publish modal handler
+      const handlePublish = (e) => {
+        e.preventDefault();
+        if (!newTitle.trim()) return;
+        const newItem = {
+          id: idCounter++,
+          title: newTitle.trim(),
+          imageUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600&auto=format&fit=crop&q=80",
+          aspectRatio: 1.25,
+          authorName: "当前用户",
+          authorAvatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80",
+          likes: 0,
+          isLiked: false,
+          likeAnimating: false
+        };
+        setItems(prev => [newItem, ...prev]);
+        setNewTitle("");
+        setShowPublishModal(false);
+      };
+
+      return (
+        <div 
+          ref={containerRef}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className="min-h-screen flex flex-col page-fade-in"
+        >
+          {/* Pull to Refresh Indicator */}
+          {pullDistance > 0 && (
+            <div 
+              className="flex items-center justify-center overflow-hidden transition-all duration-200 text-xs text-gray-500 font-medium"
+              style={{ height: `${pullDistance}px` }}
+            >
+              <div className="flex items-center space-x-2">
+                {isRefreshing ? <Icons.Refresh /> : <span>{pullDistance > 45 ? '松开立即刷新' : '下拉刷新内容'}</span>}
+              </div>
+            </div>
+          )}
+
+          {/* Top Sticky Header */}
+          <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm px-4 py-2.5">
+            <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+              {/* Logo */}
+              <div className="flex items-center gap-1.5 flex-shrink-0 cursor-pointer" onClick={() => { setSearchQuery(""); window.scrollTo({top:0, behavior:'smooth'}); }}>
+                <span className="text-xl font-black text-brand tracking-tight">小蓝书</span>
+                <span className="hidden sm:inline-block text-[10px] bg-red-50 text-brand px-1.5 py-0.5 rounded-full font-medium">社区</span>
+              </div>
+
+              {/* Search Bar */}
+              <div className="flex-1 max-w-xl relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Icons.Search />
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="搜索你感兴趣的内容"
+                  className="w-full pl-9 pr-4 py-1.5 text-sm bg-gray-100 text-gray-800 placeholder-gray-400 rounded-full focus:outline-none focus:ring-2 focus:ring-brand/30 focus:bg-white transition-all"
+                />
+                {searchQuery && (
+                  <button 
+                    onClick={() => setSearchQuery("")}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Publish Button */}
+              <button
+                onClick={() => setShowPublishModal(true)}
+                className="flex-shrink-0 flex items-center space-x-1.5 bg-brand hover:bg-brand-dark active:scale-95 text-white text-sm font-medium px-3.5 py-1.5 rounded-full shadow-sm transition-all focus:outline-none"
+              >
+                <Icons.Plus />
+                <span>发布</span>
+              </button>
+            </div>
+          </header>
+
+          {/* Main Content Area */}
+          <main className="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-4">
+            {/* Waterfall Grid */}
+            <div className="flex gap-3 sm:gap-4 items-start">
+              {columns.map((col, colIndex) => (
+                <div key={colIndex} className="flex-1 flex flex-col min-w-0">
+                  {col.map(item => (
+                    <WaterfallCard key={item.id} item={item} onLike={handleLike} />
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {/* Empty Search Result */}
+            {filteredItems.length === 0 && !isLoading && (
+              <div className="py-20 text-center">
+                <p className="text-gray-400 text-sm">暂无与 &ldquo;{searchQuery}&rdquo; 相关的内容</p>
+                <button 
+                  onClick={() => setSearchQuery("")}
+                  className="mt-3 text-xs text-brand font-medium hover:underline"
+                >
+                  清除搜索条件
+                </button>
+              </div>
+            )}
+
+            {/* Bottom Loading Indicator */}
+            {isLoading && (
+              <div className="py-6 flex items-center justify-center space-x-2 text-gray-400 text-xs">
+                <Icons.Spinner />
+                <span>正在探索更多精彩内容...</span>
+              </div>
+            )}
+          </main>
+
+          {/* Publish Modal */}
+          {showPublishModal && (
+            <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+              <div className="bg-white rounded-xl max-w-md w-full p-5 shadow-2xl">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <h3 className="font-bold text-gray-800 text-base">发布新灵感笔记</h3>
+                  <button 
+                    onClick={() => setShowPublishModal(false)}
+                    className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <form onSubmit={handlePublish} className="mt-4 space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">笔记标题 / 文案</label>
+                    <textarea
+                      rows="3"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="写下这一刻的想法，分享你的真实体验..."
+                      className="w-full text-sm border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-brand/30"
+                      required
+                    ></textarea>
+                  </div>
+                  <div className="flex justify-end space-x-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowPublishModal(false)}
+                      className="px-4 py-2 text-xs text-gray-500 hover:bg-gray-100 rounded-lg"
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 text-xs bg-brand text-white font-medium rounded-lg hover:bg-brand-dark transition-colors shadow-sm"
+                    >
+                      确认发布
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [体素微缩建筑工地沙盘](../../demos/voxel-construction-site/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](../../demos/voxel-construction-site/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](../../demos/voxel-construction-site/runs/gemini-3-8-flash-high-r01/index.html) |

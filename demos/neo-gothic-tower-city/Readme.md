@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [新哥特式塔楼城市](../../demos/neo-gothic-tower-city/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](../../demos/neo-gothic-tower-city/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](../../demos/neo-gothic-tower-city/runs/gemini-3-8-flash-high-r01/index.html) |

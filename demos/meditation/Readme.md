@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [冥想 iOS App 原型](../../demos/meditation/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](../../demos/meditation/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](../../demos/meditation/runs/gemini-3-8-flash-high-r01/index.html) |
