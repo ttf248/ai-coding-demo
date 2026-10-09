@@ -14,6 +14,7 @@ React 18 + TypeScript 实现响应式瀑布流：首屏 20 条 mock 内容、两
 - 输入记录：使用 bluebook 提示词 v2 的完整正文；未附加 v1 内容或历史上下文。
 - 工具：Codex 当前会话。按用户指定记录为 gpt-6-luna / max；本轮未委派子代理。
 - 运行方式：在本目录 npm ci 后 npm run dev；Pages 使用根目录 previews 中已提交的构建产物。
+- 费用记录：OpenAI · ChatGPT Plus 订阅；单案例货币金额未记录。据用户说明，OpenAI 模型通过 ChatGPT Plus 订阅测试；全部案例完成后，五小时额度未耗尽。未提供单案例费用金额。
 - [小蓝书瀑布流](../../../../previews/bluebook/gpt-6-luna-max-r02/index.html)
 
 ### 部署适配记录

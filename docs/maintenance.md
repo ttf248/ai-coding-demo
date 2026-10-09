@@ -18,6 +18,8 @@
 - `assets/generated/catalog.js`：自动生成的浏览器数据，不手改。
 - 根 README 的 catalog 区块、主题 README、实验 README 的 archive 区块由脚本维护。区块外的历史记录不会被生成器覆盖。
 
+实验费用写在 `run.json` 的 `billing` 中。`type: "subscription"` 记录订阅方式，未知的货币金额填 `null`；`type: "batch"` 的 `amount` 是批次合计，关联批次的多条 run 可重复引用同一 `batchId`，不得将总额误读或拆算为单案例费用。金额换算时，`sourceAmount`、`sourceUnit` 与 `conversionRate` 保留原始数值及换算比例；`amount` 和 `unit` 记录换算结果。平台没有提供的额度或费用明细保持未知，并在 `note` 说明口径。
+
 所有元数据使用 `schemaVersion: 1`，契约见 [schema](../catalog/schema.json)。实验 ID 为 `{topic}--{run}`；目录用小写 kebab-case，显示名称不受 slug 限制。模型重跑新增 `r02`，不是覆盖 `r01`。未知模型用 `unknown`；日期允许年、月、日精度，缺失为 null。
 
 ## 新增实验

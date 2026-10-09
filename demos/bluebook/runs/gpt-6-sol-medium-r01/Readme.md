@@ -20,6 +20,7 @@
 - 输入记录：本轮按存档任务正文原文执行。 用户另行指定本轮全部主题、模型名 gpt-6-sol、medium 档位及当前会话执行。
 - 工具：Codex 当前会话。用户指定模型名称 gpt-6-sol、档位 medium；运行环境未提供可独立核验的模型标识。未委派子代理。
 - 运行方式：在本目录 npm ci 后 npm run dev；Pages 使用根目录 previews 中已提交的构建产物。
+- 费用记录：OpenAI · ChatGPT Plus 订阅；单案例货币金额未记录。据用户说明，OpenAI 模型通过 ChatGPT Plus 订阅测试；全部案例完成后，五小时额度未耗尽。未提供单案例费用金额。
 - [预览](../../../../previews/bluebook/gpt-6-sol-medium-r01/index.html)
 
 ### 部署适配记录

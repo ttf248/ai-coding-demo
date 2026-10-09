@@ -41,6 +41,7 @@ HTTP 和 file:// 均在 Chromium 中检查；390px 触摸模式无页面水平�
 - 输入记录：保存本轮用户原始请求与执行的 v1 任务正文；context 保存仓库指令和运行条件。未留存完整系统、开发者上下文及工具往返，不能视为严格隔离同题评测。
 - 工具：Codex。用户指定 gpt-6.1-sol / high；按要求在当前会话直接顺序实现，无子代理。Windows PowerShell，Node v22.16.0；未读取历史实现，使用现有独立测试目录。
 - 运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。
+- 费用记录：OpenAI · ChatGPT Plus 订阅；单案例货币金额未记录。据用户说明，OpenAI 模型通过 ChatGPT Plus 订阅测试；全部案例完成后，五小时额度未耗尽。未提供单案例费用金额。
 - [实验台](../../../../demos/fluid-simulation/runs/gpt-6-1-sol-high-r01/index.html)
 
 ### 部署适配记录

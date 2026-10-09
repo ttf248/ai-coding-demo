@@ -73,6 +73,36 @@
     '</select></label><label id="topic-sort-field">版本内排序<select id="topic-sort"><option value="model">模型 / 档位从高到低</option><option value="recent">日期从新到旧</option></select></label><button id="topic-reset">清除筛选</button></div>' +
     '<div class="topic-results-heading"><p id="topic-count" role="status"></p><p id="topic-results-help"></p></div><section id="topic-matrix" aria-label="模型与档位实验矩阵" hidden></section><section id="topic-list"><div class="topic-run-groups"></div></section><section id="topic-prompts" class="prompt-library" hidden><h2>任务与版本</h2><div></div></section>';
   const refreshSelection = U.setupSelection(data);
+  function billingSummary(run) {
+    const billing = run.billing;
+    if (!billing) return "费用未记录";
+    if (billing.type === "batch") {
+      const amount =
+        billing.unit === "USD"
+          ? `$${Number(billing.amount).toFixed(2)} USD`
+          : `${billing.amount} ${billing.unit}`;
+      const source =
+        billing.sourceAmount != null
+          ? `；原始消耗 ${billing.sourceAmount} ${billing.sourceUnit}`
+          : "";
+      return `批次总额：${amount}（${billing.caseCount} 个案例${source}）`;
+    }
+    if (billing.type === "subscription")
+      return `${billing.plan || "订阅"}（五小时额度未耗尽）`;
+    if (billing.amount !== null)
+      return `${billing.amount} ${billing.unit || ""}`.trim();
+    return "费用口径未记录";
+  }
+  function billingMarkup(run) {
+    const note = run.billing?.note || "";
+    return (
+      '<span class="billing-summary"' +
+      (note ? ' title="' + e(note) + '"' : "") +
+      ">费用 · " +
+      e(billingSummary(run)) +
+      "</span>"
+    );
+  }
   function entries(items) {
     return items
       .map((r) => {
@@ -90,7 +120,9 @@
           (r.preview.kind === "none" ? "无预览" : "可预览") +
           " " +
           U.executionModeBadge(r) +
-          '</small><div class="card-actions">' +
+          "</small>" +
+          billingMarkup(r) +
+          '<div class="card-actions">' +
           (U.screenshotURL(r)
             ? '<a href="' +
               e(U.screenshotURL(r)) +
@@ -278,9 +310,9 @@
             items.length +
             ' 条实验</span></div><a href="compare.html?group=' +
             encodeURIComponent(topic.id + "/" + p.id) +
-            '&tab=prompt">比较此版本 →</a></header><p class="topic-table-hint">左右滑动查看日期与操作 →</p><div class="topic-table-scroll" tabindex="0" aria-label="实验表格，可横向滚动"><table class="topic-runs-table"><caption class="sr-only">' +
+            '&tab=prompt">比较此版本 →</a></header><p class="topic-table-hint">左右滑动查看日期、费用与操作 →</p><div class="topic-table-scroll" tabindex="0" aria-label="实验记录表，包含费用信息，可横向滚动"><table class="topic-runs-table"><caption class="sr-only">' +
             e(p.title) +
-            '的实验记录</caption><thead><tr><th scope="col">模型</th><th scope="col">推理档位</th><th scope="col">轮次</th><th scope="col">日期</th><th scope="col">操作</th></tr></thead><tbody>' +
+            '的实验记录</caption><thead><tr><th scope="col">模型</th><th scope="col">推理档位</th><th scope="col">轮次</th><th scope="col">日期</th><th scope="col">费用记录</th><th scope="col">操作</th></tr></thead><tbody>' +
             items
               .map((r) => {
                 const href = U.previewURL(r);
@@ -296,7 +328,9 @@
                   e(U.roundLabel(r)) +
                   '</td><td class="topic-run-date"><time>' +
                   e(r.date || "日期未记录") +
-                  '</time></td><td><div class="topic-row-actions">' +
+                  '</time></td><td class="topic-run-billing">' +
+                  billingMarkup(r) +
+                  '</td><td><div class="topic-row-actions">' +
                   (U.screenshotURL(r)
                     ? '<a href="' +
                       e(U.screenshotURL(r)) +

@@ -23,6 +23,7 @@
 - 输入记录：使用当前模型执行 v1 任务正文。
 - 工具：Copilot SDK in VS Code。当前会话直接执行生成与验证。
 - 运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。
+- 费用记录：GitHub Copilot 批次合计 $2.76 USD（11 个案例；原始消耗 414 GitHub Copilot credits，换算比例 10 USD / 1500 GitHub Copilot credits；批次 github-copilot-gemini-3-8-flash-high-2026-10-09；未记录单案例费用）
 - [流体模拟](../../../../demos/fluid-simulation/runs/gemini-3-8-flash-high-r01/index.html)
 
 ### 部署适配记录
