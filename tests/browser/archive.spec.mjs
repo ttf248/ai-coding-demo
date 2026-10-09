@@ -48,6 +48,7 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
   await page.locator("#model").selectOption("gpt-6-1-sol");
   await page.reload();
   await expect(page.locator("#model")).toHaveValue("gpt-6-1-sol");
+  await page.locator("#advanced-filters > summary").click();
   await page.locator("#provider").selectOption("MiniMax");
   await expect(page.locator('[data-remove-filter="provider"]')).toContainText(
     "MiniMax",

@@ -12,6 +12,7 @@ test("topic effort order matches comparison selectors and date sorting remains e
   });
   await expect(solRows.locator(".topic-run-effort")).toHaveText([
     "max（最大）",
+    "xhigh（超高）",
     "medium（中）",
   ]);
   await expect(page.locator("#topic-effort option")).toHaveText([
@@ -38,6 +39,7 @@ test("topic effort order matches comparison selectors and date sorting remains e
     );
   expect(options).toEqual([
     "bluebook--gpt-6-1-sol-max-r01",
+    "bluebook--gpt-6-1-sol-xhigh-r01",
     "bluebook--gpt-6-1-sol-medium-r01",
   ]);
 });
@@ -64,7 +66,9 @@ test("topic browsing groups versions, filters experiments and restores state", a
     ).toBe(true);
   }
   await page.locator("#topic-model").selectOption("gpt-6-1-sol");
-  await expect(page.locator(".topic-run-row")).toHaveCount(2);
+  await expect(page.locator(".topic-run-row")).toHaveCount(
+    blue.filter((r) => r.modelId === "gpt-6-1-sol").length,
+  );
   await page.locator("#topic-effort").selectOption("medium");
   await expect(page.locator(".topic-run-row")).toHaveCount(1);
   await expect(page.locator(".topic-run-model")).toHaveText("GPT-6.1 Sol");
