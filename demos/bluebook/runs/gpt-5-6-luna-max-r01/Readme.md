@@ -22,6 +22,7 @@
 - 输入记录：完整输入记录为提示词 v2 原文；未附加系统提示、图片或多轮输入。
 - 工具：Codex。按用户指定记录模型 gpt-5.6-luna 与 max 档位；使用独立 Vite 构建并提交 Pages 预览。
 - 运行方式：在本目录 npm ci 后 npm run dev；Pages 使用根目录 previews 中已提交的构建产物。
+- 费用记录：OpenAI · ChatGPT Plus 订阅；单案例货币金额未记录。据用户说明，OpenAI 模型通过 ChatGPT Plus 订阅测试；全部案例完成后，五小时额度未耗尽。未提供单案例费用金额。
 - [小蓝书应用](../../../../previews/bluebook/gpt-5-6-luna-max-r01/index.html)
 
 ### 部署适配记录

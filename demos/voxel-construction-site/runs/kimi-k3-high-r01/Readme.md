@@ -30,6 +30,7 @@
 - 输入记录：完整输入即主题任务正文 v1，无附加上下文。正文同时写有「Three.js r160 CDN」与「不引用任何外部资源」，按前者执行：Three.js 走 CDN，其余贴图、标签全部代码生成。
 - 工具：GitHub Copilot CLI（VS Code）。model-test-base 独立克隆中由当前会话直接执行；模型 kimi-k3，档位 high；未委派子代理。
 - 运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。
+- 费用记录：GitHub Copilot 批次合计 $5.89 USD（11 个案例；原始消耗 883 GitHub Copilot credits，换算比例 10 USD / 1500 GitHub Copilot credits；批次 github-copilot-kimi-k3-high-2026-10-09；未记录单案例费用）
 - [体素微缩建筑工地](../../../../demos/voxel-construction-site/runs/kimi-k3-high-r01/index.html)
 
 ### 部署适配记录

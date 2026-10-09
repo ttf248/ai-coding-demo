@@ -14,6 +14,7 @@ Three.js r160 与 OrbitControls 从 unpkg 导入，需要联网。已在 Chromiu
 - 输入记录：提示词 v1 原文完整快照；按正文要求允许在局部环境或库缺失时继续完成。
 - 工具：Codex 当前会话。按用户指定记录为 gpt-6-luna / max；本轮未委派子代理。
 - 运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。
+- 费用记录：OpenAI · ChatGPT Plus 订阅；单案例货币金额未记录。据用户说明，OpenAI 模型通过 ChatGPT Plus 订阅测试；全部案例完成后，五小时额度未耗尽。未提供单案例费用金额。
 - [塔楼城市漫游](../../../../demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r03/index.html)
 
 ### 部署适配记录

@@ -242,8 +242,14 @@ export function generatedFiles(catalog) {
       r.input.executionMode && r.input.executionMode !== "unknown"
         ? `- 执行模式：${executionMode}${r.input.authorization ? `；授权原文：${r.input.authorization}` : ""}\n`
         : "";
+    const billingInfo = r.billing
+      ? r.billing.type === "batch"
+        ? `- 费用记录：${r.billing.provider || "厂商未记录"} 批次合计 ${r.billing.unit === "USD" ? `$${Number(r.billing.amount).toFixed(2)} USD` : `${r.billing.amount} ${r.billing.unit || ""}`}（${r.billing.caseCount || "案例数未记录"} 个案例${r.billing.sourceAmount != null ? `；原始消耗 ${r.billing.sourceAmount} ${r.billing.sourceUnit || ""}，换算比例 ${r.billing.conversionRate.amount} ${r.billing.conversionRate.unit} / ${r.billing.conversionRate.perAmount} ${r.billing.conversionRate.perUnit}` : ""}；批次 ${r.billing.batchId}；未记录单案例费用）\n`
+        : `- 费用记录：${r.billing.provider || "厂商未记录"}${r.billing.plan ? ` · ${r.billing.plan}` : ""} 订阅；单案例货币金额未记录。${r.billing.note}\n`
+      : "";
     const content =
       `\n## 当前归档信息（自动生成）\n\n- 实验 ID：\`${r.id}\`\n- 模型：${model}；推理档位：${r.effort}\n${executionInfo}- 类型：${r.type}；预览：${r.preview.kind}；网络：${r.preview.network}\n- [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=${r.topicId})\n- 输入记录：${r.input.notes}\n- 工具：${r.environment.tool || "未记录"}。${r.environment.notes}\n- 运行方式：${r.preview.kind === "static" ? "浏览器直接打开本目录入口；CDN/外部素材需要联网。" : r.preview.kind === "build" ? "在本目录 npm ci 后 npm run dev；Pages 使用根目录 previews 中已提交的构建产物。" : r.preview.kind === "external" ? "使用登记的外部地址，独立部署由维护者操作。" : "无静态预览，参见上方历史说明与源码。"}\n` +
+      billingInfo +
       r.preview.pages
         .map((p) => `- [${p.label}](../../../../${p.href})`)
         .join("\n") +

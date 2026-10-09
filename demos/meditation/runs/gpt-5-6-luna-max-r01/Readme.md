@@ -20,6 +20,7 @@
 - 输入记录：完整输入记录为提示词 v1 原文；未附加系统提示、图片或多轮输入。
 - 工具：Codex。按用户指定记录模型 gpt-5.6-luna 与 max 档位；原型使用 Tailwind 与 Unsplash CDN，需要联网预览。
 - 运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。
+- 费用记录：OpenAI · ChatGPT Plus 订阅；单案例货币金额未记录。据用户说明，OpenAI 模型通过 ChatGPT Plus 订阅测试；全部案例完成后，五小时额度未耗尽。未提供单案例费用金额。
 - [冥想 App 原型](../../../../demos/meditation/runs/gpt-5-6-luna-max-r01/index.html)
 
 ### 部署适配记录
