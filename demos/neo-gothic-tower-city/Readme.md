@@ -8,6 +8,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [neo-gothic-tower-city](../../demos/neo-gothic-tower-city/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](../../demos/neo-gothic-tower-city/runs/claude-haiku-45-default-r01/prompt.md) | [打开](../../demos/neo-gothic-tower-city/runs/claude-haiku-45-default-r01/index.html) |
+| [新哥特式塔楼城市 · 3D 动画网页](../../demos/neo-gothic-tower-city/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](../../demos/neo-gothic-tower-city/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](../../demos/neo-gothic-tower-city/runs/claude-haiku-5-5-max-r01/index.html) |
 | [新哥特式塔楼城市](../../demos/neo-gothic-tower-city/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](../../demos/neo-gothic-tower-city/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](../../demos/neo-gothic-tower-city/runs/gemini-3-8-flash-high-r01/index.html) |
 | [新哥特式塔楼城市](../../demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v1](../../demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/index.html) |
 | [夜潮之城 · 新哥特式塔楼城市](../../demos/neo-gothic-tower-city/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v1](../../demos/neo-gothic-tower-city/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](../../demos/neo-gothic-tower-city/runs/gpt-6-1-sol-max-r01/index.html) |

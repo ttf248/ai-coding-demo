@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>图片粒子化与手势还原</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #07090f; color: #e7edf7; font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; overflow: hidden; }
+    .app { display: grid; grid-template-columns: 300px minmax(0, 1fr); height: 100%; }
+    .side { display: flex; flex-direction: column; gap: 12px; padding: 16px; background: #0d1220; border-right: 1px solid #1e2a40; overflow-y: auto; }
+    .side h1 { margin: 0; font-size: 18px; }
+    .side p { margin: 0; color: #9fb0c8; font-size: 13px; line-height: 1.6; }
+    .card { padding: 12px; border-radius: 12px; background: #131b2e; border: 1px solid #22304a; font-size: 13px; line-height: 1.6; }
+    .card b { color: #ffd166; }
+    label { font-size: 13px; color: #b8c6dc; display: block; margin-bottom: 6px; }
+    input[type="range"] { width: 100%; }
+    input[type="file"] { width: 100%; color: #b8c6dc; font-size: 13px; }
+    .btn { font: inherit; font-size: 14px; padding: 10px 12px; border-radius: 10px; border: 1px solid #33466a; background: #1b2740; color: #e7edf7; cursor: pointer; min-height: 40px; }
+    .btn:hover { background: #24345a; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { min-height: 1.6em; font-size: 13px; color: #ffd39a; line-height: 1.6; }
+    .stage { position: relative; min-width: 0; min-height: 0; }
+    #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .cam { position: absolute; right: 16px; top: 16px; width: min(28vw, 300px); aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.2); background: #000; }
+    .cam video, .cam canvas { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+    .cam canvas { pointer-events: none; }
+    .hint { position: absolute; left: 16px; bottom: 16px; padding: 10px 12px; border-radius: 12px; background: rgba(7, 9, 15, 0.7); font-size: 13px; line-height: 1.7; backdrop-filter: blur(6px); }
+    .progress { position: absolute; left: 16px; top: 16px; padding: 8px 12px; border-radius: 10px; background: rgba(7, 9, 15, 0.7); font-size: 13px; }
+    @media (max-width: 760px) {
+      html, body { overflow: auto; }
+      .app { grid-template-columns: 1fr; grid-template-rows: auto 70vh; height: auto; }
+      .side { border-right: 0; border-bottom: 1px solid #1e2a40; overflow: visible; }
+      .cam { width: 40vw; right: 10px; top: 10px; }
+    }
+  </style>
+  <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="side" aria-label="控制面板">
+      <h1>图片粒子化与手势还原</h1>
+      <p>上传一张本地图片，它会被拆成粒子流并随机飘散。张开手掌激活吸引场，粒子向原图位置回归；握拳暂停；比 V 字时上下移动手掌可调整吸引半径。</p>
+      <div>
+        <label for="file">选择图片（仅在本地读取，不上传）</label>
+        <input id="file" type="file" accept="image/*" />
+      </div>
+      <div>
+        <label for="step">采样间隔 <span id="stepV">4</span> px（越小粒子越多）</label>
+        <input id="step" type="range" min="2" max="8" step="1" value="4" />
+      </div>
+      <div>
+        <label for="speed">还原速度 <span id="speedV">1.0</span>×</label>
+        <input id="speed" type="range" min="0.4" max="2.5" step="0.1" value="1" />
+      </div>
+      <button class="btn" id="startCam" type="button">开启摄像头与手部识别</button>
+      <div class="card">
+        <b>手势说明</b><br />
+        张开手掌（≥4 指伸直）：吸引场跟随手掌，粒子回归图片<br />
+        握拳（≤1 指伸直）：暂停吸引，粒子缓慢漂浮<br />
+        V 字（食指与中指伸直）：上下移动手掌，调整吸引半径
+      </div>
+      <div class="card" id="stats">粒子数：0 · 已还原：0%</div>
+      <div class="status" id="status" role="status">等待上传图片。</div>
+    </aside>
+    <section class="stage" aria-label="粒子画布">
+      <canvas id="gl" aria-label="粒子渲染画布"></canvas>
+      <div class="cam" id="camBox">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+      </div>
+      <div class="progress" id="loading" hidden>正在加载手部识别模型……</div>
+      <div class="hint" id="hint">请先选择一张图片。</div>
+    </section>
+  </div>
+  <script type="module">
+    import * as THREE from "three";
+
+    const $ = (id) => document.getElementById(id);
+    const statusEl = $("status"), hintEl = $("hint"), statsEl = $("stats");
+    const setStatus = (text) => { statusEl.textContent = text; };
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const WORLD_H = 6;
+
+    const glCanvas = $("gl");
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true });
+    } catch (error) {
+      setStatus("当前浏览器无法创建 WebGL 上下文，无法显示粒子。");
+      throw error;
+    }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x07090f);
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -10, 10);
+    camera.position.z = 5;
+    let viewW = WORLD_H, viewH = WORLD_H;
+    function resize() {
+      const r = glCanvas.getBoundingClientRect();
+      renderer.setSize(r.width, r.height, false);
+      viewW = WORLD_H * (r.width / r.height);
+      viewH = WORLD_H;
+      camera.left = -viewW / 2;
+      camera.right = viewW / 2;
+      camera.top = viewH / 2;
+      camera.bottom = -viewH / 2;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    // Particle state: current position, velocity, target on the image, and a scattered home position.
+    const material = new THREE.ShaderMaterial({
+      uniforms: { uPixel: { value: renderer.getPixelRatio() }, uSize: { value: 2.4 } },
+      vertexShader: "attribute vec3 aColor; uniform float uPixel; uniform float uSize; varying vec3 vColor; void main() { vColor = aColor; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = uSize * uPixel; }",
+      fragmentShader: "varying vec3 vColor; void main() { vec2 p = gl_PointCoord - vec2(0.5); if (dot(p, p) > 0.25) discard; gl_FragColor = vec4(vColor, 1.0); }",
+    });
+    const P = { n: 0, pos: null, vel: null, tgt: null, home: null, points: null, geo: null };
+    let imageAspect = 1;
+
+    function loadImageFile(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          resolve(img);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("图片无法解码，请换一张 PNG 或 JPG。"));
+        };
+        img.src = url;
+      });
+    }
+
+    // Sample the image on a grid; every sample becomes one particle with its colour and target position.
+    function buildParticles(img, step) {
+      const maxSide = 360;
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const g = canvas.getContext("2d", { willReadFrequently: true });
+      g.drawImage(img, 0, 0, w, h);
+      const data = g.getImageData(0, 0, w, h).data;
+      const samples = [];
+      for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+          const i = (y * w + x) * 4;
+          if (data[i + 3] < 40) continue;
+          samples.push([x, y, data[i] / 255, data[i + 1] / 255, data[i + 2] / 255]);
+        }
+      }
+      if (P.points) {
+        scene.remove(P.points);
+        P.geo.dispose();
+      }
+      const n = samples.length;
+      const pos = new Float32Array(n * 3), vel = new Float32Array(n * 3), tgt = new Float32Array(n * 3), home = new Float32Array(n * 3), col = new Float32Array(n * 3);
+      const worldW = WORLD_H * (w / h);
+      imageAspect = w / h;
+      samples.forEach(([x, y, r, gg, b], i) => {
+        const k = i * 3;
+        tgt[k] = (x / w - 0.5) * worldW;
+        tgt[k + 1] = (0.5 - y / h) * WORLD_H;
+        home[k] = (Math.random() - 0.5) * viewW * 1.6;
+        home[k + 1] = (Math.random() - 0.5) * viewH * 1.6;
+        pos[k] = home[k];
+        pos[k + 1] = home[k + 1];
+        col[k] = r;
+        col[k + 1] = gg;
+        col[k + 2] = b;
+      });
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
+      const points = new THREE.Points(geo, material);
+      scene.add(points);
+      Object.assign(P, { n, pos, vel, tgt, home, points, geo });
+      return n;
+    }
+
+    // Integrate particles: inside the attraction field they are pulled firmly to their targets;
+    // outside it they are pulled weakly; with the field off they drift around their scattered homes.
+    let time = 0, speedMul = 1;
+    function updateParticles(dt, field) {
+      if (!P.n) return;
+      const { pos, vel, tgt, home } = P;
+      const damp = Math.exp(-dt * 2.4);
+      const stiff = 7.0 * speedMul;
+      const r2 = field.r * field.r;
+      for (let i = 0, k = 0; i < P.n; i++, k += 3) {
+        let ax = 0, ay = 0;
+        if (field.active) {
+          const inside = (pos[k] - field.x) ** 2 + (pos[k + 1] - field.y) ** 2 < r2;
+          const w = inside ? 1 : 0.1;
+          ax = (tgt[k] - pos[k]) * stiff * w;
+          ay = (tgt[k + 1] - pos[k + 1]) * stiff * w;
+        } else {
+          ax = (home[k] - pos[k]) * 0.6 + Math.sin(time * 0.8 + i) * 0.5;
+          ay = (home[k + 1] - pos[k + 1]) * 0.6 + Math.cos(time * 0.7 + i * 0.5) * 0.5;
+        }
+        vel[k] = (vel[k] + ax * dt) * damp;
+        vel[k + 1] = (vel[k + 1] + ay * dt) * damp;
+        pos[k] += vel[k] * dt;
+        pos[k + 1] += vel[k + 1] * dt;
+      }
+      P.geo.attributes.position.needsUpdate = true;
+    }
+
+    // Built-in sample drawn on a canvas so the particle effect is visible before any upload.
+    function makeSample() {
+      const c = document.createElement("canvas");
+      c.width = 480;
+      c.height = 320;
+      const g = c.getContext("2d");
+      const grd = g.createLinearGradient(0, 0, 480, 320);
+      grd.addColorStop(0, "#1f6fb2");
+      grd.addColorStop(1, "#f29e4c");
+      g.fillStyle = grd;
+      g.fillRect(0, 0, 480, 320);
+      g.fillStyle = "#ffd166";
+      g.beginPath();
+      g.arc(340, 110, 60, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#0b3d62";
+      g.fillRect(0, 230, 480, 90);
+      g.fillStyle = "#e8f4ff";
+      g.font = "bold 46px system-ui, sans-serif";
+      g.fillText("PIXEL FLOW", 40, 120);
+      return c;
+    }
+
+    // Hand tracking (MediaPipe Hands) and gesture classification.
+    const video = $("video"), overlay = $("overlay"), octx = overlay.getContext("2d");
+    let hands = null, busy = false, lastHand = null;
+    const votes = [];
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const extended = (lm, tip, pip) => dist(lm[tip], lm[0]) > dist(lm[pip], lm[0]) * 1.15;
+    function classify(lm) {
+      const f = [extended(lm, 8, 6), extended(lm, 12, 10), extended(lm, 16, 14), extended(lm, 20, 18)];
+      const count = f.filter(Boolean).length;
+      if (count >= 4) return "open";
+      if (count <= 1) return "fist";
+      if (f[0] && f[1] && !f[2] && !f[3]) return "v";
+      return "other";
+    }
+    function palmCenter(lm) {
+      const ids = [0, 5, 9, 13, 17];
+      return ids.reduce((acc, i) => ({ x: acc.x + lm[i].x / ids.length, y: acc.y + lm[i].y / ids.length }), { x: 0, y: 0 });
+    }
+    function onHands(results) {
+      octx.clearRect(0, 0, overlay.width, overlay.height);
+      const list = results.multiHandLandmarks || [];
+      if (!list.length) {
+        lastHand = null;
+        votes.length = 0;
+        return;
+      }
+      const lm = list[0];
+      octx.fillStyle = "#ffd166";
+      for (const p of lm) {
+        octx.beginPath();
+        octx.arc(p.x * overlay.width, p.y * overlay.height, 3, 0, Math.PI * 2);
+        octx.fill();
+      }
+      votes.push(classify(lm));
+      if (votes.length > 5) votes.shift();
+      const count = (k) => votes.filter((v) => v === k).length;
+      const gesture = ["open", "fist", "v", "other"].reduce((best, k) => (count(k) > count(best) ? k : best), "other");
+      lastHand = { gesture, palm: palmCenter(lm) };
+    }
+
+    // The attraction field follows the palm (mirrored to match the preview). V-gesture sets the radius by height.
+    const field = { active: false, x: 0, y: 0, r: 1.4 };
+    function updateField(dt) {
+      const open = lastHand && (lastHand.gesture === "open" || lastHand.gesture === "v");
+      field.active = !!open;
+      if (!open) return;
+      const tx = (0.5 - lastHand.palm.x) * viewW, ty = (0.5 - lastHand.palm.y) * viewH;
+      const follow = Math.min(1, dt * 10);
+      field.x += (tx - field.x) * follow;
+      field.y += (ty - field.y) * follow;
+      const targetR = lastHand.gesture === "v" ? clamp(0.6 + (1 - lastHand.palm.y) * 3.2, 0.6, 4) : 1.4;
+      field.r += (targetR - field.r) * Math.min(1, dt * 4);
+    }
+
+    let statsTimer = 0;
+    function updateStats() {
+      if (!P.n) return;
+      let done = 0;
+      for (let i = 0, k = 0; i < P.n; i++, k += 3) {
+        if (Math.abs(P.pos[k] - P.tgt[k]) < 0.06 && Math.abs(P.pos[k + 1] - P.tgt[k + 1]) < 0.06) done++;
+      }
+      const names = { open: "张开手掌·吸引", fist: "握拳·暂停", v: "V 字·调半径", other: "其他手势" };
+      const gesture = lastHand ? names[lastHand.gesture] : "未检测到手";
+      statsEl.textContent = `粒子数：${P.n} · 已还原：${Math.round((done / P.n) * 100)}% · ${field.active ? "吸引中" : "漂浮中"} · ${gesture}`;
+    }
+    let last = performance.now();
+    function frame(now) {
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      time += dt;
+      updateField(dt);
+      updateParticles(dt, field);
+      renderer.render(scene, camera);
+      statsTimer += dt;
+      if (statsTimer > 0.4) {
+        statsTimer = 0;
+        updateStats();
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // Controls
+    let image = makeSample();
+    buildParticles(image, Number($("step").value));
+    hintEl.textContent = "示例粒子已生成：上传图片或开启摄像头后即可用手势还原。";
+    setStatus("已载入示例图片，可上传自己的图片或开启摄像头。");
+    $("file").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        setStatus("正在读取图片并生成粒子……");
+        image = await loadImageFile(file);
+        const n = buildParticles(image, Number($("step").value));
+        hintEl.textContent = "张开手掌吸引粒子回归图片；握拳暂停；比 V 字并上下移动手掌可调整吸引半径。";
+        setStatus(`已生成 ${n} 个粒子。`);
+      } catch (error) {
+        setStatus(error.message);
+      }
+    });
+    $("step").addEventListener("input", () => {
+      $("stepV").textContent = $("step").value;
+    });
+    $("step").addEventListener("change", () => {
+      const n = buildParticles(image, Number($("step").value));
+      setStatus(`已按采样间隔 ${$("step").value} px 重新生成 ${n} 个粒子。`);
+    });
+    $("speed").addEventListener("input", () => {
+      speedMul = Number($("speed").value);
+      $("speedV").textContent = speedMul.toFixed(1);
+    });
+    $("startCam").addEventListener("click", async () => {
+      $("startCam").disabled = true;
+      $("loading").hidden = false;
+      try {
+        if (!window.Hands) throw new Error("MediaPipe 手部识别脚本未能加载，请检查网络后刷新");
+        if (!hands) {
+          hands = new window.Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+          hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5 });
+          hands.onResults(onHands);
+          if (typeof hands.initialize === "function") await hands.initialize();
+        }
+        $("loading").hidden = true;
+        setStatus("正在请求摄像头权限……");
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" }, audio: false });
+        video.srcObject = stream;
+        await video.play();
+        overlay.width = video.videoWidth;
+        overlay.height = video.videoHeight;
+        setStatus("摄像头已开启：张开手掌即可吸引粒子。");
+        const pump = async () => {
+          if (!busy && video.readyState >= 2) {
+            busy = true;
+            try {
+              await hands.send({ image: video });
+            } catch (error) {
+              console.warn(error);
+            }
+            busy = false;
+          }
+          requestAnimationFrame(pump);
+        };
+        pump();
+      } catch (error) {
+        $("loading").hidden = true;
+        $("startCam").disabled = false;
+        setStatus("无法启动手部识别：" + (error.message || error.name) + "。粒子效果仍可用，但没有手势控制。");
+      }
+    });
+
+    requestAnimationFrame((t) => {
+      last = t;
+      frame(t);
+    });
+  </script>
+</body>
+</html>

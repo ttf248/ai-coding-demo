@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>简化电路实验台</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: #0e1420; color: #e7eef8; font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 16px; }
+    h1 { margin: 6px 0 4px; font-size: 22px; }
+    .intro { margin: 0 0 12px; color: #a9b8cc; font-size: 14px; line-height: 1.7; }
+    .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .btn { font: inherit; font-size: 14px; color: #e7eef8; background: #1c2740; border: 1px solid #33466a; border-radius: 10px; padding: 8px 12px; min-height: 40px; cursor: pointer; }
+    .btn:hover { background: #26365a; }
+    .btn.primary { background: #2c6bd6; border-color: #3d7ce0; }
+    .btn.danger { background: #4a2430; border-color: #7a3a4c; }
+    .btn:focus-visible { outline: 2px solid #7fb4ff; outline-offset: 2px; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; align-items: start; }
+    @media (max-width: 820px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+    .board { position: relative; width: 100%; aspect-ratio: 1000 / 640; overflow: hidden; border-radius: 14px; border: 1px solid #2a3a58; background-color: #111a2b; background-image: radial-gradient(circle, #22304a 1px, transparent 1.5px); background-size: 5% 6.25%; touch-action: none; user-select: none; -webkit-user-select: none; }
+    .wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    .wires .line { fill: none; stroke: #8fd3ff; stroke-width: 3; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+    .wires .line.sel { stroke: #ffd166; }
+    .wires .hit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; vector-effect: non-scaling-stroke; }
+    .wires .preview { fill: none; stroke: #ffd166; stroke-width: 2.5; stroke-dasharray: 6 6; vector-effect: non-scaling-stroke; }
+    .comp { position: absolute; width: 18%; height: 18.75%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 6px; border-radius: 12px; border: 2px solid #3a5278; background: #18233a; cursor: grab; text-align: center; font-size: 13px; line-height: 1.35; }
+    .comp.sel { border-color: #ffd166; }
+    .comp .title { font-weight: 600; }
+    .comp .value { color: #bcd0ea; white-space: nowrap; font-size: 12px; }
+    .comp .read { color: #7fe3a6; white-space: normal; font-size: 12px; min-height: 1.35em; }
+    .comp.switch.open .value { color: #ff9c9c; }
+    .term { position: absolute; top: 50%; width: 28px; height: 28px; margin-top: -14px; border-radius: 50%; border: 2px solid #ffd166; background: #0e1420; color: #ffd166; font-size: 12px; font-weight: 700; padding: 0; line-height: 24px; cursor: crosshair; touch-action: none; }
+    .term.l { left: -14px; }
+    .term.r { right: -14px; }
+    .side { background: #142038; border: 1px solid #2a3a58; border-radius: 14px; padding: 12px; font-size: 14px; line-height: 1.6; }
+    .side h2 { margin: 0 0 8px; font-size: 16px; }
+    .side p { margin: 6px 0; color: #c5d3e6; }
+    .side label { display: block; margin: 8px 0 4px; color: #a9b8cc; font-size: 13px; }
+    .side input[type="number"] { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #33466a; background: #0e1420; color: #e7eef8; font: inherit; }
+    .side .err { color: #ff9c9c; font-size: 13px; min-height: 1.4em; }
+    .status { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: 14px; line-height: 1.6; }
+    .status.ok { background: rgba(52, 199, 89, 0.12); border: 1px solid rgba(52, 199, 89, 0.4); }
+    .status.warn { background: rgba(255, 190, 80, 0.12); border: 1px solid rgba(255, 190, 80, 0.45); }
+    .status.err { background: rgba(255, 90, 110, 0.14); border: 1px solid rgba(255, 90, 110, 0.5); }
+    .note { margin: 10px 0 0; color: #9fb0c8; font-size: 12px; line-height: 1.6; }
+    @media (max-width: 420px) { .comp { font-size: 11px; } .comp .value, .comp .read { font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>简化电路实验台</h1>
+    <p class="intro">拖动元件可移动；连线时从一个端子拖到另一个端子（触摸同样可用）。单击元件选中，单击开关可切换通断；选中后可修改电池电压或电阻值，删除元件会同时清除相关连线。模型为理想直流电池、电阻、开关与固定 60 Ω 灯泡，仅用于教学演示。</p>
+    <div class="bar" role="toolbar" aria-label="元件与预设">
+      <button class="btn" type="button" data-add="battery">＋ 电池</button>
+      <button class="btn" type="button" data-add="resistor">＋ 电阻</button>
+      <button class="btn" type="button" data-add="switch">＋ 开关</button>
+      <button class="btn" type="button" data-add="bulb">＋ 灯泡</button>
+      <button class="btn primary" type="button" id="presetSeries">串联预设</button>
+      <button class="btn primary" type="button" id="presetParallel">并联预设</button>
+      <button class="btn danger" type="button" id="resetAll">一键重置</button>
+    </div>
+    <div class="layout">
+      <div class="board" id="board" aria-label="电路画布">
+        <svg class="wires" id="wires" viewBox="0 0 1000 640" preserveAspectRatio="none" aria-hidden="true"></svg>
+      </div>
+      <aside class="side" aria-live="polite">
+        <h2>选中项</h2>
+        <div id="prop"><p>选中元件或导线后，在此修改参数或删除。</p></div>
+        <div class="status" id="status"></div>
+        <p class="note">简化模型：电池视为理想电压源；灯泡按固定 60 Ω 电阻计算，亮度只随耗散功率变化，不代表真实光效。不包含交流、电容、电感或半导体。</p>
+      </aside>
+    </div>
+  </main>
+  <script>
+    (function () {
+      "use strict";
+      const BOARD_W = 1000, BOARD_H = 640, COMP_W = 180, COMP_H = 120, TERM_DX = 90;
+      const BULB_R = 60;
+      const NAMES = { battery: "电池", resistor: "电阻", switch: "开关", bulb: "灯泡" };
+      const PREFIX = { battery: "E", resistor: "R", switch: "S", bulb: "L" };
+      const DEFAULTS = { battery: 12, resistor: 100, switch: 1, bulb: BULB_R };
+      const RANGES = { battery: [0, 48, "V"], resistor: [1, 100000, "Ω"] };
+
+      const board = document.getElementById("board");
+      const wiresSvg = document.getElementById("wires");
+      const propEl = document.getElementById("prop");
+      const statusEl = document.getElementById("status");
+      const compEls = new Map();
+      const state = { comps: [], wires: [], sel: null, counter: {}, uid: 0, wireUid: 0, pending: null, drag: null, sol: null };
+
+      const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+      const findComp = (id) => state.comps.find((c) => c.id === id);
+      const termPos = (tid) => {
+        const [cid, side] = tid.split(":");
+        const c = findComp(cid);
+        return { x: c.x + (side === "0" ? -TERM_DX : TERM_DX), y: c.y };
+      };
+      const fmt = (x, digits) => (Math.abs(x) < 1e-9 ? (0).toFixed(digits) : x.toFixed(digits));
+
+      // Modified nodal analysis for one island: node voltages plus one current per ideal source.
+      // Returns null when the system has no unique solution (conflicting or loop-only sources).
+      function solveMNA(nodes, srcs, rs) {
+        const ref = nodes[0];
+        const idx = new Map();
+        nodes.forEach((n) => { if (n !== ref) idx.set(n, idx.size); });
+        const nV = idx.size, m = srcs.length, size = nV + m;
+        const A = Array.from({ length: size }, () => new Float64Array(size + 1));
+        const at = (node) => (node === ref ? -1 : idx.get(node));
+        for (const r of rs) {
+          const G = 1 / r.R, a = at(r.a), b = at(r.b);
+          if (a >= 0) { A[a][a] += G; if (b >= 0) A[a][b] -= G; }
+          if (b >= 0) { A[b][b] += G; if (a >= 0) A[b][a] -= G; }
+        }
+        srcs.forEach((s, j) => {
+          const col = nV + j, p = at(s.p), q = at(s.q);
+          if (p >= 0) { A[p][col] += 1; A[col][p] += 1; }
+          if (q >= 0) { A[q][col] -= 1; A[col][q] -= 1; }
+          A[col][size] = s.E;
+        });
+        for (let c = 0; c < size; c++) {
+          let piv = c;
+          for (let r = c + 1; r < size; r++) if (Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r;
+          if (Math.abs(A[piv][c]) < 1e-12) return null;
+          [A[c], A[piv]] = [A[piv], A[c]];
+          for (let r = c + 1; r < size; r++) {
+            const f = A[r][c] / A[c][c];
+            if (f !== 0) for (let k = c; k <= size; k++) A[r][k] -= f * A[c][k];
+          }
+        }
+        const x = new Float64Array(size);
+        for (let r = size - 1; r >= 0; r--) {
+          let s = A[r][size];
+          for (let k = r + 1; k < size; k++) s -= A[r][k] * x[k];
+          x[r] = s / A[r][r];
+        }
+        const V = new Map([[ref, 0]]);
+        for (const [node, i] of idx) V.set(node, x[i]);
+        return { V, I: Array.from({ length: m }, (_, j) => x[nV + j]) };
+      }
+
+      // Terminals joined by wires or by a closed switch form one electrical node.
+      function solve() {
+        const parent = new Map();
+        for (const c of state.comps) {
+          parent.set(c.id + ":0", c.id + ":0");
+          parent.set(c.id + ":1", c.id + ":1");
+        }
+        const root = (t) => {
+          let r = t;
+          while (parent.get(r) !== r) r = parent.get(r);
+          let s = t;
+          while (s !== r) { const nx = parent.get(s); parent.set(s, r); s = nx; }
+          return r;
+        };
+        const join = (a, b) => {
+          const ra = root(a), rb = root(b);
+          if (ra !== rb) parent.set(ra, rb);
+        };
+        for (const w of state.wires) join(w.a, w.b);
+        for (const c of state.comps) if (c.type === "switch" && c.closed) join(c.id + ":0", c.id + ":1");
+
+        const sources = [];
+        const resistors = [];
+        for (const c of state.comps) {
+          if (c.type === "battery") {
+            sources.push({ c, p: root(c.id + ":1"), q: root(c.id + ":0"), E: Number(c.value) });
+          } else if (c.type === "resistor" || c.type === "bulb") {
+            resistors.push({ c, a: root(c.id + ":0"), b: root(c.id + ":1"), R: c.type === "bulb" ? BULB_R : Number(c.value) });
+          }
+        }
+        if (sources.some((s) => s.p === s.q)) {
+          return { status: "short", readings: new Map(), message: "电源短路：电池两端被导线或闭合开关直接相连，理想电源的电流不受限制。已停止计算，请断开短路导线。" };
+        }
+
+        const adj = new Map();
+        const link = (u, v) => {
+          if (!adj.has(u)) adj.set(u, []);
+          if (!adj.has(v)) adj.set(v, []);
+          adj.get(u).push(v);
+          adj.get(v).push(u);
+        };
+        for (const s of sources) link(s.p, s.q);
+        for (const r of resistors) link(r.a, r.b);
+        const islandOf = new Map();
+        const islands = [];
+        for (const start of adj.keys()) {
+          if (islandOf.has(start)) continue;
+          const id = islands.length;
+          const list = [start];
+          islandOf.set(start, id);
+          for (let i = 0; i < list.length; i++) {
+            for (const m of adj.get(list[i])) {
+              if (!islandOf.has(m)) { islandOf.set(m, id); list.push(m); }
+            }
+          }
+          islands.push(list);
+        }
+
+        const readings = new Map();
+        let ambiguous = false;
+        islands.forEach((nodes, k) => {
+          const srcs = sources.filter((s) => islandOf.get(s.p) === k);
+          const rs = resistors.filter((r) => islandOf.get(r.a) === k);
+          if (srcs.length === 0) {
+            for (const r of rs) readings.set(r.c.id, { v: 0, i: 0 });
+            return;
+          }
+          const sol = solveMNA(nodes, srcs, rs);
+          if (!sol) { ambiguous = true; return; }
+          for (const r of rs) {
+            const v = sol.V.get(r.a) - sol.V.get(r.b);
+            readings.set(r.c.id, { v, i: v / r.R });
+          }
+          srcs.forEach((s, j) => readings.set(s.c.id, { v: s.E, i: -sol.I[j] }));
+        });
+
+        if (ambiguous) {
+          return { status: "ambiguous", readings: new Map(), message: "无唯一解：理想电源相互冲突，或回路只由电源与导线组成，无法唯一确定电流。请加入电阻限制电流。" };
+        }
+        if (sources.length === 0) {
+          return { status: "open", readings, message: "未接入电源：请添加电池并连线，当前所有电流为零。" };
+        }
+        const flowing = [...readings.values()].some((r) => Math.abs(r.i) > 1e-9);
+        if (!flowing) {
+          return { status: "open", readings, message: "开路：没有闭合回路（开关断开或支路未连通），所有电流为零。" };
+        }
+        return { status: "ok", readings, message: "唯一解：已完成直流求解，读数为各元件电压与电流，箭头表示电流方向。" };
+      }
+
+      const valueText = (c) => {
+        if (c.type === "battery") return `${Number(c.value)} V`;
+        if (c.type === "resistor") return `${Number(c.value)} Ω`;
+        if (c.type === "switch") return c.closed ? "闭合 · 导通" : "断开 · 开路";
+        return `${BULB_R} Ω 固定`;
+      };
+      const brightness = (c, sol) => {
+        const r = sol.readings.get(c.id);
+        if (!r || sol.status === "short" || sol.status === "ambiguous") return 0;
+        return clamp(Math.abs(r.v * r.i) / 2, 0, 1);
+      };
+      function readText(c, sol) {
+        if (sol.status === "short" || sol.status === "ambiguous") return "— 不计算";
+        const r = sol.readings.get(c.id);
+        if (!r || c.type === "switch") return "";
+        if (c.type === "battery") {
+          const dir = r.i > 1e-9 ? "（+ 端输出）" : "";
+          return `U ${fmt(r.v, 2)} V · I ${fmt(r.i, 3)} A${dir}`;
+        }
+        const arrow = r.i > 1e-9 ? " →" : r.i < -1e-9 ? " ←" : "";
+        const base = `U ${fmt(r.v, 2)} V · I ${fmt(Math.abs(r.i), 3)} A${arrow}`;
+        return c.type === "bulb" ? `${base} · 亮度 ${Math.round(brightness(c, sol) * 100)}%` : base;
+      }
+
+      function buildComp(c) {
+        const el = document.createElement("div");
+        el.className = "comp " + c.type;
+        el.dataset.id = c.id;
+        el.innerHTML = '<button class="term l" type="button"></button><div class="title"></div><div class="value"></div><div class="read"></div><button class="term r" type="button"></button>';
+        const tl = el.querySelector(".term.l");
+        const tr = el.querySelector(".term.r");
+        tl.dataset.id = c.id + ":0";
+        tr.dataset.id = c.id + ":1";
+        tl.setAttribute("aria-label", c.name + " 左端子");
+        tr.setAttribute("aria-label", c.name + " 右端子");
+        if (c.type === "battery") {
+          tl.textContent = "−";
+          tr.textContent = "+";
+        }
+        el.addEventListener("pointerdown", (e) => onCompDown(e, c.id));
+        return el;
+      }
+
+      function updateComp(c, el, sol) {
+        el.style.left = (c.x - COMP_W / 2) / BOARD_W * 100 + "%";
+        el.style.top = (c.y - COMP_H / 2) / BOARD_H * 100 + "%";
+        el.classList.toggle("sel", !!state.sel && state.sel.kind === "comp" && state.sel.id === c.id);
+        el.classList.toggle("open", c.type === "switch" && !c.closed);
+        el.querySelector(".title").textContent = c.name + " · " + NAMES[c.type];
+        el.querySelector(".value").textContent = valueText(c);
+        el.querySelector(".read").textContent = readText(c, sol);
+        if (c.type === "bulb") {
+          const b = brightness(c, sol);
+          el.style.background = `rgb(${Math.round(24 + 200 * b)}, ${Math.round(35 + 150 * b)}, ${Math.round(58 + 40 * b)})`;
+          el.style.boxShadow = b > 0 ? `0 0 ${Math.round(8 + 26 * b)}px rgba(255, 200, 90, ${(0.25 + 0.75 * b).toFixed(2)})` : "";
+        } else {
+          el.style.background = "";
+          el.style.boxShadow = "";
+        }
+      }
+
+      const SVGNS = "http://www.w3.org/2000/svg";
+      function svgPath(d, cls, attrs) {
+        const p = document.createElementNS(SVGNS, "path");
+        p.setAttribute("d", d);
+        p.setAttribute("class", cls);
+        if (attrs) for (const [k, v] of Object.entries(attrs)) p.setAttribute(k, v);
+        return p;
+      }
+      function renderWires() {
+        wiresSvg.textContent = "";
+        for (const w of state.wires) {
+          const p1 = termPos(w.a), p2 = termPos(w.b);
+          const d = `M${p1.x} ${p1.y} L${p2.x} ${p2.y}`;
+          const sel = !!state.sel && state.sel.kind === "wire" && state.sel.id === w.id;
+          wiresSvg.append(svgPath(d, "hit", { "data-wire": w.id }), svgPath(d, sel ? "line sel" : "line"));
+        }
+        if (state.pending && state.pending.to) {
+          const p1 = termPos(state.pending.from);
+          wiresSvg.append(svgPath(`M${p1.x} ${p1.y} L${state.pending.to.x} ${state.pending.to.y}`, "preview"));
+        }
+      }
+
+      function render() {
+        const sol = solve();
+        state.sol = sol;
+        const alive = new Set();
+        for (const c of state.comps) {
+          alive.add(c.id);
+          let el = compEls.get(c.id);
+          if (!el) {
+            el = buildComp(c);
+            compEls.set(c.id, el);
+            board.appendChild(el);
+          }
+          updateComp(c, el, sol);
+        }
+        for (const [id, el] of compEls) {
+          if (!alive.has(id)) { el.remove(); compEls.delete(id); }
+        }
+        renderWires();
+        statusEl.className = "status " + (sol.status === "ok" ? "ok" : sol.status === "open" ? "warn" : "err");
+        statusEl.textContent = sol.message;
+      }
+
+      function boardPoint(e) {
+        const r = board.getBoundingClientRect();
+        return { x: (e.clientX - r.left) / r.width * BOARD_W, y: (e.clientY - r.top) / r.height * BOARD_H };
+      }
+      function onCompDown(e, id) {
+        if (e.target.closest(".term")) return;
+        e.stopPropagation();
+        const c = findComp(id);
+        const el = compEls.get(id);
+        state.drag = { id, pointerId: e.pointerId, sx: e.clientX, sy: e.clientY, ox: c.x, oy: c.y, moved: false };
+        el.setPointerCapture(e.pointerId);
+      }
+      function onCompClick(id) {
+        const c = findComp(id);
+        if (c.type === "switch") c.closed = !c.closed;
+        state.sel = { kind: "comp", id };
+        renderProp();
+      }
+      function addWire(a, b) {
+        if (state.wires.some((w) => (w.a === a && w.b === b) || (w.a === b && w.b === a))) {
+          notify("这两个端子之间已经有导线。");
+          return;
+        }
+        state.wires.push({ id: "w" + (++state.wireUid), a, b });
+        state.sel = null;
+        renderProp();
+      }
+
+      board.addEventListener("pointerdown", (e) => {
+        const term = e.target.closest(".term");
+        if (term) {
+          e.preventDefault();
+          state.pending = { from: term.dataset.id, to: boardPoint(e), pointerId: e.pointerId };
+          render();
+          return;
+        }
+        if (e.target.closest(".comp") || e.target.closest(".hit")) return;
+        if (state.sel) {
+          state.sel = null;
+          refreshAll();
+        }
+      });
+      board.addEventListener("pointermove", (e) => {
+        if (state.pending && state.pending.pointerId === e.pointerId) {
+          state.pending.to = boardPoint(e);
+          renderWires();
+          return;
+        }
+        const d = state.drag;
+        if (!d || d.pointerId !== e.pointerId) return;
+        const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+        if (!d.moved && Math.hypot(dx, dy) < 6) return;
+        d.moved = true;
+        const r = board.getBoundingClientRect();
+        const c = findComp(d.id);
+        c.x = clamp(d.ox + dx / r.width * BOARD_W, COMP_W / 2, BOARD_W - COMP_W / 2);
+        c.y = clamp(d.oy + dy / r.height * BOARD_H, COMP_H / 2, BOARD_H - COMP_H / 2);
+        render();
+      });
+      function endPointer(e) {
+        const p = state.pending;
+        if (p && p.pointerId === e.pointerId) {
+          state.pending = null;
+          const hit = document.elementFromPoint(e.clientX, e.clientY);
+          const target = hit && hit.closest ? hit.closest(".term") : null;
+          if (target && target.dataset.id !== p.from) addWire(p.from, target.dataset.id);
+          render();
+          return;
+        }
+        const d = state.drag;
+        if (d && d.pointerId === e.pointerId) {
+          state.drag = null;
+          if (!d.moved) onCompClick(d.id);
+          render();
+        }
+      }
+      board.addEventListener("pointerup", endPointer);
+      board.addEventListener("pointercancel", endPointer);
+      wiresSvg.addEventListener("pointerdown", (e) => {
+        const hit = e.target.closest(".hit");
+        if (!hit) return;
+        e.stopPropagation();
+        state.sel = { kind: "wire", id: hit.dataset.wire };
+        refreshAll();
+      });
+
+      function notify(text) {
+        const n = document.getElementById("notice");
+        if (n) n.textContent = text;
+      }
+      function renderProp() {
+        const s = state.sel;
+        if (s && s.kind === "comp" && !findComp(s.id)) state.sel = null;
+        const cur = state.sel;
+        let html;
+        if (!cur) {
+          html = "<p>选中元件或导线后，在此修改参数或删除。</p>";
+        } else if (cur.kind === "wire") {
+          html = '<p>已选中导线。</p><button class="btn danger" type="button" data-act="del">删除导线</button>';
+        } else {
+          const c = findComp(cur.id);
+          if (c.type === "switch") {
+            html = `<p>${c.name} 开关：${c.closed ? "当前闭合（导通）" : "当前断开（开路）"}。</p><button class="btn primary" type="button" data-act="toggle">${c.closed ? "断开开关" : "闭合开关"}</button>`;
+          } else if (c.type === "bulb") {
+            html = `<p>${c.name} 灯泡按固定 ${BULB_R} Ω 电阻计算，阻值不可修改。</p>`;
+          } else {
+            const [lo, hi] = RANGES[c.type];
+            html = `<label for="valInput">${c.type === "battery" ? "电压（V，0–48）" : "电阻（Ω，1–100000）"}</label><input id="valInput" type="number" inputmode="decimal" step="any" min="${lo}" max="${hi}" value="${c.value}" /><div class="err" id="valErr"></div>`;
+          }
+          html += `<button class="btn danger" type="button" data-act="del" style="margin-top:10px">删除${NAMES[c.type]}</button>`;
+        }
+        propEl.innerHTML = html + '<div class="err" id="notice"></div>';
+      }
+      function refreshAll() {
+        render();
+        renderProp();
+      }
+
+      propEl.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-act]");
+        if (!btn || !state.sel) return;
+        if (btn.dataset.act === "toggle") {
+          const c = findComp(state.sel.id);
+          c.closed = !c.closed;
+          refreshAll();
+        } else if (btn.dataset.act === "del") {
+          deleteSelected();
+        }
+      });
+      propEl.addEventListener("change", (e) => {
+        if (e.target.id !== "valInput" || !state.sel) return;
+        const c = findComp(state.sel.id);
+        const [lo, hi] = RANGES[c.type];
+        const text = e.target.value.trim();
+        const v = Number(text);
+        const err = document.getElementById("valErr");
+        if (text === "" || !Number.isFinite(v) || v < lo || v > hi) {
+          err.textContent = `请输入 ${lo}–${hi} 之间的数值，已恢复为原值。`;
+          e.target.value = c.value;
+          return;
+        }
+        c.value = v;
+        refreshAll();
+      });
+
+      function addComp(type, x, y, value) {
+        state.counter[type] = (state.counter[type] || 0) + 1;
+        const c = {
+          id: "c" + (++state.uid),
+          type,
+          name: PREFIX[type] + state.counter[type],
+          x: clamp(x, COMP_W / 2, BOARD_W - COMP_W / 2),
+          y: clamp(y, COMP_H / 2, BOARD_H - COMP_H / 2),
+          value: value === undefined ? DEFAULTS[type] : value,
+          closed: true,
+        };
+        state.comps.push(c);
+        return c;
+      }
+      function connect(a, b) {
+        state.wires.push({ id: "w" + (++state.wireUid), a, b });
+      }
+      function deleteSelected() {
+        const s = state.sel;
+        if (!s) return;
+        if (s.kind === "wire") {
+          state.wires = state.wires.filter((w) => w.id !== s.id);
+        } else {
+          state.comps = state.comps.filter((c) => c.id !== s.id);
+          state.wires = state.wires.filter((w) => !w.a.startsWith(s.id + ":") && !w.b.startsWith(s.id + ":"));
+        }
+        state.sel = null;
+        refreshAll();
+      }
+      function loadPreset(name) {
+        state.comps = [];
+        state.wires = [];
+        state.sel = null;
+        state.counter = {};
+        if (name === "series") {
+          const b = addComp("battery", 150, 320, 12);
+          const r1 = addComp("resistor", 430, 150, 100);
+          const r2 = addComp("resistor", 720, 150, 200);
+          const s1 = addComp("switch", 430, 500);
+          connect(b.id + ":1", r1.id + ":0");
+          connect(r1.id + ":1", r2.id + ":0");
+          connect(r2.id + ":1", s1.id + ":0");
+          connect(s1.id + ":1", b.id + ":0");
+        } else if (name === "parallel") {
+          const b = addComp("battery", 150, 320, 12);
+          const r1 = addComp("resistor", 470, 150, 100);
+          const r2 = addComp("resistor", 470, 470, 200);
+          const s1 = addComp("switch", 720, 470);
+          connect(b.id + ":1", r1.id + ":0");
+          connect(b.id + ":1", r2.id + ":0");
+          connect(r1.id + ":1", b.id + ":0");
+          connect(r2.id + ":1", s1.id + ":0");
+          connect(s1.id + ":1", b.id + ":0");
+        }
+        refreshAll();
+      }
+
+      document.querySelectorAll("[data-add]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const n = state.comps.length;
+          const c = addComp(btn.dataset.add, 500 + (n % 4) * 60 - 90, 200 + Math.floor(n / 4) * 70, undefined);
+          state.sel = { kind: "comp", id: c.id };
+          refreshAll();
+        });
+      });
+      document.getElementById("presetSeries").addEventListener("click", () => loadPreset("series"));
+      document.getElementById("presetParallel").addEventListener("click", () => loadPreset("parallel"));
+      document.getElementById("resetAll").addEventListener("click", () => loadPreset("empty"));
+      window.addEventListener("keydown", (e) => {
+        if (e.target && e.target.matches && e.target.matches("input, textarea, select")) return;
+        if ((e.key === "Delete" || e.key === "Backspace") && state.sel) {
+          e.preventDefault();
+          deleteSelected();
+        } else if (e.key === "Escape") {
+          state.sel = null;
+          state.pending = null;
+          refreshAll();
+        }
+      });
+
+      loadPreset("series");
+    })();
+  </script>
+</body>
+</html>

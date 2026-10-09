@@ -8,6 +8,7 @@
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
 | [meditation](../../demos/meditation/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](../../demos/meditation/runs/claude-haiku-45-default-r01/prompt.md) | [打开](../../demos/meditation/runs/claude-haiku-45-default-r01/index.html) |
+| [冥想 iOS App · 原型图](../../demos/meditation/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](../../demos/meditation/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](../../demos/meditation/runs/claude-haiku-5-5-max-r01/index.html) |
 | [冥想 iOS App 原型](../../demos/meditation/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](../../demos/meditation/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](../../demos/meditation/runs/gemini-3-8-flash-high-r01/index.html) |
 | [冥想 iOS App](../../demos/meditation/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v1](../../demos/meditation/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../demos/meditation/runs/gpt-5-6-luna-max-r01/index.html) |
 | [静屿 · 冥想 iOS 原型](../../demos/meditation/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v1](../../demos/meditation/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](../../demos/meditation/runs/gpt-6-1-sol-max-r01/index.html) |
