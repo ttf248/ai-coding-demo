@@ -2,13 +2,20 @@ import { test, expect } from "@playwright/test";
 import { loadCatalog } from "../../scripts/lib.mjs";
 const data = loadCatalog();
 const blue = data.runs.filter((r) => r.topicId === "bluebook");
+const voxel = data.runs.filter((r) => r.topicId === "voxel-construction-site");
+const designRun = voxel.find(
+  (r) => r.input.executionMode === "design-enhanced",
+);
+const priorVoxelRun = voxel.find(
+  (r) => r.id !== designRun?.id && !r.input.executionMode,
+);
 test("topic effort order matches comparison selectors and date sorting remains explicit", async ({
   page,
 }) => {
   await page.goto("topic.html?id=bluebook&prompt=v2");
   await expect(page.locator("#topic-sort")).toHaveValue("model");
   const solRows = page.locator(".topic-run-row").filter({
-    has: page.locator(".topic-run-model", { hasText: /^GPT-6\.1 Sol$/ }),
+    has: page.locator(".topic-run-model", { hasText: /^GPT-6\.1 Sol/ }),
   });
   await expect(solRows.locator(".topic-run-effort")).toHaveText([
     "max（最大）",
@@ -71,7 +78,7 @@ test("topic browsing groups versions, filters experiments and restores state", a
   );
   await page.locator("#topic-effort").selectOption("medium");
   await expect(page.locator(".topic-run-row")).toHaveCount(1);
-  await expect(page.locator(".topic-run-model")).toHaveText("GPT-6.1 Sol");
+  await expect(page.locator(".topic-run-model")).toContainText("GPT-6.1 Sol");
   await expect(page.locator(".topic-run-effort")).toContainText("medium（中）");
   await page.reload();
   await expect(page.locator("#topic-model")).toHaveValue("gpt-6-1-sol");
@@ -124,6 +131,62 @@ test("topic browsing groups versions, filters experiments and restores state", a
     path: `test-results/topic-redesign-desktop-${test.info().project.name}.png`,
     fullPage: true,
   });
+});
+test("design-enhanced authorization is visible on home, topic and comparison pages", async ({
+  page,
+}) => {
+  expect(designRun).toBeDefined();
+  expect(priorVoxelRun).toBeDefined();
+
+  await page.goto("./?group=runs&testing=all&q=%E4%BD%93%E7%B4%A0");
+  const homeBadge = page.locator(".run-card .execution-mode-chip");
+  await expect(homeBadge).toHaveText("自主设计授权");
+  await expect(homeBadge).toBeVisible();
+
+  await page.goto("topic.html?id=voxel-construction-site");
+  const row = page.locator(`#run-${designRun.id}`);
+  await expect(row.locator(".execution-mode-chip")).toHaveText("自主设计授权");
+  await expect(row.locator(".execution-mode-chip")).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+
+  await page.goto(
+    `compare.html?left=${priorVoxelRun.id}&right=${designRun.id}&tab=conditions`,
+  );
+  await expect(page.locator("#relation")).toContainText("任务正文一致");
+  await expect(page.locator("#relation")).toContainText("执行模式不同");
+  const modeRow = page
+    .locator("#conditions-table tr")
+    .filter({ has: page.getByRole("rowheader", { name: "执行模式" }) });
+  await expect(modeRow.locator("td")).toHaveText([
+    "执行模式未记录",
+    "自主设计授权",
+  ]);
+  const authorizationRow = page.locator("#conditions-table tr").filter({
+    has: page.getByRole("rowheader", { name: "自主优化授权原文" }),
+  });
+  await expect(authorizationRow.locator("td")).toHaveText([
+    "未记录",
+    designRun.input.authorization,
+  ]);
+
+  await page.locator('[data-tab="info"]').click();
+  await page.locator('[data-mobile="right"]').click();
+  await expect(page.locator("#panel-right")).toBeVisible();
+  await expect(page.locator("#panel-right .execution-mode-chip")).toHaveText(
+    "自主设计授权",
+  );
+  await expect(page.locator("#panel-right .execution-mode-chip")).toBeVisible();
+  await expect(page.locator("#panel-right .panel-info")).toContainText(
+    designRun.input.authorization,
+  );
+  await expect(
+    page.locator(`#run-right option[value="${designRun.id}"]`),
+  ).toContainText("自主设计授权");
 });
 test("effort names remain visible in topic matrices and comparison selectors", async ({
   page,

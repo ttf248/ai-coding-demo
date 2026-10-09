@@ -35,6 +35,7 @@
 
 - 实验 ID：`fantasy-map-generator--gpt-6-1-sol-xhigh-r01`
 - 模型：GPT-6.1 Sol；推理档位：xhigh
+- 执行模式：自主设计授权；授权原文：允许你理解输入的需求，针对需求进行优化，按照你理解的更好的设计，进行具体的开发实现。
 - 类型：single-html；预览：static；网络：offline
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=fantasy-map-generator)
 - 输入记录：保存本轮用户原文与所选任务正文；允许理解并优化需求和设计，区别于原文严格执行轮次。当前会话连续执行，系统上下文未完整归档。

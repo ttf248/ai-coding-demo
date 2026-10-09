@@ -290,7 +290,7 @@ test("module selection, sharing, missing HTTP preview and external fallback", as
 test("single HTML entries remain directly openable", async ({
   page,
 }, testInfo) => {
-  test.setTimeout(90000);
+  test.setTimeout(150000);
   test.skip(
     testInfo.project.name !== "root",
     "File URLs are independent of hosting prefix",

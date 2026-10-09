@@ -222,6 +222,7 @@
           e(data.categories.find((c) => c.id === t.category).label) +
           "</span>" +
           (U.isTopicArchived(t) ? '<span class="pill">已归档</span>' : "") +
+          U.executionModeBadge(previewRun) +
           '</div><h3><a href="topic.html?id=' +
           t.id +
           '">' +
@@ -634,7 +635,9 @@
         e(U.effortLabel(r.effort)) +
         " · " +
         e(U.roundLabel(r)) +
-        "</span><time>" +
+        "</span>" +
+        (U.executionMode(r) === "unknown" ? "" : U.executionModeBadge(r)) +
+        "<time>" +
         e(r.date || "日期未记录") +
         "</time></small></a>",
     )

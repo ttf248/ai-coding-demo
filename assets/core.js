@@ -19,6 +19,25 @@
   const modelProvider = (data, run) =>
     data.models.find((m) => m.id === run.modelId)?.provider ||
     "未记录 / 多轮混合";
+  const executionModeLabel = (mode) =>
+    ({
+      "design-enhanced": "自主设计授权",
+      strict: "按原任务执行",
+      unknown: "执行模式未记录",
+    })[mode] || "执行模式未记录";
+  const executionMode = (run) => run?.input?.executionMode || "unknown";
+  const executionModeBadge = (run, className = "execution-mode-chip") =>
+    executionMode(run) === "unknown"
+      ? ""
+      : '<span class="' +
+        escape(className) +
+        '" title="' +
+        escape(
+          run.input.authorization || executionModeLabel(executionMode(run)),
+        ) +
+        '">' +
+        escape(executionModeLabel(executionMode(run))) +
+        "</span>";
   const isTopicArchived = (topic) => topic?.testingStatus === "archived";
   function compareModels(x, y) {
     const providerOrder =
@@ -110,8 +129,19 @@
     )
       return "输入信息不足";
     if (a.rawHash === b.rawHash) return "已记录的原始输入一致";
-    if (promptFor(data, a)?.hash === promptFor(data, b)?.hash)
+    if (promptFor(data, a)?.hash === promptFor(data, b)?.hash) {
+      const modeA = executionMode(a),
+        modeB = executionMode(b);
+      if (modeA !== modeB && (modeA !== "unknown" || modeB !== "unknown"))
+        return (
+          "任务正文一致 · 执行模式不同（A：" +
+          executionModeLabel(modeA) +
+          "；B：" +
+          executionModeLabel(modeB) +
+          "）"
+        );
       return "任务正文一致 · 原始输入不同";
+    }
     return "同主题 · 不同输入";
   }
   function filterRuns(data, state) {
@@ -410,7 +440,9 @@
       escape(effortLabel(r.effort)) +
       "</span><span>提示词 " +
       escape(r.promptId) +
-      '</span></div><div class="card-actions">' +
+      "</span>" +
+      executionModeBadge(r) +
+      '</div><div class="card-actions">' +
       (href
         ? '<a href="' +
           escape(href) +
@@ -428,6 +460,9 @@
     modelLabel,
     modelProviderId,
     modelProvider,
+    executionMode,
+    executionModeLabel,
+    executionModeBadge,
     isTopicArchived,
     compareModelRuns,
     compareModels,
