@@ -88,6 +88,8 @@
           e(r.date || "日期未记录") +
           " · " +
           (r.preview.kind === "none" ? "无预览" : "可预览") +
+          " " +
+          U.executionModeBadge(r) +
           '</small><div class="card-actions">' +
           (U.screenshotURL(r)
             ? '<a href="' +
@@ -287,6 +289,7 @@
                   e(r.id) +
                   '"><th scope="row" class="topic-run-model">' +
                   e(U.modelLabel(data, r)) +
+                  U.executionModeBadge(r) +
                   '</th><td class="topic-run-effort">' +
                   e(U.effortLabel(r.effort)) +
                   "</td><td>" +
