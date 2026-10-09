@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>彩色流体实验台</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: #090d16;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      user-select: none;
+    }
+    header {
+      background: #111827;
+      border-bottom: 1px solid #1f2937;
+      padding: 10px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      z-index: 20;
+    }
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .title-text {
+      font-size: 16px;
+      font-weight: bold;
+      color: #38bdf8;
+    }
+    .badge {
+      font-size: 11px;
+      background: #075985;
+      color: #e0f2fe;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    @media (min-width: 860px) {
+      .main-area {
+        flex-direction: row;
+      }
+    }
+    .canvas-box {
+      flex: 1;
+      position: relative;
+      background: #000;
+      min-height: 420px;
+      overflow: hidden;
+      cursor: crosshair;
+      touch-action: none;
+    }
+    canvas#fluid-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .control-panel {
+      width: 100%;
+      background: #111827;
+      border-top: 1px solid #1f2937;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 12px;
+      z-index: 10;
+    }
+    @media (min-width: 860px) {
+      .control-panel {
+        width: 320px;
+        border-top: none;
+        border-left: 1px solid #1f2937;
+        overflow-y: auto;
+        max-height: calc(100vh - 54px);
+      }
+    }
+    .section-card {
+      background: #0b0f19;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 10px;
+    }
+    .card-title {
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+    .row label {
+      color: #cbd5e1;
+      white-space: nowrap;
+    }
+    input[type="range"] {
+      flex: 1;
+      accent-color: #38bdf8;
+    }
+    select {
+      background: #1f2937;
+      color: #f8fafc;
+      border: 1px solid #374151;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      width: 130px;
+    }
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .btn {
+      background: #1f2937;
+      color: #f8fafc;
+      border: 1px solid #374151;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .btn:hover {
+      background: #374151;
+      border-color: #4b5563;
+    }
+    .btn:active {
+      transform: scale(0.96);
+    }
+    .btn-primary {
+      background: #0284c7;
+      border-color: #0369a1;
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #0369a1;
+    }
+    .btn-danger {
+      background: #991b1b;
+      border-color: #7f1d1d;
+    }
+    .btn-danger:hover {
+      background: #7f1d1d;
+    }
+    .val-display {
+      font-family: monospace;
+      color: #38bdf8;
+      width: 38px;
+      text-align: right;
+    }
+    .alert-box {
+      display: none;
+      background: #7f1d1d;
+      color: #fecaca;
+      border: 1px solid #ef4444;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin: 10px;
+    }
+    .hud-hint {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      pointer-events: none;
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(4px);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="title-group">
+      <span class="title-text">🌊 彩色流体实验台</span>
+      <span class="badge">WebGL 欧拉方程求解</span>
+    </div>
+    <div style="font-size: 12px; color: #94a3b8;">
+      纯静态 Navier-Stokes 压力投影 · 动量与染料平流
+    </div>
+  </header>
+
+  <div id="webgl-alert" class="alert-box">
+    ⚠️ 您的浏览器未开启或不支持 WebGL 硬件加速，流体仿真计算无法初始化。
+  </div>
+
+  <div class="main-area">
+    <div class="canvas-box" id="canvas-box">
+      <div class="hud-hint">
+        滑动鼠标或手指注入动量与流体 · 多指触控支持
+      </div>
+      <canvas id="fluid-canvas"></canvas>
+    </div>
+
+    <div class="control-panel">
+      <!-- 物理与求解参数 -->
+      <div class="section-card">
+        <div class="card-title">流体动力学与求解</div>
+        <div class="row">
+          <label>注入力度:</label>
+          <input type="range" id="splat-force" min="500" max="8000" step="100" value="3500" oninput="updateVal('splat-force', 'val-force', '')" />
+          <span class="val-display" id="val-force">3500</span>
+        </div>
+        <div class="row">
+          <label>注入半径:</label>
+          <input type="range" id="splat-radius" min="10" max="60" value="25" oninput="updateVal('splat-radius', 'val-radius', 'px')" />
+          <span class="val-display" id="val-radius">25px</span>
+        </div>
+        <div class="row">
+          <label>染料消散率:</label>
+          <input type="range" id="dye-dissipation" min="950" max="999" value="985" oninput="updateVal('dye-dissipation', 'val-dissipation', '%', 0.1)" />
+          <span class="val-display" id="val-dissipation">98.5%</span>
+        </div>
+        <div class="row">
+          <label>压力迭代次数:</label>
+          <input type="range" id="pressure-iter" min="5" max="40" step="1" value="20" oninput="updateVal('pressure-iter', 'val-iter', '次')" />
+          <span class="val-display" id="val-iter">20次</span>
+        </div>
+        <div class="row">
+          <label>计算网格精细度:</label>
+          <select id="grid-res" onchange="changeResolution(this.value)">
+            <option value="128">128 × 128 (极速)</option>
+            <option value="256" selected>256 × 256 (标准)</option>
+            <option value="384">384 × 384 (高清)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 配色方案 -->
+      <div class="section-card">
+        <div class="card-title">染料色谱风格</div>
+        <div class="row">
+          <label>色彩调色盘:</label>
+          <select id="color-palette" onchange="currentPalette = this.value">
+            <option value="rainbow" selected>🌈 绚丽霓虹 (循环变化)</option>
+            <option value="aurora">🌌 极光蓝绿 (Cyan/Emerald)</option>
+            <option value="fire">🔥 烈焰熔岩 (Amber/Crimson)</option>
+            <option value="ocean">🌊 碧海深蓝 (Azure/Sapphire)</option>
+            <option value="electric">⚡ 赛博电光 (Purple/Pink)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 操作与导出 -->
+      <div class="section-card">
+        <div class="card-title">实验台控制</div>
+        <div class="btn-grid">
+          <button class="btn btn-primary" id="btn-pause" onclick="togglePause()">⏸️ 暂停模拟</button>
+          <button class="btn" onclick="clearFluid()">🧹 清空流体</button>
+          <button class="btn" onclick="exportPNG()">📸 导出 PNG 截图</button>
+          <button class="btn btn-danger" onclick="resetParams()">🔄 重置默认参数</button>
+        </div>
+      </div>
+
+      <!-- 理论与验收说明 -->
+      <div style="font-size: 11px; color: #64748b; line-height: 1.5; padding: 4px;">
+        • <strong>Navier-Stokes 方程</strong>：通过不可压缩流体欧拉网格计算速度平流、散度投影与压力泊松方程。<br>
+        • <strong>动态交互</strong>：沿拖拽向量方向施加动量梯度并注入染料粒子，自发形成漩涡剪切与扩散混色。
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("fluid-canvas");
+    let gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+
+    if (!gl) {
+      document.getElementById("webgl-alert").style.display = "block";
+    }
+
+    // Try extensions for float textures
+    const extFloat = gl ? gl.getExtension("OES_texture_float") : null;
+    const extHalfFloat = gl ? gl.getExtension("OES_texture_half_float") : null;
+    const extLinear = gl ? gl.getExtension("OES_texture_float_linear") : null;
+
+    // Simulation configuration
+    let simRes = 256;
+    let isPaused = false;
+    let currentPalette = "rainbow";
+    let colorCycle = 0;
+
+    let params = {
+      force: 3500,
+      radius: 0.002,
+      dyeDissipation: 0.985,
+      velDissipation: 0.98,
+      pressureIterations: 20
+    };
+
+    function updateVal(inputId, displayId, unit, scale = 1) {
+      const raw = parseFloat(document.getElementById(inputId).value);
+      if (inputId === 'splat-force') params.force = raw;
+      if (inputId === 'splat-radius') params.radius = (raw / 10000) * 0.8;
+      if (inputId === 'dye-dissipation') params.dyeDissipation = raw / 1000;
+      if (inputId === 'pressure-iter') params.pressureIterations = Math.round(raw);
+
+      document.getElementById(displayId).innerText = `${(raw * scale).toFixed(scale < 1 ? 1 : 0)}${unit}`;
+    }
+
+    // Shader Source Code
+    const baseVertexShader = `
+      attribute vec2 aPosition;
+      varying vec2 vUv;
+      void main() {
+        vUv = aPosition * 0.5 + 0.5;
+        gl_Position = vec4(aPosition, 0.0, 1.0);
+      }
+    `;
+
+    const clearShader = `
+      precision highp float;
+      uniform float uValue;
+      void main() {
+        gl_FragColor = vec4(uValue);
+      }
+    `;
+
+    const splatShader = `
+      precision highp float;
+      varying vec2 vUv;
+      uniform sampler2D uTarget;
+      uniform float uAspectRatio;
+      uniform vec3 uColor;
+      uniform vec2 uPoint;
+      uniform float uRadius;
+      void main() {
+        vec2 p = vUv - uPoint.xy;
+        p.x *= uAspectRatio;
+        vec3 splat = exp(-dot(p, p) / uRadius) * uColor;
+        vec3 base = texture2D(uTarget, vUv).xyz;
+        gl_FragColor = vec4(base + splat, 1.0);
+      }
+    `;
+
+    const advectionShader = `
+      precision highp float;
+      varying vec2 vUv;
+      uniform sampler2D uVelocity;
+      uniform sampler2D uSource;
+      uniform vec2 uTexelSize;
+      uniform float uDt;
+      uniform float uDissipation;
+      void main() {
+        vec2 coord = vUv - uDt * texture2D(uVelocity, vUv).xy * uTexelSize;
+        gl_FragColor = uDissipation * texture2D(uSource, coord);
+      }
+    `;
+
+    const divergenceShader = `
+      precision highp float;
+      varying vec2 vUv;
+      uniform sampler2D uVelocity;
+      uniform vec2 uTexelSize;
+      void main() {
+        float L = texture2D(uVelocity, vUv - vec2(uTexelSize.x, 0.0)).x;
+        float R = texture2D(uVelocity, vUv + vec2(uTexelSize.x, 0.0)).x;
+        float B = texture2D(uVelocity, vUv - vec2(0.0, uTexelSize.y)).y;
+        float T = texture2D(uVelocity, vUv + vec2(0.0, uTexelSize.y)).y;
+        float div = 0.5 * (R - L + T - B);
+        gl_FragColor = vec4(div, 0.0, 0.0, 1.0);
+      }
+    `;
+
+    const pressureShader = `
+      precision highp float;
+      varying vec2 vUv;
+      uniform sampler2D uPressure;
+      uniform sampler2D uDivergence;
+      uniform vec2 uTexelSize;
+      void main() {
+        float L = texture2D(uPressure, vUv - vec2(uTexelSize.x, 0.0)).x;
+        float R = texture2D(uPressure, vUv + vec2(uTexelSize.x, 0.0)).x;
+        float B = texture2D(uPressure, vUv - vec2(0.0, uTexelSize.y)).x;
+        float T = texture2D(uPressure, vUv + vec2(0.0, uTexelSize.y)).x;
+        float div = texture2D(uDivergence, vUv).x;
+        float p = (L + R + B + T - div) * 0.25;
+        gl_FragColor = vec4(p, 0.0, 0.0, 1.0);
+      }
+    `;
+
+    const gradientSubtractShader = `
+      precision highp float;
+      varying vec2 vUv;
+      uniform sampler2D uPressure;
+      uniform sampler2D uVelocity;
+      uniform vec2 uTexelSize;
+      void main() {
+        float L = texture2D(uPressure, vUv - vec2(uTexelSize.x, 0.0)).x;
+        float R = texture2D(uPressure, vUv + vec2(uTexelSize.x, 0.0)).x;
+        float B = texture2D(uPressure, vUv - vec2(0.0, uTexelSize.y)).x;
+        float T = texture2D(uPressure, vUv + vec2(0.0, uTexelSize.y)).x;
+        vec2 v = texture2D(uVelocity, vUv).xy;
+        v -= vec2(R - L, T - B) * 0.5;
+        gl_FragColor = vec4(v, 0.0, 1.0);
+      }
+    `;
+
+    const displayShader = `
+      precision highp float;
+      varying vec2 vUv;
+      uniform sampler2D uDye;
+      void main() {
+        vec3 c = texture2D(uDye, vUv).rgb;
+        // Mild tone mapping
+        c = c / (c + vec3(0.85));
+        c = pow(c, vec3(0.9));
+        gl_FragColor = vec4(c, 1.0);
+      }
+    `;
+
+    // WebGL Program Helpers
+    function createShader(gl, type, source) {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, source);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(s));
+        gl.deleteShader(s);
+        return null;
+      }
+      return s;
+    }
+
+    function createProgram(gl, vsSource, fsSource) {
+      const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
+      const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+      const prog = gl.createProgram();
+      gl.attachShader(prog, vs);
+      gl.attachShader(prog, fs);
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(prog));
+        return null;
+      }
+      return prog;
+    }
+
+    // Quad geometry
+    const quadBuffer = gl ? gl.createBuffer() : null;
+    if (gl) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    }
+
+    function blit(targetFbo) {
+      if (!targetFbo) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      } else {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, targetFbo.fbo);
+        gl.viewport(0, 0, targetFbo.width, targetFbo.height);
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(0);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+
+    // Framebuffer Objects
+    function createFBO(width, height) {
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+      const type = extFloat ? gl.FLOAT : (extHalfFloat ? extHalfFloat.HALF_FLOAT_OES : gl.UNSIGNED_BYTE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, type, null);
+
+      const fbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+
+      return { fbo, tex, width, height };
+    }
+
+    function createDoubleFBO(width, height) {
+      let fbo1 = createFBO(width, height);
+      let fbo2 = createFBO(width, height);
+      return {
+        get read() { return fbo1; },
+        get write() { return fbo2; },
+        swap() { const t = fbo1; fbo1 = fbo2; fbo2 = t; }
+      };
+    }
+
+    // Compile Shader Programs
+    let progClear, progSplat, progAdvect, progDiverge, progPressure, progGradient, progDisplay;
+    let dyeFBO, velocityFBO, divergenceFBO, pressureFBO;
+
+    if (gl) {
+      progClear = createProgram(gl, baseVertexShader, clearShader);
+      progSplat = createProgram(gl, baseVertexShader, splatShader);
+      progAdvect = createProgram(gl, baseVertexShader, advectionShader);
+      progDiverge = createProgram(gl, baseVertexShader, divergenceShader);
+      progPressure = createProgram(gl, baseVertexShader, pressureShader);
+      progGradient = createProgram(gl, baseVertexShader, gradientSubtractShader);
+      progDisplay = createProgram(gl, baseVertexShader, displayShader);
+
+      initFBOs(simRes);
+    }
+
+    function initFBOs(res) {
+      simRes = res;
+      dyeFBO = createDoubleFBO(res, res);
+      velocityFBO = createDoubleFBO(res, res);
+      divergenceFBO = createFBO(res, res);
+      pressureFBO = createDoubleFBO(res, res);
+    }
+
+    function changeResolution(val) {
+      initFBOs(parseInt(val, 10));
+    }
+
+    // Palette Colors Generator
+    function getPaletteColor() {
+      colorCycle += 0.015;
+      if (currentPalette === "rainbow") {
+        const r = Math.sin(colorCycle) * 0.5 + 0.5;
+        const g = Math.sin(colorCycle + 2.09) * 0.5 + 0.5;
+        const b = Math.sin(colorCycle + 4.18) * 0.5 + 0.5;
+        return [r * 2.5, g * 2.5, b * 2.5];
+      } else if (currentPalette === "aurora") {
+        const t = Math.sin(colorCycle) * 0.5 + 0.5;
+        return [0.1 * (1 - t) + 0.8 * t, 0.9 * (1 - t) + 0.3 * t, 0.7];
+      } else if (currentPalette === "fire") {
+        const t = Math.sin(colorCycle) * 0.5 + 0.5;
+        return [2.5, 0.4 + t * 0.8, 0.1];
+      } else if (currentPalette === "ocean") {
+        const t = Math.sin(colorCycle) * 0.5 + 0.5;
+        return [0.1, 0.5 + t * 0.5, 2.0];
+      } else {
+        // Electric
+        const t = Math.sin(colorCycle) * 0.5 + 0.5;
+        return [1.8 + t * 0.4, 0.2, 1.8 - t * 0.4];
+      }
+    }
+
+    // Splat injection
+    function splat(x, y, dx, dy, color) {
+      if (!gl) return;
+      const aspect = canvas.width / canvas.height;
+
+      // Inject velocity
+      gl.useProgram(progSplat);
+      gl.uniform1i(gl.getUniformLocation(progSplat, "uTarget"), 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, velocityFBO.read.tex);
+      gl.uniform1f(gl.getUniformLocation(progSplat, "uAspectRatio"), aspect);
+      gl.uniform2f(gl.getUniformLocation(progSplat, "uPoint"), x, y);
+      gl.uniform3f(gl.getUniformLocation(progSplat, "uColor"), dx * params.force, dy * params.force, 0.0);
+      gl.uniform1f(gl.getUniformLocation(progSplat, "uRadius"), params.radius);
+      blit(velocityFBO.write);
+      velocityFBO.swap();
+
+      // Inject dye
+      gl.uniform1i(gl.getUniformLocation(progSplat, "uTarget"), 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, dyeFBO.read.tex);
+      gl.uniform3f(gl.getUniformLocation(progSplat, "uColor"), color[0], color[1], color[2]);
+      blit(dyeFBO.write);
+      dyeFBO.swap();
+    }
+
+    // Simulation Step
+    function step(dt) {
+      if (!gl || isPaused) return;
+
+      const texel = [1.0 / simRes, 1.0 / simRes];
+
+      // 1. Advect Velocity
+      gl.useProgram(progAdvect);
+      gl.uniform1i(gl.getUniformLocation(progAdvect, "uVelocity"), 0);
+      gl.uniform1i(gl.getUniformLocation(progAdvect, "uSource"), 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, velocityFBO.read.tex);
+      gl.uniform2f(gl.getUniformLocation(progAdvect, "uTexelSize"), texel[0], texel[1]);
+      gl.uniform1f(gl.getUniformLocation(progAdvect, "uDt"), dt);
+      gl.uniform1f(gl.getUniformLocation(progAdvect, "uDissipation"), params.velDissipation);
+      blit(velocityFBO.write);
+      velocityFBO.swap();
+
+      // 2. Advect Dye
+      gl.uniform1i(gl.getUniformLocation(progAdvect, "uVelocity"), 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, velocityFBO.read.tex);
+      gl.uniform1i(gl.getUniformLocation(progAdvect, "uSource"), 1);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, dyeFBO.read.tex);
+      gl.uniform1f(gl.getUniformLocation(progAdvect, "uDissipation"), params.dyeDissipation);
+      blit(dyeFBO.write);
+      dyeFBO.swap();
+
+      // 3. Compute Divergence
+      gl.useProgram(progDiverge);
+      gl.uniform1i(gl.getUniformLocation(progDiverge, "uVelocity"), 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, velocityFBO.read.tex);
+      gl.uniform2f(gl.getUniformLocation(progDiverge, "uTexelSize"), texel[0], texel[1]);
+      blit(divergenceFBO);
+
+      // 4. Jacobi Pressure Iterations
+      gl.useProgram(progClear);
+      gl.uniform1f(gl.getUniformLocation(progClear, "uValue"), 0.0);
+      blit(pressureFBO.write);
+      pressureFBO.swap();
+
+      gl.useProgram(progPressure);
+      gl.uniform1i(gl.getUniformLocation(progPressure, "uDivergence"), 1);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, divergenceFBO.tex);
+      gl.uniform2f(gl.getUniformLocation(progPressure, "uTexelSize"), texel[0], texel[1]);
+
+      for (let i = 0; i < params.pressureIterations; i++) {
+        gl.uniform1i(gl.getUniformLocation(progPressure, "uPressure"), 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, pressureFBO.read.tex);
+        blit(pressureFBO.write);
+        pressureFBO.swap();
+      }
+
+      // 5. Subtract Gradient (Velocity Projection)
+      gl.useProgram(progGradient);
+      gl.uniform1i(gl.getUniformLocation(progGradient, "uPressure"), 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, pressureFBO.read.tex);
+      gl.uniform1i(gl.getUniformLocation(progGradient, "uVelocity"), 1);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, velocityFBO.read.tex);
+      gl.uniform2f(gl.getUniformLocation(progGradient, "uTexelSize"), texel[0], texel[1]);
+      blit(velocityFBO.write);
+      velocityFBO.swap();
+    }
+
+    // Render to Screen
+    function render() {
+      if (!gl) return;
+      gl.useProgram(progDisplay);
+      gl.uniform1i(gl.getUniformLocation(progDisplay, "uDye"), 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, dyeFBO.read.tex);
+      blit(null);
+    }
+
+    // Animation Loop
+    let lastTime = performance.now();
+    function animate() {
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.033);
+      lastTime = now;
+
+      step(dt);
+      render();
+      requestAnimationFrame(animate);
+    }
+
+    // Pointer Interaction (Mouse & Touch)
+    const pointers = new Map();
+
+    function getNormalizedCoords(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (clientX - rect.left) / rect.width;
+      const y = 1.0 - (clientY - rect.top) / rect.height; // Flip Y for WebGL
+      return { x, y };
+    }
+
+    function handlePointerDown(id, clientX, clientY) {
+      const p = getNormalizedCoords(clientX, clientY);
+      pointers.set(id, { x: p.x, y: p.y, lastX: p.x, lastY: p.y });
+    }
+
+    function handlePointerMove(id, clientX, clientY) {
+      const p = pointers.get(id);
+      if (!p) return;
+      const cur = getNormalizedCoords(clientX, clientY);
+      const dx = cur.x - p.lastX;
+      const dy = cur.y - p.lastY;
+
+      if (Math.hypot(dx, dy) > 0.0001) {
+        splat(cur.x, cur.y, dx, dy, getPaletteColor());
+      }
+      p.lastX = cur.x;
+      p.lastY = cur.y;
+    }
+
+    function handlePointerUp(id) {
+      pointers.delete(id);
+    }
+
+    // Mouse Listeners
+    canvas.addEventListener("mousedown", (e) => handlePointerDown("mouse", e.clientX, e.clientY));
+    window.addEventListener("mousemove", (e) => handlePointerMove("mouse", e.clientX, e.clientY));
+    window.addEventListener("mouseup", () => handlePointerUp("mouse"));
+
+    // Touch Listeners
+    canvas.addEventListener("touchstart", (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        handlePointerDown(t.identifier, t.clientX, t.clientY);
+      }
+    }, { passive: false });
+
+    window.addEventListener("touchmove", (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        handlePointerMove(t.identifier, t.clientX, t.clientY);
+      }
+    }, { passive: false });
+
+    window.addEventListener("touchend", (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        handlePointerUp(t.identifier);
+      }
+    });
+
+    // Control Functions
+    function togglePause() {
+      isPaused = !isPaused;
+      const btn = document.getElementById("btn-pause");
+      btn.innerText = isPaused ? "▶️ 继续模拟" : "⏸️ 暂停模拟";
+    }
+
+    function clearFluid() {
+      if (!gl) return;
+      gl.useProgram(progClear);
+      gl.uniform1f(gl.getUniformLocation(progClear, "uValue"), 0.0);
+      blit(dyeFBO.write); dyeFBO.swap();
+      blit(dyeFBO.write); dyeFBO.swap();
+      blit(velocityFBO.write); velocityFBO.swap();
+      blit(velocityFBO.write); velocityFBO.swap();
+      render();
+    }
+
+    function resetParams() {
+      document.getElementById("splat-force").value = "3500";
+      document.getElementById("splat-radius").value = "25";
+      document.getElementById("dye-dissipation").value = "985";
+      document.getElementById("pressure-iter").value = "20";
+      document.getElementById("color-palette").value = "rainbow";
+      currentPalette = "rainbow";
+      updateVal('splat-force', 'val-force', '');
+      updateVal('splat-radius', 'val-radius', 'px');
+      updateVal('dye-dissipation', 'val-dissipation', '%', 0.1);
+      updateVal('pressure-iter', 'val-iter', '次');
+    }
+
+    function exportPNG() {
+      const link = document.createElement("a");
+      link.download = `fluid-simulation-${Date.now()}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    }
+
+    // Resize Handling
+    function resize() {
+      const rect = document.getElementById("canvas-box").getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+      if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
+      render();
+    }
+
+    window.addEventListener("resize", resize);
+    window.addEventListener("load", () => {
+      resize();
+      if (gl) {
+        // Initial splash
+        setTimeout(() => {
+          splat(0.5, 0.5, 0.0, 0.002, [2.0, 1.2, 0.5]);
+          splat(0.48, 0.52, 0.002, -0.001, [0.4, 1.8, 2.0]);
+        }, 100);
+        animate();
+      }
+    });
+  </script>
+</body>
+</html>

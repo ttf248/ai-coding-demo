@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pixel Flow · 图片粒子化与手势还原</title>
+  <!-- Three.js CDN -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <!-- MediaPipe Hands & Camera CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: #06080e;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      user-select: none;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    .hud-header {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      z-index: 20;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 10px 16px;
+      border-radius: 12px;
+      max-width: 340px;
+    }
+    .hud-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hud-desc {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+    .hud-controls {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 10px 16px;
+      border-radius: 30px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      max-width: 95vw;
+      overflow-x: auto;
+    }
+    .btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f8fafc;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: #38bdf8;
+    }
+    .btn.active {
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: #fff;
+      font-weight: bold;
+    }
+    /* Webcam PIP Window */
+    .webcam-pip {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      z-index: 20;
+      width: 140px;
+      height: 105px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+    }
+    .webcam-pip video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+    .pip-badge {
+      position: absolute;
+      bottom: 4px;
+      left: 4px;
+      font-size: 9px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #38bdf8;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .restore-meter {
+      position: absolute;
+      top: 135px;
+      right: 16px;
+      z-index: 20;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 11px;
+      color: #94a3b8;
+      width: 140px;
+    }
+    .progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: #1e293b;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #38bdf8, #818cf8);
+      transition: width 0.2s;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <div class="hud-header">
+    <div class="hud-title">
+      <span>✨</span> Pixel Flow 粒子流
+    </div>
+    <div class="hud-desc">
+      本地图片像素化提取 · 动态粒子涡流 · 摄像头手势识别还原
+    </div>
+  </div>
+
+  <!-- Webcam PIP View -->
+  <div class="webcam-pip" id="webcam-box">
+    <video id="webcam-video" playsinline autoplay muted></video>
+    <div class="pip-badge" id="gesture-badge">手势: 待启动</div>
+  </div>
+
+  <!-- Progress Meter -->
+  <div class="restore-meter">
+    <div style="display: flex; justify-content: space-between;">
+      <span>图像还原度</span>
+      <span id="restore-pct" style="color: #38bdf8; font-weight: bold;">0%</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div id="progress-fill" class="progress-bar-fill"></div>
+    </div>
+  </div>
+
+  <!-- Hidden File Input -->
+  <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileUpload(event)">
+
+  <!-- Controls Panel -->
+  <div class="hud-controls">
+    <button class="btn" onclick="document.getElementById('file-input').click()">📁 上传图片</button>
+    <button class="btn" onclick="loadSampleImage('galaxy')">🌌 星云样例</button>
+    <button class="btn" onclick="loadSampleImage('portrait')">👤 人像样例</button>
+    <button class="btn active" id="btn-camera" onclick="toggleCamera()">📷 启动摄像头追踪</button>
+    <button class="btn" id="btn-force-attract" onclick="toggleAttraction()">🧲 一键聚拢还原</button>
+  </div>
+
+  <script>
+    // Three.js Scene Setup
+    const container = document.getElementById("canvas-container");
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x06080e, 0.002);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1500);
+    camera.position.set(0, 0, 160);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // Particle State
+    let particleSystem = null;
+    let particleCount = 0;
+    let originalPositions = []; // Float32Array
+    let currentPositions = [];  // Float32Array
+    let targetPositions = [];   // Float32Array
+    let colors = [];            // Float32Array
+    let velocities = [];        // Float32Array
+
+    // Attraction & Gesture State
+    let attractionStrength = 0.0; // 0.0 = dispersed, 1.0 = fully restored
+    let isAttracting = false;
+    let handDetected = false;
+    let handPos = { x: 0, y: 0 };
+    let cameraRunning = false;
+
+    // Canvas for Image Sampling
+    const sampleCanvas = document.createElement("canvas");
+    const sampleCtx = sampleCanvas.getContext("2d", { willReadFrequently: true });
+
+    // Generate Default Sample: Aurora / Nebula
+    function createSampleImage(type) {
+      sampleCanvas.width = 120;
+      sampleCanvas.height = 120;
+      const w = 120, h = 120;
+      sampleCtx.clearRect(0, 0, w, h);
+
+      if (type === 'galaxy') {
+        const grad = sampleCtx.createRadialGradient(w/2, h/2, 5, w/2, h/2, 55);
+        grad.addColorStop(0, "#ffffff");
+        grad.addColorStop(0.2, "#38bdf8");
+        grad.addColorStop(0.5, "#818cf8");
+        grad.addColorStop(0.8, "#c084fc");
+        grad.addColorStop(1, "transparent");
+        sampleCtx.fillStyle = grad;
+        sampleCtx.fillRect(0, 0, w, h);
+
+        // Stars
+        sampleCtx.fillStyle = "#fff";
+        for (let i = 0; i < 40; i++) {
+          sampleCtx.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5);
+        }
+      } else {
+        // Portrait Silhouette
+        sampleCtx.fillStyle = "#0f172a";
+        sampleCtx.fillRect(0, 0, w, h);
+        const grad = sampleCtx.createLinearGradient(0, 0, w, h);
+        grad.addColorStop(0, "#f43f5e");
+        grad.addColorStop(0.5, "#fb923c");
+        grad.addColorStop(1, "#facc15");
+        sampleCtx.fillStyle = grad;
+        // Draw geometric face/circle
+        sampleCtx.beginPath();
+        sampleCtx.arc(w/2, h/2 - 5, 32, 0, Math.PI * 2);
+        sampleCtx.fill();
+        sampleCtx.fillStyle = "#38bdf8";
+        sampleCtx.beginPath();
+        sampleCtx.arc(w/2, h/2 + 35, 45, Math.PI, Math.PI * 2);
+        sampleCtx.fill();
+      }
+
+      extractParticlesFromCanvas();
+    }
+
+    // Extract Pixels into Particles
+    function extractParticlesFromCanvas() {
+      const w = sampleCanvas.width;
+      const h = sampleCanvas.height;
+      const imgData = sampleCtx.getImageData(0, 0, w, h).data;
+
+      const posList = [];
+      const origList = [];
+      const colList = [];
+      const velList = [];
+
+      const aspect = w / h;
+      const scale = 0.9;
+
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) {
+          const idx = (y * w + x) * 4;
+          const r = imgData[idx] / 255;
+          const g = imgData[idx + 1] / 255;
+          const b = imgData[idx + 2] / 255;
+          const a = imgData[idx + 3] / 255;
+
+          if (a > 0.15) {
+            // Target coordinate (Centered in 3D world)
+            const tx = (x - w / 2) * scale * aspect;
+            const ty = -(y - h / 2) * scale;
+            const tz = 0;
+
+            origList.push(tx, ty, tz);
+
+            // Initial dispersed state (Spreading out in sphere)
+            const radius = Math.random() * 80 + 30;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(Math.random() * 2 - 1);
+            posList.push(
+              radius * Math.sin(phi) * Math.cos(theta),
+              radius * Math.sin(phi) * Math.sin(theta),
+              radius * Math.cos(phi)
+            );
+
+            colList.push(r, g, b);
+            velList.push(
+              (Math.random() - 0.5) * 0.4,
+              (Math.random() - 0.5) * 0.4,
+              (Math.random() - 0.5) * 0.4
+            );
+          }
+        }
+      }
+
+      particleCount = origList.length / 3;
+      originalPositions = new Float32Array(origList);
+      currentPositions = new Float32Array(posList);
+      colors = new Float32Array(colList);
+      velocities = new Float32Array(velList);
+
+      // Create Three.js Particle Mesh
+      if (particleSystem) scene.remove(particleSystem);
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(currentPositions, 3));
+      geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+      // Circular particle texture
+      const pCanvas = document.createElement("canvas");
+      pCanvas.width = 16; pCanvas.height = 16;
+      const pCtx = pCanvas.getContext("2d");
+      const pGrad = pCtx.createRadialGradient(8, 8, 0, 8, 8, 8);
+      pGrad.addColorStop(0, "rgba(255, 255, 255, 1)");
+      pGrad.addColorStop(0.5, "rgba(255, 255, 255, 0.8)");
+      pGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+      pCtx.fillStyle = pGrad;
+      pCtx.fillRect(0, 0, 16, 16);
+      const pTex = new THREE.CanvasTexture(pCanvas);
+
+      const mat = new THREE.PointsMaterial({
+        size: 1.8,
+        vertexColors: true,
+        map: pTex,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      particleSystem = new THREE.Points(geo, mat);
+      scene.add(particleSystem);
+    }
+
+    function handleFileUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          sampleCanvas.width = 120;
+          sampleCanvas.height = 120;
+          sampleCtx.clearRect(0, 0, 120, 120);
+          sampleCtx.drawImage(img, 0, 0, 120, 120);
+          extractParticlesFromCanvas();
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function loadSampleImage(type) {
+      createSampleImage(type);
+    }
+
+    function toggleAttraction() {
+      isAttracting = !isAttracting;
+      document.getElementById("btn-force-attract").classList.toggle("active", isAttracting);
+    }
+
+    // MediaPipe Hands & Camera Integration
+    const videoElement = document.getElementById("webcam-video");
+    const gestureBadge = document.getElementById("gesture-badge");
+    let hands = null;
+    let cameraPipe = null;
+
+    function initMediaPipe() {
+      if (typeof Hands === "undefined") {
+        gestureBadge.innerText = "手势库离线: 鼠标交互可用";
+        return;
+      }
+
+      hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      });
+
+      hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+
+      hands.onResults((results) => {
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+          handDetected = true;
+          const landmarks = results.multiHandLandmarks[0];
+
+          // Compute Open Palm vs Closed Fist
+          // Compare distance between fingertips and wrist (landmark 0)
+          const wrist = landmarks[0];
+          const tip8 = landmarks[8];   // Index finger
+          const tip12 = landmarks[12]; // Middle finger
+          const tip16 = landmarks[16]; // Ring finger
+          const tip20 = landmarks[20]; // Pinky
+
+          const avgDist = (
+            Math.hypot(tip8.x - wrist.x, tip8.y - wrist.y) +
+            Math.hypot(tip12.x - wrist.x, tip12.y - wrist.y) +
+            Math.hypot(tip16.x - wrist.x, tip16.y - wrist.y) +
+            Math.hypot(tip20.x - wrist.x, tip20.y - wrist.y)
+          ) / 4;
+
+          // Hand position normalized (-1 to 1)
+          handPos.x = (landmarks[9].x - 0.5) * -120;
+          handPos.y = (landmarks[9].y - 0.5) * -80;
+
+          if (avgDist > 0.35) {
+            // Open Palm -> Attract particles to reconstruct image
+            isAttracting = true;
+            gestureBadge.innerText = "手势: 张开手掌 (凝聚还原)";
+            gestureBadge.style.color = "#4ade80";
+          } else {
+            // Fist -> Disperse particles
+            isAttracting = false;
+            gestureBadge.innerText = "手势: 握拳 (释放飘散)";
+            gestureBadge.style.color = "#f87171";
+          }
+        } else {
+          handDetected = false;
+          gestureBadge.innerText = "手势: 未检测到手部";
+          gestureBadge.style.color = "#94a3b8";
+        }
+      });
+    }
+
+    function toggleCamera() {
+      const btn = document.getElementById("btn-camera");
+      if (!cameraRunning) {
+        if (!hands) initMediaPipe();
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } })
+            .then((stream) => {
+              videoElement.srcObject = stream;
+              cameraRunning = true;
+              btn.classList.add("active");
+              btn.innerText = "📷 关闭摄像头";
+
+              if (typeof Camera !== "undefined" && hands) {
+                cameraPipe = new Camera(videoElement, {
+                  onFrame: async () => {
+                    await hands.send({ image: videoElement });
+                  },
+                  width: 320,
+                  height: 240
+                });
+                cameraPipe.start();
+              }
+            })
+            .catch((err) => {
+              alert("无法访问摄像头或权限被拒绝。已切换为鼠标拖拽交互模式。");
+              console.warn(err);
+            });
+        }
+      } else {
+        if (videoElement.srcObject) {
+          videoElement.srcObject.getTracks().forEach(t => t.stop());
+        }
+        cameraRunning = false;
+        btn.classList.remove("active");
+        btn.innerText = "📷 启动摄像头追踪";
+        gestureBadge.innerText = "手势: 已关闭";
+      }
+    }
+
+    // Mouse & Touch Attraction Interaction (Backup when no camera)
+    let isMouseDown = false;
+    let mousePos3D = new THREE.Vector3(0, 0, 0);
+
+    window.addEventListener("mousedown", () => {
+      isMouseDown = true;
+      if (!cameraRunning) isAttracting = true;
+    });
+
+    window.addEventListener("mouseup", () => {
+      isMouseDown = false;
+      if (!cameraRunning && !document.getElementById("btn-force-attract").classList.contains("active")) {
+        isAttracting = false;
+      }
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      const mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+      const mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+      mousePos3D.set(mouseX * 80, mouseY * 50, 0);
+    });
+
+    // Touch Support
+    window.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 1) {
+        isMouseDown = true;
+        if (!cameraRunning) isAttracting = true;
+      }
+    });
+
+    window.addEventListener("touchend", () => {
+      isMouseDown = false;
+      if (!cameraRunning && !document.getElementById("btn-force-attract").classList.contains("active")) {
+        isAttracting = false;
+      }
+    });
+
+    // Animation Loop
+    let clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const time = clock.getElapsedTime();
+
+      // Smoothly adjust attraction level
+      const targetAttraction = isAttracting ? 1.0 : 0.0;
+      attractionStrength += (targetAttraction - attractionStrength) * 0.05;
+
+      document.getElementById("restore-pct").innerText = `${Math.round(attractionStrength * 100)}%`;
+      document.getElementById("progress-fill").style.width = `${attractionStrength * 100}%`;
+
+      if (particleSystem && currentPositions.length > 0) {
+        const positions = particleSystem.geometry.attributes.position.array;
+
+        for (let i = 0; i < particleCount; i++) {
+          const i3 = i * 3;
+          const origX = originalPositions[i3];
+          const origY = originalPositions[i3 + 1];
+          const origZ = originalPositions[i3 + 2];
+
+          // Swirling cosmic vortex dynamics
+          const curX = positions[i3];
+          const curY = positions[i3 + 1];
+          const curZ = positions[i3 + 2];
+
+          // Noise swirl force
+          const angle = time * 0.6 + curY * 0.02;
+          const swirlX = Math.cos(angle) * 0.6;
+          const swirlY = Math.sin(angle * 1.2) * 0.6;
+          const swirlZ = Math.sin(angle * 0.8) * 0.6;
+
+          // Interpolate between Vortex Swirl and Target Original Pixel
+          const destX = origX + (handDetected ? handPos.x * 0.1 : 0);
+          const destY = origY + (handDetected ? handPos.y * 0.1 : 0);
+          const destZ = origZ;
+
+          // Physics update
+          positions[i3 + 0] += (destX - curX) * (0.04 + attractionStrength * 0.12) + swirlX * (1.0 - attractionStrength);
+          positions[i3 + 1] += (destY - curY) * (0.04 + attractionStrength * 0.12) + swirlY * (1.0 - attractionStrength);
+          positions[i3 + 2] += (destZ - curZ) * (0.04 + attractionStrength * 0.12) + swirlZ * (1.0 - attractionStrength);
+        }
+
+        particleSystem.geometry.attributes.position.needsUpdate = true;
+        // Subtle tilt
+        particleSystem.rotation.y = Math.sin(time * 0.2) * 0.08 * (1.0 - attractionStrength);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // Resize
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Start with Galaxy sample
+    window.addEventListener("load", () => {
+      loadSampleImage('galaxy');
+      animate();
+    });
+  </script>
+</body>
+</html>

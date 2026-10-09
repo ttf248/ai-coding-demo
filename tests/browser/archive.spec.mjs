@@ -19,6 +19,7 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
   await expect(page.locator("#provider option")).toHaveText([
     "全部厂商",
     "Anthropic",
+    "GitHub Copilot",
     "MiniMax",
     "OpenAI",
     "未记录 / 多轮混合",
@@ -27,10 +28,17 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
     await page
       .locator("#model optgroup")
       .evaluateAll((groups) => groups.map((g) => g.label)),
-  ).toEqual(["Anthropic", "MiniMax", "OpenAI", "未记录 / 多轮混合"]);
+  ).toEqual([
+    "Anthropic",
+    "GitHub Copilot",
+    "MiniMax",
+    "OpenAI",
+    "未记录 / 多轮混合",
+  ]);
   await expect(page.locator("#model option")).toHaveText([
     "全部模型",
     "Claude 4.0",
+    "Gemini 3.8 Flash",
     "MiniMax M3.1 Flash Preview",
     "MiniMax M3",
     "MiniMax M2.1",
@@ -55,6 +63,11 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
   );
   await page.reload();
   await expect(page.locator("#provider")).toHaveValue("MiniMax");
+  await page.locator("#model").selectOption("");
+  await page.locator("#provider").selectOption("GitHub Copilot");
+  await expect(page.locator("#result-count")).toContainText("11 条匹配记录");
+  await page.locator("#model").selectOption("gemini-3-8-flash");
+  await expect(page.locator("#result-count")).toContainText("11 条匹配记录");
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(

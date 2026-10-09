@@ -7,6 +7,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
+| [体素微缩建筑工地沙盘](../../demos/voxel-construction-site/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](../../demos/voxel-construction-site/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](../../demos/voxel-construction-site/runs/gemini-3-8-flash-high-r01/index.html) |
 | [体素微缩建筑工地](../../demos/voxel-construction-site/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v1](../../demos/voxel-construction-site/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](../../demos/voxel-construction-site/runs/gpt-5-6-luna-max-r01/index.html) |
 | [筑境工地 · GPT 5.6 Sol High](../../demos/voxel-construction-site/runs/gpt-5-6-sol-high-r01/Readme.md) | GPT-5.6 Sol / high | 2026-09-15 | [v1](../../demos/voxel-construction-site/runs/gpt-5-6-sol-high-r01/prompt.md) | [打开](../../demos/voxel-construction-site/runs/gpt-5-6-sol-high-r01/index.html) |
 | [工作台 07 · 体素施工沙盘](../../demos/voxel-construction-site/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v1](../../demos/voxel-construction-site/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](../../demos/voxel-construction-site/runs/gpt-6-1-sol-max-r01/index.html) |

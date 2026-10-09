@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>3D 新哥特式塔楼城市 · 可漫游微缩沙盘</title>
+  <!-- Three.js CDN -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: #05070b;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cinzel", "Times New Roman", serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      user-select: none;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    .hud-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      pointer-events: none;
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      z-index: 10;
+    }
+    .title-panel {
+      background: rgba(10, 14, 23, 0.75);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      backdrop-filter: blur(8px);
+      padding: 10px 16px;
+      border-radius: 8px;
+      pointer-events: auto;
+      max-width: 320px;
+    }
+    .title-panel h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #f1d78a;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .title-panel p {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+    .controls-panel {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 14, 23, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      padding: 8px 12px;
+      border-radius: 30px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      max-width: 95vw;
+      overflow-x: auto;
+    }
+    .btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #cbd5e1;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      background: rgba(212, 175, 55, 0.25);
+      color: #fef08a;
+      border-color: rgba(212, 175, 55, 0.5);
+    }
+    .btn.active {
+      background: #ca8a04;
+      color: #0f172a;
+      font-weight: bold;
+      border-color: #eab308;
+    }
+    .hud-hint {
+      position: absolute;
+      bottom: 64px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: #94a3b8;
+      background: rgba(0,0,0,0.5);
+      padding: 3px 8px;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <div class="hud-overlay">
+    <div class="title-panel">
+      <h1>🏰 新哥特式塔楼城市</h1>
+      <p>3D 真实比例重构 · 海浪潮涌 · 火焰飞烬 · 自由多视角漫游</p>
+    </div>
+  </div>
+
+  <div class="hud-hint">
+    拖拽鼠标或触控滑屏环视 · 滚轮缩放 · 键盘 WASD 移动
+  </div>
+
+  <div class="controls-panel">
+    <button class="btn active" id="btn-orbit" onclick="setCameraMode('orbit')">🎥 电影巡航</button>
+    <button class="btn" id="btn-fly" onclick="setCameraMode('fly')">🦅 穿梭掠影</button>
+    <button class="btn" id="btn-overlook" onclick="setCameraMode('overlook')">🗼 塔尖俯瞰</button>
+    <button class="btn" id="btn-roam" onclick="setCameraMode('roam')">🚶 自由漫步</button>
+    <button class="btn" onclick="toggleMoon()">🌕 月色切换</button>
+  </div>
+
+  <script>
+    // Scene, Camera, Renderer
+    const container = document.getElementById("canvas-container");
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x070b14, 0.0035);
+
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 2000);
+    camera.position.set(0, 70, 240);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0x1a2436, 1.2);
+    scene.add(ambientLight);
+
+    const moonLight = new THREE.DirectionalLight(0xa5c4e8, 2.2);
+    moonLight.position.set(150, 250, 100);
+    moonLight.castShadow = true;
+    moonLight.shadow.mapSize.width = 1024;
+    moonLight.shadow.mapSize.height = 1024;
+    moonLight.shadow.camera.near = 10;
+    moonLight.shadow.camera.far = 600;
+    const d = 160;
+    moonLight.shadow.camera.left = -d;
+    moonLight.shadow.camera.right = d;
+    moonLight.shadow.camera.top = d;
+    moonLight.shadow.camera.bottom = -d;
+    scene.add(moonLight);
+
+    // Warm Interior & Brazier Lights
+    const torchLight = new THREE.PointLight(0xff7722, 3.5, 120);
+    torchLight.position.set(0, 45, 0);
+    scene.add(torchLight);
+
+    // Gothic Materials
+    const darkStoneMat = new THREE.MeshStandardMaterial({
+      color: 0x22262d,
+      roughness: 0.85,
+      metalness: 0.15
+    });
+
+    const lightStoneMat = new THREE.MeshStandardMaterial({
+      color: 0x3d434d,
+      roughness: 0.75,
+      metalness: 0.1
+    });
+
+    const goldTrimMat = new THREE.MeshStandardMaterial({
+      color: 0xcca040,
+      roughness: 0.4,
+      metalness: 0.6
+    });
+
+    const stainedGlassMat = new THREE.MeshBasicMaterial({
+      color: 0xffaa33
+    });
+
+    const windowGlowMat = new THREE.MeshBasicMaterial({
+      color: 0xff8822
+    });
+
+    // 1. Procedural Gothic City Generation
+    const cityGroup = new THREE.Group();
+    scene.add(cityGroup);
+
+    // Foundation Cliff & Sea Rocks
+    const cliffGeo = new THREE.CylinderGeometry(140, 160, 40, 16);
+    const cliff = new THREE.Mesh(cliffGeo, darkStoneMat);
+    cliff.position.y = -20;
+    cliff.receiveShadow = true;
+    cityGroup.add(cliff);
+
+    // Helper: Create Gothic Tower
+    function createGothicTower(x, z, height, radius, hasSpire = true) {
+      const towerGroup = new THREE.Group();
+      towerGroup.position.set(x, 0, z);
+
+      // Base Shaft
+      const shaftGeo = new THREE.CylinderGeometry(radius * 0.85, radius, height, 8);
+      const shaft = new THREE.Mesh(shaftGeo, darkStoneMat);
+      shaft.position.y = height / 2;
+      shaft.castShadow = true;
+      shaft.receiveShadow = true;
+      towerGroup.add(shaft);
+
+      // Buttresses around tower
+      for (let i = 0; i < 4; i++) {
+        const angle = (i * Math.PI) / 2;
+        const buttressGeo = new THREE.BoxGeometry(radius * 0.4, height * 0.7, radius * 0.6);
+        const buttress = new THREE.Mesh(buttressGeo, lightStoneMat);
+        buttress.position.set(
+          Math.cos(angle) * (radius * 0.95),
+          height * 0.35,
+          Math.sin(angle) * (radius * 0.95)
+        );
+        buttress.castShadow = true;
+        towerGroup.add(buttress);
+      }
+
+      // Tower Balcony Gallery
+      const balconyGeo = new THREE.CylinderGeometry(radius * 1.15, radius * 0.9, 4, 8);
+      const balcony = new THREE.Mesh(balconyGeo, goldTrimMat);
+      balcony.position.y = height + 2;
+      towerGroup.add(balcony);
+
+      // Glowing Windows
+      for (let w = 0; w < 3; w++) {
+        const winGeo = new THREE.BoxGeometry(0.8, 4.5, 0.3);
+        const win = new THREE.Mesh(winGeo, windowGlowMat);
+        win.position.set(0, height * 0.3 + w * 12, radius * 0.9);
+        towerGroup.add(win);
+      }
+
+      // Spire & Pinnacles
+      if (hasSpire) {
+        const spireH = height * 0.6;
+        const spireGeo = new THREE.ConeGeometry(radius * 0.85, spireH, 8);
+        const spire = new THREE.Mesh(spireGeo, lightStoneMat);
+        spire.position.y = height + 4 + spireH / 2;
+        spire.castShadow = true;
+        towerGroup.add(spire);
+
+        // Gold Cross / Pinnacle Finial
+        const finialGeo = new THREE.OctahedronGeometry(radius * 0.25);
+        const finial = new THREE.Mesh(finialGeo, goldTrimMat);
+        finial.position.y = height + 4 + spireH;
+        towerGroup.add(finial);
+      }
+
+      cityGroup.add(towerGroup);
+      return towerGroup;
+    }
+
+    // Main Central Cathedral
+    const mainCathedral = new THREE.Group();
+    // Central Nave
+    const naveGeo = new THREE.BoxGeometry(36, 55, 75);
+    const nave = new THREE.Mesh(naveGeo, darkStoneMat);
+    nave.position.set(0, 27.5, 0);
+    nave.castShadow = true;
+    nave.receiveShadow = true;
+    mainCathedral.add(nave);
+
+    // Rose Window
+    const roseGeo = new THREE.TorusGeometry(8, 1.2, 8, 24);
+    const roseFrame = new THREE.Mesh(roseGeo, goldTrimMat);
+    roseFrame.position.set(0, 40, 38);
+    mainCathedral.add(roseFrame);
+
+    const roseGlassGeo = new THREE.CircleGeometry(7.5, 16);
+    const roseGlass = new THREE.Mesh(roseGlassGeo, stainedGlassMat);
+    roseGlass.position.set(0, 40, 37.8);
+    mainCathedral.add(roseGlass);
+
+    // Twin Front High Spires
+    createGothicTower(-16, 38, 95, 7.5);
+    createGothicTower(16, 38, 95, 7.5);
+
+    // Central Crossing Giant Spire (Height 150m)
+    createGothicTower(0, 0, 140, 11);
+
+    // Flying Buttresses
+    for (let side = -1; side <= 1; side += 2) {
+      for (let b = -2; b <= 2; b++) {
+        const archGeo = new THREE.TorusGeometry(12, 1.2, 6, 12, Math.PI / 2);
+        const arch = new THREE.Mesh(archGeo, lightStoneMat);
+        arch.position.set(side * 24, 32, b * 14);
+        arch.rotation.z = side > 0 ? 0 : Math.PI;
+        arch.rotation.x = Math.PI / 2;
+        mainCathedral.add(arch);
+      }
+    }
+    cityGroup.add(mainCathedral);
+
+    // Surrounding Tower Ring & Connecting Bridges
+    const ringTowers = [
+      { x: -55, z: -35, h: 70, r: 6 },
+      { x: 55, z: -35, h: 75, r: 6 },
+      { x: -65, z: 25, h: 65, r: 5.5 },
+      { x: 65, z: 25, h: 68, r: 5.5 },
+      { x: 0, z: -65, h: 80, r: 7 },
+      { x: -35, z: 65, h: 55, r: 5 },
+      { x: 35, z: 65, h: 55, r: 5 }
+    ];
+
+    ringTowers.forEach(t => createGothicTower(t.x, t.z, t.h, t.r));
+
+    // High Suspended Bridges
+    function createBridge(x1, z1, x2, z2, y) {
+      const length = Math.hypot(x2 - x1, z2 - z1);
+      const angle = Math.atan2(z2 - z1, x2 - x1);
+      const bridgeGeo = new THREE.BoxGeometry(length, 3, 4);
+      const bridge = new THREE.Mesh(bridgeGeo, lightStoneMat);
+      bridge.position.set((x1 + x2) / 2, y, (z1 + z2) / 2);
+      bridge.rotation.y = -angle;
+      bridge.castShadow = true;
+      cityGroup.add(bridge);
+    }
+    createBridge(-55, -35, 0, -65, 45);
+    createBridge(55, -35, 0, -65, 45);
+    createBridge(-65, 25, -35, 65, 35);
+    createBridge(65, 25, 35, 65, 35);
+
+    // 2. Animated Ocean Waves
+    const oceanGeo = new THREE.PlaneGeometry(1200, 1200, 64, 64);
+    oceanGeo.rotateX(-Math.PI / 2);
+    const oceanPos = oceanGeo.attributes.position;
+    const oceanInitialY = new Float32Array(oceanPos.count);
+    for (let i = 0; i < oceanPos.count; i++) {
+      oceanInitialY[i] = oceanPos.getY(i);
+    }
+
+    const oceanMat = new THREE.MeshStandardMaterial({
+      color: 0x051324,
+      roughness: 0.25,
+      metalness: 0.8,
+      flatShading: true
+    });
+    const ocean = new THREE.Mesh(oceanGeo, oceanMat);
+    ocean.position.y = -2;
+    ocean.receiveShadow = true;
+    scene.add(ocean);
+
+    // 3. Fire & Rising Embers Particle System
+    const emberCount = 500;
+    const emberGeo = new THREE.BufferGeometry();
+    const emberPositions = new Float32Array(emberCount * 3);
+    const emberVelocities = new Float32Array(emberCount * 3);
+
+    for (let i = 0; i < emberCount; i++) {
+      emberPositions[i * 3 + 0] = (Math.random() - 0.5) * 120;
+      emberPositions[i * 3 + 1] = Math.random() * 80 + 5;
+      emberPositions[i * 3 + 2] = (Math.random() - 0.5) * 120;
+
+      emberVelocities[i * 3 + 0] = (Math.random() - 0.5) * 0.2;
+      emberVelocities[i * 3 + 1] = Math.random() * 0.4 + 0.2;
+      emberVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.2;
+    }
+    emberGeo.setAttribute("position", new THREE.BufferAttribute(emberPositions, 3));
+
+    // Particle sprite canvas
+    const pCanvas = document.createElement("canvas");
+    pCanvas.width = 16; pCanvas.height = 16;
+    const pCtx = pCanvas.getContext("2d");
+    const pGrad = pCtx.createRadialGradient(8, 8, 0, 8, 8, 8);
+    pGrad.addColorStop(0, "rgba(255, 180, 50, 1)");
+    pGrad.addColorStop(0.5, "rgba(255, 70, 0, 0.7)");
+    pGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    pCtx.fillStyle = pGrad;
+    pCtx.fillRect(0, 0, 16, 16);
+    const pTexture = new THREE.CanvasTexture(pCanvas);
+
+    const emberMat = new THREE.PointsMaterial({
+      size: 2.2,
+      map: pTexture,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const embers = new THREE.Points(emberGeo, emberMat);
+    scene.add(embers);
+
+    // 4. Camera Modes & Interaction
+    let cameraMode = 'orbit'; // 'orbit', 'fly', 'overlook', 'roam'
+    let orbitAngle = 0;
+    let bloodMoon = false;
+
+    function setCameraMode(mode) {
+      cameraMode = mode;
+      document.querySelectorAll(".controls-panel button").forEach(b => b.classList.remove("active"));
+      if (mode === 'orbit') document.getElementById("btn-orbit").classList.add("active");
+      if (mode === 'fly') document.getElementById("btn-fly").classList.add("active");
+      if (mode === 'overlook') document.getElementById("btn-overlook").classList.add("active");
+      if (mode === 'roam') document.getElementById("btn-roam").classList.add("active");
+
+      if (mode === 'overlook') {
+        camera.position.set(0, 175, 40);
+        camera.lookAt(0, 50, 0);
+      } else if (mode === 'roam') {
+        camera.position.set(0, 32, 70);
+        camera.lookAt(0, 45, 0);
+      }
+    }
+
+    function toggleMoon() {
+      bloodMoon = !bloodMoon;
+      if (bloodMoon) {
+        scene.fog.color.setHex(0x1a0709);
+        moonLight.color.setHex(0xff3322);
+        ambientLight.color.setHex(0x2a0d11);
+      } else {
+        scene.fog.color.setHex(0x070b14);
+        moonLight.color.setHex(0xa5c4e8);
+        ambientLight.color.setHex(0x1a2436);
+      }
+    }
+
+    // Pointer Dragging for Viewport Orbit/Pan
+    let isPointerDown = false;
+    let prevMouseX = 0, prevMouseY = 0;
+    let spherical = { radius: 240, theta: 0.3, phi: 1.1 };
+
+    window.addEventListener("mousedown", (e) => {
+      isPointerDown = true;
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isPointerDown) return;
+      const dx = e.clientX - prevMouseX;
+      const dy = e.clientY - prevMouseY;
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
+
+      spherical.theta -= dx * 0.005;
+      spherical.phi = Math.max(0.2, Math.min(Math.PI / 2 - 0.05, spherical.phi - dy * 0.005));
+    });
+
+    window.addEventListener("mouseup", () => isPointerDown = false);
+
+    // Touch Support
+    window.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 1) {
+        isPointerDown = true;
+        prevMouseX = e.touches[0].clientX;
+        prevMouseY = e.touches[0].clientY;
+      }
+    });
+
+    window.addEventListener("touchmove", (e) => {
+      if (!isPointerDown || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - prevMouseX;
+      const dy = e.touches[0].clientY - prevMouseY;
+      prevMouseX = e.touches[0].clientX;
+      prevMouseY = e.touches[0].clientY;
+
+      spherical.theta -= dx * 0.006;
+      spherical.phi = Math.max(0.2, Math.min(Math.PI / 2 - 0.05, spherical.phi - dy * 0.006));
+    });
+
+    window.addEventListener("touchend", () => isPointerDown = false);
+
+    // Wheel Zoom
+    window.addEventListener("wheel", (e) => {
+      spherical.radius = Math.max(60, Math.min(500, spherical.radius + e.deltaY * 0.15));
+    });
+
+    // Animation Loop
+    let clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const time = clock.getElapsedTime();
+
+      // 1. Animate Ocean Waves
+      const count = oceanPos.count;
+      for (let i = 0; i < count; i++) {
+        const x = oceanPos.getX(i);
+        const z = oceanPos.getZ(i);
+        // Swell synthesis
+        const wave = Math.sin(x * 0.02 + time * 1.5) * 2.2 +
+                     Math.cos(z * 0.025 + time * 1.2) * 1.8 +
+                     Math.sin((x + z) * 0.03 + time * 2.0) * 1.2;
+        oceanPos.setY(i, oceanInitialY[i] + wave);
+      }
+      oceanPos.needsUpdate = true;
+      oceanGeo.computeVertexNormals();
+
+      // 2. Animate Embers
+      const positions = emberGeo.attributes.position.array;
+      for (let i = 0; i < emberCount; i++) {
+        positions[i * 3 + 0] += emberVelocities[i * 3 + 0];
+        positions[i * 3 + 1] += emberVelocities[i * 3 + 1];
+        positions[i * 3 + 2] += emberVelocities[i * 3 + 2];
+
+        // Reset if reached height
+        if (positions[i * 3 + 1] > 140) {
+          positions[i * 3 + 0] = (Math.random() - 0.5) * 100;
+          positions[i * 3 + 1] = 10;
+          positions[i * 3 + 2] = (Math.random() - 0.5) * 100;
+        }
+      }
+      emberGeo.attributes.position.needsUpdate = true;
+
+      // 3. Torch Light Flicker
+      torchLight.intensity = 3.0 + Math.sin(time * 12) * 0.5 + Math.cos(time * 23) * 0.3;
+
+      // 4. Camera Animation based on Mode
+      if (cameraMode === 'orbit') {
+        if (!isPointerDown) {
+          orbitAngle += 0.003;
+          spherical.theta = orbitAngle;
+        }
+        camera.position.x = spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
+        camera.position.y = spherical.radius * Math.cos(spherical.phi);
+        camera.position.z = spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+        camera.lookAt(0, 45, 0);
+      } else if (cameraMode === 'fly') {
+        const flyR = 120 + Math.sin(time * 0.4) * 40;
+        camera.position.x = Math.sin(time * 0.35) * flyR;
+        camera.position.y = 45 + Math.sin(time * 0.6) * 25;
+        camera.position.z = Math.cos(time * 0.35) * flyR;
+        camera.lookAt(0, 50 + Math.sin(time * 0.5) * 10, 0);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // Resize
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+  </script>
+</body>
+</html>

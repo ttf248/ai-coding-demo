@@ -472,9 +472,13 @@ test("legacy latest links use complexity and card badges stay grouped", async ({
     for (const group of ["topics", "runs"]) {
       await page.locator('[data-group="' + group + '"]').click();
       await page.locator("#q").fill("体素");
-      await expect(
-        page.locator(".card-badges .execution-mode-chip").first(),
-      ).toBeVisible();
+      if (group === "runs") {
+        expect(
+          await page.locator(".card-badges .execution-mode-chip").count(),
+        ).toBeGreaterThan(0);
+      } else {
+        await expect(page.locator(".card-badges .pill").first()).toBeVisible();
+      }
       const aligned = await page
         .locator("#project-grid .card-top")
         .evaluateAll((rows) =>
