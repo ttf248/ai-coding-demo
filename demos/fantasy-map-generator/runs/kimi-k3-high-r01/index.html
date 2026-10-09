@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>奇幻地图生成器</title>
+<style>
+  :root{--bg:#efe9dc;--panel:#fbf7ee;--ink:#3d3427;--muted:#8a7c64;--line:#d8cdb8;--accent:#7a5c2e;--danger:#b3352b;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--ink);font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;}
+  header{padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+  header h1{font-size:18px;margin-right:auto;}
+  #status{font-size:13px;padding:4px 10px;border-radius:6px;background:#f0e9da;color:var(--muted);}
+  #status.err{background:#f8e3e0;color:var(--danger);}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);align-items:center;font-size:13px;}
+  button,select,input[type=text]{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);background:#fffdf8;border-radius:6px;cursor:pointer;color:var(--ink);}
+  input[type=text]{cursor:text;width:130px;}
+  button:hover{border-color:var(--accent);color:var(--accent);}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  button.active{background:#e9ddc4;border-color:var(--accent);color:var(--accent);}
+  label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;}
+  main{flex:1;display:flex;gap:10px;padding:10px;flex-wrap:wrap;}
+  #mapWrap{flex:1 1 520px;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative;}
+  #map{display:block;width:100%;height:540px;touch-action:none;cursor:grab;}
+  aside{flex:0 1 280px;min-width:240px;display:flex;flex-direction:column;gap:10px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;}
+  .card h2{font-size:14px;margin-bottom:8px;color:var(--muted);}
+  .legend div{display:flex;align-items:center;gap:8px;padding:2px 0;font-size:12px;}
+  .sw{width:16px;height:16px;border-radius:3px;border:1px solid rgba(0,0,0,.2);flex:none;}
+  .hint{font-size:12px;color:var(--muted);line-height:1.7;}
+  footer{padding:8px 14px;font-size:12px;color:var(--muted);}
+  @media (max-width:760px){#map{height:420px;}aside{flex:1 1 100%;min-width:0;}}
+</style>
+</head>
+<body>
+<header>
+  <h1>奇幻地图生成器</h1>
+  <div id="status">就绪</div>
+</header>
+<div class="toolbar">
+  <label>种子 <input type="text" id="seed" value="Avalon-07"></label>
+  <button id="regen" class="primary">重新生成</button>
+  <button id="randSeed">随机种子</button>
+  <label>海平面 <input type="range" id="sea" min="20" max="60" value="38" style="width:80px"></label>
+  <label>粗糙度 <input type="range" id="rough" min="0" max="100" value="50" style="width:80px"></label>
+</div>
+<div class="toolbar">
+  <span style="font-size:12px;color:var(--muted)">工具：</span>
+  <button data-tool="pan" class="active">平移</button>
+  <button data-tool="raise">抬升地形</button>
+  <button data-tool="lower">降低地形</button>
+  <label>画笔 <input type="range" id="brush" min="2" max="14" value="6" style="width:70px"></label>
+  <label><input type="checkbox" id="showTowns" checked> 城镇标签</label>
+  <span style="flex:0 0 8px"></span>
+  <button id="zoomOut">－</button>
+  <button id="zoomIn">＋</button>
+  <button id="resetView">重置视角</button>
+  <button id="exportPng">导出 PNG</button>
+</div>
+<main>
+  <div id="mapWrap"><canvas id="map"></canvas></div>
+  <aside>
+    <div class="card legend">
+      <h2>图例</h2>
+      <div><i class="sw" style="background:#31587e"></i>海洋</div>
+      <div><i class="sw" style="background:#4f7ba0"></i>浅海</div>
+      <div><i class="sw" style="background:#e3d3a5"></i>海岸</div>
+      <div><i class="sw" style="background:#9db173"></i>平原</div>
+      <div><i class="sw" style="background:#5d7f4a"></i>森林</div>
+      <div><i class="sw" style="background:#8d8578"></i>山脉</div>
+      <div><i class="sw" style="background:#6f93b8"></i>河流 / 内陆湖</div>
+      <div><i class="sw" style="background:#8c3b2e"></i>城镇</div>
+    </div>
+    <div class="card hint">
+      操作说明：相同种子与参数会生成相同地图。选择“平移”拖动地图、滚轮或双指缩放；选择“抬升/降低地形”后在地图上涂抹，海岸、河流与城镇会随之更新。河流沿地势下降流向海洋或形成合理的内陆水体，不会穿越山峰。首屏即为可操作的默认地图。
+    </div>
+    <div class="card hint">
+      地形统计：<span id="stats">—</span>
+    </div>
+  </aside>
+</main>
+<footer>纯静态单文件 · 无网络依赖 · 支持鼠标与触摸 · 手绘风格渲染</footer>
+<script>
+(function(){
+"use strict";
+var W=176, H=124; // 网格分辨率
+var canvas=document.getElementById('map'), ctx=canvas.getContext('2d');
+var statusEl=document.getElementById('status');
+var heightMap=new Float32Array(W*H);
+var cellType=new Uint8Array(W*H); // 0 海洋 1 浅海 2 海岸 3 平原 4 森林 5 山脉 6 河流 7 湖
+var towns=[];
+var seaLevel=0.38, rough=0.5;
+var view={cx:W/2, cy:H/2, scale:6};
+var dpr=1, cw=800, ch=540;
+var tool='pan';
+function setStatus(msg, cls){ statusEl.textContent=msg; statusEl.className=cls||''; }
+var baseCanvas=document.createElement('canvas'); baseCanvas.width=W; baseCanvas.height=H;
+var baseCtx=baseCanvas.getContext('2d');
+var decorSeed=1;
+
+/* ---------- 确定性随机 ---------- */
+function hashStr(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ---------- 值噪声 + fBm ---------- */
+function makeNoise(seed){
+  var perm=new Uint8Array(512);
+  var rnd=mulberry32(seed);
+  var p=new Uint8Array(256);
+  for(var i=0;i<256;i++)p[i]=i;
+  for(var i2=255;i2>0;i2--){var j=(rnd()*(i2+1))|0;var t=p[i2];p[i2]=p[j];p[j]=t;}
+  for(var k=0;k<512;k++)perm[k]=p[k&255];
+  function lat(ix,iy){return perm[(perm[ix&255]+iy)&255]/255;}
+  function smooth(t){return t*t*(3-2*t);}
+  function noise(x,y){
+    var ix=Math.floor(x), iy=Math.floor(y), fx=x-ix, fy=y-iy;
+    var a=lat(ix,iy),b=lat(ix+1,iy),c=lat(ix,iy+1),d=lat(ix+1,iy+1);
+    var u=smooth(fx),v=smooth(fy);
+    return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;
+  }
+  return function fbm(x,y,oct,pers){
+    var amp=1,f=1,sum=0,norm=0;
+    for(var o=0;o<oct;o++){sum+=amp*noise(x*f,y*f);norm+=amp;amp*=pers;f*=2;}
+    return sum/norm;
+  };
+}
+
+/* ---------- 地图生成 ---------- */
+function generate(seedText){
+  var seed=hashStr(seedText||'default');
+  decorSeed=seed;
+  var fbm=makeNoise(seed);
+  var fbm2=makeNoise(seed^0x9e3779b9);
+  var oct=3+Math.round(rough*4);
+  var pers=0.35+rough*0.35;
+  for(var y=0;y<H;y++)for(var x=0;x<W;x++){
+    var nx=x/W*6, ny=y/H*6;
+    var e=fbm(nx,ny,oct,pers);
+    // 岛屿径向衰减，保证四周为海洋
+    var dx=x/W-0.5, dy=y/H-0.5;
+    var d=Math.sqrt(dx*dx+dy*dy)*2;
+    var fall=Math.max(0, 1-Math.pow(d,2.6));
+    var h=e*0.75+fall*0.45-0.12;
+    // 湿度通道（低频率独立噪声）
+    heightMap[y*W+x]=h;
+    moisture[y*W+x]=fbm2(nx*0.7+13,ny*0.7+7,3,0.5);
+  }
+  classify();
+  buildRivers(seed);
+  placeTowns(seed);
+  renderBase();
+  updateStats();
+  draw();
+}
+var moisture=new Float32Array(W*H);
+
+function classify(){
+  var coast=seaLevel+0.025, plainHi=seaLevel+0.16, forestHi=seaLevel+0.34;
+  for(var i=0;i<W*H;i++){
+    var h=heightMap[i];
+    if(h<seaLevel-0.04) cellType[i]=0;
+    else if(h<seaLevel) cellType[i]=1;
+    else if(h<coast) cellType[i]=2;
+    else if(h>forestHi) cellType[i]=5;
+    else if(h>plainHi && moisture[i]>0.46) cellType[i]=4;
+    else cellType[i]=3;
+  }
+}
+
+/* ---------- 河流：沿最陡下降流向海洋，局部低洼形成内陆湖 ---------- */
+function buildRivers(seed){
+  // 清除旧河流/湖泊
+  for(var i=0;i<W*H;i++) if(cellType[i]===6||cellType[i]===7){
+    var h=heightMap[i];
+    cellType[i]= h<seaLevel? (h<seaLevel-0.04?0:1) : (h<seaLevel+0.025?2:(h>seaLevel+0.34?5:(h>seaLevel+0.16&&moisture[i]>0.46?4:3)));
+  }
+  var rnd=mulberry32(seed^0x51ab);
+  var candidates=[];
+  for(var y=1;y<H-1;y++)for(var x=1;x<W-1;x++){
+    if(cellType[y*W+x]===5) candidates.push([x,y]);
+  }
+  // 确定性挑选泉眼
+  for(var s=0;s<26 && candidates.length;s++){
+    var c=candidates.splice((rnd()*candidates.length)|0,1)[0];
+    traceRiver(c[0],c[1]);
+  }
+}
+function traceRiver(sx,sy){
+  var x=sx,y=sy,guard=W*H;
+  var path=[];
+  while(guard-->0){
+    var i=y*W+x;
+    var h=heightMap[i];
+    if(h<seaLevel){ // 到达海洋
+      path.forEach(function(p){ if(cellType[p]!==0&&cellType[p]!==1) cellType[p]=6; });
+      return;
+    }
+    path.push(i);
+    // 找最低邻居（8 方向）
+    var bx=-1,by=-1,bh=h;
+    for(var dy=-1;dy<=1;dy++)for(var dx=-1;dx<=1;dx++){
+      if(!dx&&!dy)continue;
+      var nx=x+dx,ny=y+dy;
+      if(nx<0||ny<0||nx>=W||ny>=H)continue;
+      var nh=heightMap[ny*W+nx];
+      if(nh<bh){bh=nh;bx=nx;by=ny;}
+    }
+    if(bx<0){ // 局部最低点：形成内陆湖（淹没周围低洼）
+      formLake(x,y,h);
+      path.forEach(function(p){ if(cellType[p]!==7) cellType[p]=6; });
+      return;
+    }
+    x=bx;y=by;
+  }
+}
+function formLake(cx,cy,level){
+  var rim=level+0.012;
+  var stack=[[cx,cy]], seen=new Set();
+  while(stack.length && seen.size<140){
+    var p=stack.pop(), x=p[0], y=p[1], i=y*W+x;
+    if(seen.has(i))continue;
+    seen.add(i);
+    if(heightMap[i]>rim) continue;
+    if(heightMap[i]<seaLevel) continue;
+    cellType[i]=7;
+    if(x>0)stack.push([x-1,y]);
+    if(x<W-1)stack.push([x+1,y]);
+    if(y>0)stack.push([x,y-1]);
+    if(y<H-1)stack.push([x,y+1]);
+  }
+}
+
+/* ---------- 城镇：海岸附近平原，确定性命名 ---------- */
+var TOWN_NAMES=['晨风港','鹰巢城','雾溪镇','碎星堡','苔痕村','苍鹭渡','铁冠城','流萤谷','白杨哨','瑟兰堡','灰岩集','月桂湾','龙牙关','静湖镇','荆棘垒','风笛港'];
+function placeTowns(seed){
+  towns=[];
+  var rnd=mulberry32(seed^0x77c1);
+  var spots=[];
+  for(var y=2;y<H-2;y++)for(var x=2;x<W-2;x++){
+    var i=y*W+x;
+    if(cellType[i]!==3) continue;
+    var nearCoast=false, nearRiver=false;
+    for(var dy=-3;dy<=3&&!nearCoast;dy++)for(var dx=-3;dx<=3;dx++){
+      var nx=x+dx,ny=y+dy;
+      if(nx<0||ny<0||nx>=W||ny>=H)continue;
+      var t=cellType[ny*W+nx];
+      if(t===1||t===2) nearCoast=true;
+    }
+    for(var dy2=-2;dy2<=2;dy2++)for(var dx2=-2;dx2<=2;dx2++){
+      var nx2=x+dx2,ny2=y+dy2;
+      if(nx2<0||ny2<0||nx2>=W||ny2>=H)continue;
+      if(cellType[ny2*W+nx2]===6) nearRiver=true;
+    }
+    if(nearCoast||nearRiver) spots.push([x,y,nearCoast?0:1]);
+  }
+  spots.sort(function(a,b){return a[2]-b[2];});
+  var count=Math.min(6, spots.length);
+  var used=new Set();
+  for(var n=0;n<count;n++){
+    if(!spots.length)break;
+    var s=spots.splice((rnd()*spots.length)|0,1)[0];
+    var key=(s[0]>>3)+','+(s[1]>>3);
+    if(used.has(key)){n--;continue;}
+    used.add(key);
+    towns.push({x:s[0],y:s[1],name:TOWN_NAMES[(rnd()*TOWN_NAMES.length)|0]});
+  }
+}
+
+/* ---------- 渲染 ---------- */
+var COLORS=['#31587e','#4f7ba0','#e3d3a5','#9db173','#5d7f4a','#8d8578','#6f93b8','#6f93b8'];
+function renderBase(){
+  var img=baseCtx.createImageData(W,H);
+  var rnd=mulberry32(decorSeed^0x33);
+  var grain=[];
+  for(var i=0;i<W*H;i++) grain.push((rnd()-0.5)*14);
+  for(var i2=0;i2<W*H;i2++){
+    var t=cellType[i2];
+    var col=COLORS[t];
+    var r=parseInt(col.slice(1,3),16)+grain[i2];
+    var g=parseInt(col.slice(3,5),16)+grain[i2];
+    var b=parseInt(col.slice(5,7),16)+grain[i2];
+    img.data[i2*4]=Math.max(0,Math.min(255,r));
+    img.data[i2*4+1]=Math.max(0,Math.min(255,g));
+    img.data[i2*4+2]=Math.max(0,Math.min(255,b));
+    img.data[i2*4+3]=255;
+  }
+  baseCtx.putImageData(img,0,0);
+}
+function updateStats(){
+  var c=[0,0,0,0,0,0,0,0];
+  for(var i=0;i<W*H;i++)c[cellType[i]]++;
+  var land=c[2]+c[3]+c[4]+c[5]+c[6]+c[7];
+  document.getElementById('stats').textContent=
+    '陆地 '+Math.round(land/(W*H)*100)+'% · 森林 '+Math.round(c[4]/(W*H)*100)+'% · 山脉 '+Math.round(c[5]/(W*H)*100)+'% · 城镇 '+towns.length+' 座';
+}
+function draw(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  // 羊皮纸底
+  ctx.fillStyle='#e8dfc8';
+  ctx.fillRect(0,0,cw,ch);
+  var sc=view.scale;
+  var ox=cw/2-view.cx*sc, oy=ch/2-view.cy*sc;
+  ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(baseCanvas, ox, oy, W*sc, H*sc);
+  // 海岸描边与装饰（矢量叠加，随缩放清晰）
+  ctx.save();
+  ctx.translate(ox,oy); ctx.scale(sc,sc);
+  ctx.lineWidth=1/sc*2;
+  // 海岸线
+  ctx.strokeStyle='rgba(58,76,96,0.55)';
+  ctx.beginPath();
+  for(var y=1;y<H-1;y++)for(var x=1;x<W-1;x++){
+    var t=cellType[y*W+x];
+    var land=t>=2&&t!==6&&t!==7;
+    if(!land)continue;
+    var edges=[[1,0],[-1,0],[0,1],[0,-1]];
+    for(var e=0;e<4;e++){
+      var nx=x+edges[e][0],ny=y+edges[e][1];
+      var nt=cellType[ny*W+nx];
+      var nland=nt>=2&&nt!==6&&nt!==7;
+      if(nland)continue;
+      ctx.moveTo(x+(e===0?1:e===1?0:0.5)+ (e<2?0:0), y+(e===2?1:e===3?0:0.5));
+      if(e===0){ctx.moveTo(x+1,y);ctx.lineTo(x+1,y+1);}
+      if(e===1){ctx.moveTo(x,y);ctx.lineTo(x,y+1);}
+      if(e===2){ctx.moveTo(x,y+1);ctx.lineTo(x+1,y+1);}
+      if(e===3){ctx.moveTo(x,y);ctx.lineTo(x+1,y);}
+    }
+  }
+  ctx.stroke();
+  // 山脉三角
+  var rnd=mulberry32(decorSeed^0x99);
+  ctx.strokeStyle='#4a4335'; ctx.fillStyle='rgba(255,255,255,0.25)';
+  for(var y2=1;y2<H-1;y2++)for(var x2=1;x2<W-1;x2++){
+    if(cellType[y2*W+x2]!==5)continue;
+    if((x2+y2)%2===0 && rnd()<0.5){
+      ctx.beginPath();
+      ctx.moveTo(x2+0.15,y2+0.85);ctx.lineTo(x2+0.5,y2+0.15);ctx.lineTo(x2+0.85,y2+0.85);ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+  }
+  // 森林树标
+  ctx.fillStyle='#2e4a26';
+  for(var y3=1;y3<H-1;y3++)for(var x3=1;x3<W-1;x3++){
+    if(cellType[y3*W+x3]!==4)continue;
+    if((x3*7+y3*13)%5===0){
+      ctx.beginPath();
+      ctx.moveTo(x3+0.2,y3+0.75);ctx.lineTo(x3+0.5,y3+0.2);ctx.lineTo(x3+0.8,y3+0.75);ctx.closePath();
+      ctx.fill();
+      ctx.fillRect(x3+0.45,y3+0.75,0.1,0.2);
+    }
+  }
+  // 城镇
+  if(document.getElementById('showTowns').checked){
+    towns.forEach(function(t){
+      ctx.fillStyle='#8c3b2e';
+      ctx.fillRect(t.x+0.15,t.y+0.15,0.7,0.7);
+      ctx.strokeStyle='#fff'; ctx.lineWidth=0.08; ctx.strokeRect(t.x+0.15,t.y+0.15,0.7,0.7);
+      ctx.font='0.9px "Microsoft YaHei",sans-serif';
+      ctx.fillStyle='#2d2417';
+      ctx.strokeStyle='rgba(255,252,240,0.85)'; ctx.lineWidth=0.16;
+      ctx.strokeText(t.name, t.x-0.2, t.y-0.25);
+      ctx.fillText(t.name, t.x-0.2, t.y-0.25);
+    });
+  }
+  ctx.restore();
+  // 画笔预览圈
+  if(brushCursor && (tool==='raise'||tool==='lower')){
+    ctx.strokeStyle= tool==='raise' ? 'rgba(122,92,46,0.9)' : 'rgba(49,88,126,0.9)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.arc(brushCursor.sx, brushCursor.sy, brushSize()*view.scale, 0, 7);
+    ctx.stroke();
+  }
+}
+function brushSize(){ return parseInt(document.getElementById('brush').value,10); }
+
+/* ---------- 坐标换算 ---------- */
+function screenToMap(sx,sy){
+  return { x:(sx-cw/2)/view.scale+view.cx, y:(sy-ch/2)/view.scale+view.cy };
+}
+
+/* ---------- 画笔编辑 ---------- */
+function applyBrush(mx,my,delta){
+  var r=brushSize();
+  var changed=false;
+  for(var y=Math.max(0,Math.floor(my-r));y<=Math.min(H-1,Math.ceil(my+r));y++)
+    for(var x=Math.max(0,Math.floor(mx-r));x<=Math.min(W-1,Math.ceil(mx+r));x++){
+      var d=Math.sqrt((x-mx)*(x-mx)+(y-my)*(y-my));
+      if(d>r)continue;
+      var f=1-d/r;
+      heightMap[y*W+x]=Math.max(0,Math.min(1.2,heightMap[y*W+x]+delta*f));
+      changed=true;
+    }
+  if(changed){
+    classify();
+    buildRivers(decorSeed);
+    placeTowns(decorSeed);
+    renderBase();
+    updateStats();
+  }
+}
+
+/* ---------- 交互（平移/缩放/画笔/双指捏合） ---------- */
+var pointers=new Map();
+var pinchDist=0;
+var brushCursor=null;
+canvas.addEventListener('pointerdown',function(e){
+  canvas.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pointers.size===2){
+    var ps=[...pointers.values()];
+    pinchDist=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);
+  }
+});
+canvas.addEventListener('pointermove',function(e){
+  var r=canvas.getBoundingClientRect();
+  var sx=e.clientX-r.left, sy=e.clientY-r.top;
+  brushCursor={sx:sx,sy:sy};
+  if(!pointers.has(e.pointerId)){ draw(); return; }
+  var prev=pointers.get(e.pointerId);
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pointers.size===2){
+    var ps=[...pointers.values()];
+    var nd=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);
+    if(pinchDist>0){
+      var mid={x:(ps[0].x+ps[1].x)/2-r.left, y:(ps[0].y+ps[1].y)/2-r.top};
+      zoomAt(mid.x,mid.y, nd/pinchDist);
+    }
+    pinchDist=nd;
+    draw(); return;
+  }
+  var dx=e.clientX-prev.x, dy=e.clientY-prev.y;
+  if(tool==='pan'){
+    view.cx-=dx/view.scale; view.cy-=dy/view.scale;
+    clampView(); draw();
+  } else {
+    var m=screenToMap(sx,sy);
+    applyBrush(m.x,m.y, tool==='raise'?0.05:-0.05);
+    setStatus(tool==='raise'?'正在抬升地形…':'正在降低地形…','');
+    draw();
+  }
+});
+function endPointer(e){
+  pointers.delete(e.pointerId);
+  if(pointers.size<2) pinchDist=0;
+  if(pointers.size===0){ setStatus('就绪',''); }
+}
+canvas.addEventListener('pointerup',endPointer);
+canvas.addEventListener('pointercancel',endPointer);
+canvas.addEventListener('pointerleave',function(){ brushCursor=null; draw(); });
+canvas.addEventListener('wheel',function(e){
+  e.preventDefault();
+  var r=canvas.getBoundingClientRect();
+  zoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.15:1/1.15);
+  draw();
+},{passive:false});
+function zoomAt(sx,sy,factor){
+  var before=screenToMap(sx,sy);
+  view.scale=Math.max(1.5,Math.min(40, view.scale*factor));
+  var after=screenToMap(sx,sy);
+  view.cx+=before.x-after.x; view.cy+=before.y-after.y;
+  clampView();
+}
+function clampView(){
+  view.cx=Math.max(0,Math.min(W,view.cx));
+  view.cy=Math.max(0,Math.min(H,view.cy));
+}
+
+/* ---------- 控件 ---------- */
+document.querySelectorAll('[data-tool]').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('[data-tool]').forEach(function(o){o.classList.remove('active');});
+    b.classList.add('active');
+    tool=b.getAttribute('data-tool');
+    canvas.style.cursor = tool==='pan' ? 'grab' : 'crosshair';
+  };
+});
+function regen(){
+  seaLevel=parseInt(document.getElementById('sea').value,10)/100;
+  rough=parseInt(document.getElementById('rough').value,10)/100;
+  generate(document.getElementById('seed').value.trim());
+  setStatus('已按种子与参数重新生成','');
+}
+document.getElementById('regen').onclick=regen;
+document.getElementById('randSeed').onclick=function(){
+  document.getElementById('seed').value='isle-'+Math.floor(Math.random()*100000);
+  regen();
+};
+document.getElementById('sea').onchange=regen;
+document.getElementById('rough').onchange=regen;
+document.getElementById('showTowns').onchange=draw;
+document.getElementById('zoomIn').onclick=function(){ zoomAt(cw/2,ch/2,1.3); draw(); };
+document.getElementById('zoomOut').onclick=function(){ zoomAt(cw/2,ch/2,1/1.3); draw(); };
+document.getElementById('resetView').onclick=function(){ view={cx:W/2,cy:H/2,scale:Math.min(cw/W,ch/H)}; draw(); };
+document.getElementById('exportPng').onclick=function(){
+  try{
+    var S=8;
+    var out=document.createElement('canvas');
+    out.width=W*S; out.height=H*S;
+    var octx=out.getContext('2d');
+    octx.imageSmoothingEnabled=false;
+    octx.drawImage(baseCanvas,0,0,W*S,H*S);
+    octx.save(); octx.scale(S,S);
+    // 河流加粗
+    octx.strokeStyle='#5b83ad'; octx.lineWidth=0.35; octx.lineCap='round';
+    var drawn=new Set();
+    for(var y=0;y<H;y++)for(var x=0;x<W;x++){
+      if(cellType[y*W+x]!==6)continue;
+      [[1,0],[0,1]].forEach(function(d){
+        var nx=x+d[0],ny=y+d[1];
+        if(nx<W&&ny<H&&cellType[ny*W+nx]===6){
+          octx.beginPath();octx.moveTo(x+0.5,y+0.5);octx.lineTo(nx+0.5,ny+0.5);octx.stroke();
+        }
+      });
+    }
+    towns.forEach(function(t){
+      octx.fillStyle='#8c3b2e'; octx.fillRect(t.x+0.15,t.y+0.15,0.7,0.7);
+      octx.font='1.1px "Microsoft YaHei",sans-serif'; octx.fillStyle='#2d2417';
+      octx.fillText(t.name,t.x-0.3,t.y-0.3);
+    });
+    octx.restore();
+    var a=document.createElement('a');
+    a.download='fantasy-map-'+document.getElementById('seed').value.trim()+'.png';
+    a.href=out.toDataURL('image/png');
+    a.click();
+    setStatus('已导出当前地图 PNG','');
+  }catch(err){
+    setStatus('导出失败：'+err.message,'err');
+  }
+};
+
+/* ---------- 尺寸 ---------- */
+function resize(){
+  var r=canvas.getBoundingClientRect();
+  dpr=Math.min(window.devicePixelRatio||1,2);
+  cw=r.width; ch=r.height;
+  canvas.width=Math.round(cw*dpr); canvas.height=Math.round(ch*dpr);
+  draw();
+}
+if(window.ResizeObserver){ new ResizeObserver(resize).observe(canvas); }
+window.addEventListener('resize',resize);
+
+view.scale=6;
+generate(document.getElementById('seed').value.trim());
+resize();
+view={cx:W/2,cy:H/2,scale:Math.max(2,Math.min(560/W,420/H))};
+draw();
+})();
+</script>
+</body>
+</html>

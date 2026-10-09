@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>寻路算法实验室</title>
+<style>
+  :root{--bg:#f6f7f9;--panel:#fff;--ink:#222a35;--muted:#6b7280;--line:#dde2ea;--accent:#2563eb;--danger:#dc2626;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--ink);font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;}
+  header{padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+  header h1{font-size:18px;margin-right:auto;}
+  #status{font-size:13px;padding:4px 10px;border-radius:6px;background:#eef2f7;color:var(--muted);}
+  #status.err{background:#fdecec;color:var(--danger);}
+  #status.ok{background:#e8f7f0;color:#059669;}
+  .toolbar{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);align-items:center;}
+  button,select{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;color:var(--ink);}
+  button:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  button.warn{border-color:var(--danger);color:var(--danger);}
+  button:disabled{opacity:.45;cursor:not-allowed;}
+  .tools button.active{background:#dbeafe;border-color:var(--accent);color:var(--accent);}
+  .toolbar label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;}
+  main{flex:1;display:flex;gap:10px;padding:10px;flex-wrap:wrap;}
+  #gridWrap{flex:1 1 520px;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;overflow:hidden;}
+  #grid{display:block;width:100%;touch-action:none;border-radius:6px;}
+  aside{flex:0 1 300px;min-width:250px;display:flex;flex-direction:column;gap:10px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;}
+  .card h2{font-size:14px;margin-bottom:8px;color:var(--muted);}
+  .stat{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed var(--line);}
+  .stat:last-child{border-bottom:none;}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:4px;}
+  .sw{width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid var(--line);}
+  .hint{font-size:12px;color:var(--muted);line-height:1.7;}
+  footer{padding:8px 14px;font-size:12px;color:var(--muted);}
+</style>
+</head>
+<body>
+<header>
+  <h1>寻路算法实验室</h1>
+  <div id="status">就绪</div>
+</header>
+<div class="toolbar">
+  <select id="algo">
+    <option value="bfs">BFS（按步数）</option>
+    <option value="dijkstra">Dijkstra（按地形代价）</option>
+    <option value="astar">A*（按地形代价，曼哈顿启发）</option>
+  </select>
+  <button id="runBtn" class="primary">运行</button>
+  <button id="pauseBtn" disabled>暂停</button>
+  <button id="stepBtn" disabled>单步</button>
+  <button id="clearSearchBtn">清除搜索</button>
+  <button id="resetBtn" class="warn">重置地图</button>
+  <label>速度 <input type="range" id="speed" min="1" max="30" value="10" style="width:90px"></label>
+</div>
+<div class="toolbar tools">
+  <span style="font-size:12px;color:var(--muted)">画笔：</span>
+  <button data-tool="wall" class="active">障碍</button>
+  <button data-tool="terrain">高代价地形(代价5)</button>
+  <button data-tool="erase">擦除</button>
+  <button data-tool="start">拖动起点</button>
+  <button data-tool="end">拖动终点</button>
+  <span style="flex:0 0 8px"></span>
+  <span style="font-size:12px;color:var(--muted)">预设：</span>
+  <select id="preset">
+    <option value="">选择预设地图…</option>
+    <option value="empty">空白</option>
+    <option value="maze">迷宫</option>
+    <option value="valley">高代价河谷</option>
+    <option value="sealed">封闭终点（不可达）</option>
+  </select>
+</div>
+<main>
+  <div id="gridWrap"><canvas id="grid"></canvas></div>
+  <aside>
+    <div class="card">
+      <h2>结果</h2>
+      <div class="stat"><span>算法</span><b id="stAlgo">—</b></div>
+      <div class="stat"><span>已访问节点</span><b id="stVisited">0</b></div>
+      <div class="stat"><span>路径步数</span><b id="stSteps">—</b></div>
+      <div class="stat"><span>路径总代价</span><b id="stCost">—</b></div>
+    </div>
+    <div class="card">
+      <h2>图例</h2>
+      <div class="legend">
+        <span><i class="sw" style="background:#22c55e"></i>起点</span>
+        <span><i class="sw" style="background:#ef4444"></i>终点</span>
+        <span><i class="sw" style="background:#334155"></i>障碍</span>
+        <span><i class="sw" style="background:#d6a85c"></i>高代价地形</span>
+        <span><i class="sw" style="background:#fde047"></i>搜索前沿</span>
+        <span><i class="sw" style="background:#bfdbfe"></i>已访问</span>
+        <span><i class="sw" style="background:#fb923c"></i>最终路径</span>
+      </div>
+    </div>
+    <div class="card hint">
+      说明：四方向移动；普通格进入代价为 1，高代价地形为 5，起点代价不计入。BFS 按步数搜索（忽略地形代价），Dijkstra 与 A* 按地形代价搜索，A* 使用曼哈顿距离启发。搜索过程中编辑地图会自动停止并清除旧搜索。起点和终点不可被障碍覆盖，可直接拖动（或选择对应画笔后点按目标格）。
+    </div>
+  </aside>
+</main>
+<footer>纯静态单文件 · 无网络依赖 · 支持鼠标与触摸</footer>
+<script>
+(function(){
+"use strict";
+var canvas=document.getElementById('grid'), ctx=canvas.getContext('2d');
+var statusEl=document.getElementById('status');
+var T_EMPTY=0, T_WALL=1, T_ROUGH=2;
+var COST_NORMAL=1, COST_ROUGH=5;
+
+var cols=36, rows=20, cell=20, dpr=1;
+var map=[], start={x:2,y:2}, goal={x:33,y:17};
+var tool='wall', painting=false, paintVal=T_WALL, draggingMark=null;
+var search=null; // {algo, state:'running'|'paused'|'done'|'failed', ...}
+var timer=null;
+
+function idx(x,y){return y*cols+x;}
+function inBounds(x,y){return x>=0&&y>=0&&x<cols&&y<rows;}
+function resetMap(fill){ map=new Array(cols*rows).fill(fill||T_EMPTY); }
+resetMap();
+
+/* ---------- 预设（归一化坐标，可重复） ---------- */
+function hash01(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return ((h>>>0)%10000)/10000;}
+function applyPreset(name){
+  stopTimer(); search=null;
+  resetMap();
+  start={x:Math.round(cols*0.06),y:Math.round(rows*0.1)};
+  goal={x:Math.min(cols-2,Math.round(cols*0.92)),y:Math.min(rows-2,Math.round(rows*0.88))};
+  if(name==='maze'){
+    for(var y=0;y<rows;y++)for(var x=0;x<cols;x++){
+      if(x===0||y===0||x===cols-1||y===rows-1) {map[idx(x,y)]=T_WALL;continue;}
+      if(x%2===0&&y%2===0){map[idx(x,y)]=T_WALL;continue;}
+      if(x%2===0||y%2===0){ if(hash01(x+','+y)<0.42) map[idx(x,y)]=T_WALL; }
+    }
+    // 保证起终点周围可走
+    carveAround(start); carveAround(goal);
+  } else if(name==='valley'){
+    var midX=Math.round(cols/2);
+    for(var y2=0;y2<rows;y2++)for(var x2=0;x2<cols;x2++){
+      var d=Math.abs(x2-midX);
+      if(d<=2) map[idx(x2,y2)]=T_ROUGH;
+      else if(d===3&&hash01('r'+x2+','+y2)<0.5) map[idx(x2,y2)]=T_ROUGH;
+    }
+    // 顶部一条普通缺口，绕路更省代价但步数更多
+    for(var x3=midX-2;x3<=midX+2;x3++) map[idx(x3,1)]=T_EMPTY;
+    start={x:Math.round(cols*0.25),y:Math.round(rows/2)};
+    goal={x:Math.round(cols*0.75),y:Math.round(rows/2)};
+  } else if(name==='sealed'){
+    var gx=goal.x, gy=goal.y;
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){
+      var x=gx+d[0], y=gy+d[1];
+      if(inBounds(x,y)) map[idx(x,y)]=T_WALL;
+    });
+  }
+  updateStats(); setStatus('就绪',''); draw();
+}
+function carveAround(p){
+  for(var dy=-1;dy<=1;dy++)for(var dx=-1;dx<=1;dx++){
+    var x=p.x+dx,y=p.y+dy;
+    if(inBounds(x,y)) map[idx(x,y)]=T_EMPTY;
+  }
+}
+
+/* ---------- 搜索核心（逐步执行） ---------- */
+function newSearch(algo){
+  return {
+    algo:algo, state:'running', iter:0,
+    g:new Float64Array(cols*rows).fill(Infinity),
+    came:new Int32Array(cols*rows).fill(-1),
+    visitedOrder:[], inFrontier:new Set(),
+    heap:[], // [priority, index, tie]
+    tie:0,
+    path:null, totalCost:null
+  };
+}
+function h(a,b){return Math.abs(a.x-b.x)+Math.abs(a.y-b.y);}
+function pushNode(s,x,y,prio){
+  var i=idx(x,y);
+  s.heap.push([prio,i,s.tie++]);
+  s.inFrontier.add(i);
+  heapUp(s,s.heap.length-1);
+}
+function heapUp(s,i){var h=s.heap;while(i>0){var p=(i-1)>>1;if(h[p][0]<=h[i][0])break;var t=h[p];h[p]=h[i];h[i]=t;i=p;}}
+function heapDown(s,i){var h=s.heap;for(;;){var l=2*i+1,r=l+1,m=i;if(l<h.length&&h[l][0]<h[m][0])m=l;if(r<h.length&&h[r][0]<h[m][0])m=r;if(m===i)break;var t=h[m];h[m]=h[i];h[i]=t;i=m;}}
+function popNode(s){
+  var h=s.heap;
+  var top=h[0], last=h.pop();
+  if(h.length){h[0]=last;heapDown(s,0);}
+  return top;
+}
+function startSearch(algo){
+  stopTimer();
+  search=newSearch(algo);
+  var si=idx(start.x,start.y);
+  search.g[si]=0;
+  pushNode(search,start.x,start.y, algo==='astar'?h(start,goal):0);
+  document.getElementById('pauseBtn').disabled=false;
+  document.getElementById('stepBtn').disabled=false;
+  document.getElementById('pauseBtn').textContent='暂停';
+  setStatus('搜索中…','');
+  runTimer();
+}
+function stepSearch(){
+  var s=search;
+  if(!s||s.state!=='running'&&s.state!=='paused') return;
+  var algo=s.algo;
+  while(s.heap.length){
+    var item;
+    if(algo==='bfs'){ item=s.heap.shift(); s.inFrontier.delete(item[1]); }
+    else { item=popNode(s); s.inFrontier.delete(item[1]); }
+    var ci=item[1], cx=ci%cols, cy=(ci/cols)|0;
+    // 惰性删除过期堆项
+    var curPrio = algo==='bfs' ? s.g[ci] : s.g[ci] + (algo==='astar'? h({x:cx,y:cy},goal):0);
+    if(item[0]>curPrio) continue;
+    if(s.visitedOrder.length && s.came[ci]===-2) continue;
+    if(cx===goal.x&&cy===goal.y){
+      s.state='done';
+      s.totalCost=s.g[ci];
+      s.path=[];
+      var cur=ci;
+      while(cur!==-1){ s.path.push(cur); cur=s.came[cur]; }
+      s.path.reverse();
+      stopTimer();
+      setStatus('已找到路径：'+ (s.path.length-1) +' 步，总代价 '+ s.totalCost,'ok');
+      document.getElementById('pauseBtn').disabled=true;
+      document.getElementById('stepBtn').disabled=true;
+      updateStats(); draw();
+      return;
+    }
+    if(!s.closed) s.closed=new Set();
+    if(s.closed.has(ci)) continue;
+    s.closed.add(ci);
+    s.visitedOrder.push(ci);
+    s.iter++;
+    var dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+    for(var d=0;d<4;d++){
+      var nx=cx+dirs[d][0], ny=cy+dirs[d][1];
+      if(!inBounds(nx,ny)) continue;
+      var ni=idx(nx,ny);
+      if(map[ni]===T_WALL) continue;
+      var stepCost=(algo==='bfs')?1:(map[ni]===T_ROUGH?COST_ROUGH:COST_NORMAL);
+      var ng=s.g[ci]+stepCost;
+      if(ng<s.g[ni]){
+        s.g[ni]=ng; s.came[ni]=ci;
+        var prio=(algo==='bfs')?ng:(ng+(algo==='astar'?h({x:nx,y:ny},goal):0));
+        pushNode(s,nx,ny,prio);
+      }
+    }
+    updateStats(); draw();
+    return;
+  }
+  s.state='failed';
+  stopTimer();
+  setStatus('终点不可达：搜索前沿已耗尽。','err');
+  document.getElementById('pauseBtn').disabled=true;
+  document.getElementById('stepBtn').disabled=true;
+  updateStats(); draw();
+}
+function runTimer(){
+  stopTimer();
+  var speed=parseInt(document.getElementById('speed').value,10);
+  timer=setInterval(function(){
+    var stepsPerTick=Math.max(1,Math.round(speed/3));
+    for(var i=0;i<stepsPerTick;i++){
+      if(!search||search.state!=='running') break;
+      stepSearch();
+    }
+  }, 40);
+}
+function stopTimer(){ if(timer){clearInterval(timer);timer=null;} }
+
+/* ---------- 控件 ---------- */
+document.getElementById('runBtn').onclick=function(){ startSearch(document.getElementById('algo').value); };
+document.getElementById('pauseBtn').onclick=function(){
+  if(!search) return;
+  if(search.state==='running'){ search.state='paused'; stopTimer(); this.textContent='继续'; setStatus('已暂停（可单步）',''); }
+  else if(search.state==='paused'){ search.state='running'; this.textContent='暂停'; setStatus('搜索中…',''); runTimer(); }
+};
+document.getElementById('stepBtn').onclick=function(){
+  if(!search) return;
+  if(search.state==='running'){ search.state='paused'; stopTimer(); document.getElementById('pauseBtn').textContent='继续'; }
+  if(search.state==='paused'){ stepSearch(); if(search&&search.state==='paused') setStatus('已暂停（可单步）',''); }
+};
+document.getElementById('clearSearchBtn').onclick=function(){
+  stopTimer(); search=null;
+  document.getElementById('pauseBtn').disabled=true;
+  document.getElementById('stepBtn').disabled=true;
+  setStatus('已清除搜索结果',''); updateStats(); draw();
+};
+document.getElementById('resetBtn').onclick=function(){ applyPreset('empty'); };
+document.getElementById('preset').onchange=function(){ if(this.value) applyPreset(this.value); this.value=''; };
+document.getElementById('speed').oninput=function(){ if(search&&search.state==='running') runTimer(); };
+document.querySelectorAll('[data-tool]').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('[data-tool]').forEach(function(o){o.classList.remove('active');});
+    b.classList.add('active'); tool=b.getAttribute('data-tool');
+  };
+});
+
+/* ---------- 画布 ---------- */
+function resize(){
+  var wrap=document.getElementById('gridWrap');
+  var w=wrap.clientWidth-16;
+  // 保持格子为正方形且适配宽度，移动端保证触摸尺寸
+  var newCell=Math.max(14, Math.floor(w/cols));
+  var wantCols=Math.max(20, Math.min(48, Math.floor(w/18)));
+  if(wantCols!==cols){ rescaleMap(wantCols); }
+  cell=Math.max(14, Math.floor(w/cols));
+  dpr=Math.min(window.devicePixelRatio||1,2);
+  canvas.width=cols*cell*dpr; canvas.height=rows*cell*dpr;
+  canvas.style.height=(rows*cell)+'px';
+  draw();
+}
+function rescaleMap(newCols){
+  // 尺寸变化时重采样地图，保持预设可重复
+  var oldCols=cols, oldRows=rows, oldMap=map;
+  cols=newCols; rows=Math.max(14, Math.round(cols*0.55));
+  resetMap();
+  for(var y=0;y<rows;y++)for(var x=0;x<cols;x++){
+    var ox=Math.min(oldCols-1, Math.round(x*(oldCols-1)/(cols-1)));
+    var oy=Math.min(oldRows-1, Math.round(y*(oldRows-1)/(rows-1)));
+    map[idx(x,y)]=oldMap[oy*oldCols+ox];
+  }
+  start={x:Math.min(cols-2,Math.round(start.x*(cols-1)/(oldCols-1))),y:Math.min(rows-2,Math.round(start.y*(rows-1)/(oldRows-1)))};
+  goal={x:Math.min(cols-2,Math.round(goal.x*(cols-1)/(oldCols-1))),y:Math.min(rows-2,Math.round(goal.y*(rows-1)/(oldRows-1)))};
+  map[idx(start.x,start.y)]=T_EMPTY; map[idx(goal.x,goal.y)]=T_EMPTY;
+}
+if(window.ResizeObserver){ new ResizeObserver(resize).observe(document.getElementById('gridWrap')); }
+window.addEventListener('resize', resize);
+
+function draw(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(var y=0;y<rows;y++)for(var x=0;x<cols;x++){
+    var i=idx(x,y), px=x*cell, py=y*cell;
+    var t=map[i];
+    if(t===T_WALL) ctx.fillStyle='#334155';
+    else if(t===T_ROUGH) ctx.fillStyle='#d6a85c';
+    else ctx.fillStyle='#ffffff';
+    ctx.fillRect(px,py,cell,cell);
+    if(search){
+      if(search.path && search.path.indexOf(i)!==-1) { ctx.fillStyle='#fb923c'; ctx.fillRect(px,py,cell,cell); }
+      else if(search.closed && search.closed.has(i)) { ctx.fillStyle='#bfdbfe'; ctx.fillRect(px,py,cell,cell); }
+      else if(search.inFrontier.has(i)) { ctx.fillStyle='#fde047'; ctx.fillRect(px,py,cell,cell); }
+    }
+    ctx.strokeStyle='#e5e9f0'; ctx.lineWidth=1;
+    ctx.strokeRect(px+.5,py+.5,cell-1,cell-1);
+  }
+  drawMark(start,'#22c55e','起');
+  drawMark(goal,'#ef4444','终');
+}
+function drawMark(p,color,label){
+  var px=p.x*cell, py=p.y*cell;
+  ctx.fillStyle=color;
+  ctx.fillRect(px+1,py+1,cell-2,cell-2);
+  ctx.fillStyle='#fff';
+  ctx.font='bold '+Math.max(9,cell*0.5)+'px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(label,px+cell/2,py+cell/2+1);
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+}
+
+/* ---------- 编辑交互 ---------- */
+function cellAt(e){
+  var r=canvas.getBoundingClientRect();
+  var x=Math.floor((e.clientX-r.left)/cell), y=Math.floor((e.clientY-r.top)/cell);
+  return inBounds(x,y)?{x:x,y:y}:null;
+}
+function editCell(c){
+  if(!c) return;
+  var isStart=(c.x===start.x&&c.y===start.y), isGoal=(c.x===goal.x&&c.y===goal.y);
+  if(tool==='start'){ if(map[idx(c.x,c.y)]!==T_WALL && !isGoal){ start=c; } }
+  else if(tool==='end'){ if(map[idx(c.x,c.y)]!==T_WALL && !isStart){ goal=c; } }
+  else if(tool==='wall'){ if(!isStart&&!isGoal) map[idx(c.x,c.y)]=T_WALL; }
+  else if(tool==='terrain'){ if(!isStart&&!isGoal) map[idx(c.x,c.y)]=T_ROUGH; }
+  else if(tool==='erase'){ map[idx(c.x,c.y)]=T_EMPTY; }
+}
+function invalidateSearch(){
+  if(search){ stopTimer(); search=null;
+    document.getElementById('pauseBtn').disabled=true;
+    document.getElementById('stepBtn').disabled=true;
+    setStatus('地图已修改，旧搜索已停止并清除。','');
+  }
+}
+canvas.addEventListener('pointerdown',function(e){
+  e.preventDefault(); canvas.setPointerCapture(e.pointerId);
+  var c=cellAt(e); if(!c) return;
+  // 直接拖拽起点/终点
+  if(c.x===start.x&&c.y===start.y&&tool!=='wall'&&tool!=='terrain'){ draggingMark='start'; return; }
+  if(c.x===goal.x&&c.y===goal.y&&tool!=='wall'&&tool!=='terrain'){ draggingMark='goal'; return; }
+  painting=true;
+  invalidateSearch();
+  editCell(c); updateStats(); draw();
+});
+canvas.addEventListener('pointermove',function(e){
+  var c=cellAt(e); if(!c) return;
+  if(draggingMark){
+    if(map[idx(c.x,c.y)]===T_WALL) return;
+    if(draggingMark==='start'&&!(c.x===goal.x&&c.y===goal.y)){ start=c; invalidateSearch(); draw(); }
+    if(draggingMark==='goal'&&!(c.x===start.x&&c.y===start.y)){ goal=c; invalidateSearch(); draw(); }
+    return;
+  }
+  if(painting){ editCell(c); updateStats(); draw(); }
+});
+canvas.addEventListener('pointerup',function(){ painting=false; draggingMark=null; });
+canvas.addEventListener('pointercancel',function(){ painting=false; draggingMark=null; });
+
+/* ---------- 状态与统计 ---------- */
+function setStatus(msg,cls){ statusEl.textContent=msg; statusEl.className=cls||''; }
+function updateStats(){
+  document.getElementById('stAlgo').textContent = search? ({bfs:'BFS',dijkstra:'Dijkstra',astar:'A*'})[search.algo] : '—';
+  document.getElementById('stVisited').textContent = search? search.visitedOrder.length : 0;
+  document.getElementById('stSteps').textContent = search&&search.path? (search.path.length-1) : (search&&search.state==='failed'?'不可达':'—');
+  document.getElementById('stCost').textContent = search&&search.totalCost!=null? search.totalCost : (search&&search.state==='failed'?'不可达':'—');
+}
+
+resize();
+applyPreset('empty');
+})();
+</script>
+</body>
+</html>
