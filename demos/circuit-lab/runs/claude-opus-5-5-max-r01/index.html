@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="简化直流电路实验台：放置电池、电阻、开关和灯泡，连线后用修正节点分析法实时求解电压、电流与方向。">
+<title>简化电路实验台 · 直流电路实时求解</title>
+<style>
+  :root {
+    --bg: #eef2f7;
+    --panel: #ffffff;
+    --ink: #1f2937;
+    --muted: #64748b;
+    --line: #d6dde8;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --danger: #dc2626;
+    --danger-soft: #fee2e2;
+    --warn: #b45309;
+    --warn-soft: #fef3c7;
+    --ok: #15803d;
+    --ok-soft: #dcfce7;
+    --wire: #334155;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+  header.top { padding: 14px 16px 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+  header.top h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
+  header.top p { margin: 0; color: var(--muted); font-size: 13px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 8px 16px; align-items: center; }
+  .group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .glabel { font-size: 12px; color: var(--muted); }
+  button {
+    font: inherit; font-size: 13px; border: 1px solid var(--line); background: #fff; color: var(--ink);
+    border-radius: 8px; padding: 6px 10px; cursor: pointer; min-height: 34px; touch-action: manipulation;
+  }
+  button:hover { border-color: #9fb3d1; background: #f8fafc; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { background: #1d4ed8; }
+  button.danger { color: var(--danger); border-color: #f3b4b4; }
+  button.danger:hover { background: var(--danger-soft); }
+  .chk { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; padding: 0 4px; cursor: pointer; }
+  .chk input { width: 16px; height: 16px; margin: 0; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; padding: 0 16px 20px; align-items: start; }
+  .stage { min-width: 0; }
+  .status { display: grid; gap: 6px; margin-bottom: 8px; }
+  .msg { border-radius: 10px; padding: 8px 12px; font-size: 13px; border: 1px solid transparent; overflow-wrap: anywhere; }
+  .msg.ok { background: var(--ok-soft); color: #14532d; border-color: #bbf7d0; }
+  .msg.error { background: var(--danger-soft); color: #7f1d1d; border-color: #fecaca; font-weight: 600; }
+  .msg.warn { background: var(--warn-soft); color: #78350f; border-color: #fde68a; }
+  .msg.info { background: var(--accent-soft); color: #1e3a8a; border-color: #bfdbfe; }
+  .msg.note { background: #f1f5f9; color: #334155; border-color: #e2e8f0; }
+  .board-wrap {
+    position: relative; height: min(68vh, 640px); min-height: 360px; background: #fbfcfe;
+    border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
+  }
+  #board { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+  .toast {
+    position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); max-width: calc(100% - 24px);
+    background: rgba(15, 23, 42, .88); color: #fff; font-size: 13px; padding: 7px 12px; border-radius: 999px;
+    opacity: 0; transition: opacity .25s; pointer-events: none; text-align: center;
+  }
+  .toast.show { opacity: 1; }
+  .pending-hint {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 20px);
+    background: var(--accent-soft); color: #1e3a8a; border: 1px solid #bfdbfe; border-radius: 10px;
+    padding: 6px 12px; font-size: 13px; pointer-events: none; text-align: center; box-shadow: 0 4px 14px rgba(37, 99, 235, .15);
+  }
+  .pending-hint[hidden] { display: none; }
+  .side { display: grid; gap: 12px; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0; }
+  .card h2 { font-size: 15px; margin: 0 0 8px; }
+  .card ol, .card ul { margin: 0; padding-left: 20px; font-size: 13px; color: #334155; }
+  .card li + li { margin-top: 4px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0; }
+  .sel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #e2e8f0; color: #334155; }
+  .field { display: grid; gap: 4px; font-size: 13px; margin-bottom: 8px; }
+  .field input { font: inherit; font-size: 15px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; width: 100%; min-width: 0; }
+  .field input.invalid { border-color: var(--danger); background: #fff7f7; }
+  .ferr { color: var(--danger); font-size: 12px; min-height: 0; margin: -4px 0 8px; }
+  .ferr:empty { display: none; }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+  .readout { font-size: 13px; background: #f8fafc; border-radius: 10px; padding: 8px 10px; display: grid; gap: 2px; }
+  .readout b { font-variant-numeric: tabular-nums; }
+  .table-wrap { overflow-x: auto; max-width: 100%; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 5px 4px; border-bottom: 1px solid #edf1f6; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover { background: #f8fafc; }
+  tr.is-sel { background: var(--accent-soft); }
+  tr.bad td { color: var(--danger); }
+  tr.indet td { color: var(--warn); }
+  .arrow { font-size: 15px; color: var(--accent); }
+  .muted { color: var(--muted); }
+  .sum { margin-top: 8px; font-size: 13px; }
+  kbd { font-family: inherit; font-size: 11px; border: 1px solid #cbd5e1; border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: #f8fafc; }
+
+  #board .wire { fill: none; stroke: var(--wire); stroke-width: 2.6; stroke-linejoin: round; stroke-linecap: round; }
+  #board .wire.sel { stroke: var(--accent); stroke-width: 4.2; }
+  #board .wire.bad { stroke: var(--danger); stroke-dasharray: 7 5; }
+  #board .comp .lead { stroke: var(--wire); stroke-width: 2.6; stroke-linecap: round; }
+  #board .comp .plate { stroke: #111827; stroke-width: 3; stroke-linecap: round; }
+  #board .comp .plate.neg { stroke-width: 6; stroke-linecap: butt; }
+  #board .comp .body { fill: #fff; stroke: #111827; stroke-width: 2.4; }
+  #board .comp .bulb { stroke: #111827; stroke-width: 2.2; }
+  #board .comp .x { stroke: #111827; stroke-width: 1.8; }
+  #board .comp .pin { fill: #fff; stroke: #111827; stroke-width: 2; }
+  #board .comp .lever { stroke: #111827; stroke-width: 3; stroke-linecap: round; }
+  #board .comp .selbox { fill: rgba(37, 99, 235, .07); stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 5 4; }
+  #board .comp.st-short .plate, #board .comp.st-short .lever, #board .comp.st-short .lead { stroke: var(--danger); animation: blink .9s steps(2, start) infinite; }
+  #board .comp.st-error .body, #board .comp.st-error .bulb { stroke: #9ca3af; }
+  #board .comp.st-indet .lever, #board .comp.st-indet .plate { stroke: var(--warn); }
+  #board text { font-family: inherit; pointer-events: none; }
+  #board .lname { font-size: calc(13px * var(--k, 1)); font-weight: 700; fill: #0f172a; paint-order: stroke; stroke: #fbfcfe; stroke-width: 4px; stroke-linejoin: round; }
+  #board .lread { font-size: calc(12px * var(--k, 1)); fill: #1d4ed8; font-variant-numeric: tabular-nums; paint-order: stroke; stroke: #fbfcfe; stroke-width: 4px; stroke-linejoin: round; }
+  #board .lread.bad { fill: var(--danger); font-weight: 700; }
+  #board .lread.warn { fill: var(--warn); }
+  #board .lread.dim { fill: #64748b; }
+  #board .pol { font-size: 15px; font-weight: 800; fill: #b91c1c; paint-order: stroke; stroke: #fbfcfe; stroke-width: 3px; }
+  #board .node-tag rect { fill: #0f766e; }
+  #board .node-tag text { fill: #fff; font-size: calc(11px * var(--k, 1)); font-weight: 600; }
+  #board .term { stroke: #0f172a; stroke-width: 1.8; }
+  #board .term.free { fill: #fff; }
+  #board .term.on { fill: #0f172a; }
+  #board .ring { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+  #board .ring.pending { stroke-dasharray: 4 3; animation: spin 1.2s linear infinite; transform-box: fill-box; transform-origin: center; }
+  #board .flow { stroke-width: 2.4; }
+  #temp-wire { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 6 5; pointer-events: none; }
+  @keyframes blink { to { opacity: .25; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    .board-wrap { height: 58vh; min-height: 340px; }
+  }
+  @media (max-width: 480px) {
+    header.top { padding: 10px 12px 2px; }
+    header.top h1 { font-size: 18px; }
+    .toolbar { padding: 6px 12px; gap: 6px 10px; }
+    .layout { padding: 0 12px 16px; }
+    button { padding: 5px 8px; font-size: 12.5px; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>简化电路实验台</h1>
+  <p>理想直流电池 · 电阻 · 开关 · 灯泡 · 理想导线｜修正节点分析法（MNA）实时求解</p>
+</header>
+
+<div class="toolbar" role="toolbar" aria-label="电路工具栏">
+  <div class="group" aria-label="添加元件">
+    <span class="glabel">添加</span>
+    <button type="button" data-add="battery">＋ 电池</button>
+    <button type="button" data-add="resistor">＋ 电阻</button>
+    <button type="button" data-add="switch">＋ 开关</button>
+    <button type="button" data-add="lamp">＋ 灯泡</button>
+  </div>
+  <div class="group" aria-label="预设电路">
+    <span class="glabel">预设</span>
+    <button type="button" data-preset="series">串联</button>
+    <button type="button" data-preset="parallel">并联</button>
+    <button type="button" data-preset="mixed">混联</button>
+    <button type="button" data-preset="short">短路演示</button>
+  </div>
+  <div class="group">
+    <button type="button" id="btn-reset" class="primary" title="恢复默认串联电路与视图">一键重置</button>
+    <button type="button" id="btn-clear" class="danger">清空画布</button>
+  </div>
+  <div class="group" aria-label="视图">
+    <span class="glabel">视图</span>
+    <button type="button" id="zoom-out" aria-label="缩小">－</button>
+    <button type="button" id="zoom-in" aria-label="放大">＋</button>
+    <button type="button" id="zoom-fit">适应画面</button>
+    <label class="chk"><input type="checkbox" id="opt-values" checked> 显示数值</label>
+    <label class="chk"><input type="checkbox" id="opt-nodes"> 节点电位</label>
+  </div>
+</div>
+
+<main class="layout">
+  <section class="stage" aria-label="电路画布">
+    <div id="status" class="status" aria-live="polite"></div>
+    <div class="board-wrap" id="board-wrap">
+      <svg id="board" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="电路画布：可拖动元件并在端子之间连线">
+        <defs>
+          <pattern id="grid" x="-10" y="-10" width="20" height="20" patternUnits="userSpaceOnUse">
+            <circle cx="10" cy="10" r="1.2" fill="#c5cfdd"></circle>
+          </pattern>
+          <radialGradient id="glow">
+            <stop offset="0" stop-color="#ffd84d" stop-opacity=".95"></stop>
+            <stop offset=".45" stop-color="#ffd84d" stop-opacity=".45"></stop>
+            <stop offset="1" stop-color="#ffd84d" stop-opacity="0"></stop>
+          </radialGradient>
+        </defs>
+        <rect x="-20000" y="-20000" width="40000" height="40000" fill="url(#grid)"></rect>
+        <g id="layer-wires"></g>
+        <g id="layer-comps"></g>
+        <g id="layer-labels"></g>
+        <g id="layer-terms"></g>
+        <path id="temp-wire" d=""></path>
+      </svg>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+      <div id="pending-hint" class="pending-hint" aria-live="polite" hidden></div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <section class="card" aria-labelledby="sel-title">
+      <h2 id="sel-title">选中对象</h2>
+      <div id="sel-body"></div>
+    </section>
+    <section class="card" aria-labelledby="res-title">
+      <h2 id="res-title">计算结果</h2>
+      <div id="results"></div>
+    </section>
+    <section class="card" aria-labelledby="help-title">
+      <h2 id="help-title">操作说明</h2>
+      <ol>
+        <li>点击“添加”放置元件，按住元件主体拖动即可移动（自动吸附网格，连线随之移动）。</li>
+        <li><b>连线：</b>从一个端子（元件两端的小圆点）拖到另一个端子后松开；触屏上也可以先点一个端子、再点另一个端子。</li>
+        <li>点击元件后在“选中对象”中修改电压/电阻、旋转或删除；直接点击开关可切换闭合/断开。</li>
+        <li>点击导线可选中并删除；删除元件会同时清除与它相连的导线。</li>
+        <li>拖动空白处平移画布，滚轮或双指捏合缩放；快捷键：<kbd>Delete</kbd> 删除、<kbd>R</kbd> 旋转、<kbd>Esc</kbd> 取消。</li>
+        <li>“一键重置”恢复默认串联电路；“预设”可快速载入串联、并联、混联与短路演示。</li>
+      </ol>
+    </section>
+    <section class="card" aria-labelledby="model-title">
+      <h2 id="model-title">模型说明（简化模型）</h2>
+      <ul>
+        <li>只考虑直流稳态：理想电池无内阻；导线电阻为零；闭合开关视为 0 Ω 理想导通，断开开关视为理想断路。</li>
+        <li>由导线连在一起的所有端子属于同一节点；以电池负极为参考点（0 V），用修正节点分析法联立 KCL/KVL 求解。</li>
+        <li>灯泡按<b>固定电阻</b>计算，不考虑灯丝温度变化；亮度 = 实际功率 ÷ 满亮功率（上限 100%），仅作示意。</li>
+        <li>电源被零电阻回路短接、理想电源电压相互冲突时电路无解，会给出提示而不是显示伪造的有限电流；零电阻回路中的电流分配不唯一时标记为“不唯一”。</li>
+        <li>箭头表示电流的实际方向（正电荷移动方向），图中数值显示大小。</li>
+      </ul>
+    </section>
+  </aside>
+</main>
+<noscript><p style="padding:16px">此页面需要启用 JavaScript 才能运行电路求解。</p></noscript>
+<script>
+(function () {
+  'use strict';
+
+  const GRID = 20;
+  const HALF = 40;
+  const S_MIN = 0.2;
+  const S_MAX = 5;
+  const TYPES = {
+    battery: { label: '电池', prefix: 'E' },
+    resistor: { label: '电阻', prefix: 'R' },
+    switch: { label: '开关', prefix: 'S' },
+    lamp: { label: '灯泡', prefix: 'L' },
+  };
+  const LIMITS = {
+    V: { min: 0, max: 1000, unit: 'V', label: '电压', range: '0 ~ 1000 V' },
+    R: { min: 0.1, max: 1e7, unit: 'Ω', label: '电阻', range: '0.1 Ω ~ 10 MΩ' },
+    P: { min: 0.01, max: 1000, unit: 'W', label: '满亮功率', range: '0.01 ~ 1000 W' },
+  };
+
+  const $ = (s) => document.querySelector(s);
+  const svg = $('#board');
+  const layers = {
+    wires: $('#layer-wires'),
+    comps: $('#layer-comps'),
+    labels: $('#layer-labels'),
+    terms: $('#layer-terms'),
+  };
+  const tempWire = $('#temp-wire');
+
+  let state = blankState();
+  let result = null;
+  const view = { cx: 340, cy: 240, s: 1 };
+  const opts = { values: true, nodes: false };
+  const routes = new Map();
+  let hoverTerm = null;
+  let labelK = 1;
+
+  function blankState() {
+    return { comps: [], wires: [], seq: { E: 0, R: 0, S: 0, L: 0, W: 0, id: 0 }, selected: null, pending: null };
+  }
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const snap = (v) => Math.round(v / GRID) * GRID;
+  const compById = (id) => state.comps.find((c) => c.id === id);
+  const wireById = (id) => state.wires.find((w) => w.id === id);
+
+  function clean(v) { return Math.abs(v) < 1e-12 ? 0 : v; }
+  function num(v) {
+    v = clean(v);
+    const a = Math.abs(v);
+    if (a === 0) return '0';
+    if (a >= 1e5 || a < 1e-4) return v.toExponential(3).replace(/\.?0+e/, 'e');
+    return String(+v.toPrecision(4));
+  }
+  function fmtI(v) {
+    if (v === null || v === undefined) return '—';
+    v = clean(v);
+    const a = Math.abs(v);
+    if (a === 0) return '0 A';
+    return a >= 1e-3 ? num(v) + ' A' : num(v * 1000) + ' mA';
+  }
+  function fmtU(v) { return v === null || v === undefined ? '—' : num(v) + ' V'; }
+  function fmtP(v) {
+    if (v === null || v === undefined) return '—';
+    v = clean(v);
+    const a = Math.abs(v);
+    if (a === 0) return '0 W';
+    return a >= 1e-3 ? num(v) + ' W' : num(v * 1000) + ' mW';
+  }
+  function fmtR(v) { return v >= 1e3 ? num(v / 1e3) + ' kΩ' : num(v) + ' Ω'; }
+  function mix(c1, c2, t) {
+    const a = parseInt(c1.slice(1), 16), b = parseInt(c2.slice(1), 16);
+    const ch = (sh) => Math.round(((a >> sh) & 255) * (1 - t) + ((b >> sh) & 255) * t);
+    return 'rgb(' + ch(16) + ',' + ch(8) + ',' + ch(0) + ')';
+  }
+
+  // ---------- geometry ----------
+  function rotPt(x, y, rot) {
+    switch (((rot % 360) + 360) % 360) {
+      case 90: return [-y, x];
+      case 180: return [-x, -y];
+      case 270: return [y, -x];
+      default: return [x, y];
+    }
+  }
+  const termId = (c, i) => c.id + ':' + i;
+  function parseTerm(t) {
+    const k = t.lastIndexOf(':');
+    const c = compById(t.slice(0, k));
+    return c ? { c, i: +t.slice(k + 1) } : null;
+  }
+  function termPos(c, i) {
+    const d = rotPt(i ? HALF : -HALF, 0, c.rot);
+    return { x: c.x + d[0], y: c.y + d[1] };
+  }
+  function termDir(c, i) {
+    const d = rotPt(i ? 1 : -1, 0, c.rot);
+    return { x: d[0], y: d[1] };
+  }
+  function termLabel(c, i) {
+    if (c.type === 'battery') return i ? '负极(−)' : '正极(+)';
+    return '端子' + (i + 1);
+  }
+  function termName(t) {
+    const p = parseTerm(t);
+    return p ? p.c.name + ' ' + termLabel(p.c, p.i) : t;
+  }
+
+  // Orthogonal wire routing: try a few L/Z shapes and keep the one with fewest turns and no backtracking.
+  function route(a, da, b, db) {
+    const ST = 14;
+    const A1 = { x: a.x + da.x * ST, y: a.y + da.y * ST };
+    const B1 = { x: b.x + db.x * ST, y: b.y + db.y * ST };
+    const mx = (A1.x + B1.x) / 2, my = (A1.y + B1.y) / 2;
+    const candidates = [
+      [{ x: B1.x, y: A1.y }],
+      [{ x: A1.x, y: B1.y }],
+      [{ x: mx, y: A1.y }, { x: mx, y: B1.y }],
+      [{ x: A1.x, y: my }, { x: B1.x, y: my }],
+    ];
+    let best = null, bestScore = Infinity;
+    for (const mid of candidates) {
+      const pts = dedupe([a, A1].concat(mid, [B1, b]));
+      const sc = routeScore(pts);
+      if (sc < bestScore) { bestScore = sc; best = pts; }
+    }
+    return best;
+  }
+  function dedupe(pts) {
+    const out = [];
+    for (const p of pts) {
+      const q = out[out.length - 1];
+      if (!q || Math.abs(q.x - p.x) > 1e-6 || Math.abs(q.y - p.y) > 1e-6) out.push(p);
+    }
+    return out;
+  }
+  function routeScore(pts) {
+    let turns = 0, back = 0, len = 0, prev = null;
+    for (let i = 1; i < pts.length; i++) {
+      const dx = pts[i].x - pts[i - 1].x, dy = pts[i].y - pts[i - 1].y;
+      len += Math.abs(dx) + Math.abs(dy);
+      const d = { x: Math.sign(dx), y: Math.sign(dy) };
+      if (prev) {
+        if (d.x === -prev.x && d.y === -prev.y) back++;
+        else if (d.x !== prev.x || d.y !== prev.y) turns++;
+      }
+      prev = d;
+    }
+    return back * 1000 + turns * 10 + len * 0.001;
+  }
+  function distToSeg(p, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const l2 = dx * dx + dy * dy;
+    let t = l2 ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2 : 0;
+    t = clamp(t, 0, 1);
+    return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+  }
+
+  // ---------- circuit model ----------
+  function makeComp(type, x, y, rot, props) {
+    const t = TYPES[type];
+    const c = { id: 'c' + (++state.seq.id), type, name: t.prefix + (++state.seq[t.prefix]), x, y, rot: rot || 0 };
+    if (type === 'battery') c.V = 12;
+    if (type === 'resistor') c.R = 100;
+    if (type === 'lamp') { c.R = 60; c.P = 2.4; }
+    if (type === 'switch') c.closed = true;
+    Object.assign(c, props || {});
+    state.comps.push(c);
+    return c;
+  }
+  function makeWire(a, b) {
+    const w = { id: 'w' + (++state.seq.W), a, b };
+    state.wires.push(w);
+    return w;
+  }
+
+  // ---------- DC solver (modified nodal analysis) ----------
+  function gauss(A, z) {
+    const n = z.length;
+    let scale = 0;
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) scale = Math.max(scale, Math.abs(A[r][c]));
+    const tol = 1e-12 * (scale || 1);
+    for (let col = 0; col < n; col++) {
+      let piv = col, max = Math.abs(A[col][col]);
+      for (let r = col + 1; r < n; r++) {
+        const v = Math.abs(A[r][col]);
+        if (v > max) { max = v; piv = r; }
+      }
+      if (max < tol) return null;
+      if (piv !== col) {
+        const t = A[col]; A[col] = A[piv]; A[piv] = t;
+        const tz = z[col]; z[col] = z[piv]; z[piv] = tz;
+      }
+      for (let r = col + 1; r < n; r++) {
+        const f = A[r][col] / A[col][col];
+        if (!f) continue;
+        for (let c = col; c < n; c++) A[r][c] -= f * A[col][c];
+        z[r] -= f * z[col];
+      }
+    }
+    const x = new Array(n);
+    for (let r = n - 1; r >= 0; r--) {
+      let s = z[r];
+      for (let c = r + 1; c < n; c++) s -= A[r][c] * x[c];
+      x[r] = s / A[r][r];
+    }
+    return x;
+  }
+
+  function analyze() {
+    const comps = state.comps;
+    const parent = new Map();
+    const find = (x) => {
+      let r = x;
+      while (parent.get(r) !== r) r = parent.get(r);
+      while (parent.get(x) !== r) { const n = parent.get(x); parent.set(x, r); x = n; }
+      return r;
+    };
+    for (const c of comps) for (const i of [0, 1]) parent.set(termId(c, i), termId(c, i));
+    for (const w of state.wires) {
+      if (!parent.has(w.a) || !parent.has(w.b)) continue;
+      const ra = find(w.a), rb = find(w.b);
+      if (ra !== rb) parent.set(ra, rb);
+    }
+    const nodeIndex = new Map(), nodeTerms = [], termNode = new Map();
+    for (const c of comps) {
+      for (const i of [0, 1]) {
+        const t = termId(c, i), r = find(t);
+        if (!nodeIndex.has(r)) { nodeIndex.set(r, nodeTerms.length); nodeTerms.push([]); }
+        const k = nodeIndex.get(r);
+        termNode.set(t, k);
+        nodeTerms[k].push(t);
+      }
+    }
+    const N = nodeTerms.length;
+    const els = comps.map((c) => ({
+      c,
+      a: termNode.get(termId(c, 0)),
+      b: termNode.get(termId(c, 1)),
+      kind: c.type === 'battery' ? 'V' : c.type === 'switch' ? (c.closed ? 'V' : 'open') : 'R',
+      V: c.type === 'battery' ? c.V : 0,
+      R: c.R,
+    }));
+    const gp = Array.from({ length: N }, (_, i) => i);
+    const gf = (x) => { while (gp[x] !== x) { gp[x] = gp[gp[x]]; x = gp[x]; } return x; };
+    for (const e of els) if (e.kind !== 'open') { const ra = gf(e.a), rb = gf(e.b); if (ra !== rb) gp[ra] = rb; }
+    const groups = new Map();
+    for (let n = 0; n < N; n++) {
+      const r = gf(n);
+      if (!groups.has(r)) groups.set(r, { nodes: [], els: [] });
+      groups.get(r).nodes.push(n);
+    }
+    for (const e of els) if (e.kind !== 'open') groups.get(gf(e.a)).els.push(e);
+
+    const res = {
+      N, termNode, nodeTerms,
+      nodeV: new Array(N).fill(null),
+      ground: new Set(),
+      badNodes: new Set(),
+      comp: new Map(),
+      errors: [], warnings: [], infos: [],
+    };
+    for (const g of groups.values()) solveGroup(g, res);
+    for (const e of els) {
+      if (e.kind !== 'open') continue;
+      const va = res.nodeV[e.a], vb = res.nodeV[e.b];
+      const known = gf(e.a) === gf(e.b) && va !== null && vb !== null;
+      res.comp.set(e.c.id, { status: 'open', I: 0, U: known ? clean(va - vb) : null, P: 0, brightness: 0 });
+    }
+    for (const e of els) {
+      if (e.c.type !== 'battery') continue;
+      const info = res.comp.get(e.c.id);
+      if (info && info.status === 'ok' && Math.abs(info.I) < 1e-12) res.infos.push(e.c.name + ' 所在电路没有闭合回路（开路），电流为 0。');
+    }
+    return res;
+  }
+
+  function names(list) { return list.map((e) => e.c.name).join('、'); }
+
+  function pathBetween(adj, from, to) {
+    if (from === to) return [];
+    const prev = new Map([[from, null]]);
+    const queue = [from];
+    while (queue.length) {
+      const n = queue.shift();
+      if (n === to) break;
+      for (const ed of adj.get(n) || []) {
+        if (prev.has(ed.to)) continue;
+        prev.set(ed.to, { n, e: ed.e });
+        queue.push(ed.to);
+      }
+    }
+    const out = [];
+    let cur = to;
+    while (prev.get(cur)) { const p = prev.get(cur); out.push(p.e); cur = p.n; }
+    return out;
+  }
+
+  function solveGroup(g, res) {
+    // Weighted union-find over zero-resistance branches (batteries, closed switches) detects source loops.
+    const par = new Map(), off = new Map();
+    for (const n of g.nodes) { par.set(n, n); off.set(n, 0); }
+    const find = (n) => {
+      let o = 0, x = n;
+      const path = [];
+      while (par.get(x) !== x) { path.push(x); o += off.get(x); x = par.get(x); }
+      let acc = o;
+      for (const y of path) { const oy = off.get(y); par.set(y, x); off.set(y, acc); acc -= oy; }
+      return [x, o];
+    };
+    const adj = new Map(g.nodes.map((n) => [n, []]));
+    const forest = [], loops = [];
+    for (const e of g.els) {
+      if (e.kind !== 'V') continue;
+      const [ra, oa] = find(e.a), [rb, ob] = find(e.b);
+      if (ra === rb) {
+        const implied = oa - ob;
+        const ok = Math.abs(implied - e.V) <= 1e-9 * Math.max(1, Math.abs(e.V));
+        loops.push({ closing: e, path: pathBetween(adj, e.a, e.b), ok });
+      } else {
+        par.set(ra, rb);
+        off.set(ra, e.V - oa + ob);
+        adj.get(e.a).push({ to: e.b, e });
+        adj.get(e.b).push({ to: e.a, e });
+        forest.push(e);
+      }
+    }
+
+    const bad = loops.filter((l) => !l.ok);
+    if (bad.length) {
+      const inLoop = new Set();
+      for (const l of bad) {
+        const list = l.path.concat([l.closing]);
+        list.forEach((e) => inLoop.add(e));
+        const bats = list.filter((e) => e.c.type === 'battery');
+        const sws = list.filter((e) => e.c.type === 'switch');
+        let msg;
+        if (bats.length <= 1) {
+          msg = '电源短路：' + names(bats) + ' 的正负极之间只有' + (sws.length ? '闭合开关 ' + names(sws) + ' 和导线' : '导线') +
+            '（零电阻）直接相连，理想电源将输出无穷大电流，该电路无法求解。请断开开关或删除短接导线。';
+        } else {
+          msg = '理想电源冲突：' + names(bats) + (sws.length ? '（经闭合开关 ' + names(sws) + '）' : '') +
+            ' 构成只含理想电源与零电阻支路的回路，回路电动势之和不为零，不满足基尔霍夫电压定律，电路无解。请修改电压或断开其中一路。';
+        }
+        res.errors.push({ msg, ids: list.map((e) => e.c.id) });
+      }
+      for (const e of g.els) res.comp.set(e.c.id, { status: inLoop.has(e) ? 'short' : 'error', I: null, U: null, P: null, brightness: 0 });
+      g.nodes.forEach((n) => res.badNodes.add(n));
+      return;
+    }
+
+    const indet = new Set();
+    for (const l of loops) { indet.add(l.closing); l.path.forEach((e) => indet.add(e)); }
+    if (indet.size) {
+      const list = [...indet];
+      const onlySwitches = list.every((e) => e.c.type === 'switch');
+      res.warnings.push({
+        msg: '电流无唯一解：' + names(list) + (onlySwitches
+          ? ' 的两端已被导线或其他闭合开关直接连通（零电阻并联），'
+          : ' 构成电压一致的理想电源/零电阻并联回路，') +
+          '回路内各支路的电流分配不唯一，这些元件的电流显示为“不唯一”；节点电压与其余元件照常求解。',
+        ids: list.map((e) => e.c.id),
+      });
+    }
+
+    let ground = g.nodes[0];
+    const bat = g.els.find((e) => e.c.type === 'battery');
+    if (bat) ground = bat.b;
+    res.ground.add(ground);
+    const idx = new Map();
+    let n = 0;
+    for (const nd of g.nodes) if (nd !== ground) idx.set(nd, n++);
+    const size = n + forest.length;
+    const ix = (nd) => (nd === ground ? -1 : idx.get(nd));
+    let x = [];
+    if (size) {
+      const A = Array.from({ length: size }, () => new Float64Array(size));
+      const z = new Float64Array(size);
+      for (const e of g.els) {
+        if (e.kind !== 'R') continue;
+        const G = 1 / e.R, a = ix(e.a), b = ix(e.b);
+        if (a >= 0) A[a][a] += G;
+        if (b >= 0) A[b][b] += G;
+        if (a >= 0 && b >= 0) { A[a][b] -= G; A[b][a] -= G; }
+      }
+      forest.forEach((e, k) => {
+        const r = n + k, a = ix(e.a), b = ix(e.b);
+        if (a >= 0) { A[a][r] += 1; A[r][a] += 1; }
+        if (b >= 0) { A[b][r] -= 1; A[r][b] -= 1; }
+        z[r] = e.V;
+      });
+      x = gauss(A, z);
+      if (!x || x.some((v) => !Number.isFinite(v))) {
+        res.errors.push({ msg: '该电路的方程组没有唯一解（' + names(g.els) + '），已停止求解，请检查连线。', ids: g.els.map((e) => e.c.id) });
+        for (const e of g.els) res.comp.set(e.c.id, { status: 'error', I: null, U: null, P: null, brightness: 0 });
+        g.nodes.forEach((nd) => res.badNodes.add(nd));
+        return;
+      }
+    }
+    for (const nd of g.nodes) res.nodeV[nd] = nd === ground ? 0 : clean(x[idx.get(nd)]);
+    const branch = new Map();
+    forest.forEach((e, k) => branch.set(e, x[n + k]));
+    for (const e of g.els) {
+      const U = clean(res.nodeV[e.a] - res.nodeV[e.b]);
+      let info;
+      if (e.kind === 'R') {
+        const I = clean(U / e.R);
+        info = { status: 'ok', U, I, P: clean(U * I) };
+        if (e.c.type === 'lamp') info.brightness = clamp(info.P / e.c.P, 0, 1);
+      } else if (indet.has(e)) {
+        info = { status: 'indet', U, I: null, P: null };
+      } else {
+        const I = clean(branch.get(e));
+        info = { status: 'ok', U, I, P: clean(U * I) };
+      }
+      res.comp.set(e.c.id, info);
+    }
+  }
+
+  // ---------- rendering ----------
+  function labelPos(c) {
+    const k = labelK;
+    const vertical = c.rot === 90 || c.rot === 270;
+    if (!vertical) {
+      return { name: { x: c.x, y: c.y - 30, anchor: 'middle' }, read: { x: c.x, y: c.y + 46 * k, anchor: 'middle', step: 14 * k }, arrow: { x: c.x, y: c.y + 27 * k } };
+    }
+    return { name: { x: c.x + 26, y: c.y - 6, anchor: 'start' }, read: { x: c.x - 31 * k, y: c.y - 3, anchor: 'end', step: 14 * k }, arrow: { x: c.x - 22 * k, y: c.y } };
+  }
+  function valueText(c) {
+    if (c.type === 'battery') return num(c.V) + ' V';
+    if (c.type === 'switch') return c.closed ? '闭合' : '断开';
+    return fmtR(c.R);
+  }
+  function readoutLines(c, info) {
+    if (!info) return [];
+    if (info.status === 'short') return [['短路！无解', 'bad']];
+    if (info.status === 'error') return [['无法求解', 'bad']];
+    if (info.status === 'indet') return [['I 不唯一', 'warn'], ['U = ' + fmtU(Math.abs(info.U)), '']];
+    if (info.status === 'open') return [['I = 0 A（断开）', 'dim'], [info.U === null ? 'U 不确定' : 'U = ' + fmtU(Math.abs(info.U)), 'dim']];
+    const lines = [['I = ' + fmtI(Math.abs(info.I)), ''], ['U = ' + fmtU(Math.abs(info.U)), '']];
+    if (c.type === 'lamp') lines.push(['亮度 ' + Math.round(info.brightness * 100) + '%', '']);
+    return lines;
+  }
+  function arrowSVG(x, y, dx, dy, color) {
+    const L = 11 * labelK, h = 7 * labelK, w = 4.5 * labelK;
+    const tx = x + dx * L, ty = y + dy * L;
+    const px = -dy, py = dx;
+    return '<line class="flow" x1="' + (x - dx * L) + '" y1="' + (y - dy * L) + '" x2="' + (tx - dx * 5) + '" y2="' + (ty - dy * 5) +
+      '" stroke="' + color + '"/><polygon points="' + tx + ',' + ty + ' ' + (tx - dx * h + px * w) + ',' + (ty - dy * h + py * w) + ' ' +
+      (tx - dx * h - px * w) + ',' + (ty - dy * h - py * w) + '" fill="' + color + '"/>';
+  }
+  function isSel(kind, id) { return !!state.selected && state.selected.kind === kind && state.selected.id === id; }
+
+  function symbol(c, info) {
+    let out = isSel('comp', c.id) ? '<rect class="selbox" x="-47" y="-27" width="94" height="54" rx="10"/>' : '';
+    const leads = (r) => '<line class="lead" x1="-40" y1="0" x2="' + -r + '" y2="0"/><line class="lead" x1="' + r + '" y1="0" x2="40" y2="0"/>';
+    switch (c.type) {
+      case 'battery':
+        out += leads(6) + '<line class="plate" x1="-6" y1="-18" x2="-6" y2="18"/><line class="plate neg" x1="6" y1="-10" x2="6" y2="10"/>';
+        break;
+      case 'resistor':
+        out += leads(24) + '<rect class="body" x="-24" y="-9" width="48" height="18" rx="2"/>';
+        break;
+      case 'lamp': {
+        const b = info && info.brightness ? info.brightness : 0;
+        out += '<circle r="34" fill="url(#glow)" opacity="' + Math.pow(b, 0.7).toFixed(3) + '"/>' + leads(15) +
+          '<circle class="bulb" r="15" fill="' + mix('#ffffff', '#ffd43b', b) + '"/>' +
+          '<line class="x" x1="-10.6" y1="-10.6" x2="10.6" y2="10.6"/><line class="x" x1="-10.6" y1="10.6" x2="10.6" y2="-10.6"/>';
+        break;
+      }
+      case 'switch':
+        out += leads(20) + '<circle class="pin" cx="-20" r="3.4"/><circle class="pin" cx="20" r="3.4"/>' +
+          (c.closed ? '<line class="lever" x1="-20" y1="0" x2="20" y2="0"/>' : '<line class="lever" x1="-20" y1="0" x2="15" y2="-17"/>');
+        break;
+    }
+    return out;
+  }
+
+  function render() {
+    routes.clear();
+    let html = '';
+    for (const w of state.wires) {
+      const ta = parseTerm(w.a), tb = parseTerm(w.b);
+      if (!ta || !tb) continue;
+      const pts = route(termPos(ta.c, ta.i), termDir(ta.c, ta.i), termPos(tb.c, tb.i), termDir(tb.c, tb.i));
+      routes.set(w.id, pts);
+      const bad = result && result.badNodes.has(result.termNode.get(w.a));
+      html += '<path class="wire' + (isSel('wire', w.id) ? ' sel' : '') + (bad ? ' bad' : '') + '" d="M' + pts.map((p) => p.x + ' ' + p.y).join(' L') + '"/>';
+    }
+    layers.wires.innerHTML = html;
+
+    html = '';
+    for (const c of state.comps) {
+      const info = result && result.comp.get(c.id);
+      html += '<g class="comp ' + c.type + (info ? ' st-' + info.status : '') + '" transform="translate(' + c.x + ' ' + c.y + ') rotate(' + c.rot + ')">' + symbol(c, info) + '</g>';
+    }
+    layers.comps.innerHTML = html;
+
+    html = '';
+    for (const c of state.comps) {
+      const info = result && result.comp.get(c.id);
+      const pos = labelPos(c);
+      html += '<text class="lname" x="' + pos.name.x + '" y="' + pos.name.y + '" text-anchor="' + pos.name.anchor + '">' + esc(c.name + ' ' + valueText(c)) + '</text>';
+      if (c.type === 'battery') {
+        const p1 = rotPt(-17, -13, c.rot), p2 = rotPt(17, -13, c.rot);
+        html += '<text class="pol" x="' + (c.x + p1[0]) + '" y="' + (c.y + p1[1] + 5) + '" text-anchor="middle">+</text>' +
+          '<text class="pol" x="' + (c.x + p2[0]) + '" y="' + (c.y + p2[1] + 5) + '" text-anchor="middle">−</text>';
+      }
+      if (!opts.values || !info) continue;
+      readoutLines(c, info).forEach((ln, k) => {
+        html += '<text class="lread' + (ln[1] ? ' ' + ln[1] : '') + '" x="' + pos.read.x + '" y="' + (pos.read.y + k * pos.read.step) + '" text-anchor="' + pos.read.anchor + '">' + esc(ln[0]) + '</text>';
+      });
+      if (info.status === 'ok' && info.I !== null && Math.abs(info.I) > 1e-12) {
+        const d = rotPt(Math.sign(info.I), 0, c.rot);
+        html += arrowSVG(pos.arrow.x, pos.arrow.y, d[0], d[1], '#2563eb');
+      }
+    }
+    if (opts.nodes && result) {
+      for (let k = 0; k < result.N; k++) {
+        const v = result.nodeV[k];
+        const tp = parseTerm(result.nodeTerms[k][0]);
+        if (!tp) continue;
+        const p = termPos(tp.c, tp.i);
+        const label = v === null ? 'φ ?' : 'φ=' + fmtU(v) + (result.ground.has(k) ? '（参考）' : '');
+        const wdt = (label.length * 7 + 10) * labelK;
+        html += '<g class="node-tag" transform="translate(' + (p.x + 7) + ' ' + (p.y - 25 * labelK) + ')"><rect width="' + wdt + '" height="' + 17 * labelK + '" rx="' + 8.5 * labelK + '"/><text x="' + wdt / 2 + '" y="' + 12.5 * labelK + '" text-anchor="middle">' + esc(label) + '</text></g>';
+      }
+    }
+    layers.labels.innerHTML = html;
+
+    const count = new Map();
+    for (const w of state.wires) { count.set(w.a, (count.get(w.a) || 0) + 1); count.set(w.b, (count.get(w.b) || 0) + 1); }
+    html = '';
+    for (const c of state.comps) {
+      for (const i of [0, 1]) {
+        const t = termId(c, i), p = termPos(c, i), n = count.get(t) || 0;
+        if (state.pending === t) html += '<circle class="ring pending" cx="' + p.x + '" cy="' + p.y + '" r="12"/>';
+        else if (hoverTerm === t) html += '<circle class="ring" cx="' + p.x + '" cy="' + p.y + '" r="11"/>';
+        html += '<circle class="term ' + (n ? 'on' : 'free') + '" cx="' + p.x + '" cy="' + p.y + '" r="' + (n > 1 ? 5.2 : 4.6) + '"/>';
+      }
+    }
+    layers.terms.innerHTML = html;
+  }
+
+  function renderStatus() {
+    let html = '';
+    const hint = $('#pending-hint');
+    hint.hidden = !state.pending;
+    hint.innerHTML = state.pending ? '已选中 <b>' + esc(termName(state.pending)) + '</b>：点击另一个端子完成连线，点空白处取消' : '';
+    for (const e of result.errors) html += '<div class="msg error">⚠ ' + esc(e.msg) + '</div>';
+    for (const w of result.warnings) html += '<div class="msg warn">△ ' + esc(w.msg) + '</div>';
+    if (!state.comps.length) {
+      html += '<div class="msg note">画布为空：点击“添加”放置元件，或选择一个预设电路。</div>';
+    } else if (!result.errors.length) {
+      const bats = state.comps.filter((c) => c.type === 'battery');
+      const parts = bats.map((c) => {
+        const info = result.comp.get(c.id);
+        if (!info || info.I === null) return c.name + ' 电流不唯一';
+        return c.name + ' 输出电流 ' + fmtI(Math.max(0, -info.I)) + (info.I > 1e-12 ? '（被反向充电 ' + fmtI(info.I) + '）' : '');
+      });
+      html += '<div class="msg ok">✓ 已求解：' + result.N + ' 个节点，' + state.comps.length + ' 个元件，' + state.wires.length + ' 根导线' +
+        (parts.length ? '。' + esc(parts.join('；')) : '。电路中没有电源，所有电流为 0。') + '</div>';
+    }
+    for (const i of result.infos) html += '<div class="msg note">' + esc(i) + '</div>';
+    $('#status').innerHTML = html;
+  }
+
+  function flowText(c, info) {
+    if (!info) return '';
+    if (info.status === 'open') return '断路';
+    if (info.status === 'indet') return '不唯一';
+    if (info.status !== 'ok') return '—';
+    if (Math.abs(info.I) < 1e-12) return '无电流';
+    const d = rotPt(Math.sign(info.I), 0, c.rot);
+    const glyph = d[0] > 0 ? '→' : d[0] < 0 ? '←' : d[1] > 0 ? '↓' : '↑';
+    const from = info.I > 0 ? 0 : 1;
+    const desc = c.type === 'battery' ? (info.I < 0 ? '放电' : '充电') : termLabel(c, from).replace('端子', '') + '→' + termLabel(c, 1 - from).replace('端子', '');
+    return '<span class="arrow">' + glyph + '</span> ' + esc(desc);
+  }
+
+  function renderResults() {
+    const box = $('#results');
+    if (!state.comps.length) { box.innerHTML = '<p class="hint">暂无元件。</p>'; return; }
+    let rows = '';
+    for (const c of state.comps) {
+      const info = result.comp.get(c.id) || {};
+      const cls = ['clickable', isSel('comp', c.id) ? 'is-sel' : '', info.status === 'short' || info.status === 'error' ? 'bad' : '', info.status === 'indet' ? 'indet' : ''].join(' ');
+      let I = info.status === 'indet' ? '不唯一' : info.status === 'short' || info.status === 'error' ? '无解' : fmtI(info.I === null || info.I === undefined ? null : Math.abs(info.I));
+      let P = info.P === null || info.P === undefined ? '—' : c.type === 'battery' ? '输出 ' + fmtP(-info.P) : fmtP(Math.abs(info.P));
+      if (c.type === 'lamp' && info.status === 'ok') P += ' · ' + Math.round(info.brightness * 100) + '%';
+      rows += '<tr class="' + cls + '" data-select="' + c.id + '"><td><b>' + esc(c.name) + '</b> ' + TYPES[c.type].label + '</td><td>' + esc(valueText(c)) + '</td><td>' +
+        esc(info.U === null || info.U === undefined ? '—' : fmtU(Math.abs(info.U))) + '</td><td>' + esc(I) + '</td><td>' + flowText(c, info) + '</td><td>' + esc(P) + '</td></tr>';
+    }
+    box.innerHTML = '<div class="table-wrap"><table><thead><tr><th>元件</th><th>参数</th><th>电压</th><th>电流</th><th>方向</th><th>功率</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<p class="sum muted">电压、电流显示大小，方向列与图中箭头一致（实际电流方向）。电池功率为输出功率。</p>';
+  }
+
+  let panelKey = null;
+  function readoutHTML(c) {
+    const info = result.comp.get(c.id);
+    if (!info) return '';
+    const rows = [];
+    if (info.status === 'short' || info.status === 'error') rows.push('<span style="color:var(--danger)">该元件所在电路无解（见上方提示）。</span>');
+    else {
+      rows.push('电压：<b>' + fmtU(info.U === null ? null : Math.abs(info.U)) + '</b>');
+      rows.push('电流：<b>' + (info.status === 'indet' ? '不唯一' : fmtI(Math.abs(info.I))) + '</b> ' + flowText(c, info));
+      if (info.P !== null) rows.push((c.type === 'battery' ? '输出功率：' : '功率：') + '<b>' + fmtP(c.type === 'battery' ? -info.P : Math.abs(info.P)) + '</b>');
+      if (c.type === 'lamp') rows.push('亮度：<b>' + Math.round((info.brightness || 0) * 100) + '%</b>（功率 ÷ 满亮功率，简化模型）');
+    }
+    return rows.map((r) => '<div>' + r + '</div>').join('');
+  }
+  function fieldHTML(c, prop) {
+    const lim = LIMITS[prop];
+    return '<label class="field">' + lim.label + '（' + lim.range + '）<input type="number" step="any" inputmode="decimal" data-prop="' + prop +
+      '" value="' + c[prop] + '" min="' + lim.min + '" max="' + lim.max + '"></label><div class="ferr" data-err="' + prop + '"></div>';
+  }
+  function renderPanel(force) {
+    const sel = state.selected;
+    const key = sel ? sel.kind + ':' + sel.id : '';
+    const body = $('#sel-body');
+    if (force || key !== panelKey) {
+      panelKey = key;
+      if (!sel) {
+        body.innerHTML = '<p class="hint">点击画布中的元件或导线进行选择。选中元件后可修改参数、旋转或删除。</p>';
+      } else if (sel.kind === 'wire') {
+        const w = wireById(sel.id);
+        const nodeV = result.nodeV[result.termNode.get(w.a)];
+        body.innerHTML = '<div class="sel-head"><span class="badge">导线</span><strong>' + esc(w.id.toUpperCase()) + '</strong></div>' +
+          '<p class="hint">连接 ' + esc(termName(w.a)) + ' ↔ ' + esc(termName(w.b)) + '。理想导线电阻为零，两端属于同一节点' +
+          (nodeV === null ? '' : '（电位 ' + esc(fmtU(nodeV)) + '）') + '。</p><div class="btnrow"><button type="button" class="danger" data-act="delete">删除导线</button></div>';
+      } else {
+        const c = compById(sel.id);
+        let fields = '';
+        if (c.type === 'battery') fields = fieldHTML(c, 'V');
+        if (c.type === 'resistor') fields = fieldHTML(c, 'R');
+        if (c.type === 'lamp') fields = fieldHTML(c, 'R') + fieldHTML(c, 'P');
+        body.innerHTML = '<div class="sel-head"><span class="badge">' + TYPES[c.type].label + '</span><strong>' + esc(c.name) + '</strong></div>' + fields +
+          (c.type === 'switch' ? '<p class="hint" style="margin-bottom:6px">当前状态：<b>' + (c.closed ? '闭合（导通）' : '断开（断路）') + '</b></p>' : '') +
+          '<div class="btnrow">' + (c.type === 'switch' ? '<button type="button" class="primary" data-act="toggle">' + (c.closed ? '断开开关' : '闭合开关') + '</button>' : '') +
+          '<button type="button" data-act="rotate">旋转 90°</button><button type="button" class="danger" data-act="delete">删除元件</button></div>' +
+          '<div id="sel-readout" class="readout"></div>';
+      }
+    }
+    const ro = $('#sel-readout');
+    if (ro && sel && sel.kind === 'comp') ro.innerHTML = readoutHTML(compById(sel.id));
+  }
+
+  // ---------- actions ----------
+  function update(forcePanel) {
+    if (state.selected && (state.selected.kind === 'comp' ? !compById(state.selected.id) : !wireById(state.selected.id))) state.selected = null;
+    if (state.pending && !parseTerm(state.pending)) state.pending = null;
+    result = analyze();
+    render();
+    renderStatus();
+    renderResults();
+    renderPanel(forcePanel);
+  }
+  let toastTimer = 0;
+  function toast(msg) {
+    const el = $('#toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+  function select(kind, id) {
+    state.selected = kind ? { kind, id } : null;
+    update();
+  }
+  function addComp(type) {
+    const r = svg.getBoundingClientRect();
+    const center = r.width ? clientToWorld(r.left + r.width / 2, r.top + r.height / 2) : { x: view.cx, y: view.cy };
+    let x = snap(center.x), y = snap(center.y);
+    for (let k = 0; k < 40 && state.comps.some((c) => Math.abs(c.x - x) < 60 && Math.abs(c.y - y) < 50); k++) {
+      x += 40; y += 40;
+    }
+    const c = makeComp(type, x, y, 0);
+    state.selected = { kind: 'comp', id: c.id };
+    update(true);
+    toast('已添加' + TYPES[type].label + ' ' + c.name + '，拖动可移动，从端子拖出可连线');
+  }
+  function deleteSelected() {
+    const sel = state.selected;
+    if (!sel) return;
+    if (sel.kind === 'wire') {
+      state.wires = state.wires.filter((w) => w.id !== sel.id);
+      toast('已删除导线');
+    } else {
+      const c = compById(sel.id);
+      if (!c) return;
+      const prefix = c.id + ':';
+      const before = state.wires.length;
+      state.wires = state.wires.filter((w) => !w.a.startsWith(prefix) && !w.b.startsWith(prefix));
+      state.comps = state.comps.filter((x) => x.id !== c.id);
+      if (state.pending && state.pending.startsWith(prefix)) state.pending = null;
+      toast('已删除 ' + c.name + (before - state.wires.length ? '，并清除 ' + (before - state.wires.length) + ' 根相关导线' : ''));
+    }
+    state.selected = null;
+    update(true);
+  }
+  function rotateSelected() {
+    const sel = state.selected;
+    if (!sel || sel.kind !== 'comp') return;
+    const c = compById(sel.id);
+    c.rot = (c.rot + 90) % 360;
+    update();
+  }
+  function toggleSwitch(c) {
+    c.closed = !c.closed;
+    update(true);
+    toast(c.name + (c.closed ? ' 已闭合' : ' 已断开'));
+  }
+  function connect(a, b) {
+    if (a === b) return false;
+    if (state.wires.some((w) => (w.a === a && w.b === b) || (w.a === b && w.b === a))) {
+      toast('这两个端子已经连接');
+      return false;
+    }
+    makeWire(a, b);
+    toast('已连接 ' + termName(a) + ' ↔ ' + termName(b));
+    return true;
+  }
+  function tapTerminal(t) {
+    if (state.pending && state.pending !== t) {
+      const from = state.pending;
+      state.pending = null;
+      connect(from, t);
+    } else if (state.pending === t) {
+      state.pending = null;
+      toast('已取消连线');
+    } else {
+      state.pending = t;
+    }
+    update();
+  }
+
+  // ---------- presets ----------
+  const T = termId;
+  const PRESETS = {
+    series: {
+      label: '串联电路（12 V，100 Ω + 200 Ω）',
+      build() {
+        const e = makeComp('battery', 100, 260, 90, { V: 12 });
+        const s = makeComp('switch', 240, 140, 0);
+        const r1 = makeComp('resistor', 400, 140, 0, { R: 100 });
+        const r2 = makeComp('resistor', 540, 260, 90, { R: 200 });
+        makeWire(T(e, 0), T(s, 0));
+        makeWire(T(s, 1), T(r1, 0));
+        makeWire(T(r1, 1), T(r2, 0));
+        makeWire(T(r2, 1), T(e, 1));
+      },
+    },
+    parallel: {
+      label: '并联电路（12 V，100 Ω ∥ 200 Ω，各带开关）',
+      build() {
+        const e = makeComp('battery', 100, 260, 90, { V: 12 });
+        const s1 = makeComp('switch', 300, 180, 90);
+        const r1 = makeComp('resistor', 300, 300, 90, { R: 100 });
+        const s2 = makeComp('switch', 480, 180, 90);
+        const r2 = makeComp('resistor', 480, 300, 90, { R: 200 });
+        makeWire(T(e, 0), T(s1, 0));
+        makeWire(T(s1, 0), T(s2, 0));
+        makeWire(T(s1, 1), T(r1, 0));
+        makeWire(T(s2, 1), T(r2, 0));
+        makeWire(T(r1, 1), T(e, 1));
+        makeWire(T(r2, 1), T(r1, 1));
+      },
+    },
+    mixed: {
+      label: '混联电路（R1 串联后接 灯泡 ∥ [S1 + R2]）',
+      build() {
+        const e = makeComp('battery', 100, 260, 90, { V: 12 });
+        const r1 = makeComp('resistor', 240, 140, 0, { R: 40 });
+        const l1 = makeComp('lamp', 360, 240, 90, { R: 60, P: 2.4 });
+        const s1 = makeComp('switch', 480, 140, 0);
+        const r2 = makeComp('resistor', 600, 240, 90, { R: 120 });
+        makeWire(T(e, 0), T(r1, 0));
+        makeWire(T(r1, 1), T(l1, 0));
+        makeWire(T(r1, 1), T(s1, 0));
+        makeWire(T(s1, 1), T(r2, 0));
+        makeWire(T(l1, 1), T(e, 1));
+        makeWire(T(r2, 1), T(e, 1));
+      },
+    },
+    short: {
+      label: '短路演示（闭合 S1 会把电源直接短接）',
+      build() {
+        const e = makeComp('battery', 100, 260, 90, { V: 12 });
+        const l1 = makeComp('lamp', 400, 140, 0, { R: 60, P: 2.4 });
+        const s1 = makeComp('switch', 320, 260, 90, { closed: false });
+        makeWire(T(e, 0), T(l1, 0));
+        makeWire(T(l1, 1), T(e, 1));
+        makeWire(T(s1, 0), T(e, 0));
+        makeWire(T(s1, 1), T(e, 1));
+      },
+    },
+  };
+  function loadPreset(name, silent) {
+    state = blankState();
+    PRESETS[name].build();
+    const r = svg.getBoundingClientRect();
+    if (r.width && r.height > r.width * 1.15) {
+      const swap = { 0: 90, 90: 0, 180: 270, 270: 180 };
+      for (const c of state.comps) { const x = c.x; c.x = c.y; c.y = x; c.rot = swap[c.rot]; }
+    }
+    update(true);
+    fitView();
+    if (!silent) toast('已载入：' + PRESETS[name].label);
+  }
+
+  // ---------- view ----------
+  function clientToWorld(x, y) {
+    const r = svg.getBoundingClientRect();
+    return { x: view.cx + (x - r.left - r.width / 2) * view.s, y: view.cy + (y - r.top - r.height / 2) * view.s };
+  }
+  // Labels grow a little when zoomed out (e.g. phones) so values stay readable.
+  const kFor = (s) => Math.round(clamp(Math.pow(s, 0.4), 1, 1.4) * 20) / 20;
+  function applyView() {
+    const r = svg.getBoundingClientRect();
+    const W = Math.max(1, r.width), H = Math.max(1, r.height);
+    svg.setAttribute('viewBox', (view.cx - (W * view.s) / 2) + ' ' + (view.cy - (H * view.s) / 2) + ' ' + W * view.s + ' ' + H * view.s);
+    const k = kFor(view.s);
+    if (k !== labelK) {
+      labelK = k;
+      svg.style.setProperty('--k', String(k));
+      if (result) render();
+    }
+  }
+  function fitView() {
+    const r = svg.getBoundingClientRect();
+    const W = r.width || 600, H = r.height || 400;
+    let k = 1;
+    for (let pass = 0; pass < 2; pass++) {
+      let x0 = 0, y0 = 0, x1 = 680, y1 = 420;
+      if (state.comps.length) {
+        x0 = Infinity; y0 = Infinity; x1 = -Infinity; y1 = -Infinity;
+        for (const c of state.comps) {
+          const vertical = c.rot === 90 || c.rot === 270;
+          x0 = Math.min(x0, c.x - (vertical ? 40 + 80 * k : 70)); x1 = Math.max(x1, c.x + (vertical ? 40 + 70 * k : 70));
+          y0 = Math.min(y0, c.y - (vertical ? 60 : 50)); y1 = Math.max(y1, c.y + (vertical ? 70 : 50 + 40 * k));
+        }
+      }
+      view.s = clamp(Math.max((x1 - x0) / W, (y1 - y0) / H), S_MIN, S_MAX);
+      view.cx = (x0 + x1) / 2;
+      view.cy = (y0 + y1) / 2;
+      k = kFor(view.s);
+    }
+    applyView();
+  }
+  function zoomAt(x, y, s) {
+    s = clamp(s, S_MIN, S_MAX);
+    const w = clientToWorld(x, y);
+    const r = svg.getBoundingClientRect();
+    view.s = s;
+    view.cx = w.x - (x - r.left - r.width / 2) * s;
+    view.cy = w.y - (y - r.top - r.height / 2) * s;
+    applyView();
+  }
+  function zoomCenter(k) {
+    const r = svg.getBoundingClientRect();
+    zoomAt(r.left + r.width / 2, r.top + r.height / 2, view.s * k);
+  }
+
+  // ---------- hit testing ----------
+  function termRadius() { return clamp(20 * view.s, 12, 30); }
+  function nearestTerm(p, radius) {
+    let best = null, bd = radius;
+    for (const c of state.comps) {
+      for (const i of [0, 1]) {
+        const q = termPos(c, i), d = Math.hypot(q.x - p.x, q.y - p.y);
+        if (d <= bd) { bd = d; best = termId(c, i); }
+      }
+    }
+    return best;
+  }
+  function pick(p) {
+    const close = nearestTerm(p, 9);
+    if (close) return { kind: 'term', id: close };
+    for (let i = state.comps.length - 1; i >= 0; i--) {
+      const c = state.comps[i];
+      const l = rotPt(p.x - c.x, p.y - c.y, 360 - c.rot);
+      if (Math.abs(l[0]) <= 29 && Math.abs(l[1]) <= 22) return { kind: 'comp', id: c.id };
+    }
+    const t = nearestTerm(p, termRadius());
+    if (t) return { kind: 'term', id: t };
+    const tol = clamp(9 * view.s, 6, 18);
+    for (let i = state.wires.length - 1; i >= 0; i--) {
+      const pts = routes.get(state.wires[i].id) || [];
+      for (let k = 1; k < pts.length; k++) if (distToSeg(p, pts[k - 1], pts[k]) <= tol) return { kind: 'wire', id: state.wires[i].id };
+    }
+    return { kind: 'none' };
+  }
+
+  // ---------- pointer interaction ----------
+  const pointers = new Map();
+  let gesture = null;
+  function pinchState() {
+    const [p1, p2] = [...pointers.values()];
+    return { d: Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1, m: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 } };
+  }
+  svg.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    try { svg.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 2) {
+      tempWire.setAttribute('d', '');
+      const ps = pinchState();
+      gesture = { type: 'pinch', d0: ps.d, s0: view.s, w0: clientToWorld(ps.m.x, ps.m.y) };
+      return;
+    }
+    if (pointers.size > 2) return;
+    const p = clientToWorld(e.clientX, e.clientY);
+    const hit = pick(p);
+    const base = { start: { x: e.clientX, y: e.clientY }, c0: { x: view.cx, y: view.cy }, moved: false };
+    if (hit.kind === 'term') gesture = Object.assign(base, { type: 'wire', from: hit.id });
+    else if (hit.kind === 'comp') {
+      const c = compById(hit.id);
+      gesture = Object.assign(base, { type: 'comp', id: c.id, orig: { x: c.x, y: c.y }, p0: p });
+    } else if (hit.kind === 'wire') gesture = Object.assign(base, { type: 'wireSel', id: hit.id });
+    else gesture = Object.assign(base, { type: 'pan' });
+  });
+  svg.addEventListener('pointermove', (e) => {
+    if (!pointers.has(e.pointerId)) {
+      if (e.pointerType !== 'mouse') return;
+      const hit = pick(clientToWorld(e.clientX, e.clientY));
+      svg.style.cursor = hit.kind === 'term' ? 'crosshair' : hit.kind === 'comp' ? 'move' : hit.kind === 'wire' ? 'pointer' : 'grab';
+      const ht = hit.kind === 'term' ? hit.id : null;
+      if (ht !== hoverTerm) { hoverTerm = ht; render(); }
+      return;
+    }
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (!gesture) return;
+    if (gesture.type === 'pinch') {
+      if (pointers.size < 2) return;
+      const ps = pinchState();
+      const s = clamp((gesture.s0 * gesture.d0) / ps.d, S_MIN, S_MAX);
+      const r = svg.getBoundingClientRect();
+      view.s = s;
+      view.cx = gesture.w0.x - (ps.m.x - r.left - r.width / 2) * s;
+      view.cy = gesture.w0.y - (ps.m.y - r.top - r.height / 2) * s;
+      applyView();
+      return;
+    }
+    if (!gesture.moved && Math.hypot(e.clientX - gesture.start.x, e.clientY - gesture.start.y) > 5) {
+      gesture.moved = true;
+      if (gesture.type === 'wireSel') gesture.type = 'pan';
+    }
+    if (!gesture.moved) return;
+    const p = clientToWorld(e.clientX, e.clientY);
+    if (gesture.type === 'comp') {
+      const c = compById(gesture.id);
+      if (!c) return;
+      const nx = snap(gesture.orig.x + p.x - gesture.p0.x), ny = snap(gesture.orig.y + p.y - gesture.p0.y);
+      if (nx !== c.x || ny !== c.y) { c.x = nx; c.y = ny; render(); }
+    } else if (gesture.type === 'wire') {
+      const tp = parseTerm(gesture.from);
+      if (!tp) return;
+      const a = termPos(tp.c, tp.i);
+      const target = nearestTerm(p, termRadius());
+      const end = target && target !== gesture.from ? termPos(parseTerm(target).c, parseTerm(target).i) : p;
+      tempWire.setAttribute('d', 'M' + a.x + ' ' + a.y + ' L' + end.x + ' ' + end.y);
+      const ht = target && target !== gesture.from ? target : null;
+      if (ht !== hoverTerm) { hoverTerm = ht; render(); }
+    } else if (gesture.type === 'pan') {
+      view.cx = gesture.c0.x - (e.clientX - gesture.start.x) * view.s;
+      view.cy = gesture.c0.y - (e.clientY - gesture.start.y) * view.s;
+      applyView();
+    }
+  });
+  function endPointer(e, cancelled) {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.delete(e.pointerId);
+    if (!gesture) return;
+    if (gesture.type === 'pinch') {
+      if (pointers.size === 1) {
+        const pt = [...pointers.values()][0];
+        gesture = { type: 'pan', start: { x: pt.x, y: pt.y }, c0: { x: view.cx, y: view.cy }, moved: true };
+      } else if (!pointers.size) gesture = null;
+      return;
+    }
+    const g = gesture;
+    gesture = null;
+    tempWire.setAttribute('d', '');
+    if (cancelled) { hoverTerm = null; update(); return; }
+    const p = clientToWorld(e.clientX, e.clientY);
+    if (g.type === 'comp') {
+      const c = compById(g.id);
+      if (!c) return;
+      state.selected = { kind: 'comp', id: c.id };
+      if (state.pending) state.pending = null;
+      if (!g.moved && c.type === 'switch') { toggleSwitch(c); return; }
+      update();
+    } else if (g.type === 'wire') {
+      hoverTerm = null;
+      if (g.moved) {
+        const t = nearestTerm(p, termRadius());
+        if (t && t !== g.from) { state.pending = null; connect(g.from, t); update(); }
+        else { toast('未连接：请在另一个端子（小圆点）上松开'); render(); }
+      } else tapTerminal(g.from);
+    } else if (g.type === 'wireSel') {
+      state.pending = null;
+      select('wire', g.id);
+    } else if (g.type === 'pan' && !g.moved) {
+      const had = state.pending;
+      state.pending = null;
+      state.selected = null;
+      update();
+      if (had) toast('已取消连线');
+    }
+  }
+  svg.addEventListener('pointerup', (e) => endPointer(e, false));
+  svg.addEventListener('pointercancel', (e) => endPointer(e, true));
+  svg.addEventListener('pointerleave', (e) => {
+    if (e.pointerType === 'mouse' && !pointers.size && hoverTerm) { hoverTerm = null; render(); }
+  });
+  svg.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, view.s * Math.exp(clamp(e.deltaY, -120, 120) * 0.0018));
+  }, { passive: false });
+
+  // ---------- panel & toolbar bindings ----------
+  $('#sel-body').addEventListener('input', (e) => {
+    const input = e.target.closest('input[data-prop]');
+    if (!input || !state.selected) return;
+    const c = compById(state.selected.id);
+    const prop = input.dataset.prop, lim = LIMITS[prop];
+    const err = $('#sel-body [data-err="' + prop + '"]');
+    const raw = input.value.trim();
+    const v = Number(raw);
+    let msg = '';
+    if (raw === '' || !Number.isFinite(v)) msg = '请输入有效数字。';
+    else if (v < lim.min || v > lim.max) msg = lim.label + '需在 ' + lim.range + ' 之间' + (prop === 'R' && v <= 0 ? '（理想零电阻请改用导线）' : '') + '。';
+    input.classList.toggle('invalid', !!msg);
+    err.textContent = msg ? msg + '当前仍按 ' + num(c[prop]) + ' ' + lim.unit + ' 计算。' : '';
+    if (msg) return;
+    c[prop] = v;
+    update();
+  });
+  $('#sel-body').addEventListener('change', (e) => {
+    const input = e.target.closest('input[data-prop]');
+    if (!input || !state.selected || !input.classList.contains('invalid')) return;
+    const c = compById(state.selected.id);
+    input.value = c[input.dataset.prop];
+    input.classList.remove('invalid');
+    $('#sel-body [data-err="' + input.dataset.prop + '"]').textContent = '';
+    toast('输入无效，已恢复为 ' + num(c[input.dataset.prop]) + ' ' + LIMITS[input.dataset.prop].unit);
+  });
+  $('#sel-body').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
+    if (act === 'delete') deleteSelected();
+    else if (act === 'rotate') rotateSelected();
+    else if (act === 'toggle') toggleSwitch(compById(state.selected.id));
+  });
+  $('#results').addEventListener('click', (e) => {
+    const row = e.target.closest('tr[data-select]');
+    if (row) select('comp', row.dataset.select);
+  });
+  document.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', () => addComp(b.dataset.add)));
+  document.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => loadPreset(b.dataset.preset)));
+  $('#btn-reset').addEventListener('click', () => { opts.values = true; opts.nodes = false; $('#opt-values').checked = true; $('#opt-nodes').checked = false; loadPreset('series', true); toast('已重置为默认串联电路'); });
+  $('#btn-clear').addEventListener('click', () => {
+    if (state.comps.length && !confirm('确定清空画布上的全部元件和导线吗？')) return;
+    state = blankState();
+    update(true);
+    fitView();
+    toast('画布已清空');
+  });
+  $('#zoom-in').addEventListener('click', () => zoomCenter(1 / 1.25));
+  $('#zoom-out').addEventListener('click', () => zoomCenter(1.25));
+  $('#zoom-fit').addEventListener('click', fitView);
+  $('#opt-values').addEventListener('change', (e) => { opts.values = e.target.checked; render(); });
+  $('#opt-nodes').addEventListener('change', (e) => { opts.nodes = e.target.checked; render(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.target.closest('input, textarea, select')) return;
+    if (e.key === 'Delete' || e.key === 'Backspace') { if (state.selected) { e.preventDefault(); deleteSelected(); } }
+    else if (e.key === 'r' || e.key === 'R') rotateSelected();
+    else if (e.key === 'Escape') { state.pending = null; state.selected = null; update(); }
+    else if (e.key === '+' || e.key === '=') zoomCenter(1 / 1.25);
+    else if (e.key === '-') zoomCenter(1.25);
+  });
+  let fitted = false;
+  new ResizeObserver(() => {
+    if (!fitted && svg.getBoundingClientRect().width > 0) { fitted = true; fitView(); } else applyView();
+  }).observe(svg);
+
+  window.circuitLab = {
+    get state() { return state; },
+    get result() { return result; },
+    loadPreset,
+    toggle(name) { const c = state.comps.find((x) => x.name === name); if (c) toggleSwitch(c); },
+    termScreen(name, i) {
+      const c = state.comps.find((x) => x.name === name);
+      const p = termPos(c, i), r = svg.getBoundingClientRect();
+      return { x: r.left + r.width / 2 + (p.x - view.cx) / view.s, y: r.top + r.height / 2 + (p.y - view.cy) / view.s };
+    },
+    compScreen(name) {
+      const c = state.comps.find((x) => x.name === name), r = svg.getBoundingClientRect();
+      return { x: r.left + r.width / 2 + (c.x - view.cx) / view.s, y: r.top + r.height / 2 + (c.y - view.cy) / view.s };
+    },
+  };
+  loadPreset('series', true);
+})();
+</script>
+</body>
+</html>

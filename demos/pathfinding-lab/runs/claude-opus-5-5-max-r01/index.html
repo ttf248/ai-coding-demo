@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="网格寻路算法实验室：对比 BFS、Dijkstra 与 A*，可绘制障碍和高代价地形，逐步观察搜索前沿与最终路径。">
+<title>寻路算法实验室 · BFS / Dijkstra / A*</title>
+<style>
+  :root {
+    --bg: #f1f4f9;
+    --panel: #fff;
+    --ink: #1e293b;
+    --muted: #64748b;
+    --line: #dbe2ec;
+    --accent: #4f46e5;
+    --accent-soft: #e0e7ff;
+    --wall: #1f2937;
+    --weight: #c8a165;
+    --visited: #93c5fd;
+    --frontier: #fcd34d;
+    --path: #e11d48;
+    --start: #16a34a;
+    --goal: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink); line-height: 1.5; overflow-x: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+  header.top { padding: 14px 16px 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+  header.top h1 { margin: 0; font-size: 20px; }
+  header.top p { margin: 0; color: var(--muted); font-size: 13px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; padding: 8px 16px 20px; align-items: start; }
+  .main { min-width: 0; display: grid; gap: 10px; }
+  .side { min-width: 0; display: grid; gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0; }
+  .card h2 { margin: 0 0 8px; font-size: 15px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+  .row + .row { margin-top: 8px; }
+  .lbl { font-size: 12px; color: var(--muted); min-width: 2.5em; }
+  button, select, input[type="number"] {
+    font: inherit; font-size: 13px; border: 1px solid var(--line); background: #fff; color: var(--ink);
+    border-radius: 8px; padding: 6px 10px; min-height: 34px; touch-action: manipulation;
+  }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { border-color: #a5b4cf; background: #f8fafc; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { background: #4338ca; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; max-width: 100%; flex-wrap: wrap; }
+  .seg button { border: 0; border-radius: 0; min-height: 34px; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  .seg.tools button[aria-pressed="true"][data-tool="wall"] { background: var(--wall); }
+  .seg.tools button[aria-pressed="true"][data-tool="weight"] { background: #9a6b2f; }
+  .seg.tools button[aria-pressed="true"][data-tool="erase"] { background: #475569; }
+  input[type="range"] { width: 140px; max-width: 40vw; accent-color: var(--accent); }
+  input[type="number"] { width: 92px; }
+  .status { border-radius: 10px; padding: 8px 12px; font-size: 14px; background: #fff; border: 1px solid var(--line); overflow-wrap: anywhere; }
+  .status.found { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+  .status.fail { background: #fef2f2; border-color: #fecaca; color: #991b1b; font-weight: 600; }
+  .status.running { background: #eef2ff; border-color: #c7d2fe; color: #3730a3; }
+  .board { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 10px; display: grid; justify-items: center; }
+  #grid { display: block; touch-action: none; cursor: crosshair; border-radius: 6px; max-width: 100%; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: #334155; margin-top: 8px; justify-content: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .sw { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid rgba(0,0,0,.12); }
+  .stats { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 13px; }
+  .stats dt { color: var(--muted); }
+  .stats dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 5px 4px; border-bottom: 1px solid #edf1f6; text-align: left; white-space: nowrap; }
+  th { color: var(--muted); font-size: 12px; }
+  .table-wrap { overflow-x: auto; }
+  .note { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
+  .card ul, .card ol { margin: 0; padding-left: 20px; font-size: 13px; color: #334155; }
+  .card li + li { margin-top: 4px; }
+  .badge-ok { color: #047857; font-weight: 700; }
+  .badge-bad { color: #b91c1c; font-weight: 700; }
+  .toast {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: calc(100% - 32px);
+    background: rgba(15, 23, 42, .9); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 13px;
+    opacity: 0; transition: opacity .25s; pointer-events: none; text-align: center; z-index: 10;
+  }
+  .toast.show { opacity: 1; }
+  kbd { font-family: inherit; font-size: 11px; border: 1px solid #cbd5e1; border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: #f8fafc; }
+  @media (max-width: 980px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 480px) {
+    header.top { padding: 10px 12px 2px; }
+    header.top h1 { font-size: 18px; }
+    .layout { padding: 6px 10px 16px; }
+    .board { padding: 6px; }
+    button, select { padding: 5px 8px; font-size: 12.5px; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>寻路算法实验室</h1>
+  <p>四方向网格 · BFS 按步数 · Dijkstra / A* 按地形代价（普通格 1，高代价格 5，起点不计）</p>
+</header>
+<div class="layout">
+  <main class="main">
+    <section class="card" aria-label="算法与运行控制">
+      <div class="row">
+        <span class="lbl">算法</span>
+        <div class="seg" role="group" aria-label="选择算法" id="algos">
+          <button type="button" data-algo="bfs">BFS 广度优先</button>
+          <button type="button" data-algo="dijkstra">Dijkstra</button>
+          <button type="button" data-algo="astar">A*（曼哈顿）</button>
+        </div>
+      </div>
+      <div class="row">
+        <button type="button" class="primary" id="btn-run">▶ 运行</button>
+        <button type="button" id="btn-pause">⏸ 暂停</button>
+        <button type="button" id="btn-step">⏭ 单步</button>
+        <button type="button" id="btn-finish">⏩ 直接出结果</button>
+        <button type="button" id="btn-clear">清除搜索</button>
+        <button type="button" id="btn-reset">重置地图</button>
+      </div>
+      <div class="row">
+        <label class="lbl" for="speed">速度</label>
+        <input type="range" id="speed" min="1" max="10" value="6" aria-describedby="speed-val">
+        <span id="speed-val" class="note" style="margin:0">约 50 步/秒</span>
+      </div>
+      <div class="row">
+        <span class="lbl">画笔</span>
+        <div class="seg tools" role="group" aria-label="地图编辑工具">
+          <button type="button" data-tool="wall">墙壁</button>
+          <button type="button" data-tool="weight">高代价 ×5</button>
+          <button type="button" data-tool="erase">擦除</button>
+        </div>
+        <label class="note" style="margin:0"><input type="checkbox" id="show-cost"> 显示代价数值</label>
+      </div>
+    </section>
+    <div id="status" class="status" aria-live="polite"></div>
+    <section class="board" aria-label="寻路网格">
+      <canvas id="grid" aria-label="网格地图：拖动起点、终点，按住拖动绘制墙壁或地形"></canvas>
+      <div class="legend" aria-hidden="true">
+        <span><i class="sw" style="background:var(--start)"></i>起点</span>
+        <span><i class="sw" style="background:var(--goal)"></i>终点</span>
+        <span><i class="sw" style="background:var(--wall)"></i>墙壁</span>
+        <span><i class="sw" style="background:var(--weight)"></i>高代价（5）</span>
+        <span><i class="sw" style="background:var(--frontier)"></i>搜索前沿</span>
+        <span><i class="sw" style="background:var(--visited)"></i>已访问</span>
+        <span><i class="sw" style="background:var(--path)"></i>最终路径</span>
+      </div>
+    </section>
+  </main>
+  <aside class="side">
+    <section class="card" aria-labelledby="map-title">
+      <h2 id="map-title">地图与预设</h2>
+      <div class="row">
+        <label class="lbl" for="preset">预设</label>
+        <select id="preset">
+          <option value="empty">空白网格</option>
+          <option value="weighted">加权地形（沼泽带）</option>
+          <option value="maze">迷宫（带环路）</option>
+          <option value="enclosed">封闭终点（不可达）</option>
+          <option value="random">随机障碍</option>
+        </select>
+        <label class="lbl" for="seed">种子</label>
+        <input type="number" id="seed" value="7" min="0" max="999999" step="1" inputmode="numeric">
+      </div>
+      <div class="row">
+        <label class="lbl" for="size">尺寸</label>
+        <select id="size">
+          <option value="15x11">小 15 × 11</option>
+          <option value="25x15">中 25 × 15</option>
+          <option value="39x23">大 39 × 23</option>
+        </select>
+        <button type="button" id="btn-load" class="primary">载入预设</button>
+      </div>
+      <p class="note" id="map-info"></p>
+    </section>
+    <section class="card" aria-labelledby="stat-title">
+      <h2 id="stat-title">当前搜索</h2>
+      <dl class="stats" id="stats"></dl>
+    </section>
+    <section class="card" aria-labelledby="cmp-title">
+      <h2 id="cmp-title">三种算法对比（当前地图）</h2>
+      <div class="table-wrap" id="compare"></div>
+      <p class="note">对比表在后台即时计算，不影响左侧动画。BFS 只保证步数最少；Dijkstra 与 A* 保证总代价最小。</p>
+    </section>
+    <section class="card" aria-labelledby="rule-title">
+      <h2 id="rule-title">规则说明</h2>
+      <ul>
+        <li>只能上下左右四方向移动，不能斜走，不能穿过墙壁。</li>
+        <li><b>BFS</b> 把每一步都视为相同代价，按步数逐层扩展，得到<b>步数最少</b>的路径，不考虑地形代价。</li>
+        <li><b>Dijkstra</b> 按累计地形代价从小到大扩展；<b>A*</b> 在此基础上加入曼哈顿距离启发值 h = |Δx| + |Δy|，按 f = g + h 扩展。由于最小进入代价为 1，h 不会高估，A* 与 Dijkstra 得到相同的最小总代价。</li>
+        <li>代价按“进入格子”计算：起点不计；普通格 1，高代价格 5（终点也按其地形计入）。</li>
+        <li>每次“单步”扩展一个节点：从前沿取出节点、标记为已访问，并把可达邻居加入前沿。</li>
+      </ul>
+    </section>
+    <section class="card" aria-labelledby="help-title">
+      <h2 id="help-title">操作说明</h2>
+      <ol>
+        <li>选择画笔后在网格上按住拖动：墙壁/高代价画笔从已有同类格开始拖动时会改为擦除该类格。</li>
+        <li>按住起点（绿）或终点（红）拖动即可移动，它们不能被墙壁或地形覆盖，也不能放到墙上。</li>
+        <li>搜索进行中修改地图、移动起终点、切换算法或载入预设，都会立即停止并清除旧搜索。</li>
+        <li>快捷键：<kbd>空格</kbd> 运行/暂停，<kbd>N</kbd> 单步，<kbd>C</kbd> 清除搜索。</li>
+      </ol>
+    </section>
+  </aside>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<noscript><p style="padding:16px">此页面需要启用 JavaScript。</p></noscript>
+<script>
+(function () {
+  'use strict';
+  const $ = (s) => document.querySelector(s);
+  const canvas = $('#grid');
+  const ctx = canvas.getContext('2d');
+  const EMPTY = 0, WALL = 1, WEIGHT = 2;
+  const ALGO = { bfs: 'BFS', dijkstra: 'Dijkstra', astar: 'A*' };
+  const RATES = [2, 4, 8, 15, 30, 50, 90, 160, 300, 600];
+  const COLORS = {
+    empty: '#f8fafc', grid: '#e2e8f0', wall: '#1f2937', weight: '#c8a165', weightInk: 'rgba(84, 52, 12, .55)',
+    visited: '#93c5fd', frontier: '#fcd34d', current: '#f97316', path: '#e11d48', pathCell: '#fecdd3', start: '#16a34a', goal: '#dc2626',
+  };
+
+  const S = {
+    cols: 25, rows: 15, cells: new Uint8Array(0), start: 0, goal: 0,
+    algo: 'astar', tool: 'wall', preset: 'weighted', seed: 7,
+    search: null, running: false, showCost: false,
+  };
+  let cellPx = 24;
+  let dpr = 1;
+
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // ---------- presets (deterministic for a given size and seed) ----------
+  function buildPreset(name, cols, rows, seed) {
+    const cells = new Uint8Array(cols * rows);
+    const I = (x, y) => y * cols + x;
+    const mid = Math.floor(rows / 2);
+    let start = I(1, mid), goal = I(cols - 2, mid);
+    const rnd = mulberry32(seed);
+    if (name === 'weighted') {
+      const c0 = Math.round(cols * 0.36), c1 = cols - 1 - c0;
+      const r0 = Math.round(rows * 0.2), r1 = rows - 1 - r0;
+      for (let y = r0; y <= r1; y++) for (let x = c0; x <= c1; x++) cells[I(x, y)] = WEIGHT;
+      for (let y = 0; y < rows; y++) if (y < r0 - 1 || y > r1 + 1) { cells[I(c0 - 2, y)] = WALL; cells[I(c1 + 2, y)] = WALL; }
+    } else if (name === 'maze') {
+      cells.fill(WALL);
+      const stack = [[1, 1]];
+      cells[I(1, 1)] = EMPTY;
+      while (stack.length) {
+        const [x, y] = stack[stack.length - 1];
+        const dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]].filter(([dx, dy]) => {
+          const nx = x + dx, ny = y + dy;
+          return nx > 0 && ny > 0 && nx < cols - 1 && ny < rows - 1 && cells[I(nx, ny)] === WALL;
+        });
+        if (!dirs.length) { stack.pop(); continue; }
+        const [dx, dy] = dirs[Math.floor(rnd() * dirs.length)];
+        cells[I(x + dx / 2, y + dy / 2)] = EMPTY;
+        cells[I(x + dx, y + dy)] = EMPTY;
+        stack.push([x + dx, y + dy]);
+      }
+      const loops = [];
+      for (let y = 1; y < rows - 1; y++) {
+        for (let x = 1; x < cols - 1; x++) {
+          if (cells[I(x, y)] !== WALL) continue;
+          const h = cells[I(x - 1, y)] !== WALL && cells[I(x + 1, y)] !== WALL;
+          const v = cells[I(x, y - 1)] !== WALL && cells[I(x, y + 1)] !== WALL;
+          if (h !== v) loops.push(I(x, y));
+        }
+      }
+      for (let k = loops.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [loops[k], loops[j]] = [loops[j], loops[k]]; }
+      loops.slice(0, Math.max(2, Math.round(loops.length * 0.12))).forEach((i) => { cells[i] = EMPTY; });
+      for (let i = 0; i < cells.length; i++) if (cells[i] === EMPTY && rnd() < 0.14) cells[i] = WEIGHT;
+      start = I(1, 1);
+      goal = I(cols - 2, rows - 2);
+    } else if (name === 'enclosed') {
+      const gx = cols - 4, gy = mid;
+      for (let i = 0; i < cells.length; i++) if (rnd() < 0.12) cells[i] = WALL;
+      for (let y = gy - 2; y <= gy + 2; y++) {
+        for (let x = gx - 2; x <= gx + 2; x++) cells[I(x, y)] = Math.max(Math.abs(x - gx), Math.abs(y - gy)) === 2 ? WALL : EMPTY;
+      }
+      goal = I(gx, gy);
+    } else if (name === 'random') {
+      for (let i = 0; i < cells.length; i++) {
+        const r = rnd();
+        cells[i] = r < 0.24 ? WALL : r < 0.38 ? WEIGHT : EMPTY;
+      }
+    }
+    if (name !== 'maze' && name !== 'enclosed') {
+      for (const p of [start, goal]) {
+        const px = p % cols, py = Math.floor(p / cols);
+        for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const x = px + dx, y = py + dy;
+          if (x >= 0 && y >= 0 && x < cols && y < rows && cells[I(x, y)] === WALL) cells[I(x, y)] = EMPTY;
+        }
+      }
+    }
+    cells[start] = EMPTY;
+    cells[goal] = EMPTY;
+    return { cells, start, goal };
+  }
+
+  // ---------- search algorithms ----------
+  class MinHeap {
+    constructor() { this.a = []; }
+    get size() { return this.a.length; }
+    less(x, y) { for (let k = 0; k < 3; k++) if (x[k] !== y[k]) return x[k] < y[k]; return false; }
+    push(item) {
+      const a = this.a;
+      a.push(item);
+      let i = a.length - 1;
+      while (i > 0) {
+        const p = (i - 1) >> 1;
+        if (!this.less(a[i], a[p])) break;
+        [a[i], a[p]] = [a[p], a[i]];
+        i = p;
+      }
+    }
+    pop() {
+      const a = this.a, top = a[0], last = a.pop();
+      if (a.length) {
+        a[0] = last;
+        let i = 0;
+        for (;;) {
+          const l = 2 * i + 1, r = l + 1;
+          let m = i;
+          if (l < a.length && this.less(a[l], a[m])) m = l;
+          if (r < a.length && this.less(a[r], a[m])) m = r;
+          if (m === i) break;
+          [a[i], a[m]] = [a[m], a[i]];
+          i = m;
+        }
+      }
+      return top;
+    }
+  }
+
+  // One step = take one node from the frontier, mark it visited, and push its passable neighbours.
+  function createSearch(algo, map) {
+    const { cols, rows, cells, start, goal } = map;
+    const N = cols * rows;
+    const g = new Float64Array(N).fill(Infinity);
+    const parent = new Int32Array(N).fill(-1);
+    const closed = new Uint8Array(N);
+    const open = new Uint8Array(N);
+    const gx = goal % cols, gy = Math.floor(goal / cols);
+    const h = (i) => Math.abs((i % cols) - gx) + Math.abs(Math.floor(i / cols) - gy);
+    const cost = (i) => (cells[i] === WEIGHT ? 5 : 1);
+    const queue = [];
+    let head = 0, seq = 0;
+    const heap = new MinHeap();
+    const s = {
+      algo, g, parent, closed, open, h, start, goal, cols,
+      expanded: 0, openCount: 1, maxOpen: 1, current: -1,
+      done: false, found: false, path: null, steps: 0, cost: 0,
+    };
+    g[start] = 0;
+    open[start] = 1;
+    if (algo === 'bfs') queue.push(start);
+    else heap.push([algo === 'astar' ? h(start) : 0, algo === 'astar' ? h(start) : 0, seq++, start]);
+
+    function finish(found) {
+      s.done = true;
+      s.found = found;
+      if (!found) return;
+      const path = [];
+      for (let v = goal; v !== -1; v = parent[v]) path.push(v);
+      path.reverse();
+      s.path = path;
+      s.steps = path.length - 1;
+      s.cost = path.slice(1).reduce((sum, v) => sum + cost(v), 0);
+    }
+    s.step = function () {
+      if (s.done) return false;
+      let u = -1;
+      if (algo === 'bfs') {
+        while (head < queue.length) { const v = queue[head++]; if (!closed[v]) { u = v; break; } }
+      } else {
+        while (heap.size) { const v = heap.pop()[3]; if (!closed[v]) { u = v; break; } }
+      }
+      if (u < 0) { s.current = -1; finish(false); return false; }
+      closed[u] = 1;
+      open[u] = 0;
+      s.openCount--;
+      s.expanded++;
+      s.current = u;
+      if (u === goal) { finish(true); return true; }
+      const ux = u % cols, uy = Math.floor(u / cols);
+      const nbs = [];
+      if (uy > 0) nbs.push(u - cols);
+      if (ux < cols - 1) nbs.push(u + 1);
+      if (uy < rows - 1) nbs.push(u + cols);
+      if (ux > 0) nbs.push(u - 1);
+      for (const v of nbs) {
+        if (cells[v] === WALL || closed[v]) continue;
+        if (algo === 'bfs') {
+          if (g[v] !== Infinity) continue;
+          g[v] = g[u] + 1;
+          parent[v] = u;
+          queue.push(v);
+          open[v] = 1;
+          s.openCount++;
+        } else {
+          const nd = g[u] + cost(v);
+          if (nd >= g[v]) continue;
+          g[v] = nd;
+          parent[v] = u;
+          heap.push([algo === 'astar' ? nd + h(v) : nd, algo === 'astar' ? h(v) : 0, seq++, v]);
+          if (!open[v]) { open[v] = 1; s.openCount++; }
+        }
+      }
+      s.maxOpen = Math.max(s.maxOpen, s.openCount);
+      if (s.openCount === 0) { s.current = u; finish(false); }
+      return true;
+    };
+    s.runToEnd = function () { let guard = N * 8; while (!s.done && guard-- > 0) s.step(); return s; };
+    return s;
+  }
+
+  // ---------- rendering ----------
+  function layout() {
+    const box = canvas.parentElement;
+    const cs = getComputedStyle(box);
+    const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const maxH = Math.max(220, window.innerHeight * 0.68);
+    cellPx = Math.max(8, Math.min(40, Math.floor(avail / S.cols), Math.floor(maxH / S.rows)));
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(S.cols * cellPx * dpr);
+    canvas.height = Math.round(S.rows * cellPx * dpr);
+    canvas.style.width = S.cols * cellPx + 'px';
+    canvas.style.height = S.rows * cellPx + 'px';
+    draw();
+  }
+
+  function draw() {
+    const c = cellPx, W = S.cols * c, H = S.rows * c;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = COLORS.empty;
+    ctx.fillRect(0, 0, W, H);
+    const s = S.search;
+    const onPath = new Set(s && s.path ? s.path : []);
+    for (let i = 0; i < S.cells.length; i++) {
+      const x = (i % S.cols) * c, y = Math.floor(i / S.cols) * c;
+      const t = S.cells[i];
+      if (t === WALL) { ctx.fillStyle = COLORS.wall; ctx.fillRect(x, y, c, c); continue; }
+      if (t === WEIGHT) { ctx.fillStyle = COLORS.weight; ctx.fillRect(x, y, c, c); }
+      if (s) {
+        let overlay = null;
+        if (onPath.has(i)) overlay = COLORS.pathCell;
+        else if (s.closed[i]) overlay = COLORS.visited;
+        else if (s.open[i]) overlay = COLORS.frontier;
+        if (overlay) {
+          ctx.globalAlpha = t === WEIGHT ? 0.55 : 0.9;
+          ctx.fillStyle = overlay;
+          ctx.fillRect(x, y, c, c);
+          ctx.globalAlpha = 1;
+        }
+      }
+      if (t === WEIGHT && c >= 12) {
+        const showG = S.showCost && s && s.g[i] !== Infinity && c >= 20;
+        if (!showG) {
+          ctx.fillStyle = COLORS.weightInk;
+          ctx.font = '700 ' + Math.round(c * 0.42) + 'px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('5', x + c / 2, y + c / 2 + 1);
+        }
+      }
+    }
+    ctx.strokeStyle = COLORS.grid;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x <= S.cols; x++) { ctx.moveTo(x * c + 0.5, 0); ctx.lineTo(x * c + 0.5, H); }
+    for (let y = 0; y <= S.rows; y++) { ctx.moveTo(0, y * c + 0.5); ctx.lineTo(W, y * c + 0.5); }
+    ctx.stroke();
+
+    if (s && S.showCost && c >= 20) {
+      ctx.font = '600 ' + Math.max(9, Math.round(c * 0.36)) + 'px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < S.cells.length; i++) {
+        if (s.g[i] === Infinity || i === S.start || i === S.goal) continue;
+        const x = (i % S.cols) * c, y = Math.floor(i / S.cols) * c;
+        ctx.fillStyle = '#1e293b';
+        ctx.fillText(String(s.g[i]), x + c / 2, y + c / 2 + 1);
+      }
+    }
+    if (s && s.current >= 0 && !s.found) {
+      const x = (s.current % S.cols) * c, y = Math.floor(s.current / S.cols) * c;
+      ctx.strokeStyle = COLORS.current;
+      ctx.lineWidth = Math.max(2, c * 0.12);
+      ctx.strokeRect(x + ctx.lineWidth / 2, y + ctx.lineWidth / 2, c - ctx.lineWidth, c - ctx.lineWidth);
+    }
+    if (s && s.path) {
+      ctx.strokeStyle = COLORS.path;
+      ctx.lineWidth = Math.max(2.5, c * 0.24);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      s.path.forEach((v, k) => {
+        const x = (v % S.cols) * c + c / 2, y = Math.floor(v / S.cols) * c + c / 2;
+        if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      });
+      ctx.stroke();
+    }
+    drawEndpoint(S.start, COLORS.start, '起');
+    drawEndpoint(S.goal, COLORS.goal, '终');
+  }
+  function drawEndpoint(i, color, label) {
+    const c = cellPx, x = (i % S.cols) * c + c / 2, y = Math.floor(i / S.cols) * c + c / 2;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, c * 0.44, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = Math.max(1.5, c * 0.08);
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
+    if (c >= 14) {
+      ctx.fillStyle = '#fff';
+      ctx.font = '700 ' + Math.round(c * 0.46) + 'px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, x, y + 1);
+    }
+  }
+
+  // ---------- status & panels ----------
+  const fmtXY = (i) => '(' + (i % S.cols) + ', ' + Math.floor(i / S.cols) + ')';
+  function updateStatus() {
+    const el = $('#status');
+    const s = S.search;
+    let cls = 'status', text;
+    if (!s) {
+      text = '就绪：当前算法 ' + ALGO[S.algo] + '。点“运行”观看动画，或点“单步”逐个扩展节点。';
+    } else if (s.done && s.found) {
+      cls += ' found';
+      text = S.algo === 'bfs'
+        ? '找到步数最少的路径（BFS）：' + s.steps + ' 步；按地形计算的总代价为 ' + s.cost + '（BFS 不按代价搜索）。共扩展 ' + s.expanded + ' 个节点。'
+        : '找到最小代价路径（' + ALGO[S.algo] + '）：总代价 ' + s.cost + '，' + s.steps + ' 步。共扩展 ' + s.expanded + ' 个节点。';
+    } else if (s.done) {
+      cls += ' fail';
+      text = '终点不可达：搜索前沿已耗尽，起点 ' + fmtXY(S.start) + ' 与终点 ' + fmtXY(S.goal) + ' 之间没有通路（已扩展 ' + s.expanded + ' 个节点）。';
+    } else if (S.running) {
+      cls += ' running';
+      text = ALGO[S.algo] + ' 搜索中…已扩展 ' + s.expanded + ' 个节点，前沿 ' + s.openCount + ' 个。';
+    } else {
+      text = '已暂停：' + ALGO[S.algo] + ' 已扩展 ' + s.expanded + ' 个节点，前沿 ' + s.openCount + ' 个。点“单步”逐个扩展或“运行”继续。';
+    }
+    el.className = cls;
+    el.textContent = text;
+  }
+  function updateStats() {
+    const s = S.search;
+    const rows = [['算法', ALGO[S.algo] + (S.algo === 'bfs' ? '（按步数）' : S.algo === 'astar' ? '（g + 曼哈顿 h）' : '（按代价）')]];
+    if (!s) rows.push(['状态', '未开始']);
+    else {
+      rows.push(['状态', s.done ? (s.found ? '已找到路径' : '不可达') : S.running ? '搜索中' : '已暂停']);
+      rows.push(['已扩展节点', String(s.expanded)]);
+      rows.push(['当前前沿', String(s.openCount)], ['前沿峰值', String(s.maxOpen)]);
+      if (s.current >= 0) {
+        const g = s.g[s.current], h = s.h(s.current);
+        rows.push(['最近扩展', fmtXY(s.current) + (S.algo === 'bfs' ? '，步数 ' + g : '，g=' + g + (S.algo === 'astar' ? '，h=' + h + '，f=' + (g + h) : ''))]);
+      }
+      rows.push(['路径步数', s.found ? String(s.steps) : '—'], ['路径总代价', s.found ? String(s.cost) : '—']);
+    }
+    rows.push(['起点 / 终点', fmtXY(S.start) + ' → ' + fmtXY(S.goal)]);
+    $('#stats').innerHTML = rows.map((r) => '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>').join('');
+  }
+  let compareTimer = 0;
+  function compareAll() {
+    const map = { cols: S.cols, rows: S.rows, cells: S.cells, start: S.start, goal: S.goal };
+    return ['bfs', 'dijkstra', 'astar'].map((a) => {
+      const s = createSearch(a, map).runToEnd();
+      return { algo: a, found: s.found, steps: s.steps, cost: s.cost, expanded: s.expanded };
+    });
+  }
+  function updateCompare() {
+    clearTimeout(compareTimer);
+    compareTimer = setTimeout(() => {
+      const res = compareAll();
+      const rows = res.map((r) => '<tr><td><b>' + ALGO[r.algo] + '</b></td><td>' + (r.found ? '<span class="badge-ok">可达</span>' : '<span class="badge-bad">不可达</span>') +
+        '</td><td>' + (r.found ? r.steps : '—') + '</td><td>' + (r.found ? r.cost : '—') + '</td><td>' + r.expanded + '</td></tr>').join('');
+      const d = res[1], a = res[2];
+      const same = d.found === a.found && (!d.found || d.cost === a.cost);
+      $('#compare').innerHTML = '<table><thead><tr><th>算法</th><th>结果</th><th>步数</th><th>总代价</th><th>扩展节点</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+        '<p class="note">' + (d.found ? (same ? '✓ Dijkstra 与 A* 的最小总代价一致（' + d.cost + '）。' : '✗ 两者代价不一致，请检查。') : '三种算法均判定终点不可达。') +
+        (res[0].found && d.found && res[0].cost > d.cost ? ' BFS 路径步数更少但代价更高（' + res[0].cost + '）。' : '') + '</p>';
+    }, 60);
+  }
+  function updateButtons() {
+    const s = S.search;
+    $('#btn-run').textContent = s && !s.done && !S.running ? '▶ 继续' : '▶ 运行';
+    $('#btn-run').disabled = S.running;
+    $('#btn-pause').disabled = !S.running;
+    $('#btn-step').disabled = !!(s && s.done);
+    $('#btn-finish').disabled = !!(s && s.done);
+    $('#btn-clear').disabled = !s;
+    document.querySelectorAll('[data-algo]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.algo === S.algo)));
+    document.querySelectorAll('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === S.tool)));
+  }
+  function refresh() { draw(); updateStatus(); updateStats(); updateButtons(); }
+
+  let toastTimer = 0;
+  function toast(msg) {
+    const el = $('#toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+  }
+
+  // ---------- search control ----------
+  let raf = 0, last = 0, acc = 0;
+  function newSearch() {
+    S.search = createSearch(S.algo, { cols: S.cols, rows: S.rows, cells: S.cells, start: S.start, goal: S.goal });
+  }
+  function stopAndClear(reason) {
+    const had = !!S.search;
+    S.running = false;
+    cancelAnimationFrame(raf);
+    S.search = null;
+    if (had && reason) toast(reason);
+    return had;
+  }
+  function run() {
+    if (S.running) return;
+    if (!S.search || S.search.done) newSearch();
+    S.running = true;
+    last = performance.now();
+    acc = 1;
+    raf = requestAnimationFrame(tick);
+    refresh();
+  }
+  function tick(now) {
+    if (!S.running || !S.search) return;
+    const dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    acc += dt * RATES[+$('#speed').value - 1];
+    let n = Math.floor(acc);
+    acc -= n;
+    while (n-- > 0 && !S.search.done) S.search.step();
+    if (S.search.done) S.running = false;
+    refresh();
+    if (S.running) raf = requestAnimationFrame(tick);
+  }
+  function pause() {
+    if (!S.running) return;
+    S.running = false;
+    cancelAnimationFrame(raf);
+    refresh();
+  }
+  function step() {
+    if (S.running) { S.running = false; cancelAnimationFrame(raf); }
+    if (S.search && S.search.done) { toast('本次搜索已结束：点“清除搜索”或“运行”重新开始'); refresh(); return; }
+    if (!S.search) newSearch();
+    S.search.step();
+    refresh();
+  }
+  function finish() {
+    if (S.running) { S.running = false; cancelAnimationFrame(raf); }
+    if (!S.search || S.search.done) newSearch();
+    S.search.runToEnd();
+    refresh();
+  }
+
+  // ---------- map editing ----------
+  function mapChanged() {
+    updateCompare();
+    refresh();
+  }
+  function loadPreset(name, seed, size, silent) {
+    const [cols, rows] = size.split('x').map(Number);
+    stopAndClear();
+    S.preset = name;
+    S.seed = seed;
+    S.cols = cols;
+    S.rows = rows;
+    const m = buildPreset(name, cols, rows, seed);
+    S.cells = m.cells;
+    S.start = m.start;
+    S.goal = m.goal;
+    const names = { empty: '空白网格', weighted: '加权地形（沼泽带）', maze: '迷宫（种子 ' + seed + '）', enclosed: '封闭终点（种子 ' + seed + '）', random: '随机障碍（种子 ' + seed + '）' };
+    $('#map-info').textContent = '当前地图：' + names[name] + '，' + cols + ' × ' + rows + '。迷宫、封闭终点和随机障碍由种子决定，相同种子与尺寸会生成相同地图；“重置地图”恢复到该预设的初始状态。';
+    layout();
+    mapChanged();
+    if (!silent) toast('已载入预设：' + names[name]);
+  }
+
+  function cellAt(e) {
+    const r = canvas.getBoundingClientRect();
+    const x = Math.floor(((e.clientX - r.left) / r.width) * S.cols);
+    const y = Math.floor(((e.clientY - r.top) / r.height) * S.rows);
+    if (x < 0 || y < 0 || x >= S.cols || y >= S.rows) return -1;
+    return y * S.cols + x;
+  }
+  let drag = null;
+  function applyTool(i) {
+    if (i < 0 || i === S.start || i === S.goal) return false;
+    const before = S.cells[i];
+    let next = before;
+    if (drag.mode === 'wall') next = WALL;
+    else if (drag.mode === 'unwall') next = before === WALL ? EMPTY : before;
+    else if (drag.mode === 'weight') next = WEIGHT;
+    else if (drag.mode === 'unweight') next = before === WEIGHT ? EMPTY : before;
+    else if (drag.mode === 'erase') next = EMPTY;
+    if (next === before) return false;
+    S.cells[i] = next;
+    return true;
+  }
+  function editStarted() {
+    if (stopAndClear('地图已修改：旧搜索已停止并清除')) updateButtons();
+  }
+  function lineCells(a, b) {
+    let x0 = a % S.cols, y0 = Math.floor(a / S.cols);
+    const x1 = b % S.cols, y1 = Math.floor(b / S.cols);
+    const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    const out = [];
+    for (;;) {
+      out.push(y0 * S.cols + x0);
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) { err += dy; x0 += sx; }
+      if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+    return out;
+  }
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const i = cellAt(e);
+    if (i < 0) return;
+    e.preventDefault();
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    if (i === S.start || i === S.goal) {
+      drag = { mode: i === S.start ? 'start' : 'goal', last: i, id: e.pointerId };
+      return;
+    }
+    const t = S.cells[i];
+    const mode = S.tool === 'wall' ? (t === WALL ? 'unwall' : 'wall') : S.tool === 'weight' ? (t === WEIGHT ? 'unweight' : 'weight') : 'erase';
+    drag = { mode, last: i, id: e.pointerId };
+    if (applyTool(i)) { editStarted(); mapChanged(); }
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drag || drag.id !== e.pointerId) return;
+    const i = cellAt(e);
+    if (i < 0 || i === drag.last) return;
+    if (drag.mode === 'start' || drag.mode === 'goal') {
+      const other = drag.mode === 'start' ? S.goal : S.start;
+      if (S.cells[i] === WALL || i === other) return;
+      editStarted();
+      if (drag.mode === 'start') S.start = i; else S.goal = i;
+      drag.last = i;
+      mapChanged();
+      return;
+    }
+    let changed = false;
+    for (const c of lineCells(drag.last, i)) changed = applyTool(c) || changed;
+    drag.last = i;
+    if (changed) { editStarted(); mapChanged(); }
+  });
+  const endDrag = (e) => { if (drag && drag.id === e.pointerId) drag = null; };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+
+  // ---------- bindings ----------
+  document.querySelectorAll('[data-algo]').forEach((b) => b.addEventListener('click', () => {
+    if (S.algo === b.dataset.algo) return;
+    S.algo = b.dataset.algo;
+    stopAndClear('已切换为 ' + ALGO[S.algo] + '，旧搜索已清除');
+    refresh();
+  }));
+  document.querySelectorAll('[data-tool]').forEach((b) => b.addEventListener('click', () => { S.tool = b.dataset.tool; updateButtons(); }));
+  $('#btn-run').addEventListener('click', run);
+  $('#btn-pause').addEventListener('click', pause);
+  $('#btn-step').addEventListener('click', step);
+  $('#btn-finish').addEventListener('click', finish);
+  $('#btn-clear').addEventListener('click', () => { stopAndClear(); refresh(); toast('已清除搜索结果'); });
+  $('#btn-reset').addEventListener('click', () => { loadPreset(S.preset, S.seed, S.cols + 'x' + S.rows, true); toast('地图已重置为当前预设的初始状态'); });
+  $('#btn-load').addEventListener('click', () => {
+    const raw = $('#seed').value.trim();
+    const seed = Number(raw);
+    if (raw === '' || !Number.isInteger(seed) || seed < 0 || seed > 999999) { toast('种子需为 0 ~ 999999 的整数'); $('#seed').focus(); return; }
+    loadPreset($('#preset').value, seed, $('#size').value);
+  });
+  $('#speed').addEventListener('input', () => { $('#speed-val').textContent = '约 ' + RATES[+$('#speed').value - 1] + ' 步/秒'; });
+  $('#show-cost').addEventListener('change', (e) => { S.showCost = e.target.checked; draw(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.target.closest('input, select, textarea, button')) return;
+    if (e.code === 'Space') { e.preventDefault(); if (S.running) pause(); else run(); }
+    else if (e.key === 'n' || e.key === 'N') step();
+    else if (e.key === 'c' || e.key === 'C') { stopAndClear(); refresh(); }
+  });
+  let resizeTimer = 0;
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(layout, 80); });
+
+  window.pathLab = { S, run, pause, step, finish, compareAll, loadPreset, cellCenter(i) { const r = canvas.getBoundingClientRect(); return { x: r.left + ((i % S.cols) + 0.5) * (r.width / S.cols), y: r.top + (Math.floor(i / S.cols) + 0.5) * (r.height / S.rows) }; } };
+
+  const small = window.innerWidth < 640;
+  $('#size').value = small ? '15x11' : '25x15';
+  $('#preset').value = 'weighted';
+  $('#speed-val').textContent = '约 ' + RATES[+$('#speed').value - 1] + ' 步/秒';
+  loadPreset('weighted', 7, $('#size').value, true);
+})();
+</script>
+</body>
+</html>

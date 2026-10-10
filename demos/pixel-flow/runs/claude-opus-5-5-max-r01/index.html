@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Pixel Flow：上传本地图片，分解为 Three.js 粒子流，通过摄像头 + MediaPipe 手势（张开手掌吸引、握拳暂停、食指精修、剪刀手完成）交互式还原原图。">
+<title>Pixel Flow · 图片粒子化与手势还原</title>
+<style>
+  :root { --ink: #eef2ff; --muted: #9aa6c7; --panel: rgba(12, 16, 30, .74); --line: rgba(140, 160, 255, .22); --accent: #8b7bff; --accent2: #3fe0c5; --warn: #ffcf6e; --danger: #ff7d8a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #05060c; color: var(--ink); overflow: hidden; font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; -webkit-text-size-adjust: 100%; }
+  #stage { position: fixed; inset: 0; overflow: hidden; background: radial-gradient(1200px 800px at 30% 20%, #151a3a 0%, #070812 60%, #030308 100%); }
+  #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); opacity: .32; filter: saturate(.75) brightness(.8); transition: opacity .4s; }
+  #video.pip { inset: auto 16px 16px auto; width: min(240px, 34vw); height: auto; aspect-ratio: 4 / 3; border-radius: 14px; border: 1px solid var(--line); opacity: .95; filter: none; z-index: 3; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
+  #video.hidden, #video:not(.live) { opacity: 0; pointer-events: none; }
+  #gl, #overlay { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #gl { touch-action: none; cursor: crosshair; }
+  #overlay { pointer-events: none; z-index: 2; }
+  .ui { position: fixed; z-index: 5; }
+  .brand { left: 18px; top: 14px; pointer-events: none; }
+  .brand h1 { margin: 0; font-size: clamp(20px, 2.6vw, 30px); letter-spacing: 1px; background: linear-gradient(90deg, #b9a8ff, #6fe7d5); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .brand p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+  .status { left: 18px; top: 72px; display: flex; flex-wrap: wrap; gap: 6px; max-width: min(560px, calc(100vw - 36px)); pointer-events: none; }
+  .pill { font-size: 12.5px; padding: 5px 11px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .pill.ok { border-color: rgba(63, 224, 197, .55); color: #b9fff1; }
+  .pill.warn { border-color: rgba(255, 207, 110, .55); color: #ffe6b0; }
+  .pill.err { border-color: rgba(255, 125, 138, .6); color: #ffd0d6; }
+  .gesture { left: 50%; top: 18px; transform: translateX(-50%); text-align: center; pointer-events: none; }
+  .gesture .big { font-size: 15px; padding: 7px 16px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); display: inline-flex; gap: 8px; align-items: center; }
+  .gesture .big b { font-size: 20px; }
+  .progress { left: 50%; bottom: 18px; transform: translateX(-50%); width: min(420px, calc(100vw - 36px)); padding: 10px 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .progress .row { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  .progress .row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .25s; }
+  .panel { right: 16px; top: 14px; width: 318px; max-height: calc(100vh - 28px); overflow: auto; padding: 14px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); scrollbar-width: thin; }
+  .panel h2 { margin: 0 0 8px; font-size: 13.5px; color: #cfd6ff; letter-spacing: .5px; }
+  .panel section + section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  button, select, .file {
+    font: inherit; font-size: 13px; color: var(--ink); background: rgba(255, 255, 255, .06); border: 1px solid var(--line);
+    border-radius: 10px; padding: 7px 11px; min-height: 34px; cursor: pointer; touch-action: manipulation;
+  }
+  button:hover, .file:hover, select:hover { border-color: rgba(160, 175, 255, .55); background: rgba(255, 255, 255, .1); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary, .file.primary { background: linear-gradient(135deg, #7b6bff, #36cdb8); border-color: transparent; color: #071019; font-weight: 700; }
+  button.on { background: rgba(255, 207, 110, .18); border-color: rgba(255, 207, 110, .6); color: #ffe6b0; }
+  button:focus-visible, select:focus-visible, input:focus-visible, .file:focus-within { outline: 2px solid var(--accent2); outline-offset: 1px; }
+  .file { display: inline-flex; align-items: center; gap: 6px; position: relative; overflow: hidden; }
+  .file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+  .field { display: grid; gap: 3px; margin-top: 9px; font-size: 12.5px; }
+  .field .top { display: flex; justify-content: space-between; color: var(--muted); }
+  .field output { color: var(--accent2); font-weight: 600; font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .glist { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; font-size: 12.5px; }
+  .glist li { display: grid; grid-template-columns: 30px 1fr; gap: 6px; align-items: center; padding: 5px 7px; border-radius: 9px; border: 1px solid transparent; color: #c8cfea; }
+  .glist li b { color: var(--ink); }
+  .glist li.active { border-color: rgba(63, 224, 197, .6); background: rgba(63, 224, 197, .1); }
+  .glist .e { font-size: 20px; text-align: center; }
+  .note { font-size: 12px; color: var(--muted); margin: 8px 0 0; line-height: 1.55; }
+  .loading { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(3, 3, 8, .55); backdrop-filter: blur(3px); }
+  .loading[hidden] { display: none; }
+  .loading .box { text-align: center; padding: 20px 26px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); max-width: calc(100vw - 40px); }
+  .spinner { width: 42px; height: 42px; margin: 0 auto 12px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .15); border-top-color: var(--accent2); animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .toast { left: 50%; top: 118px; transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; background: rgba(12, 16, 30, .92); border: 1px solid var(--line); font-size: 13px; opacity: 0; transition: opacity .3s; pointer-events: none; text-align: center; max-width: calc(100vw - 32px); }
+  .toast.show { opacity: 1; }
+  .toggle-panel { display: none; }
+  .fatal { position: fixed; inset: 0; display: grid; place-items: center; z-index: 30; padding: 20px; text-align: center; }
+  .fatal[hidden] { display: none; }
+  @media (max-width: 820px) {
+    .brand p { display: none; }
+    .status { top: 50px; left: 12px; }
+    .pill { font-size: 11.5px; padding: 4px 9px; }
+    .gesture { top: auto; bottom: 92px; }
+    .panel { left: 10px; right: 10px; width: auto; top: auto; bottom: 10px; max-height: 52vh; display: none; }
+    .panel.open { display: block; }
+    .progress { bottom: 10px; width: calc(100vw - 96px); left: 10px; transform: none; }
+    .toggle-panel { display: inline-flex; right: 10px; bottom: 10px; position: fixed; z-index: 6; min-height: 52px; align-items: center; background: rgba(12, 16, 30, .9); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+    .panel.open ~ .toggle-panel { bottom: calc(52vh + 18px); }
+    #video.pip { width: 34vw; inset: auto 10px 74px auto; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <video id="video" playsinline muted aria-label="摄像头画面（镜像）"></video>
+  <canvas id="gl" aria-label="粒子画布：张开手掌（或按住鼠标/手指拖动）吸引粒子回到原位"></canvas>
+  <canvas id="overlay" aria-hidden="true"></canvas>
+</div>
+
+<div class="ui brand">
+  <h1>Pixel Flow</h1>
+  <p>图片粒子化 · 手势吸引还原 · Three.js + MediaPipe</p>
+</div>
+<div class="ui status" aria-live="polite">
+  <span class="pill" id="st-cam">摄像头：未开启（鼠标/触摸模式）</span>
+  <span class="pill" id="st-model">手势模型：未加载</span>
+  <span class="pill" id="st-stats">粒子 —</span>
+</div>
+<div class="ui gesture" aria-live="polite"><span class="big" id="g-now"><b>🖱</b>按住拖动吸引粒子</span></div>
+<div class="ui progress">
+  <div class="row"><span>还原进度</span><b id="prog-text">0%</b></div>
+  <div class="bar"><i id="prog-bar"></i></div>
+</div>
+
+<aside class="ui panel" id="panel" aria-label="控制面板">
+  <section>
+    <h2>① 图片</h2>
+    <div class="btns">
+      <label class="file primary">🖼 上传本地图片<input type="file" id="file" accept="image/*"></label>
+      <button type="button" id="btn-demo">换一张示例图</button>
+    </div>
+    <div class="field">
+      <div class="top"><label for="step">采样步长（每 N 像素一个粒子）</label><output id="step-out"></output></div>
+      <input type="range" id="step" min="2" max="12" step="1" value="4">
+    </div>
+    <div class="field">
+      <div class="top"><label for="psize">粒子大小</label><output id="psize-out"></output></div>
+      <input type="range" id="psize" min="0.5" max="1.6" step="0.05" value="1">
+    </div>
+  </section>
+  <section>
+    <h2>② 摄像头与手势</h2>
+    <div class="btns">
+      <button type="button" id="btn-cam" class="primary">📷 开启摄像头</button>
+      <select id="vmode" aria-label="视频显示方式"><option value="bg">视频作背景</option><option value="pip">右下角小窗</option><option value="hidden">隐藏视频</option></select>
+    </div>
+    <ul class="glist" id="glist">
+      <li data-g="open"><span class="e">🖐</span><span><b>张开手掌 · 激活</b>：手掌处出现吸引力场，进入力场的粒子加速回到原位；手离镜头越近力场越大。</span></li>
+      <li data-g="point"><span class="e">☝️</span><span><b>食指指向 · 控制</b>：指尖变为小半径精修力场，适合细节区域。</span></li>
+      <li data-g="fist"><span class="e">✊</span><span><b>握拳 · 暂停</b>：暂停吸引并冻结粒子运动。</span></li>
+      <li data-g="victory"><span class="e">✌️</span><span><b>剪刀手 · 完成</b>：保持约 0.6 秒，全部粒子由中心向外完全还原。</span></li>
+    </ul>
+    <p class="note">无摄像头时：按住鼠标或手指拖动 = 张开手掌；滚轮/右侧滑块调节力场；按住 <b>F</b> = 握拳暂停；<b>V</b> = 完成；<b>S</b> = 打散。</p>
+  </section>
+  <section>
+    <h2>③ 还原参数</h2>
+    <div class="field">
+      <div class="top"><label for="speed">还原速度</label><output id="speed-out"></output></div>
+      <input type="range" id="speed" min="0.3" max="3" step="0.1" value="1">
+    </div>
+    <div class="field">
+      <div class="top"><label for="zone">力场半径倍数</label><output id="zone-out"></output></div>
+      <input type="range" id="zone" min="0.5" max="2.5" step="0.05" value="1">
+    </div>
+    <div class="btns" style="margin-top:10px">
+      <button type="button" id="btn-scatter">💥 打散重置</button>
+      <button type="button" id="btn-complete">✨ 全部还原</button>
+      <button type="button" id="btn-pause">⏸ 暂停</button>
+    </div>
+  </section>
+</aside>
+<button type="button" class="toggle-panel" id="btn-panel" aria-controls="panel" aria-expanded="false">⚙ 控制</button>
+<div class="ui toast" id="toast" role="status"></div>
+<div class="loading" id="loading" hidden><div class="box"><div class="spinner"></div><div id="loading-text">正在加载…</div></div></div>
+<div class="fatal" id="fatal" hidden><div class="panel" style="position:static;display:block;max-width:520px"><h2 style="color:#ffd0d6">无法启动</h2><p class="note" id="fatal-msg" style="font-size:14px;color:#e6e9ff"></p></div></div>
+<script>
+  setTimeout(function () {
+    if (window.__pixelFlowStarted) return;
+    var f = document.getElementById('fatal');
+    f.hidden = false;
+    document.getElementById('fatal-msg').textContent = '未能从 CDN（cdn.jsdelivr.net / unpkg.com）加载 Three.js。请检查网络连接后刷新页面。本应用需要联网加载 Three.js 与 MediaPipe。';
+  }, 25000);
+</script>
+<script type="module">
+// Three.js and MediaPipe come from public CDNs; each has a second mirror in case the first one is unreachable.
+const importFirst = async (urls, ms) => {
+  let lastErr;
+  for (let i = 0; i < urls.length; i++) {
+    const u = urls[i], last = i === urls.length - 1;
+    try { return await (last ? import(u) : Promise.race([import(u), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout ' + u)), ms))])); }
+    catch (err) { lastErr = err; console.warn('CDN load failed:', u, err && err.message); }
+  }
+  throw lastErr;
+};
+let THREE;
+try {
+  THREE = await importFirst(['https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js', 'https://unpkg.com/three@0.160.0/build/three.module.js'], 15000);
+} catch (err) {
+  document.getElementById('fatal').hidden = false;
+  document.getElementById('fatal-msg').textContent = '未能从 CDN（cdn.jsdelivr.net / unpkg.com）加载 Three.js：' + (err && err.message) + '。请检查网络后刷新页面。';
+  throw err;
+}
+window.__pixelFlowStarted = true;
+document.getElementById('fatal').hidden = true;
+const $ = (s) => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const MP_VER = '0.10.14';
+const MP_SOURCES = [
+  { bundle: `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}/vision_bundle.mjs`, wasm: `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}/wasm` },
+  { bundle: `https://unpkg.com/@mediapipe/tasks-vision@${MP_VER}/vision_bundle.mjs`, wasm: `https://unpkg.com/@mediapipe/tasks-vision@${MP_VER}/wasm` },
+];
+const MP_MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+const MAX_PARTICLES = 160000;
+
+// ---------- renderer ----------
+const glCanvas = $('#gl');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: false, alpha: true });
+} catch (err) {
+  $('#fatal').hidden = false;
+  $('#fatal-msg').textContent = '浏览器无法创建 WebGL 上下文：' + err.message;
+  throw err;
+}
+renderer.setClearColor(0x000000, 0);
+const scene = new THREE.Scene();
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -10, 10);
+let W = 1, H = 1, DPR = 1;
+const overlay = $('#overlay'), octx = overlay.getContext('2d');
+
+// ---------- particles ----------
+const P = { n: 0, step: 4, size: 1, speed: 1, zoneK: 1, frozen: false, manualPause: false };
+let pos, vel, home, col, rest, seed, done, gxy, geo, points, imgInfo = null;
+const mat = new THREE.ShaderMaterial({
+  transparent: true, depthTest: false, depthWrite: false,
+  uniforms: { uSize: { value: 4 }, uTime: { value: 0 }, uDpr: { value: 1 } },
+  vertexShader: `attribute vec3 color; attribute float aRest; attribute float aSeed; uniform float uSize, uTime, uDpr;
+    varying vec3 vColor; varying float vRest; varying float vTw;
+    void main() {
+      vColor = color; vRest = aRest;
+      vTw = 0.75 + 0.25 * sin(uTime * (1.5 + aSeed * 3.0) + aSeed * 40.0);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      float s = mix(uSize * 0.75, uSize + 1.0, smoothstep(0.0, 1.0, aRest));
+      gl_PointSize = max(1.0, s * uDpr);
+    }`,
+  fragmentShader: `varying vec3 vColor; varying float vRest; varying float vTw;
+    void main() {
+      vec2 q = gl_PointCoord * 2.0 - 1.0;
+      float round = 1.0 - smoothstep(0.55, 1.0, length(q));
+      float settle = smoothstep(0.82, 1.0, vRest);
+      // Settled particles become fully opaque squares slightly larger than the sampling pitch so the image has no seams.
+      float a = mix(round, 1.0, settle);
+      if (a < 0.02) discard;
+      vec3 glow = vColor * mix(1.35 * vTw, 1.0, settle) + vec3(0.08, 0.06, 0.15) * (1.0 - settle);
+      gl_FragColor = vec4(glow, a * mix(0.85, 1.0, settle));
+    }`,
+});
+
+// Image area in world units (CSS px, origin at screen centre, y up); keeps clear of the brand/status rows, the progress bar and the side panel.
+function fitRect(iw, ih) {
+  const mobile = W < 820;
+  const L = mobile ? 10 : 16, R = mobile ? W - 10 : W - 350, T = mobile ? 100 : 112, B = mobile ? H - 140 : H - 84;
+  const aw = Math.max(80, R - L), ah = Math.max(80, B - T);
+  const s = Math.min(aw * 0.96 / iw, ah * 0.96 / ih);
+  return { w: iw * s, h: ih * s, cx: (L + R) / 2 - W / 2, cy: H / 2 - (T + B) / 2 };
+}
+// Samples the image on a grid (one particle per `step` screen pixels) and keeps each particle's home position and colour.
+// With keep=true the restore state is carried over from the previous grid by relative position (used when the step changes).
+function buildParticles(img, keep) {
+  const fit = fitRect(img.width, img.height);
+  let step = P.step;
+  let gw = Math.max(2, Math.round(fit.w / step)), gh = Math.max(2, Math.round(fit.h / step));
+  while (gw * gh > MAX_PARTICLES) { step += 1; gw = Math.max(2, Math.round(fit.w / step)); gh = Math.max(2, Math.round(fit.h / step)); }
+  if (step !== P.step) { P.step = step; $('#step').value = step; syncOutputs(); toast('粒子数上限 ' + MAX_PARTICLES / 1000 + 'k，采样步长已自动调整为 ' + step + ' px'); }
+  const c = document.createElement('canvas');
+  c.width = gw; c.height = gh;
+  const cx = c.getContext('2d', { willReadFrequently: true });
+  cx.imageSmoothingEnabled = true;
+  cx.imageSmoothingQuality = 'high';
+  cx.drawImage(img, 0, 0, gw, gh);
+  let data;
+  try { data = cx.getImageData(0, 0, gw, gh).data; } catch (err) { toast('无法读取图片像素：' + err.message); return false; }
+  let n = 0;
+  for (let k = 3; k < data.length; k += 4) if (data[k] >= 24) n++;
+  if (!n) { toast('图片完全透明，没有可生成的粒子'); return false; }
+  const prev = keep && imgInfo && P.n ? { gw: imgInfo.gw, gh: imgInfo.gh, map: imgInfo.map, rest, done } : null;
+  const map = new Int32Array(gw * gh).fill(-1);
+  pos = new Float32Array(n * 3); vel = new Float32Array(n * 2); home = new Float32Array(n * 2);
+  col = new Float32Array(n * 3); rest = new Float32Array(n); seed = new Float32Array(n);
+  done = new Uint8Array(n); gxy = new Uint16Array(n * 2);
+  const sx = fit.w / gw, sy = fit.h / gh;
+  let i = 0;
+  for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+    const k = (y * gw + x) * 4;
+    if (data[k + 3] < 24) continue;
+    map[y * gw + x] = i;
+    gxy[i * 2] = x; gxy[i * 2 + 1] = y;
+    const hx = fit.cx - fit.w / 2 + (x + 0.5) * sx, hy = fit.cy + fit.h / 2 - (y + 0.5) * sy;
+    home[i * 2] = hx; home[i * 2 + 1] = hy;
+    col[i * 3] = data[k] / 255; col[i * 3 + 1] = data[k + 1] / 255; col[i * 3 + 2] = data[k + 2] / 255;
+    seed[i] = Math.random();
+    let r0 = 0, d0 = 0;
+    if (prev) {
+      const ox = Math.min(prev.gw - 1, Math.floor((x + 0.5) / gw * prev.gw)), oy = Math.min(prev.gh - 1, Math.floor((y + 0.5) / gh * prev.gh));
+      const j = prev.map[oy * prev.gw + ox];
+      if (j >= 0) { r0 = prev.rest[j]; d0 = prev.done[j]; }
+    }
+    rest[i] = r0; done[i] = d0;
+    if (d0) { pos[i * 3] = hx; pos[i * 3 + 1] = hy; }
+    else if (r0 > 0) { pos[i * 3] = hx + (Math.random() - 0.5) * 80; pos[i * 3 + 1] = hy + (Math.random() - 0.5) * 80; }
+    else { pos[i * 3] = (Math.random() - 0.5) * W; pos[i * 3 + 1] = (Math.random() - 0.5) * H; }
+    i++;
+  }
+  if (points) { scene.remove(points); geo.dispose(); }
+  geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('aRest', new THREE.BufferAttribute(rest, 1).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Math.hypot(W, H) * 4);
+  points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+  scene.add(points);
+  P.n = n;
+  mat.uniforms.uSize.value = Math.max(sx, sy) * P.size;
+  imgInfo = { img, fit, gw, gh, sx, sy, map };
+  $('#st-stats').textContent = '粒子 ' + n.toLocaleString() + ' · 网格 ' + gw + '×' + gh;
+  return true;
+}
+
+// Built-in demo posters drawn with Canvas (used until the user uploads a photo).
+function demoImage(kind) {
+  const c = document.createElement('canvas');
+  c.width = 960; c.height = 640;
+  const x = c.getContext('2d');
+  if (kind === 0) {
+    const sky = x.createLinearGradient(0, 0, 0, 640);
+    sky.addColorStop(0, '#1b1450'); sky.addColorStop(0.45, '#c2367a'); sky.addColorStop(0.7, '#ff9a3c'); sky.addColorStop(1, '#ffd36a');
+    x.fillStyle = sky; x.fillRect(0, 0, 960, 640);
+    x.fillStyle = '#fff2b8'; x.beginPath(); x.arc(480, 400, 130, 0, Math.PI * 2); x.fill();
+    x.fillStyle = 'rgba(255, 120, 90, .55)';
+    for (let k = 0; k < 6; k++) x.fillRect(330, 360 + k * 26, 300, 9 + k * 1.5);
+    x.fillStyle = '#2a1846';
+    x.beginPath(); x.moveTo(0, 640); x.lineTo(0, 450); x.lineTo(150, 340); x.lineTo(290, 470); x.lineTo(420, 380); x.lineTo(560, 500); x.lineTo(700, 360); x.lineTo(830, 450); x.lineTo(960, 370); x.lineTo(960, 640); x.fill();
+    x.fillStyle = '#140c2a';
+    x.beginPath(); x.moveTo(0, 640); x.lineTo(0, 540); x.lineTo(200, 470); x.lineTo(380, 560); x.lineTo(600, 480); x.lineTo(800, 560); x.lineTo(960, 500); x.lineTo(960, 640); x.fill();
+    x.font = 'bold 92px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif'; x.textAlign = 'center';
+    x.fillStyle = 'rgba(255,255,255,.92)'; x.fillText('PIXEL FLOW', 480, 150);
+  } else if (kind === 1) {
+    const g = x.createRadialGradient(480, 320, 20, 480, 320, 520);
+    g.addColorStop(0, '#0d3b66'); g.addColorStop(1, '#03111f');
+    x.fillStyle = g; x.fillRect(0, 0, 960, 640);
+    for (let k = 0; k < 9; k++) {
+      x.strokeStyle = `hsla(${180 + k * 18}, 90%, 60%, .85)`; x.lineWidth = 16 - k;
+      x.beginPath(); x.ellipse(480, 320, 90 + k * 34, 40 + k * 22, k * 0.35, 0, Math.PI * 2); x.stroke();
+    }
+    const p = x.createRadialGradient(450, 290, 10, 480, 320, 120);
+    p.addColorStop(0, '#ffe9a8'); p.addColorStop(0.5, '#ff8f3f'); p.addColorStop(1, '#9b2c55');
+    x.fillStyle = p; x.beginPath(); x.arc(480, 320, 110, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#fff';
+    for (let k = 0; k < 160; k++) { x.globalAlpha = Math.random(); x.fillRect(Math.random() * 960, Math.random() * 640, 2, 2); }
+    x.globalAlpha = 1;
+  } else {
+    x.fillStyle = '#fff7ec'; x.fillRect(0, 0, 960, 640);
+    const cols = ['#ff5d73', '#ffb547', '#3fc1a5', '#4f7cff', '#9b6bff'];
+    for (let k = 0; k < 5; k++) { x.fillStyle = cols[k]; x.beginPath(); x.arc(170 + k * 155, 300 + Math.sin(k) * 60, 120 - k * 6, 0, Math.PI * 2); x.fill(); }
+    x.globalCompositeOperation = 'multiply';
+    for (let k = 0; k < 5; k++) { x.fillStyle = cols[(k + 2) % 5]; x.fillRect(90 + k * 160, 380, 120, 160); }
+    x.globalCompositeOperation = 'source-over';
+    x.fillStyle = '#20223a'; x.font = 'bold 70px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif'; x.textAlign = 'center';
+    x.fillText('手势还原', 480, 120);
+  }
+  return c;
+}
+let demoK = 0;
+
+// ---------- UI helpers ----------
+let toastTimer = 0;
+function toast(msg, ms = 2800) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+function syncOutputs() {
+  $('#step-out').textContent = $('#step').value + ' px';
+  $('#psize-out').textContent = (+$('#psize').value).toFixed(2) + '×';
+  $('#speed-out').textContent = (+$('#speed').value).toFixed(1) + '×';
+  $('#zone-out').textContent = (+$('#zone').value).toFixed(2) + '×';
+}
+function setPill(el, text, cls) { el.textContent = text; el.className = 'pill' + (cls ? ' ' + cls : ''); }
+
+// ---------- layout ----------
+let prevW = 0, prevH = 0;
+function resize() {
+  prevW = W; prevH = H;
+  W = Math.max(1, window.innerWidth); H = Math.max(1, window.innerHeight);
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(DPR);
+  renderer.setSize(W, H, false);
+  camera.left = -W / 2; camera.right = W / 2; camera.top = H / 2; camera.bottom = -H / 2;
+  camera.updateProjectionMatrix();
+  overlay.width = Math.round(W * DPR); overlay.height = Math.round(H * DPR);
+  octx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  mat.uniforms.uDpr.value = DPR;
+  relayout();
+}
+// Recomputes home positions after a viewport change without losing the restore progress.
+function relayout() {
+  if (!imgInfo || !P.n) return;
+  const fit = fitRect(imgInfo.img.width, imgInfo.img.height);
+  const sx = fit.w / imgInfo.gw, sy = fit.h / imgInfo.gh;
+  const kx = prevW > 1 ? W / prevW : 1, ky = prevH > 1 ? H / prevH : 1;
+  for (let i = 0; i < P.n; i++) {
+    const hx = fit.cx - fit.w / 2 + (gxy[i * 2] + 0.5) * sx, hy = fit.cy + fit.h / 2 - (gxy[i * 2 + 1] + 0.5) * sy;
+    home[i * 2] = hx; home[i * 2 + 1] = hy;
+    if (done[i]) { pos[i * 3] = hx; pos[i * 3 + 1] = hy; }
+    else { pos[i * 3] *= kx; pos[i * 3 + 1] *= ky; }
+  }
+  imgInfo.fit = fit; imgInfo.sx = sx; imgInfo.sy = sy;
+  mat.uniforms.uSize.value = Math.max(sx, sy) * P.size;
+  geo.attributes.position.needsUpdate = true;
+}
+
+// ---------- flow field ----------
+// Divergence-free stream: v = (dψ/dy, -dψ/dx) for a sum of travelling sine waves, so particles meander without clumping.
+const FLOW_CELL = 32;
+const WAVES = [[0.0041, 0.0013, 0.21, 1], [-0.0017, 0.0049, -0.17, 1], [0.0029, -0.0031, 0.13, 0.8], [0.0009, 0.0007, -0.05, 2.2], [-0.0061, -0.0022, 0.29, 0.5]];
+let fgW = 0, fgH = 0, fgVX = null, fgVY = null;
+function updateFlow(t) {
+  const gw = Math.ceil(W / FLOW_CELL) + 3, gh = Math.ceil(H / FLOW_CELL) + 3;
+  if (gw !== fgW || gh !== fgH) { fgW = gw; fgH = gh; fgVX = new Float32Array(gw * gh); fgVY = new Float32Array(gw * gh); }
+  for (let j = 0; j < gh; j++) {
+    const y = (j - 1) * FLOW_CELL - H / 2;
+    for (let i = 0; i < gw; i++) {
+      const x = (i - 1) * FLOW_CELL - W / 2;
+      let vx = 0, vy = 0;
+      for (let w = 0; w < WAVES.length; w++) {
+        const q = WAVES[w], c = q[3] * Math.cos(q[0] * x + q[1] * y + q[2] * t);
+        vx += q[1] * c; vy -= q[0] * c;
+      }
+      fgVX[j * gw + i] = vx * 160; fgVY[j * gw + i] = vy * 160;
+    }
+  }
+}
+
+// ---------- simulation ----------
+const zones = [];
+const CAPTURE = 0.25;
+let wave = null, completeBoost = 0, timeScale = 1, progress = 0, activeCount = 0, announced = false;
+let fistActive = false, keyFist = false;
+const isFrozen = () => P.manualPause || fistActive || keyFist;
+function simulate(dt, t) {
+  timeScale += ((isFrozen() ? 0 : 1) - timeScale) * Math.min(1, dt * 8);
+  if (timeScale < 0.02) { timeScale = 0; return false; }
+  const d = dt * timeScale;
+  updateFlow(t);
+  const n = P.n, sp = P.speed;
+  const halfW = W / 2 + 24, halfH = H / 2 + 24;
+  const flowSpeed = 52 * clamp(Math.min(W, H) / 800, 0.6, 1.4);
+  const driftX = Math.cos(t * 0.05) * 12, driftY = Math.sin(t * 0.07) * 6;
+  const zs = isFrozen() ? [] : zones, zn = zs.length;
+  const steer = Math.min(1, d * 2.4);
+  const autoRate = 0.3 * sp * (completeBoost ? 8 : 1);
+  const offX = W / 2, offY = H / 2, maxFx = fgW - 1.001, maxFy = fgH - 1.001;
+  if (wave) { wave.R += d * wave.speed; wave.R2 = wave.R * wave.R; }
+  let sum = 0, active = 0;
+  for (let i = 0; i < n; i++) {
+    if (done[i]) { sum += 1; continue; }
+    active++;
+    const i2 = i * 2, i3 = i * 3;
+    let px = pos[i3], py = pos[i3 + 1], vx = vel[i2], vy = vel[i2 + 1];
+    const hx = home[i2], hy = home[i2 + 1];
+    let r = rest[i], gain = 0;
+    for (let z = 0; z < zn; z++) {
+      const Z = zs[z];
+      const dx = px - Z.x, dy = py - Z.y, d2 = dx * dx + dy * dy;
+      if (d2 < Z.r2) {
+        gain += sp * Z.k * (0.35 + 0.9 * (1 - Math.sqrt(d2) * Z.ir));
+      } else if (r < 0.3 && d2 < Z.r2 * 2.56) {
+        // Outer halo (up to 1.6 r): gently pull free particles into the zone so the hand "gathers" the stream.
+        const dd = Math.sqrt(d2), f = Z.pull * d * (1.6 - dd * Z.ir) / 0.6;
+        vx -= dx / dd * f; vy -= dy / dd * f;
+      }
+      const hdx = hx - Z.x, hdy = hy - Z.y;
+      if (hdx * hdx + hdy * hdy < Z.r2) gain += sp * Z.k * 0.45;
+    }
+    if (wave) {
+      const wx = hx - wave.x, wy = hy - wave.y;
+      if (wx * wx + wy * wy < wave.R2) { if (r < CAPTURE) r = CAPTURE; gain += 3; }
+    }
+    // Below the capture threshold a particle slips back into the stream unless a zone keeps feeding it;
+    // once captured it keeps heading home on its own.
+    if (gain > 0) r += d * gain;
+    else if (r > 0 && r < CAPTURE) r = Math.max(0, r - d * 0.12);
+    if (r >= CAPTURE) r += d * autoRate * (0.5 + r);
+    if (r > 1) r = 1;
+    rest[i] = r;
+    const free = (1 - r) * (1 - r);
+    if (free > 0.0001) {
+      let fx = (px + offX) / FLOW_CELL + 1, fy = (py + offY) / FLOW_CELL + 1;
+      fx = fx < 0 ? 0 : fx > maxFx ? maxFx : fx; fy = fy < 0 ? 0 : fy > maxFy ? maxFy : fy;
+      const ix = fx | 0, iy = fy | 0, ax = fx - ix, ay = fy - iy, o = iy * fgW + ix;
+      const fvx = (fgVX[o] * (1 - ax) + fgVX[o + 1] * ax) * (1 - ay) + (fgVX[o + fgW] * (1 - ax) + fgVX[o + fgW + 1] * ax) * ay;
+      const fvy = (fgVY[o] * (1 - ax) + fgVY[o + 1] * ax) * (1 - ay) + (fgVY[o + fgW] * (1 - ax) + fgVY[o + fgW + 1] * ax) * ay;
+      const s = flowSpeed * (0.55 + seed[i] * 0.9);
+      vx += (fvx * s + driftX - vx) * steer * free;
+      vy += (fvy * s + driftY - vy) * steer * free;
+    }
+    if (r > 0) {
+      // Critically damped spring towards the home pixel; stiffness grows with the restore level.
+      const k = (2 + 40 * r * r) * (0.6 + 0.4 * sp), c = 2 * Math.sqrt(k) * 0.9, w = Math.min(1, r * 1.6);
+      vx += ((hx - px) * k - vx * c) * d * w;
+      vy += ((hy - py) * k - vy * c) * d * w;
+    }
+    px += vx * d; py += vy * d;
+    if (r >= 1) {
+      const ex = hx - px, ey = hy - py;
+      if (ex * ex + ey * ey < 0.3 && vx * vx + vy * vy < 25) { px = hx; py = hy; vx = 0; vy = 0; done[i] = 1; }
+    } else if (r < 0.05) {
+      if (px < -halfW) px += halfW * 2; else if (px > halfW) px -= halfW * 2;
+      if (py < -halfH) py += halfH * 2; else if (py > halfH) py -= halfH * 2;
+    }
+    pos[i3] = px; pos[i3 + 1] = py; vel[i2] = vx; vel[i2 + 1] = vy;
+    sum += done[i] ? 1 : r * 0.96;
+  }
+  if (wave && wave.R > wave.max) wave = null;
+  progress = n ? sum / n : 0;
+  activeCount = active;
+  if (completeBoost && progress >= 0.9999) completeBoost = 0;
+  return active > 0;
+}
+
+function scatter() {
+  if (!P.n) return;
+  const cx = imgInfo.fit.cx, cy = imgInfo.fit.cy;
+  for (let i = 0; i < P.n; i++) {
+    rest[i] = 0; done[i] = 0;
+    const dx = pos[i * 3] - cx + (Math.random() - 0.5) * 4, dy = pos[i * 3 + 1] - cy + (Math.random() - 0.5) * 4, dd = Math.hypot(dx, dy) || 1;
+    const s = 260 + Math.random() * 640;
+    vel[i * 2] = dx / dd * s + (Math.random() - 0.5) * 220;
+    vel[i * 2 + 1] = dy / dd * s + (Math.random() - 0.5) * 220;
+  }
+  wave = null; completeBoost = 0; announced = false;
+  setPaused(false);
+  progress = 0;
+  geo.attributes.aRest.needsUpdate = true;
+}
+// Completion: a radial wave sweeps out from (x, y); every particle it passes is pulled home at full strength.
+function triggerComplete(x, y) {
+  if (!P.n) return;
+  const f = imgInfo.fit;
+  let max = 0;
+  for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) max = Math.max(max, Math.hypot(f.cx + a * f.w / 2 - x, f.cy + b * f.h / 2 - y));
+  wave = { x, y, R: 0, R2: 0, max: max + 10, speed: Math.max(W, H) * 0.9 };
+  completeBoost = 1;
+  setPaused(false);
+  toast('✨ 完成：全部粒子正在归位');
+}
+
+// ---------- hand tracking & gestures ----------
+const video = $('#video');
+const stCam = $('#st-cam'), stModel = $('#st-model');
+const HAND_EDGES = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]];
+const handTrack = new Map();
+let stream = null, camLive = false, landmarker = null, modelState = 'idle', delegateUsed = '', lastVideoTime = -1, lastDetect = 0, vmode = 'bg';
+let victoryHold = 0, victoryFired = false, mainGesture = 'none';
+
+// A finger counts as extended when its tip is clearly farther from the wrist than its PIP and MCP joints.
+// x is scaled by the video aspect so distances are isotropic.
+function classify(lm, aspect) {
+  const d = (a, b) => Math.hypot((lm[a].x - lm[b].x) * aspect, lm[a].y - lm[b].y);
+  const ext = (tip, pip, mcp) => d(0, tip) > d(0, pip) * 1.12 && d(0, tip) > d(0, mcp) * 1.35;
+  const fi = ext(8, 6, 5), fm = ext(12, 10, 9), fr = ext(16, 14, 13), fp = ext(20, 18, 17);
+  const count = fi + fm + fr + fp;
+  if (count === 0) return 'fist';
+  if (fi && fm && !fr && !fp) return 'victory';
+  if (fi && !fm && !fr && !fp) return 'point';
+  if (count >= 3) return 'open';
+  return 'none';
+}
+// Normalised landmark -> screen px. In background mode the mapping follows the mirrored object-fit:cover video so the
+// skeleton lines up with the picture; in PiP/hidden modes the whole camera frame is stretched over the screen.
+function mapPoint(nx, ny) {
+  const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+  let sx, sy;
+  if (vmode === 'bg') {
+    const s = Math.max(W / vw, H / vh), dw = vw * s, dh = vh * s;
+    sx = (W - dw) / 2 + nx * dw; sy = (H - dh) / 2 + ny * dh;
+  } else { sx = nx * W; sy = ny * H; }
+  return { x: W - sx, y: sy };
+}
+function processHands(res, now) {
+  const lms = (res && res.landmarks) || [];
+  const hd = (res && (res.handednesses || res.handedness)) || [];
+  const aspect = (video.videoWidth || 4) / (video.videoHeight || 3);
+  const seen = new Set();
+  lms.forEach((lm, idx) => {
+    if (!lm || lm.length < 21) return;
+    const label = hd[idx] && hd[idx][0] ? hd[idx][0].categoryName : 'Hand';
+    const key = seen.has(label) ? label + idx : label;
+    seen.add(key);
+    const raw = classify(lm, aspect);
+    const pts = lm.map((p) => mapPoint(p.x, p.y));
+    let h = handTrack.get(key);
+    if (!h) { h = { stable: 'none', cand: raw, count: 0, cx: 0, cy: 0, size: 0, init: false, pts }; handTrack.set(key, h); }
+    // Temporal debounce: a new gesture must be seen on 3 consecutive detections before it is accepted.
+    if (raw === h.cand) h.count++; else { h.cand = raw; h.count = 1; }
+    if (h.count >= 3) h.stable = h.cand;
+    let px = 0, py = 0;
+    for (const j of [0, 5, 9, 13, 17]) { px += pts[j].x / 5; py += pts[j].y / 5; }
+    const target = h.stable === 'point' ? pts[8] : { x: px, y: py };
+    const size = Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y);
+    const a = h.init ? 0.5 : 1;
+    h.cx += (target.x - h.cx) * a; h.cy += (target.y - h.cy) * a; h.size += (size - h.size) * a;
+    h.pts = pts; h.init = true; h.last = now;
+  });
+  for (const k of [...handTrack.keys()]) if (!seen.has(k)) handTrack.delete(k);
+}
+function addZone(sx, sy, r, k, kind) {
+  zones.push({ sx, sy, x: sx - W / 2, y: H / 2 - sy, r, r2: r * r, ir: 1 / r, k, kind, pull: kind === 'point' ? 180 : 260 });
+}
+const pointerRadius = () => Math.max(56, Math.min(W, H) * 0.1) * P.zoneK;
+function buildZones(dt) {
+  zones.length = 0;
+  const order = { fist: 4, victory: 3, open: 2, point: 1, none: 0 };
+  let main = 'none', fist = false, victory = null;
+  for (const h of handTrack.values()) {
+    if (order[h.stable] > order[main]) main = h.stable;
+    if (h.stable === 'fist') fist = true;
+    else if (h.stable === 'victory') victory = h;
+    else if (h.stable === 'open') addZone(h.cx, h.cy, clamp(h.size * 1.5, 40, Math.min(W, H) * 0.3) * P.zoneK, 1, 'open');
+    else if (h.stable === 'point') addZone(h.cx, h.cy, clamp(h.size * 0.5, 20, 80) * P.zoneK, 1.7, 'point');
+  }
+  for (const p of pointers.values()) if (p.down) addZone(p.x, p.y, pointerRadius(), 1, 'pointer');
+  fistActive = fist;
+  if (victory && !fist) {
+    victoryHold += dt;
+    if (victoryHold >= 0.6 && !victoryFired) { victoryFired = true; triggerComplete(victory.cx - W / 2, H / 2 - victory.cy); }
+  } else { victoryHold = 0; victoryFired = false; }
+  mainGesture = main;
+}
+function detect(now) {
+  if (!camLive || !landmarker || video.readyState < 2) return;
+  if (video.currentTime === lastVideoTime || now - lastDetect < 30) return;
+  lastVideoTime = video.currentTime; lastDetect = now;
+  let res;
+  try { res = landmarker.detectForVideo(video, now); } catch (err) { console.warn('detectForVideo', err); return; }
+  processHands(res, now);
+}
+
+// ---------- camera & MediaPipe ----------
+const withTimeout = (p, ms, msg) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))]);
+function applyVideoMode() {
+  video.className = (camLive ? 'live' : '') + (vmode === 'bg' ? '' : ' ' + vmode);
+}
+function cameraError(err) {
+  const name = err && err.name;
+  const framed = window.self !== window.top;
+  if (name === 'NotAllowedError' || name === 'SecurityError' || name === 'PermissionDeniedError') {
+    return { short: '权限被拒绝', long: framed ? '当前页面嵌在 iframe 中，浏览器不允许它使用摄像头。请在新标签页单独打开本页，或继续用鼠标/触摸交互。' : '摄像头权限被拒绝。请在浏览器地址栏的站点设置里允许摄像头后重试，或继续用鼠标/触摸交互。' };
+  }
+  if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'DevicesNotFoundError') return { short: '未找到设备', long: '没有找到可用的摄像头，可继续用鼠标/触摸交互。' };
+  if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') return { short: '设备被占用', long: '摄像头可能正被其他程序占用，请关闭后重试。' };
+  return { short: '启动失败', long: '摄像头启动失败：' + ((err && err.message) || err) };
+}
+function showLoading(text) { $('#loading-text').textContent = text; $('#loading').hidden = false; }
+function hideLoading() { $('#loading').hidden = true; }
+async function startCamera() {
+  const btn = $('#btn-cam');
+  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setPill(stCam, '摄像头：当前环境不可用', 'err');
+    toast('浏览器只允许在 HTTPS 或 localhost 页面使用摄像头；可继续用鼠标/触摸交互。', 6000);
+    return;
+  }
+  btn.disabled = true;
+  setPill(stCam, '摄像头：请求权限中…', 'warn');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+  } catch (err) {
+    stream = null;
+    btn.disabled = false;
+    const m = cameraError(err);
+    setPill(stCam, '摄像头：' + m.short, 'err');
+    toast(m.long, 6500);
+    return;
+  }
+  video.srcObject = stream;
+  try { await video.play(); } catch (err) { console.warn('video.play', err); }
+  camLive = true;
+  lastVideoTime = -1;
+  applyVideoMode();
+  setPill(stCam, '摄像头：已开启', 'ok');
+  btn.textContent = '⏹ 关闭摄像头';
+  btn.classList.remove('primary');
+  btn.disabled = false;
+  const track = stream.getVideoTracks()[0];
+  if (track) track.addEventListener('ended', () => stopCamera('已断开'));
+  loadModel();
+}
+function stopCamera(reason) {
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  stream = null; camLive = false;
+  video.srcObject = null;
+  handTrack.clear();
+  applyVideoMode();
+  setPill(stCam, reason ? '摄像头：' + reason : '摄像头：未开启（鼠标/触摸模式）', reason ? 'warn' : '');
+  const btn = $('#btn-cam');
+  btn.textContent = '📷 开启摄像头';
+  btn.classList.add('primary');
+  btn.disabled = false;
+}
+async function loadModel() {
+  if (landmarker || modelState === 'loading') return;
+  modelState = 'loading';
+  setPill(stModel, '手势模型：加载中…', 'warn');
+  showLoading('正在加载 MediaPipe 手势模型（首次约 10 MB）…');
+  try {
+    let mp = null, src = null;
+    for (const s of MP_SOURCES) {
+      try { mp = await withTimeout(import(s.bundle), 25000, '加载 MediaPipe 脚本超时'); src = s; break; }
+      catch (err) { console.warn('MediaPipe CDN failed:', s.bundle, err && err.message); if (s === MP_SOURCES[MP_SOURCES.length - 1]) throw err; }
+    }
+    const fileset = await withTimeout(mp.FilesetResolver.forVisionTasks(src.wasm), 30000, '加载 WASM 超时');
+    const opts = (delegate) => ({
+      baseOptions: { modelAssetPath: MP_MODEL, delegate }, runningMode: 'VIDEO', numHands: 2,
+      minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5,
+    });
+    try {
+      landmarker = await withTimeout(mp.HandLandmarker.createFromOptions(fileset, opts('GPU')), 60000, '模型初始化超时');
+      delegateUsed = 'GPU';
+    } catch (err) {
+      console.warn('GPU delegate unavailable, falling back to CPU', err);
+      landmarker = await withTimeout(mp.HandLandmarker.createFromOptions(fileset, opts('CPU')), 60000, '模型初始化超时');
+      delegateUsed = 'CPU';
+    }
+    modelState = 'ready';
+    setPill(stModel, '手势模型：就绪（' + delegateUsed + '）', 'ok');
+    if (camLive) toast('手势识别已启动：张开手掌 🖐 吸引粒子', 3500);
+  } catch (err) {
+    modelState = 'error';
+    setPill(stModel, '手势模型：加载失败', 'err');
+    toast('手势模型加载失败（' + ((err && err.message) || err) + '），可继续用鼠标/触摸交互。', 7000);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ---------- pointer / keyboard fallback ----------
+const pointers = new Map();
+glCanvas.addEventListener('pointerdown', (e) => {
+  try { glCanvas.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointers cannot be captured */ }
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, down: true, type: e.pointerType });
+});
+glCanvas.addEventListener('pointermove', (e) => {
+  const p = pointers.get(e.pointerId);
+  if (p) { p.x = e.clientX; p.y = e.clientY; }
+  else if (e.pointerType === 'mouse') pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, down: false, type: 'mouse' });
+});
+const releasePointer = (e) => {
+  const p = pointers.get(e.pointerId);
+  if (!p) return;
+  if (p.type === 'mouse' && e.type === 'pointerup') p.down = false; else pointers.delete(e.pointerId);
+};
+glCanvas.addEventListener('pointerup', releasePointer);
+glCanvas.addEventListener('pointercancel', releasePointer);
+glCanvas.addEventListener('pointerleave', (e) => { const p = pointers.get(e.pointerId); if (p && !p.down) pointers.delete(e.pointerId); });
+glCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+glCanvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const z = $('#zone');
+  z.value = clamp(+z.value + (e.deltaY < 0 ? 0.05 : -0.05), 0.5, 2.5);
+  z.dispatchEvent(new Event('input'));
+}, { passive: false });
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'f') keyFist = true;
+  else if (k === 'v' && !e.repeat && imgInfo) triggerComplete(imgInfo.fit.cx, imgInfo.fit.cy);
+  else if (k === 's' && !e.repeat) { scatter(); toast('💥 已打散：张开手掌重新还原'); }
+  else if (k === ' ' && !(e.target.closest && e.target.closest('button, select, input, label'))) { e.preventDefault(); setPaused(!P.manualPause); }
+});
+window.addEventListener('keyup', (e) => { if (e.key.toLowerCase() === 'f') keyFist = false; });
+window.addEventListener('blur', () => { keyFist = false; pointers.clear(); });
+
+function setPaused(v) {
+  P.manualPause = v;
+  const b = $('#btn-pause');
+  b.textContent = v ? '▶ 继续' : '⏸ 暂停';
+  b.classList.toggle('on', v);
+  b.setAttribute('aria-pressed', String(v));
+}
+
+// ---------- images ----------
+const DEMO_NAMES = ['示例：日落山峦', '示例：星环', '示例：色块'];
+function setImage(img, name, quiet) {
+  if (!(img.width > 0 && img.height > 0)) { toast('图片尺寸无效：' + name); return; }
+  if (buildParticles(img, false)) {
+    wave = null; completeBoost = 0; announced = false; progress = 0;
+    $('#st-stats').title = name;
+    if (!quiet) toast('已载入「' + name + '」：张开手掌或按住拖动开始还原', 3400);
+  }
+}
+function loadFile(file) {
+  if (!file) return;
+  if (file.type && !file.type.startsWith('image/')) { toast('请选择图片文件（PNG / JPG / WebP / GIF …）'); return; }
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    let src = img;
+    if (!img.naturalWidth || !img.naturalHeight) {
+      // e.g. an SVG without intrinsic size
+      src = document.createElement('canvas');
+      src.width = 1024; src.height = 768;
+      src.getContext('2d').drawImage(img, 0, 0, 1024, 768);
+    }
+    setImage(src, file.name);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); toast('无法解码该图片：' + file.name, 4000); };
+  img.src = url;
+}
+
+// ---------- overlay ----------
+const G_COLORS = { open: '63,224,197', point: '170,150,255', fist: '255,207,110', victory: '255,128,190', none: '200,210,240', pointer: '63,224,197' };
+const G_LABEL = { open: '🖐 吸引', point: '☝️ 精修', fist: '✊ 暂停', victory: '✌️ 完成', none: '🤚 ?' };
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath(); c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+function drawHand(c, h) {
+  const rgb = G_COLORS[h.stable] || G_COLORS.none, pts = h.pts;
+  c.save();
+  c.lineWidth = 2.5; c.lineCap = 'round'; c.strokeStyle = `rgba(${rgb},.85)`;
+  c.beginPath();
+  for (const [a, b] of HAND_EDGES) { c.moveTo(pts[a].x, pts[a].y); c.lineTo(pts[b].x, pts[b].y); }
+  c.stroke();
+  c.fillStyle = '#fff';
+  for (const p of pts) { c.beginPath(); c.arc(p.x, p.y, 3, 0, Math.PI * 2); c.fill(); }
+  const text = G_LABEL[h.stable] || '';
+  const lx = clamp(pts[0].x, 50, W - 50), ly = clamp(pts[0].y + 28, 20, H - 20);
+  c.font = '600 14px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  const tw = c.measureText(text).width + 20;
+  c.fillStyle = 'rgba(8,10,20,.75)'; roundRect(c, lx - tw / 2, ly - 13, tw, 26, 13); c.fill();
+  c.fillStyle = `rgb(${rgb})`; c.fillText(text, lx, ly + 1);
+  if (h.stable === 'victory' && victoryHold > 0 && !victoryFired) {
+    c.strokeStyle = 'rgba(255,128,190,.95)'; c.lineWidth = 4;
+    c.beginPath(); c.arc(h.cx, h.cy, 36, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, victoryHold / 0.6)); c.stroke();
+  }
+  c.restore();
+}
+function drawOverlay(t) {
+  const c = octx;
+  c.clearRect(0, 0, W, H);
+  if (imgInfo && progress < 0.999) {
+    const f = imgInfo.fit, x = W / 2 + f.cx - f.w / 2, y = H / 2 - f.cy - f.h / 2;
+    c.save(); c.setLineDash([6, 8]); c.lineDashOffset = -t * 14; c.strokeStyle = 'rgba(160,175,255,.3)'; c.lineWidth = 1;
+    c.strokeRect(x - 5, y - 5, f.w + 10, f.h + 10); c.restore();
+  }
+  if (wave) {
+    c.save(); c.strokeStyle = 'rgba(255,240,200,.6)'; c.lineWidth = 3; c.shadowColor = 'rgba(255,220,150,.9)'; c.shadowBlur = 18;
+    c.beginPath(); c.arc(W / 2 + wave.x, H / 2 - wave.y, wave.R, 0, Math.PI * 2); c.stroke(); c.restore();
+  }
+  const frozen = isFrozen();
+  for (const z of zones) {
+    const rgb = G_COLORS[z.kind];
+    const g = c.createRadialGradient(z.sx, z.sy, 0, z.sx, z.sy, z.r);
+    g.addColorStop(0, `rgba(${rgb},.16)`); g.addColorStop(0.7, `rgba(${rgb},.07)`); g.addColorStop(1, `rgba(${rgb},0)`);
+    c.fillStyle = g; c.beginPath(); c.arc(z.sx, z.sy, z.r, 0, Math.PI * 2); c.fill();
+    c.save(); c.strokeStyle = `rgba(${rgb},${frozen ? 0.25 : 0.75})`; c.lineWidth = 1.5; c.setLineDash([10, 9]); c.lineDashOffset = t * 30;
+    c.beginPath(); c.arc(z.sx, z.sy, z.r, 0, Math.PI * 2); c.stroke(); c.restore();
+  }
+  for (const p of pointers.values()) {
+    if (p.down) continue;
+    c.save(); c.strokeStyle = 'rgba(200,210,255,.25)'; c.setLineDash([4, 8]);
+    c.beginPath(); c.arc(p.x, p.y, pointerRadius(), 0, Math.PI * 2); c.stroke(); c.restore();
+  }
+  for (const h of handTrack.values()) if (h.pts) drawHand(c, h);
+}
+
+// ---------- status UI ----------
+const G_TEXT = {
+  open: ['🖐', '张开手掌 · 吸引还原中'], point: ['☝️', '食指 · 精修小力场'], fist: ['✊', '握拳 · 已暂停吸引'],
+  victory: ['✌️', '剪刀手 · 保持 0.6 秒完成'], none: ['🤚', '未识别的手势（试试张开手掌）'], nohand: ['👋', '把手伸到摄像头前'],
+  mouse: ['🖱', '按住拖动吸引粒子'], mouseOn: ['🖱', '吸引中…'], paused: ['⏸', '已暂停（点「继续」或按空格）'],
+  keyFist: ['✊', 'F 键 · 暂停吸引'], waitModel: ['⏳', '手势模型加载中，可先用鼠标/触摸'],
+};
+let gKey = '';
+function updateUI() {
+  let anyDown = false;
+  for (const p of pointers.values()) if (p.down) anyDown = true;
+  let key;
+  if (P.manualPause) key = 'paused';
+  else if (keyFist) key = 'keyFist';
+  else if (handTrack.size && mainGesture !== 'none') key = mainGesture;
+  else if (anyDown) key = 'mouseOn';
+  else if (camLive && modelState === 'ready') key = handTrack.size ? 'none' : 'nohand';
+  else if (camLive && modelState === 'loading') key = 'waitModel';
+  else key = 'mouse';
+  if (key !== gKey) {
+    gKey = key;
+    const [emoji, text] = G_TEXT[key];
+    const b = document.createElement('b');
+    b.textContent = emoji;
+    $('#g-now').replaceChildren(b, text);
+    const active = key === 'mouseOn' ? 'open' : key === 'keyFist' || key === 'paused' ? 'fist' : key;
+    document.querySelectorAll('#glist li').forEach((li) => li.classList.toggle('active', li.dataset.g === active));
+  }
+  $('#prog-text').textContent = Math.floor(progress * 100 + 1e-6) + '%';
+  $('#prog-bar').style.width = (progress * 100).toFixed(1) + '%';
+  if (P.n && progress >= 0.9999 && !announced) { announced = true; toast('🎉 原图已完整还原！点「打散重置」或按 S 再玩一次', 4500); }
+}
+
+// ---------- controls ----------
+$('#step').addEventListener('input', syncOutputs);
+$('#step').addEventListener('change', () => { P.step = +$('#step').value; if (imgInfo) buildParticles(imgInfo.img, true); });
+$('#psize').addEventListener('input', () => { P.size = +$('#psize').value; if (imgInfo) mat.uniforms.uSize.value = Math.max(imgInfo.sx, imgInfo.sy) * P.size; syncOutputs(); });
+$('#speed').addEventListener('input', () => { P.speed = +$('#speed').value; syncOutputs(); });
+$('#zone').addEventListener('input', () => { P.zoneK = +$('#zone').value; syncOutputs(); });
+$('#btn-scatter').addEventListener('click', () => { scatter(); toast('💥 已打散：张开手掌重新还原'); });
+$('#btn-complete').addEventListener('click', () => { if (imgInfo) triggerComplete(imgInfo.fit.cx, imgInfo.fit.cy); });
+$('#btn-pause').addEventListener('click', () => setPaused(!P.manualPause));
+$('#btn-demo').addEventListener('click', () => { demoK = (demoK + 1) % 3; setImage(demoImage(demoK), DEMO_NAMES[demoK]); });
+$('#btn-cam').addEventListener('click', () => { if (camLive) stopCamera(); else startCamera(); });
+$('#vmode').addEventListener('change', (e) => { vmode = e.target.value; applyVideoMode(); });
+$('#file').addEventListener('change', (e) => { loadFile(e.target.files && e.target.files[0]); e.target.value = ''; });
+$('#btn-panel').addEventListener('click', () => {
+  const open = $('#panel').classList.toggle('open');
+  $('#btn-panel').setAttribute('aria-expanded', String(open));
+  $('#btn-panel').textContent = open ? '✕ 收起' : '⚙ 控制';
+});
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => { e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) loadFile(f); });
+glCanvas.addEventListener('webglcontextlost', () => toast('WebGL 上下文丢失，正在等待浏览器恢复…', 5000));
+glCanvas.addEventListener('webglcontextrestored', () => { if (imgInfo) buildParticles(imgInfo.img, true); toast('WebGL 已恢复'); });
+
+// ---------- main loop ----------
+let last = performance.now(), uiTimer = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.033, Math.max(0, (now - last) / 1000));
+  last = now;
+  const t = now / 1000;
+  detect(now);
+  buildZones(dt);
+  if (P.n && simulate(dt, t)) {
+    geo.attributes.position.needsUpdate = true;
+    geo.attributes.aRest.needsUpdate = true;
+  }
+  mat.uniforms.uTime.value = t;
+  renderer.render(scene, camera);
+  drawOverlay(t);
+  uiTimer += dt;
+  if (uiTimer > 0.1) { uiTimer = 0; updateUI(); }
+}
+
+window.pixelFlow = {
+  get particles() { return P.n; },
+  get progress() { return progress; },
+  get step() { return P.step; },
+  get frozen() { return isFrozen(); },
+  get timeScale() { return timeScale; },
+  get zones() { return zones.map((z) => ({ x: z.sx, y: z.sy, r: z.r, kind: z.kind })); },
+  get gesture() { return mainGesture; },
+  get hands() { return [...handTrack.values()].map((h) => ({ gesture: h.stable, x: h.cx, y: h.cy, size: h.size })); },
+  get camera() { return { live: camLive, model: modelState, delegate: delegateUsed }; },
+  get fit() { return imgInfo && { ...imgInfo.fit, gw: imgInfo.gw, gh: imgInfo.gh }; },
+  get wave() { return wave && { ...wave }; },
+  classify: (lm, aspect = 4 / 3) => classify(lm, aspect),
+  injectHands: (list) => processHands({ landmarks: list, handednesses: list.map((_, i) => [{ categoryName: i ? 'Left' : 'Right' }]) }, performance.now()),
+  scatter, setPaused,
+  complete: () => { if (imgInfo) triggerComplete(imgInfo.fit.cx, imgInfo.fit.cy); },
+  loadDemo: (k) => { demoK = k % 3; setImage(demoImage(demoK), DEMO_NAMES[demoK]); },
+  restState: () => { let s = 0, d = 0; for (let i = 0; i < P.n; i++) { s += rest[i]; d += done[i]; } return { meanRest: P.n ? s / P.n : 0, done: d, n: P.n }; },
+};
+
+if (window.innerWidth < 820) $('#step').value = 3;
+P.step = +$('#step').value; P.size = +$('#psize').value; P.speed = +$('#speed').value; P.zoneK = +$('#zone').value;
+syncOutputs();
+resize();
+setImage(demoImage(0), DEMO_NAMES[0], true);
+let resizeTimer = 0;
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 120); });
+requestAnimationFrame(frame);
+setTimeout(() => toast('🖐 张开手掌（或按住鼠标/手指拖动）吸引粒子回到原位', 4200), 500);
+</script>
+</body>
+</html>
