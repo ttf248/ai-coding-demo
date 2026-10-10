@@ -31,8 +31,8 @@
 ## 项目统计
 
 - 实验主题：12
-- 实验记录：158
-- 可预览记录：148
+- 实验记录：171
+- 可预览记录：159
 - 技术主题：14
 
 ## 实验目录
@@ -46,6 +46,7 @@
 | [小蓝书](demos/bluebook/runs/claude-4-0-unknown-r01/Readme.md) | Claude 4.0 / unknown | 2025-05 | [v2](demos/bluebook/runs/claude-4-0-unknown-r01/prompt.md) | [打开](previews/bluebook/claude-4-0-unknown-r01/index.html) |
 | [bluebook](demos/bluebook/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](demos/bluebook/runs/claude-haiku-45-default-r01/prompt.md) | [打开](previews/bluebook/claude-haiku-45-default-r01/index.html) |
 | [小蓝书瀑布流页面 · React + TypeScript 构建](demos/bluebook/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v2](demos/bluebook/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](previews/bluebook/claude-haiku-5-5-max-r01/index.html) |
+| [小蓝书瀑布流 · Claude Opus 5.5 max](demos/bluebook/runs/claude-opus-5-5-max-r01/Readme.md) | Claude Opus 5.5 / max | 2026-10-09 | [v2](demos/bluebook/runs/claude-opus-5-5-max-r01/prompt.md) | [打开](previews/bluebook/claude-opus-5-5-max-r01/index.html) |
 | [小蓝书 · 瀑布流社区](demos/bluebook/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v2](demos/bluebook/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](demos/bluebook/runs/gemini-3-8-flash-high-r01/index.html) |
 | [小蓝书 · 瀑布流社区](demos/bluebook/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v2](demos/bluebook/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](previews/bluebook/gpt-5-6-luna-max-r01/index.html) |
 | [小蓝书 · React 瀑布流社区](demos/bluebook/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v2](demos/bluebook/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](previews/bluebook/gpt-6-1-sol-max-r01/index.html) |
@@ -70,6 +71,7 @@
 |---|---|---|---|---|
 | [circuit-lab](demos/circuit-lab/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](demos/circuit-lab/runs/claude-haiku-45-default-r01/prompt.md) | [打开](demos/circuit-lab/runs/claude-haiku-45-default-r01/index.html) |
 | [简化电路实验台 · 单文件网页](demos/circuit-lab/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](demos/circuit-lab/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](demos/circuit-lab/runs/claude-haiku-5-5-max-r01/index.html) |
+| [简化电路实验台 · Claude Opus 5.5 max](demos/circuit-lab/runs/claude-opus-5-5-max-r01/Readme.md) | Claude Opus 5.5 / max | 2026-10-09 | [v1](demos/circuit-lab/runs/claude-opus-5-5-max-r01/prompt.md) | [打开](demos/circuit-lab/runs/claude-opus-5-5-max-r01/index.html) |
 | [简化电路实验台](demos/circuit-lab/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](demos/circuit-lab/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](demos/circuit-lab/runs/gemini-3-8-flash-high-r01/index.html) |
 | [circuit-lab · gpt-6.1-sol high](demos/circuit-lab/runs/gpt-6-1-sol-high-r01/Readme.md) | GPT-6.1 Sol / high | 2026-10-05 | [v1](demos/circuit-lab/runs/gpt-6-1-sol-high-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-1-sol-high-r01/index.html) |
 | [简化电路实验台 · GPT-6.1 Sol Low](demos/circuit-lab/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](demos/circuit-lab/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-1-sol-low-r01/index.html) |
@@ -88,6 +90,7 @@
 |---|---|---|---|---|
 | [fantasy-map-generator](demos/fantasy-map-generator/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](demos/fantasy-map-generator/runs/claude-haiku-45-default-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/claude-haiku-45-default-r01/index.html) |
 | [奇幻地图生成器 · 单文件网页](demos/fantasy-map-generator/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](demos/fantasy-map-generator/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/claude-haiku-5-5-max-r01/index.html) |
+| [奇幻地图生成器 · Claude Opus 5.5 max](demos/fantasy-map-generator/runs/claude-opus-5-5-max-r01/Readme.md) | Claude Opus 5.5 / max | 2026-10-09 | [v1](demos/fantasy-map-generator/runs/claude-opus-5-5-max-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/claude-opus-5-5-max-r01/index.html) |
 | [奇幻地图生成器](demos/fantasy-map-generator/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](demos/fantasy-map-generator/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gemini-3-8-flash-high-r01/index.html) |
 | [fantasy-map-generator · gpt-6.1-sol high](demos/fantasy-map-generator/runs/gpt-6-1-sol-high-r01/Readme.md) | GPT-6.1 Sol / high | 2026-10-05 | [v1](demos/fantasy-map-generator/runs/gpt-6-1-sol-high-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-1-sol-high-r01/index.html) |
 | [奇幻地图生成器 · GPT-6.1 Sol Low](demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-1-sol-low-r01/index.html) |
@@ -106,6 +109,7 @@
 |---|---|---|---|---|
 | [fluid-simulation](demos/fluid-simulation/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](demos/fluid-simulation/runs/claude-haiku-45-default-r01/prompt.md) | [打开](demos/fluid-simulation/runs/claude-haiku-45-default-r01/index.html) |
 | [彩色流体实验台 · WebGL 单文件网页](demos/fluid-simulation/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](demos/fluid-simulation/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](demos/fluid-simulation/runs/claude-haiku-5-5-max-r01/index.html) |
+| [彩色流体实验台 · Claude Opus 5.5 max](demos/fluid-simulation/runs/claude-opus-5-5-max-r01/Readme.md) | Claude Opus 5.5 / max | 2026-10-09 | [v1](demos/fluid-simulation/runs/claude-opus-5-5-max-r01/prompt.md) | [打开](demos/fluid-simulation/runs/claude-opus-5-5-max-r01/index.html) |
 | [彩色流体实验台](demos/fluid-simulation/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](demos/fluid-simulation/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gemini-3-8-flash-high-r01/index.html) |
 | [fluid-simulation · gpt-6.1-sol high](demos/fluid-simulation/runs/gpt-6-1-sol-high-r01/Readme.md) | GPT-6.1 Sol / high | 2026-10-05 | [v1](demos/fluid-simulation/runs/gpt-6-1-sol-high-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-1-sol-high-r01/index.html) |
 | [彩色流体实验台 · GPT-6.1 Sol Low](demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-1-sol-low-r01/index.html) |
@@ -124,6 +128,7 @@
 |---|---|---|---|---|
 | [life-diary](demos/life-diary/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](demos/life-diary/runs/claude-haiku-45-default-r01/prompt.md) | [打开](demos/life-diary/runs/claude-haiku-45-default-r01/index.html) |
 | [AI 情绪日记与生活助手 · 原型图](demos/life-diary/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](demos/life-diary/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](demos/life-diary/runs/claude-haiku-5-5-max-r01/canghe_app_prototype.html) |
+| [生活情绪日记原型 · Claude Opus 5.5 max](demos/life-diary/runs/claude-opus-5-5-max-r01/Readme.md) | Claude Opus 5.5 / max | 2026-10-09 | [v1](demos/life-diary/runs/claude-opus-5-5-max-r01/prompt.md) | [打开](demos/life-diary/runs/claude-opus-5-5-max-r01/canghe_app_prototype.html) |
 | [生活情绪日记原型](demos/life-diary/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](demos/life-diary/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](demos/life-diary/runs/gemini-3-8-flash-high-r01/canghe_app_prototype.html) |
 | [生活情绪日记](demos/life-diary/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v1](demos/life-diary/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-5-6-luna-max-r01/index.html) |
 | [栖心 · AI 情绪日记原型](demos/life-diary/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v1](demos/life-diary/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-6-1-sol-max-r01/index.html) |
@@ -145,6 +150,7 @@
 |---|---|---|---|---|
 | [meditation](demos/meditation/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](demos/meditation/runs/claude-haiku-45-default-r01/prompt.md) | [打开](demos/meditation/runs/claude-haiku-45-default-r01/index.html) |
 | [冥想 iOS App · 原型图](demos/meditation/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](demos/meditation/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](demos/meditation/runs/claude-haiku-5-5-max-r01/index.html) |
+| [冥想 iOS App 原型 · Claude Opus 5.5 max](demos/meditation/runs/claude-opus-5-5-max-r01/Readme.md) | Claude Opus 5.5 / max | 2026-10-09 | [v1](demos/meditation/runs/claude-opus-5-5-max-r01/prompt.md) | 无静态预览 |
 | [冥想 iOS App 原型](demos/meditation/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](demos/meditation/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](demos/meditation/runs/gemini-3-8-flash-high-r01/index.html) |
 | [冥想 iOS App](demos/meditation/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v1](demos/meditation/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/meditation/runs/gpt-5-6-luna-max-r01/index.html) |
 | [静屿 · 冥想 iOS 原型](demos/meditation/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v1](demos/meditation/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/meditation/runs/gpt-6-1-sol-max-r01/index.html) |
@@ -157,6 +163,7 @@
 | [冥想 iOS App 全量原型](demos/meditation/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-09-29 | [v1](demos/meditation/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/meditation/runs/minimax-m3-1-flash-preview-max-r01/meditation_app_prototype.html) |
 | [静境 · 冥想 iOS App 原型](demos/meditation/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/meditation/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/meditation/runs/minimax-m3-max-r01/index.html) |
 | [冥想 iOS App](demos/meditation/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](demos/meditation/runs/unknown-unknown-r01/prompt.md) | [打开](demos/meditation/runs/unknown-unknown-r01/index.html) |
+| [静屿 · 冥想 iOS App 原型 · Codex 续作](demos/meditation/runs/unknown-unknown-r02/Readme.md) | 未记录 / 多轮混合 / unknown | 2026-10-10 | [v1](demos/meditation/runs/unknown-unknown-r02/prompt.md) | [打开](demos/meditation/runs/unknown-unknown-r02/index.html) |
 
 ### 新哥特式塔楼城市
 
@@ -166,6 +173,7 @@
 |---|---|---|---|---|
 | [neo-gothic-tower-city](demos/neo-gothic-tower-city/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](demos/neo-gothic-tower-city/runs/claude-haiku-45-default-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/claude-haiku-45-default-r01/index.html) |
 | [新哥特式塔楼城市 · 3D 动画网页](demos/neo-gothic-tower-city/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](demos/neo-gothic-tower-city/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/claude-haiku-5-5-max-r01/index.html) |
+| [新哥特式塔楼城市 · Claude Opus 5.5 max](demos/neo-gothic-tower-city/runs/claude-opus-5-5-max-r01/Readme.md) | Claude Opus 5.5 / max | 2026-10-09 | [v1](demos/neo-gothic-tower-city/runs/claude-opus-5-5-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/claude-opus-5-5-max-r01/index.html) |
 | [新哥特式塔楼城市](demos/neo-gothic-tower-city/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](demos/neo-gothic-tower-city/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gemini-3-8-flash-high-r01/index.html) |
 | [新哥特式塔楼城市](demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v1](demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-5-6-luna-max-r01/index.html) |
 | [夜潮之城 · 新哥特式塔楼城市](demos/neo-gothic-tower-city/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-1-sol-max-r01/index.html) |
@@ -188,6 +196,7 @@
 |---|---|---|---|---|
 | [pathfinding-lab](demos/pathfinding-lab/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](demos/pathfinding-lab/runs/claude-haiku-45-default-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/claude-haiku-45-default-r01/index.html) |
 | [寻路算法实验室 · 单文件网页](demos/pathfinding-lab/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](demos/pathfinding-lab/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/claude-haiku-5-5-max-r01/index.html) |
+| [寻路算法实验室 · Claude Opus 5.5 max](demos/pathfinding-lab/runs/claude-opus-5-5-max-r01/Readme.md) | Claude Opus 5.5 / max | 2026-10-09 | [v1](demos/pathfinding-lab/runs/claude-opus-5-5-max-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/claude-opus-5-5-max-r01/index.html) |
 | [寻路算法实验室](demos/pathfinding-lab/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](demos/pathfinding-lab/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gemini-3-8-flash-high-r01/index.html) |
 | [pathfinding-lab · gpt-6.1-sol high](demos/pathfinding-lab/runs/gpt-6-1-sol-high-r01/Readme.md) | GPT-6.1 Sol / high | 2026-10-05 | [v1](demos/pathfinding-lab/runs/gpt-6-1-sol-high-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-1-sol-high-r01/index.html) |
 | [寻路算法实验室 · GPT-6.1 Sol Low](demos/pathfinding-lab/runs/gpt-6-1-sol-low-r01/Readme.md) | GPT-6.1 Sol / low | 2026-10-05 | [v1](demos/pathfinding-lab/runs/gpt-6-1-sol-low-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-1-sol-low-r01/index.html) |
@@ -206,6 +215,7 @@
 |---|---|---|---|---|
 | [pixel-flow](demos/pixel-flow/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](demos/pixel-flow/runs/claude-haiku-45-default-r01/prompt.md) | [打开](demos/pixel-flow/runs/claude-haiku-45-default-r01/public/index.html) |
 | [图片粒子化与手势还原 · Web 应用](demos/pixel-flow/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](demos/pixel-flow/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/claude-haiku-5-5-max-r01/index.html) |
+| [Pixel Flow 粒子手势还原 · Claude Opus 5.5 max](demos/pixel-flow/runs/claude-opus-5-5-max-r01/Readme.md) | Claude Opus 5.5 / max | 2026-10-09 | [v1](demos/pixel-flow/runs/claude-opus-5-5-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/claude-opus-5-5-max-r01/index.html) |
 | [Pixel Flow 图片粒子化与手势还原](demos/pixel-flow/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](demos/pixel-flow/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](demos/pixel-flow/runs/gemini-3-8-flash-high-r01/index.html) |
 | [Pixel Flow](demos/pixel-flow/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v1](demos/pixel-flow/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-5-6-luna-max-r01/index.html) |
 | [Pixel Flow · 手势图片重构](demos/pixel-flow/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v1](demos/pixel-flow/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-1-sol-max-r01/index.html) |
@@ -243,6 +253,7 @@
 |---|---|---|---|---|
 | [voxel-construction-site](demos/voxel-construction-site/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](demos/voxel-construction-site/runs/claude-haiku-45-default-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/claude-haiku-45-default-r01/index.html) |
 | [体素工地沙盘 · WebGL 单文件网页](demos/voxel-construction-site/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](demos/voxel-construction-site/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/claude-haiku-5-5-max-r01/index.html) |
+| [体素微缩建筑工地 · Claude Opus 5.5 max](demos/voxel-construction-site/runs/claude-opus-5-5-max-r01/Readme.md) | Claude Opus 5.5 / max | 2026-10-09 | [v1](demos/voxel-construction-site/runs/claude-opus-5-5-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/claude-opus-5-5-max-r01/index.html) |
 | [体素微缩建筑工地沙盘](demos/voxel-construction-site/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](demos/voxel-construction-site/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gemini-3-8-flash-high-r01/index.html) |
 | [体素微缩建筑工地](demos/voxel-construction-site/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v1](demos/voxel-construction-site/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-5-6-luna-max-r01/index.html) |
 | [筑境工地 · GPT 5.6 Sol High](demos/voxel-construction-site/runs/gpt-5-6-sol-high-r01/Readme.md) | GPT-5.6 Sol / high | 2026-09-15 | [v1](demos/voxel-construction-site/runs/gpt-5-6-sol-high-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-5-6-sol-high-r01/index.html) |
@@ -266,6 +277,7 @@
 |---|---|---|---|---|
 | [youtube-ui](demos/youtube-ui/runs/claude-haiku-45-default-r01/Readme.md) | Claude Haiku 4.5 / default | 2026-10-09 | [v1](demos/youtube-ui/runs/claude-haiku-45-default-r01/prompt.md) | [打开](demos/youtube-ui/runs/claude-haiku-45-default-r01/index.html) |
 | [YouTube UI 模块 · 原型图](demos/youtube-ui/runs/claude-haiku-5-5-max-r01/Readme.md) | Claude Haiku 5.5 / max | 2026-10-09 | [v1](demos/youtube-ui/runs/claude-haiku-5-5-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/claude-haiku-5-5-max-r01/home.html) |
+| [YouTube UI 模块 · Claude Opus 5.5 max](demos/youtube-ui/runs/claude-opus-5-5-max-r01/Readme.md) | Claude Opus 5.5 / max | 2026-10-09 | [v1](demos/youtube-ui/runs/claude-opus-5-5-max-r01/prompt.md) | 无静态预览 |
 | [YouTube UI 模块](demos/youtube-ui/runs/gemini-3-8-flash-high-r01/Readme.md) | Gemini 3.8 Flash / high | 2026-10-09 | [v1](demos/youtube-ui/runs/gemini-3-8-flash-high-r01/prompt.md) | [打开](demos/youtube-ui/runs/gemini-3-8-flash-high-r01/index.html) |
 | [YouTube UI 模块](demos/youtube-ui/runs/gpt-5-6-luna-max-r01/Readme.md) | GPT-5.6 Luna / max | 2026-09-29 | [v1](demos/youtube-ui/runs/gpt-5-6-luna-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-5-6-luna-max-r01/index.html) |
 | [YouTube · 五个功能模块原型](demos/youtube-ui/runs/gpt-6-1-sol-max-r01/Readme.md) | GPT-6.1 Sol / max | 2026-09-30 | [v1](demos/youtube-ui/runs/gpt-6-1-sol-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-1-sol-max-r01/index.html) |
@@ -278,6 +290,7 @@
 | [YouTube UI 模块化设计稿](demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-09-29 | [v1](demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 | [YouTube · UI 模块设计参考](demos/youtube-ui/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/youtube-ui/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/minimax-m3-max-r01/index.html) |
 | [YouTube UI 模块](demos/youtube-ui/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](demos/youtube-ui/runs/unknown-unknown-r01/prompt.md) | [打开](demos/youtube-ui/runs/unknown-unknown-r01/youtube-app-creator.html) |
+| [星流视频 · YouTube UI Codex 续作原型](demos/youtube-ui/runs/unknown-unknown-r02/Readme.md) | 未记录 / 多轮混合 / unknown | 2026-10-10 | [v1](demos/youtube-ui/runs/unknown-unknown-r02/prompt.md) | [打开](demos/youtube-ui/runs/unknown-unknown-r02/index.html) |
 
 ## 技术文档
 
