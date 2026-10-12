@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [体素微缩建筑工地沙盘](../../demos/voxel-construction-site/runs/claude-sonnet-5-5-medium-r01/Readme.md) | Claude Sonnet 5.5 / medium | 2026-10-12 | [v1](../../demos/voxel-construction-site/runs/claude-sonnet-5-5-medium-r01/prompt.md) | [打开](../../demos/voxel-construction-site/runs/claude-sonnet-5-5-medium-r01/index.html) |

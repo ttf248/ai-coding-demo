@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [小蓝书瀑布流](../../demos/bluebook/runs/claude-sonnet-5-5-medium-r01/Readme.md) | Claude Sonnet 5.5 / medium | 2026-10-12 | [v2](../../demos/bluebook/runs/claude-sonnet-5-5-medium-r01/prompt.md) | [打开](../../previews/bluebook/claude-sonnet-5-5-medium-r01/index.html) |
