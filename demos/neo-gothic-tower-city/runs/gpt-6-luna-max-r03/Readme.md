@@ -21,4 +21,5 @@ Three.js r160 与 OrbitControls 从 unpkg 导入，需要联网。已在 Chromiu
 
 - 从独立模型测试分支导入本轮实现，作为新的实验记录，保留本轮原始输入和产物。
 - 归档来源：model-test-base 分支 demos/neo-gothic-tower-city/runs/gpt-6-luna-max-r01；此前归档已有旧 r01，因此本轮保存为 gpt-6-luna-max-r03。
+- 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
 <!-- archive:end -->

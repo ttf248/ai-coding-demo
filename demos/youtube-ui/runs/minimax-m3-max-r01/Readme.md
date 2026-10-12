@@ -49,4 +49,5 @@
 - 所有图标通过 lucide-static CDN 加载，不输出 SVG 路径。
 - mockup 内滚动通过 overflow-x-auto 实现，外部窗口无滚动条。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/youtube-ui/runs/minimax-m3-max-r01；按原实验轮次导入。
+- 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
 <!-- archive:end -->

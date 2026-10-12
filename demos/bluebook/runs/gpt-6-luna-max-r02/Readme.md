@@ -21,4 +21,5 @@ React 18 + TypeScript 实现响应式瀑布流：首屏 20 条 mock 内容、两
 
 - 从独立模型测试分支导入本轮实现，作为新的实验记录，保留本轮原始输入和产物。
 - 归档来源：model-test-base 分支 demos/bluebook/runs/gpt-6-luna-max-r01；此前归档已有旧 r01，因此本轮保存为 gpt-6-luna-max-r02。
+- 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
 <!-- archive:end -->
