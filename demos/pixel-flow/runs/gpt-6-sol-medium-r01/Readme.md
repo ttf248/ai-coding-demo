@@ -27,4 +27,5 @@
 
 - 首次生成，无人工修改历史产物。
 - 摄像头需 HTTPS 或 localhost，Three.js 与 MediaPipe 从 CDN 加载。
+- 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
 <!-- archive:end -->

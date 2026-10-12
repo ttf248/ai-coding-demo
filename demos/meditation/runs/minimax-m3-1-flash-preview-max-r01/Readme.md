@@ -61,4 +61,5 @@
 ### 部署适配记录
 
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/meditation/runs/minimax-m3-1-flash-preview-max-r01；保留该测试轮号。
+- 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
 <!-- archive:end -->

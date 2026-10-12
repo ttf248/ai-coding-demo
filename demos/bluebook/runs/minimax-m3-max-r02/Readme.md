@@ -53,4 +53,5 @@
 - 保留文字头像与下拉刷新，与 v1 共用通用交互模式。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/bluebook/runs/minimax-m3-max-r02；按原实验轮次导入。
 - 部署适配：react-lazyload 构建未解析 prop-types，显式加入 prop-types 15.8.1 并更新锁文件，使归档预览正常打包。
+- 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
 <!-- archive:end -->

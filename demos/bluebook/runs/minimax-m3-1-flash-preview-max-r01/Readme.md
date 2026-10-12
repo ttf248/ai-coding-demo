@@ -72,4 +72,5 @@ src/index.css                  Tailwind 入口与瀑布流列数、下拉动画
 - 构建修复：react-lazyload 3.2.1 运行时 require('prop-types') 但未在包内声明依赖，Vite 会把它当作外部依赖，产出的 bundle 会出现裸模块导入 `import Jc from "prop-types"` 导致浏览器直接打开失败。在本项目 package.json 显式补充 prop-types 15.8.1。
 - 构建修复：补充 @types/react-lazyload 3.2.3 以通过 tsc 类型检查；该类型不提供 width 属性，LazyLoad 占位只传 height。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/bluebook/runs/minimax-m3-1-flash-preview-max-r01；保留该测试轮号。
+- 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；滚动首屏实验卡片触发懒加载后回到顶部拍摄；实验源码和原始输入未修改。
 <!-- archive:end -->

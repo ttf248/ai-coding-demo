@@ -27,4 +27,5 @@
 
 - 首次生成，无人工修改历史产物。
 - 原任务指定的 canghe_app_prototype.html 与归档规范的 index.html 内容相同。
+- 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
 <!-- archive:end -->

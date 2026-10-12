@@ -62,4 +62,5 @@
 
 - 目录入口：任务正文要求产物文件名为 canghe_app_prototype.html，按原文件名交付；另加一个 index.html 跳转页作为本目录统一入口，不复制原型内容。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/life-diary/runs/minimax-m3-1-flash-preview-max-r01；保留该测试轮号。
+- 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
 <!-- archive:end -->

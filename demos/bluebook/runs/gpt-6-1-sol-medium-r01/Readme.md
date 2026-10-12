@@ -35,4 +35,5 @@ npm ci，然后 npm run dev；npm run build 生成 dist。仓库预览位于 pre
 
 - 首版构建发现发布表单 JSX 缺少右花括号，已修复；首版源码保存在 evidence/first-output.json.gz。
 - 首次构建修复发布表单 JSX；补充 react-lazyload 的 prop-types 运行依赖；首次浏览器检查修复未滚动时提前加载下一页。已验证 20 条初始数据、滚动加载、搜索、点赞、本机图片发布及移动端。
+- 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
 <!-- archive:end -->

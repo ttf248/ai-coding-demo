@@ -116,4 +116,5 @@ Lucide 的 SVG 内部写的是 `stroke="currentColor"`，直接用 `<img>` 引�
 - 预览方式：任务正文要求调用【Artifacts】插件可视化预览，本会话没有该工具，改为交付可直接双击打开的 HTML 文件，并在 index.html 汇总 7 个模块的入口。
 - 图标着色：Lucide Static CDN 提供的 SVG 固定为 currentColor 描边，直接用 <img> 引入无法跟随主题色。改用 CSS mask（--u 变量 + background-color: currentColor）着色，图标因此能跟随所在容器的文字颜色。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r01；保留该测试轮号。
+- 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
 <!-- archive:end -->

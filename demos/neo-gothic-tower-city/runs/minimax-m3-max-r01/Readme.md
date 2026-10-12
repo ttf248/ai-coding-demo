@@ -49,4 +49,5 @@
 - 使用 Three.js r160 ESM + importmap，无构建步骤。
 - 海浪用顶点位移实现，余烬用 Points + AdditiveBlending，迷雾用自定义 Shader。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/neo-gothic-tower-city/runs/minimax-m3-max-r01；按原实验轮次导入。
+- 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
 <!-- archive:end -->
