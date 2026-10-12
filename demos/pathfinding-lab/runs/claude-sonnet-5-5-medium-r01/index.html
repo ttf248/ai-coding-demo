@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>寻路算法实验室</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;max-width:100%;overflow-x:hidden}
+body{font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif;background:#f4f6fa;color:#1d2433;line-height:1.5}
+header{padding:12px 14px;background:#1f2a44;color:#fff}
+h1{margin:0;font-size:20px}
+header p{margin:3px 0 0;font-size:13px;color:#b9c5e3}
+main{max-width:1200px;margin:0 auto;padding:10px;display:flex;flex-direction:column;gap:10px}
+.panel{background:#fff;border:1px solid #d7deec;border-radius:10px;padding:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0}
+label{font-size:13px}
+button,select{font:inherit;font-size:14px;border-radius:6px;min-height:38px}
+button{background:#2f5bd6;color:#fff;border:0;padding:8px 12px;cursor:pointer}
+button:hover{background:#2548ac}
+button.alt{background:#e3e9f7;color:#1d2433}
+button.alt:hover{background:#cfd9f0}
+button.on{background:#d9822b;color:#fff}
+select{border:1px solid #b9c5e3;padding:6px;background:#fff}
+input[type=range]{width:140px}
+#cv{width:100%;display:block;touch-action:none;background:#fff;border:2px solid #1f2a44;border-radius:6px;cursor:crosshair}
+#msg{min-height:24px;font-size:14px;padding:6px 10px;border-radius:6px;background:#eef2fb}
+#msg.err{background:#fde8e8;color:#9b1c1c;font-weight:600}
+#msg.ok{background:#e4f6e9;color:#166534}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px}
+.stat{background:#eef2fb;border-radius:8px;padding:6px 10px;font-size:12px;color:#51608a}
+.stat b{display:block;font-size:18px;color:#1d2433}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.sw{width:16px;height:16px;border:1px solid #6b7aa3;border-radius:3px;display:inline-block}
+.help{font-size:13px;color:#47557c;padding-left:18px;margin:4px 0 0}
+@media(min-width:1000px){main{display:grid;grid-template-columns:1fr 340px;align-items:start}}
+.col{display:flex;flex-direction:column;gap:10px;min-width:0}
+</style>
+</head>
+<body>
+<header><h1>寻路算法实验室</h1><p>BFS · Dijkstra · A*（曼哈顿启发），四方向移动。可视化搜索前沿、已访问节点与最终路径。</p></header>
+<main>
+<div class="col">
+<div class="panel">
+<div class="row">
+<label>算法 <select id="algo"><option value="bfs">BFS（按步数）</option><option value="dijkstra">Dijkstra（按代价）</option><option value="astar" selected>A*（按代价 + 曼哈顿）</option></select></label>
+<button id="run">运行</button><button id="step" class="alt">单步</button><button id="clearSearch" class="alt">清除搜索</button><button id="resetMap" class="alt">重置地图</button>
+<label>速度 <input id="speed" type="range" min="1" max="100" value="30"><output id="speedV">30 步/秒</output></label>
+</div>
+<div class="row">
+<span style="font-size:13px">编辑工具：</span>
+<button class="alt on" data-tool="wall">绘制障碍</button><button class="alt" data-tool="erase">擦除</button><button class="alt" data-tool="heavy">高代价地形(5)</button>
+<span style="font-size:13px;margin-left:8px">预设：</span>
+<select id="preset"></select><button id="loadPreset" class="alt">载入</button>
+</div>
+</div>
+<canvas id="cv"></canvas>
+<div id="msg">就绪。</div>
+</div>
+<div class="col">
+<div class="panel"><strong>结果</strong>
+<div class="stats" style="margin-top:6px">
+<div class="stat">状态<b id="sStatus">未开始</b></div>
+<div class="stat">路径步数<b id="sSteps">—</b></div>
+<div class="stat">总代价<b id="sCost">—</b></div>
+<div class="stat">已访问<b id="sVisited">0</b></div>
+<div class="stat">前沿节点<b id="sFront">0</b></div>
+</div></div>
+<div class="panel"><strong>图例</strong>
+<div class="legend" style="margin-top:6px">
+<span><i class="sw" style="background:#22a559"></i>起点</span>
+<span><i class="sw" style="background:#d93a3a"></i>终点</span>
+<span><i class="sw" style="background:#2b3345"></i>障碍</span>
+<span><i class="sw" style="background:#d9b384"></i>高代价(5)</span>
+<span><i class="sw" style="background:#9fd0ff"></i>前沿</span>
+<span><i class="sw" style="background:#d6dcf0"></i>已访问</span>
+<span><i class="sw" style="background:#f2c230"></i>最终路径</span>
+</div></div>
+<div class="panel"><strong>规则与说明</strong>
+<ul class="help">
+<li>四方向移动；进入普通格代价 1，进入高代价格代价 5；起点代价不计入。</li>
+<li><b>BFS 按步数</b>搜索（忽略地形代价，保证步数最少）；<b>Dijkstra 与 A* 按地形代价</b>搜索（A* 使用曼哈顿距离，该启发在最小格代价为 1 时可采纳）。</li>
+<li>拖动绿色起点或红色终点可移动它们；在空白处按住拖动绘制或擦除。选择工具后用鼠标或手指涂抹。</li>
+<li>“运行/暂停”连续搜索，“单步”每次扩展一个节点；速度滑块控制每秒步数。</li>
+<li>搜索过程中编辑地图会立即停止并清除旧搜索，避免新旧状态混用。起终点不会被障碍覆盖。</li>
+</ul></div>
+</div>
+</main>
+<script>
+(function(){
+"use strict";
+var COLS=24,ROWS=16,$=function(id){return document.getElementById(id);};
+var cv=$("cv"),ctx=cv.getContext("2d"),msgEl=$("msg");
+var grid,start,goal,tool="wall",search=null,running=false,acc=0,lastT=0;
+// grid cell: 0 normal, 1 wall, 2 heavy
+var PRESETS={
+ open:{name:"空地图（无障碍）",build:function(g){}},
+ wall:{name:"墙与缺口",build:function(g){for(var y=2;y<ROWS-2;y++)g[y][11]=1;g[8][11]=0;for(var x=4;x<10;x++)g[5][x]=1;for(var x=14;x<20;x++)g[10][x]=1;}},
+ weighted:{name:"加权地形（沼泽带）",build:function(g){for(var y=0;y<ROWS;y++)for(var x=8;x<14;x++)g[y][x]=2;for(var y=0;y<ROWS;y++)if(y!==1&&y!==14){}g[7][9]=0;g[7][10]=0;g[7][11]=0;g[7][12]=0;g[7][13]=0;}},
+ closed:{name:"终点被封闭",build:function(g){for(var d=-2;d<=2;d++){g[goalDef.y-2][goalDef.x+d]=1;g[goalDef.y+2][goalDef.x+d]=1;g[goalDef.y+d][goalDef.x-2]=1;g[goalDef.y+d][goalDef.x+2]=1;}}},
+ pseudo:{name:"固定伪随机地图",build:function(g){var s=20240607;function r(){s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;}
+   for(var y=0;y<ROWS;y++)for(var x=0;x<COLS;x++){var v=r();g[y][x]=v<0.22?1:v<0.36?2:0;}}}
+};
+var startDef={x:2,y:8},goalDef={x:21,y:8};
+Object.keys(PRESETS).forEach(function(k){var o=document.createElement("option");o.value=k;o.textContent=PRESETS[k].name;$("preset").appendChild(o);});
+function newGrid(){var g=[];for(var y=0;y<ROWS;y++){g.push(new Array(COLS).fill(0));}return g;}
+function loadPreset(k){
+  stopSearch(true);grid=newGrid();start={x:startDef.x,y:startDef.y};goal={x:goalDef.x,y:goalDef.y};
+  PRESETS[k].build(grid);grid[start.y][start.x]=0;grid[goal.y][goal.x]=0;
+  draw();say("已载入预设：“"+PRESETS[k].name+"”。","ok");
+}
+function say(t,c){msgEl.textContent=t;msgEl.className=c||"";}
+function cost(x,y){return grid[y][x]===2?5:1;}
+
+/* ---------- heap ---------- */
+function Heap(){this.a=[];this.n=0;}
+Heap.prototype.push=function(p,v){var a=this.a;a.push({p:p,s:this.n++,v:v});var i=a.length-1;while(i>0){var q=(i-1)>>1;if(less(a[q],a[i]))break;var t=a[q];a[q]=a[i];a[i]=t;i=q;}};
+function less(x,y){return x.p<y.p||(x.p===y.p&&x.s<y.s);}
+Heap.prototype.pop=function(){var a=this.a,top=a[0],last=a.pop();if(a.length){a[0]=last;var i=0;for(;;){var l=2*i+1,r=l+1,m=i;if(l<a.length&&less(a[l],a[m]))m=l;if(r<a.length&&less(a[r],a[m]))m=r;if(m===i)break;var t=a[m];a[m]=a[i];a[i]=t;i=m;}}return top;};
+Heap.prototype.size=function(){return this.a.length;};
+
+/* ---------- search ---------- */
+var DIRS=[[1,0],[0,1],[-1,0],[0,-1]];
+function manhattan(x,y){return Math.abs(x-goal.x)+Math.abs(y-goal.y);}
+function createSearch(algo){
+  var n=COLS*ROWS,s={algo:algo,g:new Float64Array(n).fill(Infinity),steps:new Int32Array(n).fill(-1),parent:new Int32Array(n).fill(-1),
+    closed:new Uint8Array(n),open:new Uint8Array(n),done:false,found:false,path:null,pathSteps:0,pathCost:0,expanded:0};
+  var sk=start.y*COLS+start.x;
+  s.g[sk]=0;s.steps[sk]=0;s.open[sk]=1;
+  if(algo==="bfs"){s.q=[sk];s.qh=0;}
+  else{s.h=new Heap();s.h.push(algo==="astar"?manhattan(start.x,start.y):0,sk);}
+  s.step=function(){
+    if(s.done)return;
+    var k=-1;
+    if(algo==="bfs"){
+      while(s.qh<s.q.length){var c=s.q[s.qh++];if(!s.closed[c]){k=c;break;}}
+    }else{
+      while(s.h.size()){var e=s.h.pop(),c2=e.v;if(s.closed[c2])continue;
+        var f=s.g[c2]+(algo==="astar"?manhattan(c2%COLS,(c2/COLS)|0):0);
+        if(e.p>f+1e-9)continue; // stale entry
+        k=c2;break;}
+    }
+    if(k<0){s.done=true;s.found=false;return;}
+    s.open[k]=0;s.closed[k]=1;s.expanded++;
+    var x=k%COLS,y=(k/COLS)|0;
+    if(x===goal.x&&y===goal.y){s.done=true;s.found=true;finish(s,k);return;}
+    for(var d=0;d<4;d++){
+      var nx=x+DIRS[d][0],ny=y+DIRS[d][1];if(nx<0||ny<0||nx>=COLS||ny>=ROWS||grid[ny][nx]===1)continue;
+      var nk=ny*COLS+nx;if(s.closed[nk])continue;
+      if(algo==="bfs"){
+        if(s.steps[nk]<0){s.steps[nk]=s.steps[k]+1;s.parent[nk]=k;s.open[nk]=1;s.q.push(nk);}
+      }else{
+        var ng=s.g[k]+cost(nx,ny);
+        if(ng<s.g[nk]){s.g[nk]=ng;s.steps[nk]=s.steps[k]+1;s.parent[nk]=k;s.open[nk]=1;s.h.push(ng+(algo==="astar"?manhattan(nx,ny):0),nk);}
+      }
+    }
+  };
+  return s;
+}
+function finish(s,k){
+  var path=[],c=k;while(c>=0){path.push(c);c=s.parent[c];}
+  path.reverse();s.path=path;s.pathSteps=path.length-1;
+  var tot=0;for(var i=1;i<path.length;i++)tot+=cost(path[i]%COLS,(path[i]/COLS)|0);s.pathCost=tot;
+}
+function counts(){var v=0,f=0;if(search){for(var i=0;i<search.closed.length;i++){if(search.closed[i])v++;if(search.open[i])f++;}}return {v:v,f:f};}
+function stopSearch(silent){running=false;search=null;$("run").textContent="运行";$("run").classList.remove("on");if(!silent)updateStats();}
+function ensureSearch(){if(!search)search=createSearch($("algo").value);return search;}
+function afterStep(){
+  if(search&&search.done){running=false;$("run").textContent="运行";
+    if(search.found)say(search.algo==="bfs"?"BFS 找到路径：步数最少，"+search.pathSteps+" 步，总代价 "+search.pathCost+"（BFS 不考虑地形代价）。":"找到最小代价路径："+search.pathSteps+" 步，总代价 "+search.pathCost+"。","ok");
+    else say("终点不可达：搜索已遍历所有可到达格子，没有找到通往终点的路径。","err");}
+  updateStats();draw();
+}
+function setRunning(r){running=r;$("run").textContent=r?"暂停":(search&&!search.done?"继续":"运行");$("run").classList.toggle("on",r);lastT=0;acc=0;}
+$("run").onclick=function(){
+  if(running){setRunning(false);say("已暂停，可单步或继续。");return;}
+  if(search&&search.done){stopSearch(true);}
+  ensureSearch();setRunning(true);say("搜索中……");requestAnimationFrame(loop);
+};
+$("step").onclick=function(){
+  if(running)setRunning(false);
+  if(search&&search.done){stopSearch(true);}
+  ensureSearch().step();afterStep();if(!search.done)say("单步：已扩展 "+search.expanded+" 个节点。");
+};
+$("clearSearch").onclick=function(){stopSearch();draw();say("已清除搜索，地图保留。");};
+$("resetMap").onclick=function(){loadPreset("open");say("地图已重置为空地图。","ok");};
+$("loadPreset").onclick=function(){loadPreset($("preset").value);};
+$("algo").onchange=function(){if(search){stopSearch();draw();say("切换算法，已清除旧搜索。");}};
+$("speed").oninput=function(){$("speedV").textContent=this.value+" 步/秒";};
+document.querySelectorAll("[data-tool]").forEach(function(b){b.onclick=function(){tool=b.getAttribute("data-tool");
+  document.querySelectorAll("[data-tool]").forEach(function(o){o.classList.toggle("on",o===b);});};});
+function loop(t){
+  if(!running)return;
+  if(!lastT)lastT=t;acc+=(t-lastT)/1000*(+$("speed").value);lastT=t;
+  var n=Math.floor(acc);acc-=n;n=Math.min(n,400);
+  while(n-->0&&!search.done)search.step();
+  afterStep();
+  if(running)requestAnimationFrame(loop);
+}
+function updateStats(){
+  var c=counts();$("sVisited").textContent=c.v;$("sFront").textContent=c.f;
+  var st="未开始";if(search){st=search.done?(search.found?"已找到":"不可达"):(running?"运行中":"已暂停");}
+  $("sStatus").textContent=st;
+  $("sSteps").textContent=search&&search.found?search.pathSteps:"—";
+  $("sCost").textContent=search&&search.found?search.pathCost:"—";
+}
+
+/* ---------- drawing ---------- */
+var CS=32;
+function resize(){
+  var r=cv.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2);
+  var w=Math.round(r.width*dpr);if(w<10)return;
+  cv.width=w;cv.height=Math.round(w*ROWS/COLS);cv.style.height=(r.width*ROWS/COLS)+"px";CS=cv.width/COLS;
+}
+function draw(){
+  if(!cv.width)resize();
+  ctx.clearRect(0,0,cv.width,cv.height);
+  var pathSet={};if(search&&search.path)search.path.forEach(function(k){pathSet[k]=1;});
+  for(var y=0;y<ROWS;y++)for(var x=0;x<COLS;x++){
+    var k=y*COLS+x,c="#ffffff",v=grid[y][x];
+    if(v===1)c="#2b3345";else if(v===2)c="#d9b384";
+    if(search&&v!==1){if(search.closed[k])c=v===2?"#c8b4a6":"#d6dcf0";if(search.open[k])c="#9fd0ff";}
+    if(pathSet[k])c="#f2c230";
+    ctx.fillStyle=c;ctx.fillRect(x*CS,y*CS,CS,CS);
+    if(v===2){ctx.fillStyle="rgba(90,60,20,.6)";ctx.font=Math.round(CS*0.45)+"px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("5",x*CS+CS/2,y*CS+CS/2);}
+  }
+  ctx.strokeStyle="#c9d1e6";ctx.lineWidth=1;ctx.beginPath();
+  for(var i=0;i<=COLS;i++){ctx.moveTo(Math.round(i*CS)+.5,0);ctx.lineTo(Math.round(i*CS)+.5,cv.height);}
+  for(var j=0;j<=ROWS;j++){ctx.moveTo(0,Math.round(j*CS)+.5);ctx.lineTo(cv.width,Math.round(j*CS)+.5);}
+  ctx.stroke();
+  if(search&&search.path&&search.path.length>1){ctx.strokeStyle="#b8860b";ctx.lineWidth=Math.max(2,CS*0.12);ctx.lineJoin="round";ctx.beginPath();
+    search.path.forEach(function(k,i){var px=(k%COLS+.5)*CS,py=((k/COLS|0)+.5)*CS;i?ctx.lineTo(px,py):ctx.moveTo(px,py);});ctx.stroke();}
+  mark(start,"#22a559","S");mark(goal,"#d93a3a","G");
+}
+function mark(p,col,t){ctx.fillStyle=col;ctx.beginPath();ctx.arc((p.x+.5)*CS,(p.y+.5)*CS,CS*0.38,0,6.283);ctx.fill();
+  ctx.fillStyle="#fff";ctx.font="bold "+Math.round(CS*0.45)+"px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(t,(p.x+.5)*CS,(p.y+.5)*CS+1);}
+
+/* ---------- editing ---------- */
+var drag=null;
+function cellAt(e){var r=cv.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*COLS),y=Math.floor((e.clientY-r.top)/r.height*ROWS);
+  if(x<0||y<0||x>=COLS||y>=ROWS)return null;return {x:x,y:y};}
+function invalidate(){if(search||running){stopSearch(true);updateStats();say("地图已编辑：旧搜索已停止并清除。","");}}
+cv.addEventListener("pointerdown",function(e){
+  var c=cellAt(e);if(!c)return;e.preventDefault();try{cv.setPointerCapture(e.pointerId);}catch(_){}
+  if(c.x===start.x&&c.y===start.y)drag={kind:"start"};
+  else if(c.x===goal.x&&c.y===goal.y)drag={kind:"goal"};
+  else{drag={kind:"paint",val:tool==="wall"?1:tool==="heavy"?2:0};
+    // toggling: painting on a cell that already has same value erases
+    if(tool!=="erase"&&grid[c.y][c.x]===drag.val)drag.val=0;paintCell(c);}
+});
+cv.addEventListener("pointermove",function(e){
+  if(!drag)return;var c=cellAt(e);if(!c)return;
+  if(drag.kind==="paint")paintCell(c);
+  else moveTerm(drag.kind,c);
+});
+function end(){drag=null;}
+cv.addEventListener("pointerup",end);cv.addEventListener("pointercancel",end);
+function paintCell(c){
+  if((c.x===start.x&&c.y===start.y)||(c.x===goal.x&&c.y===goal.y)){say("起点和终点不能被障碍或地形覆盖。","err");return;}
+  if(grid[c.y][c.x]===drag.val)return;
+  invalidate();grid[c.y][c.x]=drag.val;draw();
+}
+function moveTerm(kind,c){
+  var o=kind==="start"?goal:start,me=kind==="start"?start:goal;
+  if(c.x===me.x&&c.y===me.y)return;
+  if(grid[c.y][c.x]===1){say("不能把"+(kind==="start"?"起点":"终点")+"放在障碍上。","err");return;}
+  if(c.x===o.x&&c.y===o.y){say("起点和终点不能重合。","err");return;}
+  invalidate();me.x=c.x;me.y=c.y;draw();
+}
+window.addEventListener("resize",function(){resize();draw();});
+if(window.ResizeObserver)new ResizeObserver(function(){var w=cv.getBoundingClientRect().width;if(Math.abs(w*Math.min(devicePixelRatio||1,2)-cv.width)>2){resize();draw();}}).observe(cv);
+
+/* test hook: run synchronously */
+window.PF={get grid(){return grid;},get start(){return start;},get goal(){return goal;},
+  solve:function(algo){var s=createSearch(algo);while(!s.done)s.step();return {found:s.found,steps:s.pathSteps,cost:s.pathCost,expanded:s.expanded};},
+  setCell:function(x,y,v){grid[y][x]=v;},setStart:function(x,y){start.x=x;start.y=y;},setGoal:function(x,y){goal.x=x;goal.y=y;},
+  preset:loadPreset,draw:draw,get running(){return running;},get search(){return search;}};
+resize();loadPreset("wall");updateStats();
+})();
+</script>
+</body>
+</html>

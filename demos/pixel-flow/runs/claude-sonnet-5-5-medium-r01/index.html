@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixel Flow · 图片粒子化与手势还原</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#04060c;color:#e6ecff;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif}
+#stage{position:fixed;inset:0;background:radial-gradient(circle at 50% 40%,#0c1630,#03050a 70%)}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:.28;filter:saturate(.7) blur(1px)}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#hands{pointer-events:none}
+#three{touch-action:none}
+.panel{position:fixed;background:rgba(8,12,26,.72);border:1px solid rgba(120,160,255,.28);border-radius:12px;backdrop-filter:blur(8px);padding:10px 12px;font-size:13px}
+#top{left:12px;top:10px;max-width:min(380px,calc(100vw - 24px))}
+#top h1{margin:0 0 4px;font-size:16px;letter-spacing:1px;color:#9fc0ff}
+#top p{margin:2px 0;color:#b9c6e8;line-height:1.55;font-size:12px}
+#status{margin-top:6px;font-size:12.5px;color:#ffd98a}
+#ctrl{right:12px;top:10px;width:230px;display:flex;flex-direction:column;gap:8px}
+#ctrl label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:#b9c6e8}
+#ctrl input[type=range]{width:100%}
+button,.btn{font:inherit;font-size:13px;background:#2a4a9a;color:#fff;border:0;border-radius:8px;padding:8px 10px;cursor:pointer;text-align:center;min-height:36px}
+button:hover,.btn:hover{background:#3862c8}
+button.alt,.btn.alt{background:#27304c}
+#gest{left:12px;bottom:12px;display:flex;gap:10px;align-items:center}
+#gest b{font-size:22px}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(3,5,10,.85);z-index:5;font-size:15px;color:#9fc0ff;text-align:center;line-height:1.8;padding:20px}
+#fileIn{display:none}
+@media(max-width:700px){#ctrl{top:auto;bottom:62px;right:8px;width:calc(100vw - 16px);flex-direction:row;flex-wrap:wrap}#ctrl label{flex:1 1 40%}}
+</style>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
+</head>
+<body>
+<div id="stage">
+<video id="video" playsinline muted></video>
+<canvas id="three"></canvas>
+<canvas id="hands"></canvas>
+</div>
+<div id="loading">正在加载 Three.js ……</div>
+<div id="top" class="panel"><h1>PIXEL FLOW · 粒子化图片与手势还原</h1>
+<p>上传图片 → 分解为粒子流 → 用摄像头手势还原。<br><b>✋ 张开手掌</b>：激活力场，范围内粒子飞回原位 · <b>✊ 握拳</b>：暂停吸引 · <b>☝️ 食指</b>：精细小范围 · <b>🙌 双手张开</b>：完整还原</p>
+<p>无摄像头时：鼠标移动 = 手，按住左键 = 张开手掌，按住 F = 握拳，Enter = 完整还原，R = 重新打散。</p>
+<div id="status">初始化中……</div></div>
+<div id="ctrl" class="panel">
+<label class="btn" for="fileIn">📁 选择本地图片</label><input id="fileIn" type="file" accept="image/*">
+<label>采样步长（像素）<span id="stepV">6</span><input id="step" type="range" min="3" max="14" value="6"></label>
+<label>吸引强度<span id="strV">1.0</span><input id="str" type="range" min="0.3" max="3" step="0.1" value="1"></label>
+<label>粒子大小<span id="sizeV">2.6</span><input id="size" type="range" min="1" max="6" step="0.1" value="2.6"></label>
+<button id="scatter" class="alt">重新打散</button>
+<button id="cam" class="alt">启用摄像头</button>
+</div>
+<div id="gest" class="panel"><b id="gIcon">🖱️</b><div><div id="gName">鼠标模式</div><div id="gInfo" style="font-size:11px;color:#8ea0c8">粒子 0 · 还原 0%</div></div></div>
+<script type="module">
+const $=id=>document.getElementById(id);
+const loadingEl=$("loading"),statusEl=$("status");
+const setStatus=t=>statusEl.textContent=t;
+let THREE;
+try{THREE=await import("three");}catch(e){loadingEl.textContent="Three.js 加载失败（需联网访问 unpkg.com）。请联网后刷新。";throw e;}
+loadingEl.style.display="none";
+
+/* ---------- renderer ---------- */
+const cv=$("three"),hcv=$("hands"),hctx=hcv.getContext("2d"),video=$("video");
+let renderer;
+try{renderer=new THREE.WebGLRenderer({canvas:cv,alpha:true,antialias:false});}catch(e){loadingEl.style.display="flex";loadingEl.textContent="当前环境不支持 WebGL，无法渲染粒子。";throw e;}
+renderer.setClearColor(0x000000,0);
+const DPR=Math.min(devicePixelRatio||1,2);renderer.setPixelRatio(DPR);
+const scene=new THREE.Scene();
+const cam=new THREE.OrthographicCamera(-1,1,1,-1,-10,10);cam.position.z=5;
+let W=innerWidth,H=innerHeight;
+
+/* ---------- state ---------- */
+const MAX_P=60000;
+let N=0,hx,hy,px,py,vx,vy,rest,posAttr,restAttr,points=null,geo=null;
+let imgSource=null,imgW=0,imgH=0;
+const P={step:6,str:1,size:2.6};
+const hand={active:false,x:W/2,y:H/2,r:150,mode:"none",src:"mouse"}; // mode: open | fist | point | none
+const ctl={complete:false,mouseDown:false,fist:false,hands:[]};
+const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+  uniforms:{uSize:{value:2.6*DPR},uT:{value:0}},
+  vertexShader:"attribute vec3 color;attribute float aRest;uniform float uSize;varying vec3 vC;varying float vR;void main(){vC=color;vR=aRest;gl_PointSize=uSize*(1.0+0.9*(1.0-aRest));gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
+  fragmentShader:"varying vec3 vC;varying float vR;void main(){vec2 c=gl_PointCoord-.5;float d=length(c);if(d>.5)discard;float a=smoothstep(.5,.15,d);vec3 col=mix(vC*1.25+vec3(.12,.18,.35),vC*1.5,vR);gl_FragColor=vec4(col,a*(0.55+0.45*vR));}"});
+
+function resize(){W=innerWidth;H=innerHeight;renderer.setSize(W,H,false);cam.left=-W/2;cam.right=W/2;cam.top=H/2;cam.bottom=-H/2;cam.updateProjectionMatrix();
+  hcv.width=W*DPR;hcv.height=H*DPR;if(imgSource)buildParticles(true);}
+
+/* ---------- default image ---------- */
+function demoImage(){
+  const c=document.createElement("canvas");c.width=640;c.height=420;const x=c.getContext("2d");
+  const g=x.createLinearGradient(0,0,0,420);g.addColorStop(0,"#1a2a6c");g.addColorStop(.55,"#b21f1f");g.addColorStop(1,"#fdbb2d");x.fillStyle=g;x.fillRect(0,0,640,420);
+  x.fillStyle="#ffe9a8";x.beginPath();x.arc(440,200,70,0,7);x.fill();
+  for(let i=0;i<60;i++){x.fillStyle=`rgba(255,255,255,${Math.random()*.8})`;x.fillRect(Math.random()*640,Math.random()*170,2,2);}
+  x.fillStyle="#1b1026";x.beginPath();x.moveTo(0,420);x.lineTo(0,290);x.lineTo(110,220);x.lineTo(200,300);x.lineTo(310,200);x.lineTo(420,310);x.lineTo(520,240);x.lineTo(640,320);x.lineTo(640,420);x.fill();
+  x.fillStyle="#0d0716";x.beginPath();x.moveTo(0,420);x.lineTo(0,350);x.lineTo(150,320);x.lineTo(300,360);x.lineTo(460,330);x.lineTo(640,370);x.lineTo(640,420);x.fill();
+  x.fillStyle="#fff";x.font="bold 54px system-ui,sans-serif";x.textAlign="center";x.fillText("PIXEL FLOW",320,100);
+  x.font="20px system-ui,sans-serif";x.fillStyle="#ffe9a8";x.fillText("open your hand to restore",320,134);
+  return c;
+}
+
+/* ---------- build particles from image ---------- */
+function buildParticles(keepMsg){
+  if(!imgSource)return;
+  const maxW=W*0.78,maxH=H*0.74,sc=Math.min(maxW/imgW,maxH/imgH);
+  let dw=imgW*sc,dh=imgH*sc,step=P.step;
+  while((dw/step)*(dh/step)>MAX_P)step++;
+  const cols=Math.max(2,Math.floor(dw/step)),rows=Math.max(2,Math.floor(dh/step));
+  const oc=document.createElement("canvas");oc.width=cols;oc.height=rows;const ox=oc.getContext("2d",{willReadFrequently:true});
+  ox.drawImage(imgSource,0,0,cols,rows);
+  let data;try{data=ox.getImageData(0,0,cols,rows).data;}catch(e){setStatus("无法读取图片像素（跨域限制）。请选择本地图片。");return;}
+  const hxA=[],hyA=[],col=[];
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const i=(r*cols+c)*4;if(data[i+3]<40)continue;
+    hxA.push((c-cols/2+0.5)*step);hyA.push((rows/2-r-0.5)*step);col.push(data[i]/255,data[i+1]/255,data[i+2]/255);}
+  N=hxA.length;hx=Float32Array.from(hxA);hy=Float32Array.from(hyA);
+  px=new Float32Array(N);py=new Float32Array(N);vx=new Float32Array(N);vy=new Float32Array(N);rest=new Float32Array(N);
+  for(let i=0;i<N;i++){px[i]=(Math.random()-0.5)*W*1.1;py[i]=(Math.random()-0.5)*H*1.1;vx[i]=vy[i]=0;}
+  if(points){scene.remove(points);geo.dispose();}
+  geo=new THREE.BufferGeometry();
+  posAttr=new THREE.BufferAttribute(new Float32Array(N*3),3);posAttr.setUsage(THREE.DynamicDrawUsage);
+  restAttr=new THREE.BufferAttribute(rest,1);restAttr.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute("position",posAttr);geo.setAttribute("color",new THREE.BufferAttribute(Float32Array.from(col),3));geo.setAttribute("aRest",restAttr);
+  points=new THREE.Points(geo,mat);points.frustumCulled=false;scene.add(points);
+  ctl.complete=false;
+  if(!keepMsg)setStatus("已将图片分解为 "+N.toLocaleString()+" 个粒子（步长 "+step+"px）。"+(hand.src==="mouse"?"按住鼠标左键还原。":"张开手掌还原。"));
+}
+function loadImage(src){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error("图片解码失败"));im.src=src;});}
+$("fileIn").addEventListener("change",async e=>{
+  const f=e.target.files[0];if(!f)return;
+  if(!f.type.startsWith("image/")){setStatus("请选择图片文件（PNG / JPG / WebP 等）。");return;}
+  const url=URL.createObjectURL(f);
+  try{const im=await loadImage(url);imgSource=im;imgW=im.naturalWidth;imgH=im.naturalHeight;buildParticles();}
+  catch(err){setStatus("加载失败："+err.message);}
+  finally{setTimeout(()=>URL.revokeObjectURL(url),3000);}
+});
+function setParam(id,key,fmt){const el=$(id);el.addEventListener("input",()=>{P[key]=+el.value;$(id+"V").textContent=fmt?fmt(+el.value):el.value;if(key==="size")mat.uniforms.uSize.value=P.size*DPR;});
+  if(key==="step")el.addEventListener("change",()=>buildParticles());}
+setParam("step","step");setParam("str","str",v=>v.toFixed(1));setParam("size","size",v=>v.toFixed(1));
+$("scatter").onclick=scatter;
+function scatter(){ctl.complete=false;for(let i=0;i<N;i++){rest[i]=0;vx[i]=(Math.random()-0.5)*500;vy[i]=(Math.random()-0.5)*500;}setStatus("粒子已重新打散。");}
+
+/* ---------- mouse / keyboard fallback ---------- */
+cv.addEventListener("pointermove",e=>{if(hand.src!=="mouse")return;hand.active=true;hand.x=e.clientX;hand.y=e.clientY;});
+cv.addEventListener("pointerdown",e=>{if(hand.src!=="mouse")return;ctl.mouseDown=true;hand.active=true;hand.x=e.clientX;hand.y=e.clientY;try{cv.setPointerCapture(e.pointerId);}catch(_){}});
+cv.addEventListener("pointerup",()=>{ctl.mouseDown=false;});cv.addEventListener("pointercancel",()=>{ctl.mouseDown=false;});
+addEventListener("keydown",e=>{if(e.code==="KeyF")ctl.fist=true;if(e.code==="Enter"){ctl.complete=true;setStatus("完成手势：全部粒子还原。");}if(e.code==="KeyR")scatter();});
+addEventListener("keyup",e=>{if(e.code==="KeyF")ctl.fist=false;});
+
+/* ---------- MediaPipe hands ---------- */
+let landmarker=null,camOn=false,stream=null,lastVT=-1;
+const CONN=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+async function startCamera(){
+  if(camOn)return stopCamera();
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){setStatus("此环境不支持摄像头（需要 HTTPS 或 localhost）。已使用鼠标模式。");return;}
+  setStatus("正在请求摄像头权限……");
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:"user"},audio:false});}
+  catch(e){setStatus("无法使用摄像头（"+(e.name||"错误")+"）。已使用鼠标模式：移动鼠标 + 按住左键。");return;}
+  video.srcObject=stream;await video.play().catch(()=>{});camOn=true;$("cam").textContent="关闭摄像头";hand.src="camera";hand.active=false;
+  if(!landmarker){
+    setStatus("摄像头已开启，正在加载 MediaPipe 手部模型……");
+    try{
+      const vision=await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs");
+      const fileset=await vision.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+      const opts=d=>({baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",delegate:d},runningMode:"VIDEO",numHands:2});
+      try{landmarker=await vision.HandLandmarker.createFromOptions(fileset,opts("GPU"));}
+      catch(_){landmarker=await vision.HandLandmarker.createFromOptions(fileset,opts("CPU"));}
+    }catch(e){setStatus("MediaPipe 加载失败（需联网）：已退回鼠标模式。"+(e&&e.message?" "+e.message:""));stopCamera(true);return;}
+  }
+  setStatus("手势识别就绪：张开手掌即可还原图片。");
+}
+function stopCamera(keepMsg){camOn=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}video.srcObject=null;$("cam").textContent="启用摄像头";hand.src="mouse";hand.active=false;hctx.clearRect(0,0,hcv.width,hcv.height);if(!keepMsg)setStatus("摄像头已关闭，使用鼠标模式。");}
+$("cam").onclick=startCamera;
+
+function toScreen(lm){ // mirrored cover mapping of the video onto the viewport
+  const vw=video.videoWidth||640,vh=video.videoHeight||480,s=Math.max(W/vw,H/vh);
+  return {x:W/2+((1-lm.x)-0.5)*vw*s,y:H/2+(lm.y-0.5)*vh*s};
+}
+const d2=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function classify(l){
+  const w=l[0];let ext=0;const e=[];
+  for(const [tip,pip] of [[8,6],[12,10],[16,14],[20,18]]){const ok=d2(w,l[tip])>d2(w,l[pip])*1.12;e.push(ok);if(ok)ext++;}
+  const thumb=d2(l[4],l[17])>d2(l[3],l[17])*1.05;
+  let mode="none";
+  if(ext>=3)mode="open";else if(ext===0)mode="fist";else if(ext===1&&e[0])mode="point";
+  return {mode,ext,thumb,size:d2(l[0],l[9])};
+}
+function detect(){
+  if(!landmarker||!camOn||video.readyState<2||video.currentTime===lastVT)return;
+  lastVT=video.currentTime;
+  let res;try{res=landmarker.detectForVideo(video,performance.now());}catch(e){return;}
+  hctx.setTransform(DPR,0,0,DPR,0,0);hctx.clearRect(0,0,W,H);
+  const hs=[];
+  for(const l of res.landmarks||[]){
+    const c=classify(l);const pts=l.map(toScreen);
+    const cx=(pts[0].x+pts[5].x+pts[9].x+pts[13].x+pts[17].x)/5,cy=(pts[0].y+pts[5].y+pts[9].y+pts[13].y+pts[17].y)/5;
+    const palm=Math.hypot(pts[0].x-pts[9].x,pts[0].y-pts[9].y);
+    hs.push({x:cx,y:cy,palm,mode:c.mode});
+    hctx.strokeStyle=c.mode==="open"?"#6dffb0":c.mode==="fist"?"#ff8a8a":"#8ab4ff";hctx.lineWidth=2.5;hctx.beginPath();
+    for(const [a,b] of CONN){hctx.moveTo(pts[a].x,pts[a].y);hctx.lineTo(pts[b].x,pts[b].y);}hctx.stroke();
+    hctx.fillStyle="#fff";for(const p of pts){hctx.beginPath();hctx.arc(p.x,p.y,3,0,7);hctx.fill();}
+  }
+  ctl.hands=hs;
+  if(hs.length){hand.active=true;const h=hs[0];const k=0.45;hand.x+=(h.x-hand.x)*k;hand.y+=(h.y-hand.y)*k;
+    const target=h.mode==="point"?Math.max(40,h.palm*0.9):Math.max(70,Math.min(340,h.palm*2.1));hand.r+=(target-hand.r)*0.3;
+    if(hs.length>=2&&hs.every(x=>x.mode==="open")){if(!ctl.complete)setStatus("完成手势（双手张开）：完整还原图片。");ctl.complete=true;}
+    hand.mode=hs.some(x=>x.mode==="fist")?"fist":h.mode;
+    if(hand.mode==="fist"&&ctl.complete&&hs.length<2)ctl.complete=false;
+  }else{hand.active=false;hand.mode="none";}
+}
+
+/* ---------- simulation ---------- */
+const clock=new THREE.Clock();let t=0,fpsA=0,fpsN=0,fps=0;
+function flow(x,y,tt){return [Math.sin(y*0.008+tt*0.9)+Math.cos(x*0.005-tt*0.6)*0.7,Math.cos(x*0.007-tt*0.8)+Math.sin(y*0.006+tt*0.5)*0.7];}
+function step(dt){
+  if(!N)return;
+  let mode,active=false;
+  if(hand.src==="mouse"){active=hand.active;mode=ctl.fist?"fist":ctl.mouseDown?"open":"idle";hand.r+=((ctl.mouseDown?150:110)-hand.r)*0.2;}
+  else{active=hand.active;mode=hand.mode==="open"?"open":hand.mode==="point"?"open":hand.mode==="fist"?"fist":"idle";}
+  const attract=(mode==="open"&&active)||ctl.complete;
+  const hwx=hand.x-W/2,hwy=H/2-hand.y,R=hand.r,R2=R*R,str=P.str;
+  const damp=Math.exp(-dt*2.2);let sum=0;
+  for(let i=0;i<N;i++){
+    let r=rest[i];
+    if(attract){
+      if(ctl.complete)r+=dt*0.9*str;
+      else{const dx=px[i]-hwx,dy=py[i]-hwy,d=dx*dx+dy*dy;if(d<R2){const f=1-Math.sqrt(d)/R;r+=dt*(1.2+3.2*f)*str;}}
+    }else if(mode==="idle")r-=dt*0.02;   // slowly lose cohesion when nothing is attracting
+    if(r>1)r=1;else if(r<0)r=0;rest[i]=r;sum+=r;
+    const fl=flow(px[i],py[i],t),fa=(1-r)*70;
+    const k=r*r*(18+40*str);
+    let ax=(hx[i]-px[i])*k+fl[0]*fa,ay=(hy[i]-py[i])*k+fl[1]*fa;
+    if(mode==="fist"&&active){const dx=px[i]-hwx,dy=py[i]-hwy,d=dx*dx+dy*dy;if(d<R2&&r<0.98){const f=1-Math.sqrt(d)/R;const dd=Math.sqrt(d)+1;ax+=dx/dd*f*140;ay+=dy/dd*f*140;}}
+    const dm=Math.exp(-dt*(1.4+5*r));
+    vx[i]=vx[i]*dm+ax*dt;vy[i]=vy[i]*dm+ay*dt;
+    px[i]+=vx[i]*dt;py[i]+=vy[i]*dt;
+    if(r>0.995){px[i]+=(hx[i]-px[i])*Math.min(1,dt*12);py[i]+=(hy[i]-py[i])*Math.min(1,dt*12);}
+    // keep drifting particles on screen
+    if(px[i]>W*0.62)px[i]-=W*1.24;else if(px[i]<-W*0.62)px[i]+=W*1.24;if(py[i]>H*0.62)py[i]-=H*1.24;else if(py[i]<-H*0.62)py[i]+=H*1.24;
+  }
+  const pa=posAttr.array;for(let i=0;i<N;i++){pa[i*3]=px[i];pa[i*3+1]=py[i];pa[i*3+2]=0;}
+  posAttr.needsUpdate=true;restAttr.needsUpdate=true;
+  step.pct=sum/N;
+  step.mode=ctl.complete?"complete":mode;
+}
+function hud(){
+  const m=step.mode,map={open:["✋","张开手掌 · 吸引中"],fist:["✊","握拳 · 暂停吸引"],complete:["🙌","完整还原"],idle:["🖐️","待机"],undefined:["🖐️","待机"]};
+  let [ic,nm]=map[m]||map.idle;if(hand.src==="camera"&&hand.mode==="point"&&m==="open"){ic="☝️";nm="食指 · 精细区域";}
+  if(hand.src==="camera"&&!hand.active&&m!=="complete"){ic="👀";nm="未检测到手";}
+  $("gIcon").textContent=ic;$("gName").textContent=nm+(hand.src==="mouse"?"（鼠标）":"");
+  $("gInfo").textContent="粒子 "+N.toLocaleString()+" · 还原 "+Math.round((step.pct||0)*100)+"% · "+fps+" FPS";
+}
+function drawField(){
+  if(hand.src!=="mouse"){return;}
+  hctx.setTransform(DPR,0,0,DPR,0,0);hctx.clearRect(0,0,W,H);
+  if(!hand.active)return;hctx.strokeStyle=step.mode==="open"?"rgba(109,255,176,.9)":step.mode==="fist"?"rgba(255,138,138,.9)":"rgba(138,180,255,.6)";hctx.lineWidth=2;hctx.setLineDash([6,5]);
+  hctx.beginPath();hctx.arc(hand.x,hand.y,hand.r,0,7);hctx.stroke();hctx.setLineDash([]);
+}
+function frame(){
+  requestAnimationFrame(frame);
+  const dt=Math.min(clock.getDelta(),0.05);t+=dt;
+  detect();step(dt);
+  if(hand.src==="camera"&&hand.active){hctx.setTransform(DPR,0,0,DPR,0,0);hctx.strokeStyle="rgba(109,255,176,.6)";hctx.lineWidth=2;hctx.beginPath();hctx.arc(hand.x,hand.y,hand.r,0,7);hctx.stroke();}
+  drawField();
+  renderer.render(scene,cam);
+  fpsA+=dt;fpsN++;if(fpsA>0.5){fps=Math.round(fpsN/fpsA);fpsA=0;fpsN=0;hud();}
+}
+addEventListener("resize",resize);resize();
+const c0=demoImage();imgSource=c0;imgW=c0.width;imgH=c0.height;buildParticles();
+frame();
+window.__pf={get N(){return N;},get pct(){return step.pct;},hand,ctl,P,buildParticles,get mode(){return step.mode;},scatter};
+// try camera automatically (falls back to mouse mode)
+startCamera();
+</script>
+</body>
+</html>
