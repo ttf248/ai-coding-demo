@@ -101,7 +101,8 @@
       e(run.title + " 实际运行截图") +
       '" loading="lazy" decoding="async" width="1440" height="1050">' +
       '<span class="cover-hint">放大预览 ↗</span></button>' +
-      "<figcaption><span>实际截图</span><strong>" +
+      '<div class="image-feedback" role="status"><span>截图加载中…</span><button data-retry-image hidden>重试</button></div>' +
+      "<figcaption><span>实际截图 · 当前展示</span><strong>" +
       e(U.modelLabel(data, run)) +
       "</strong><span> · " +
       e(U.effortLabel(run.effort)) +
@@ -114,6 +115,47 @@
       e(title) +
       "</span><small>暂无截图</small></div>"
     );
+  }
+  function setupGalleryImages() {
+    $("project-grid")
+      .querySelectorAll(".topic-body, .run-body")
+      .forEach((body) => {
+        const heading = body.querySelector("h3");
+        const actions = body.querySelector(".card-actions");
+        if (heading && actions) heading.after(actions);
+      });
+    $("project-grid")
+      .querySelectorAll("figure[data-screenshot-run]")
+      .forEach((figure, index) => {
+        const img = figure.querySelector("img");
+        const feedback = figure.querySelector(".image-feedback");
+        if (!img || !feedback) return;
+        const retry = feedback.querySelector("button");
+        const update = () => {
+          const failed = img.complete && !img.naturalWidth;
+          feedback.hidden = img.complete && !failed;
+          feedback.querySelector("span").textContent = failed
+            ? "截图加载失败"
+            : "截图加载中…";
+          retry.hidden = !failed;
+          figure.classList.toggle("image-failed", failed);
+        };
+        img.addEventListener("load", update);
+        img.addEventListener("error", update);
+        retry.addEventListener("click", () => {
+          feedback.querySelector("span").textContent = "截图加载中…";
+          retry.hidden = true;
+          figure.classList.remove("image-failed");
+          const source = img.getAttribute("src");
+          img.removeAttribute("src");
+          img.setAttribute("src", source);
+        });
+        if (index < 2) {
+          img.loading = "eager";
+          img.fetchPriority = "high";
+        }
+        update();
+      });
   }
   function render(reset = false) {
     if (reset) visible = 9;
@@ -294,7 +336,7 @@
                   " / " +
                   U.runSummary(data, recommended),
               ) +
-              '">对比版本</a>'
+              '">比较模型实现</a>'
             : "") +
           "</div></div></article>"
         );
@@ -303,7 +345,9 @@
     $("project-grid").className =
       "cards " + (state.view === "list" ? "list" : "");
     $("project-grid").innerHTML = items.slice(0, visible).join("");
+    setupGalleryImages();
     $("result-count").textContent =
+      "当前范围：" +
       items.length +
       " 个" +
       (state.group === "runs" ? "实验" : "主题") +
@@ -345,6 +389,16 @@
       (key) => state[key],
     ).length;
     $("filter-count").textContent = filterCount ? "· " + filterCount : "";
+    const mobileCount = [
+      "category",
+      "model",
+      "provider",
+      "type",
+      "prompt",
+      "preview",
+    ].filter((key) => state[key]).length;
+    $("mobile-filter-toggle").textContent =
+      "筛选" + (mobileCount ? " · " + mobileCount : "");
     $("active-filters").innerHTML = [
       "q",
       "category",
@@ -436,6 +490,12 @@
       render(true);
     }),
   );
+  $("mobile-filter-toggle").addEventListener("click", () => {
+    const expanded =
+      $("mobile-filter-toggle").getAttribute("aria-expanded") !== "true";
+    $("mobile-filter-toggle").setAttribute("aria-expanded", String(expanded));
+    $("filter-layout").classList.toggle("filters-expanded", expanded);
+  });
   $("load-more").addEventListener("click", () => {
     visible += 9;
     render();

@@ -28,6 +28,7 @@ test("topic effort order matches comparison selectors and date sorting remains e
     "xhigh（超高）",
     "high（高）",
     "medium（中）",
+    "default（默认）",
     "档位未记录",
   ]);
   await page.locator("#topic-sort").selectOption("recent");
@@ -328,7 +329,7 @@ test("topic matrix filters versions, exposes repeat runs and switches to a mobil
   const cell = page.locator(
     `.matrix-desktop td[data-model="${repeated.modelId}"][data-effort="${repeated.effort}"]`,
   );
-  await cell.locator("summary").click();
+  await cell.locator(":scope > details > summary").click();
   await expect(cell.locator(".matrix-record")).toHaveCount(
     blue.filter(
       (r) => r.modelId === repeated.modelId && r.effort === repeated.effort,
@@ -493,6 +494,12 @@ test("conditions compare all selected experiments, filter differences and restor
 });
 
 async function openHomeControls(page) {
+  const toggle = page.locator("#mobile-filter-toggle");
+  if (
+    (await toggle.isVisible()) &&
+    (await toggle.getAttribute("aria-expanded")) === "false"
+  )
+    await toggle.click();
   if ((await page.locator("#advanced-filters").getAttribute("open")) === null)
     await page.locator("#advanced-filters > summary").click();
 }

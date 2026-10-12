@@ -216,6 +216,7 @@
     document.querySelector(".compare-grid").dataset.layout =
       visible.length === 1 ? "single" : state.layout;
     $("layout").value = state.layout;
+    $("layout").hidden = narrow.matches;
     $("group").value = state.group;
     document
       .querySelector(".mobile-tabs")
@@ -224,6 +225,12 @@
       btn.hidden =
         state.layout !== "quad" &&
         ["third", "fourth"].includes(btn.dataset.mobile);
+      const run = getRun(btn.dataset.mobile);
+      btn.textContent =
+        labels[btn.dataset.mobile] +
+        " · " +
+        (run ? U.modelLabel(data, run) : "未选择");
+      btn.title = run ? runLabel(run) : "未选择实验";
     });
     const a = getRun("left"),
       b = getRun("right");
@@ -338,7 +345,17 @@
         !run.preview.pages.some((p) => p.id === state[side + "Page"]),
       );
       panel.innerHTML =
-        '<div class="panel-header"><h2>' +
+        '<div class="panel-header"><strong class="panel-identity">' +
+        e(
+          run
+            ? U.modelLabel(data, run) +
+                " · " +
+                U.effortLabel(run.effort) +
+                " · " +
+                U.roundLabel(run)
+            : "未选择实验",
+        ) +
+        "</strong><h2>" +
         (labels[side] + (side === "left" ? " · 基准" : "")) +
         '</h2><label for="run-' +
         side +
@@ -381,7 +398,13 @@
         (href
           ? '<a class="button" href="' +
             e(href) +
-            '" target="_blank" rel="noopener">独立打开 ↗</a><button data-reload="' +
+            '" target="_blank" rel="noopener">独立打开 ↗</a>'
+          : "") +
+        (run
+          ? '<details class="panel-more"><summary>更多</summary><div>'
+          : "") +
+        (href
+          ? '<button data-reload="' +
             side +
             '">重载</button><button data-unload="' +
             side +
@@ -390,28 +413,21 @@
             "</button>"
           : "") +
         (run ? '<a href="' + e(run.document) + '">实验记录</a>' : "") +
+        (run ? "</div></details>" : "") +
         (run && U.executionMode(run) !== "unknown"
           ? '<span class="execution-mode-chip panel-execution-mode">' +
             e(U.executionModeLabel(U.executionMode(run))) +
             "</span>"
           : "") +
         '</div><p class="panel-status">' +
-        (run
-          ? e(
-              U.modelLabel(data, run) +
-                " / " +
-                U.effortLabel(run.effort) +
-                " · " +
-                (run.environment.tool || "工具未记录"),
-            )
-          : "请选择实验") +
+        (run ? e(run.environment.tool || "工具未记录") : "请选择实验") +
         '</p><p class="panel-status" data-size></p></div><div data-content></div>';
       const content = panel.querySelector("[data-content]");
       if (!run) {
         content.innerHTML =
           '<div class="frame-placeholder"><h3>' +
           (state[side] ? "实验不存在或已经迁移" : "选一个实验开始") +
-          "</h3><p>上方可以选择任意主题的实验。候选按厂商和版本排列，同正文版本会单独标注。</p></div>";
+          "</h3><p>先选择主题，系统会按现有模型排序填入实验；也可以分别选择 A / B。候选中的同正文版本会单独标注。</p><button data-start-comparison>选择主题开始 →</button></div>";
         continue;
       }
       if (
@@ -713,6 +729,13 @@
   document.addEventListener("click", (event) => {
     const el = event.target.closest("button");
     if (!el) return;
+    if (el.hasAttribute("data-start-comparison")) {
+      $("group").focus();
+      try {
+        $("group").showPicker?.();
+      } catch {}
+      return;
+    }
     if (el.id === "pick-models") {
       $("picker-side").value =
         state.layout === "single" || narrow.matches
@@ -782,6 +805,14 @@
     render();
   });
   narrow.addEventListener("change", render);
+  document.addEventListener(
+    "toggle",
+    (event) => {
+      if (event.target.matches?.(".panel-more"))
+        requestAnimationFrame(resizeFrames);
+    },
+    true,
+  );
   window.addEventListener("resize", resizeFrames);
   $("group").innerHTML =
     '<option value="">选择主题 / 提示词…</option>' +
