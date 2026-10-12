@@ -244,6 +244,12 @@ test("homepage exposes archived topics and keeps its directory compact", async (
 });
 
 async function openHomeControls(page) {
+  const toggle = page.locator("#mobile-filter-toggle");
+  if (
+    (await toggle.isVisible()) &&
+    (await toggle.getAttribute("aria-expanded")) === "false"
+  )
+    await toggle.click();
   if ((await page.locator("#advanced-filters").getAttribute("open")) === null)
     await page.locator("#advanced-filters > summary").click();
 }
@@ -322,6 +328,7 @@ test("quick controls and preview versions follow filters on mobile", async ({
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("./?model=gpt-6-astra&testing=active");
+  await page.locator("#mobile-filter-toggle").click();
   await page.locator("#advanced-filters > summary").click();
   await expect(page.locator('[data-view="list"]')).toBeVisible();
   await page.locator("#preview-only").click();

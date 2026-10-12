@@ -176,7 +176,10 @@ test("prompt workspace supports cycling, searchable selection, four panels and U
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  await expect(page.locator("#layout")).toBeHidden();
+  await page.setViewportSize({ width: 1440, height: 960 });
   await page.locator("#layout").selectOption("single");
+  await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator("#panel-left iframe")).toHaveCount(1);
   await page.locator('[data-mobile="right"]').click();
   await expect(page.locator("#panel-right iframe")).toHaveCount(1);

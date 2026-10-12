@@ -365,11 +365,13 @@
               '<div class="selection-item"><div><strong>' +
               "ABCD"[i] +
               " · " +
-              escape(runSummary(data, run)) +
+              escape(modelLabel(data, run) + " · " + effortLabel(run.effort)) +
               "</strong><small>" +
               escape(topic.title) +
               " · 提示词 " +
               escape(run.promptId) +
+              " · " +
+              escape(roundLabel(run)) +
               '</small></div><button data-remove="' +
               escape(id) +
               '" aria-label="移除 ' +
@@ -383,7 +385,7 @@
           ? '<a class="button primary" href="compare.html?' +
             escape(params.toString()) +
             '">开始对比 ↗</a>'
-          : "<span>再选一个实验</span>") +
+          : '<span role="status">再选一个实验开始对比</span>') +
         "</div>";
       document.querySelectorAll("[data-compare]").forEach((b) => {
         const on = selected.includes(b.dataset.compare);

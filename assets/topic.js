@@ -78,29 +78,44 @@
     if (!billing) return "费用未记录";
     if (billing.type === "batch") {
       const amount =
-        billing.unit === "USD"
-          ? `$${Number(billing.amount).toFixed(2)} USD`
-          : `${billing.amount} ${billing.unit}`;
+        billing.amount == null
+          ? "金额未记录"
+          : billing.unit === "USD"
+            ? `$${Number(billing.amount).toFixed(2)} USD`
+            : `${billing.amount} ${billing.unit}`;
       const source =
         billing.sourceAmount != null
           ? `；原始消耗 ${billing.sourceAmount} ${billing.sourceUnit}`
           : "";
-      return `批次总额：${amount}（${billing.caseCount} 个案例${source}）`;
+      return `批次总额：${amount}（${billing.caseCount == null ? "案例数未记录" : billing.caseCount + " 个案例"}${source}）`;
     }
-    if (billing.type === "subscription")
-      return `${billing.plan || "订阅"}（五小时额度未耗尽）`;
+    if (billing.type === "subscription") return billing.plan || "订阅";
     if (billing.amount !== null)
       return `${billing.amount} ${billing.unit || ""}`.trim();
     return "费用口径未记录";
   }
   function billingMarkup(run) {
     const note = run.billing?.note || "";
+    const billing = run.billing;
+    const amount =
+      billing?.amount == null
+        ? "未记录"
+        : billing.unit === "USD"
+          ? "$" + Number(billing.amount).toFixed(2)
+          : billing.amount + " " + (billing.unit || "");
+    const short =
+      billing?.type === "batch"
+        ? `批次总额 ${amount} · ${billing.caseCount == null ? "案例数未记录" : billing.caseCount + " 案例"}`
+        : billing?.type === "subscription"
+          ? billing.plan || "订阅"
+          : billingSummary(run);
     return (
-      '<span class="billing-summary"' +
-      (note ? ' title="' + e(note) + '"' : "") +
-      ">费用 · " +
+      '<details class="billing-summary"><summary>' +
+      e(short) +
+      "</summary><p>" +
       e(billingSummary(run)) +
-      "</span>"
+      (note ? "<br>" + e(note) : "") +
+      "</p></details>"
     );
   }
   function entries(items) {
@@ -324,13 +339,17 @@
                   U.executionModeBadge(r) +
                   '</th><td class="topic-run-effort">' +
                   e(U.effortLabel(r.effort)) +
-                  "</td><td>" +
+                  '</td><td class="topic-run-round">' +
                   e(U.roundLabel(r)) +
-                  '</td><td class="topic-run-date"><time>' +
+                  '</td><td class="topic-run-date" id="date-' +
+                  e(r.id) +
+                  '"><time>' +
                   e(r.date || "日期未记录") +
-                  '</time></td><td class="topic-run-billing">' +
+                  '</time></td><td class="topic-run-billing" id="billing-' +
+                  e(r.id) +
+                  '">' +
                   billingMarkup(r) +
-                  '</td><td><div class="topic-row-actions">' +
+                  '</td><td class="topic-run-actions"><div class="topic-row-actions">' +
                   (U.screenshotURL(r)
                     ? '<a href="' +
                       e(U.screenshotURL(r)) +
@@ -349,7 +368,11 @@
                   e(r.id) +
                   '" aria-pressed="false">加入对比</button><a href="' +
                   e(r.document) +
-                  '">记录</a></div></td></tr>'
+                  '">记录</a><button class="row-details-toggle" data-row-details aria-expanded="false" aria-controls="date-' +
+                  e(r.id) +
+                  " billing-" +
+                  e(r.id) +
+                  '">日期与费用</button></div></td></tr>'
                 );
               })
               .join("") +
@@ -422,6 +445,14 @@
     render();
   });
   root.addEventListener("click", (event) => {
+    const details = event.target.closest("[data-row-details]");
+    if (details) {
+      const expanded = details.getAttribute("aria-expanded") !== "true";
+      details.setAttribute("aria-expanded", String(expanded));
+      details.closest("tr").classList.toggle("details-expanded", expanded);
+      details.textContent = expanded ? "收起详情" : "日期与费用";
+      return;
+    }
     if (event.target.closest("#topic-reset, [data-reset-filters]")) {
       modelId = effort = query = "";
       updateURL();

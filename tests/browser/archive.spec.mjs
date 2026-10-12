@@ -38,6 +38,9 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
   await expect(page.locator("#model option")).toHaveText([
     "全部模型",
     "Claude 4.0",
+    "Claude Haiku 5.5",
+    "Claude Opus 5.5",
+    "Claude Haiku 4.5",
     "Gemini 3.8 Flash",
     "Kimi K3",
     "MiniMax M3.1 Flash Preview",
@@ -66,7 +69,16 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
   await expect(page.locator("#provider")).toHaveValue("MiniMax");
   await page.locator("#model").selectOption("");
   await page.locator("#provider").selectOption("GitHub Copilot");
-  await expect(page.locator("#result-count")).toContainText("22 条匹配记录");
+  const copilotCount = data.runs.filter(
+    (run) =>
+      data.models.find((model) => model.id === run.modelId)?.provider ===
+        "GitHub Copilot" &&
+      data.topics.find((topic) => topic.id === run.topicId)?.testingStatus !==
+        "archived",
+  ).length;
+  await expect(page.locator("#result-count")).toContainText(
+    copilotCount + " 条匹配记录",
+  );
   await page.locator("#model").selectOption("gemini-3-8-flash");
   await expect(page.locator("#result-count")).toContainText("11 条匹配记录");
   await page.locator("#model").selectOption("kimi-k3");
@@ -206,6 +218,7 @@ test("live previews, equal viewports, unloading and single-side reload", async (
     )
     .toBeGreaterThan(0);
   await first.evaluate((f) => (f.contentWindow.__archiveState = "kept"));
+  await page.locator("#panel-right .panel-more > summary").click();
   await page.locator('[data-reload="right"]').click();
   await expect(first).toHaveAttribute("data-preserved", "yes");
   expect(await first.evaluate((f) => f.contentWindow.__archiveState)).toBe(
@@ -215,8 +228,10 @@ test("live previews, equal viewports, unloading and single-side reload", async (
   expect(await first.evaluate((f) => f.contentWindow.__archiveState)).toBe(
     "kept",
   );
+  await page.locator("#panel-left .panel-more > summary").click();
   await page.locator('[data-unload="left"]').click();
   await expect(page.locator("iframe")).toHaveCount(1);
+  await page.locator("#panel-left .panel-more > summary").click();
   await page.locator('[data-unload="left"]').click();
   await expect(page.locator("iframe")).toHaveCount(2);
   await page.locator('[data-tab="info"]').click();
