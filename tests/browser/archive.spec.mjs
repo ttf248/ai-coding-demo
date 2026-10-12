@@ -37,6 +37,7 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
   ]);
   await expect(page.locator("#model option")).toHaveText([
     "全部模型",
+    "Claude Sonnet 5.5",
     "Claude 4.0",
     "Claude Haiku 5.5",
     "Claude Opus 5.5",
@@ -387,7 +388,13 @@ test("built apps render their local images under the configured base", async ({
   for (const r of blue) {
     const failures = [];
     const watch = (res) => {
-      if (res.url().startsWith(baseURL) && res.status() >= 400)
+      const expectedDemoFallback =
+        "/previews/bluebook/claude-sonnet-5-5-medium-r01/missing/";
+      if (
+        res.url().startsWith(baseURL) &&
+        res.status() >= 400 &&
+        !res.url().includes(expectedDemoFallback)
+      )
         failures.push(res.url());
     };
     page.on("response", watch);

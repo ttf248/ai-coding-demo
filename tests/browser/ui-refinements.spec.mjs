@@ -48,7 +48,7 @@ test("gallery screenshot errors can be retried without changing the preview sour
   page,
 }) => {
   let fail = true;
-  await page.route("**/screenshot.png", (route) =>
+  await page.route("**/preview-2026-10-12.png", (route) =>
     fail ? route.abort() : route.continue(),
   );
   await page.goto("./");
@@ -68,13 +68,17 @@ test("mobile comparison labels show models and expose only the current preview",
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("compare.html?group=fluid-simulation/v1");
+  await page.goto(
+    "compare.html?left=fluid-simulation--claude-sonnet-5-5-medium-r01&right=fluid-simulation--claude-haiku-5-5-max-r01",
+  );
   await expect(page.locator("#layout")).toBeHidden();
   await expect(page.locator(".mobile-layout-note")).toBeVisible();
-  await expect(page.locator("#relation")).toContainText("任务正文一致");
-  await expect(page.locator('[data-mobile="left"]')).toContainText("Claude");
+  await expect(page.locator("#relation")).toContainText("已记录的原始输入一致");
+  await expect(page.locator('[data-mobile="left"]')).toContainText(
+    "Claude Sonnet 5.5",
+  );
   await expect(page.locator("#panel-left .panel-identity")).toContainText(
-    "max",
+    "medium",
   );
   await expect(page.locator("iframe")).toHaveCount(1);
   await page.locator('[data-mobile="right"]').click();
