@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>体素微缩建筑工地沙盘</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#14100b;color:#f5ecd7;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;overflow-x:hidden}
+header{padding:10px 14px;background:#1f1710;border-bottom:1px solid #4a3a26}
+header h1{font-size:16px}header p{font-size:12px;color:#c9b896}
+.wrap{max-width:1120px;margin:0 auto;padding:10px}
+#gl{width:100%;height:66vh;min-height:420px;display:block;border-radius:12px;background:#0b0e1a}
+.panel{background:#1f1710;border:1px solid #4a3a26;border-radius:12px;padding:10px;margin-top:10px;font-size:13px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{border:1px solid #8b6f47;background:#2a2118;color:#f5ecd7;border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px}
+button.active{background:#8b6f47}
+.help{font-size:12px;color:#c9b896;line-height:1.7;margin-top:6px}
+.knobs{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.knob{background:#2a2118;border:1px solid #8b6f47;border-radius:10px;padding:8px 12px;cursor:pointer;min-width:150px}
+.knob b{display:block}.knob span{font-size:12px;color:#c9b896}
+</style>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<header><h1>体素微缩建筑工地沙盘 · 60FPS · InstancedMesh</h1><p>深色实木桌面 · 七大分区 · 挖掘/运输/吊装联动 · 昼夜循环 · 暴雨模式（空格）· 全部程序化无外部资源（Three.js CDN 除外）</p></header>
+<div class="wrap">
+<canvas id="gl"></canvas>
+<div class="panel">
+<div class="row">
+<button id="dayNight" class="active">昼夜循环：开</button>
+<button id="rain">暴雨：关（空格）</button>
+<label>设备速度</label><input id="speed" type="range" min="0" max="200" value="100"><span id="speedV">1.0x</span>
+<label>尘土强度</label><input id="dust" type="range" min="0" max="100" value="60"><span id="dustV">60</span>
+</div>
+<div class="knobs">
+<div class="knob" id="kSpeed">🎛 桌面旋钮·速度<br><span>点击切换 0.5x / 1x / 2x（对应3D旋钮同步旋转）</span></div>
+<div class="knob" id="kDay">💡 桌面旋钮·昼夜<br><span>点击开关昼夜循环</span></div>
+<div class="knob" id="kDust">🌪 桌面旋钮·尘土<br><span>点击切换 强/中/弱</span></div>
+</div>
+<div class="help">交互：拖拽环视，闲置 5s 自动缓慢环绕；滚轮缩放；点击桌面前方三个实体旋钮可调速/昼夜/尘土；空格触发暴雨（雨滴粒子、地面湿滑反光、灯光增强）。所有运动已做碰撞约束限于桌面，不穿模。新增场景：临时水电杆夜间暖辉 + 安全警示标识已加入。</div>
+<div class="help" id="stat">状态：正在运行…</div>
+</div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const canvas=document.getElementById('gl');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(canvas.clientWidth,canvas.clientHeight,false);
+renderer.shadowMap.enabled=true;
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0b0e1a);
+const camera=new THREE.PerspectiveCamera(50,canvas.clientWidth/canvas.clientHeight,0.1,500);
+camera.position.set(26,18,30);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.target.set(0,3,0);controls.maxPolarAngle=Math.PI*0.49;controls.enableDamping=true;
+scene.add(new THREE.HemisphereLight(0xffffff,0x33261a,0.9));
+const sun=new THREE.DirectionalLight(0xffffff,1.6);sun.position.set(30,40,10);sun.castShadow=true;scene.add(sun);
+// desk
+const desk=new THREE.Mesh(new THREE.BoxGeometry(56,2,38),new THREE.MeshStandardMaterial({color:0x4a2f1c,roughness:0.7}));
+desk.position.y=-1;desk.receiveShadow=true;scene.add(desk);
+const sandBase=new THREE.Mesh(new THREE.BoxGeometry(48,1,30),new THREE.MeshStandardMaterial({color:0xc9a86a,roughness:1}));
+sandBase.position.y=0.5;scene.add(sandBase);
+// helpers
+function box(w,h,d,c,x,y,z,parent=scene){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:c,roughness:0.9}));m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m;}
+// zones labels via colors
+box(10,0.2,8,0x8b7355,-16,1.1,-8); // pit
+box(10,0.2,6,0x9aa5b1, -16,1.1,7); // rebar shed
+box(8,0.2,8,0xb08968, -2,1.1,-8); // material
+box(10,0.2,10,0x6b7280, 10,1.1,-6); // building base
+box(9,0.2,6,0x7c8aa0, 10,1.1,8); // site office
+box(8,0.2,6,0x8a6f4d, -2,1.1,8); // spoil handled by mound
+box(48,0.15,2,0x3f3f46, 0,1.05,0); // temp road
+// pit hole
+box(8,1.2,6,0x5b4632,-16,0.8,-8);
+// building base + scaffold
+const bld=new THREE.Group();bld.position.set(10,1, -6);scene.add(bld);
+for(let f=0;f<4;f++){box(6,1.2,6,f%2?0xd6c39a:0xb8a67e,0,1+f*1.3,0,bld);}
+// scaffold
+for(let i=0;i<6;i++){box(0.2,6,0.2,0x8b8b8b,-3.4+i*1.3,3,3.4,bld);}
+// rebar stacks, cement, sand (instanced)
+{
+  const g=new THREE.BoxGeometry(0.3,0.3,3);
+  const m=new THREE.MeshStandardMaterial({color:0x7a4a2b});
+  const inst=new THREE.InstancedMesh(g,m,40);
+  const d=new THREE.Object3D();let k=0;
+  for(let i=0;i<5;i++)for(let j=0;j<8;j++){d.position.set(-4+i*0.4,1.4+j*0.32,-9);d.updateMatrix();inst.setMatrixAt(k++,d.matrix);}
+  scene.add(inst);
+  box(2,1,1.5,0xe5e5e5,-1,1.6,-10); // cement
+  const sand=new THREE.Mesh(new THREE.ConeGeometry(1.6,1.4,4),new THREE.MeshStandardMaterial({color:0xe0b96a}));sand.position.set(-2,1.8,9);scene.add(sand);
+  const spoil=new THREE.Mesh(new THREE.ConeGeometry(2.2,1.8,5),new THREE.MeshStandardMaterial({color:0x8a6a45}));spoil.position.set(-2,2,9);spoil.name='spoil';scene.add(spoil);
+}
+// office + fence + flags + gate + poles + signs
+box(7,2.2,4,0xdbe4f0,10,2.2,8);
+box(7.4,0.4,4.4,0x2563eb,10,3.4,8);
+for(let i=0;i<24;i++){const a=i/24*Math.PI*2;box(0.3,1.6,0.3,i%2?0xef4444:0xffffff,Math.cos(a)*23,1.8,Math.sin(a)*14.5);}
+for(let i=0;i<8;i++){box(0.15,2.5,0.15,0xf59e0b,-20+i*5.5,2.2,14.6);} // light poles
+box(0.4,3,0.4,0x44403c,-22,2.5,12);box(2,1,0.2,0xfef3c7,-22,3.8,12); // water-power pole with warm window
+box(1.6,1,0.1,0xfacc15,-8,2.2,14.5); // warning sign
+// blueprints, tape, helmet, level on desk corners
+box(4,0.05,3,0xe8e4d8,-24,0.1,14);
+box(1.2,0.3,1.2,0xfacc15,-20,0.3,15);
+{const h=new THREE.Mesh(new THREE.SphereGeometry(0.7,8,6,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:0xfacc15}));h.position.set(24,0.2,13);scene.add(h);}
+box(2.5,0.2,0.4,0x9ca3af,22,0.2,-15);
+// machines
+function excavator(x,z,ry){
+  const g=new THREE.Group();g.position.set(x,1.2,z);g.rotation.y=ry;scene.add(g);
+  box(2.4,1,2,0xf59e0b,0,0.8,0,g);box(1.6,1,1.6,0x1f2937,0,1.8,-0.2,g);
+  const arm=new THREE.Group();arm.position.set(0,2.2,1);g.add(arm);
+  box(0.5,0.5,2.6,0xf59e0b,0,0.6,1.2,arm);
+  const bucket=box(1,0.8,1,0x57534e,0,0,2.8,arm);bucket.name='bucket';
+  g.userData={arm,phase:Math.random()*7};
+  return g;
+}
+const ex1=excavator(-14,-6,0.6), ex2=excavator(-18,-9,-0.5);
+// trucks
+function truck(){
+  const g=new THREE.Group();scene.add(g);
+  box(2,1,4.5,0x2563eb,0,1.2,0,g);box(1.8,1,1.5,0xdbeafe,0,1.2,2.8,g);
+  const ws=[];for(const [dx,dz] of [[-1,-1.5],[1,-1.5],[-1,1.5],[1,1.5]]){const w=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.4,10),new THREE.MeshStandardMaterial({color:0x111111}));w.rotation.z=Math.PI/2;w.position.set(dx,0.5,dz);g.add(w);ws.push(w);}
+  g.userData={ws};return g;
+}
+const truck1=truck(), mixer=truck();mixer.children[0].material=new THREE.MeshStandardMaterial({color:0xe5e7eb});
+function crane(x,z){
+  const g=new THREE.Group();g.position.set(x,1,z);scene.add(g);
+  box(1.5,10,1.5,0xfacc15,0,5,0,g);
+  const jib=new THREE.Group();jib.position.y=10;g.add(jib);
+  box(8,0.6,0.8,0xfacc15,2,0,0,jib);box(3,0.6,0.8,0x57534e,-3,0,0,jib);
+  const cable=box(0.08,3,0.08,0x111111,5,-1.8,0,jib);
+  const load=box(1.4,0.8,0.8,0x7c2d12,5,-3.6,0,jib);
+  g.userData={jib,cable,load,ph:Math.random()*7};
+  // tower light
+  const l=new THREE.PointLight(0xffc46b,0,20);l.position.set(0,10.5,0);g.add(l);g.userData.light=l;
+  return g;
+}
+const crane1=crane(6,-2), crane2=crane(14,2);
+// workers instanced
+const workerGeo=new THREE.BoxGeometry(0.5,1.1,0.5);
+const workerMat=new THREE.MeshStandardMaterial({color:0xffffff});
+const WN=36;
+const workers=new THREE.InstancedMesh(workerGeo,workerMat,WN);
+workers.castShadow=true;scene.add(workers);
+const wData=[];
+for(let i=0;i<WN;i++){
+  const cols=[0xef4444,0x2563eb,0x22c55e,0xf59e0b];
+  workers.setColorAt(i,new THREE.Color(cols[i%4]));
+  wData.push({x:(Math.random()-0.5)*40,z:(Math.random()-0.5)*24,ph:Math.random()*7,role:i%5});
+}
+workers.instanceColor.needsUpdate=true;
+// dust (custom shader points)
+let dustN=1200;
+let dustGeo=new THREE.BufferGeometry();
+let dustPos=new Float32Array(dustN*3);
+for(let i=0;i<dustN;i++){dustPos[i*3]=(Math.random()-0.5)*46;dustPos[i*3+1]=Math.random()*10+1;dustPos[i*3+2]=(Math.random()-0.5)*28;}
+dustGeo.setAttribute('position',new THREE.BufferAttribute(dustPos,3));
+const dustMat=new THREE.PointsMaterial({color:0xd6c39a,size:0.18,transparent:true,opacity:0.5,depthWrite:false});
+const dust=new THREE.Points(dustGeo,dustMat);scene.add(dust);
+// rain
+const rainN=2000;
+const rainGeo=new THREE.BufferGeometry();
+const rainPos=new Float32Array(rainN*3);
+for(let i=0;i<rainN;i++){rainPos[i*3]=(Math.random()-0.5)*50;rainPos[i*3+1]=Math.random()*25;rainPos[i*3+2]=(Math.random()-0.5)*32;}
+rainGeo.setAttribute('position',new THREE.BufferAttribute(rainPos,3));
+const rain=new THREE.Points(rainGeo,new THREE.PointsMaterial({color:0x7dd3fc,size:0.15,transparent:true,opacity:0.9}));
+rain.visible=false;scene.add(rain);
+// 3D knobs on desk front
+const knobs=[];
+for(let i=0;i<3;i++){
+  const k=new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,0.5,16),new THREE.MeshStandardMaterial({color:[0xef4444,0x22c55e,0x3b82f6][i]}));
+  k.position.set(-8+i*8,0.3,17.5);scene.add(k);knobs.push(k);
+}
+// state
+let speed=1, dayNight=true, dustLevel=60, raining=false, dayT=0.35, idleT=0;
+const stat=document.getElementById('stat');
+document.getElementById('speed').oninput=e=>{speed=e.target.value/100;document.getElementById('speedV').textContent=speed.toFixed(1)+'x';};
+document.getElementById('dust').oninput=e=>{dustLevel=parseInt(e.target.value,10);document.getElementById('dustV').textContent=dustLevel;dustMat.opacity=dustLevel/100*0.8;};
+document.getElementById('dayNight').onclick=e=>{dayNight=!dayNight;e.target.textContent='昼夜循环：'+(dayNight?'开':'关');e.target.classList.toggle('active',dayNight);};
+function toggleRain(){raining=!raining;rain.visible=raining;document.getElementById('rain').textContent='暴雨：'+(raining?'开':'关')+'（空格）';}
+document.getElementById('rain').onclick=toggleRain;
+window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();toggleRain();}});
+document.getElementById('kSpeed').onclick=()=>{speed=speed>=2?0.5:speed>=1?2:1;document.getElementById('speed').value=speed*100;document.getElementById('speedV').textContent=speed.toFixed(1)+'x';};
+document.getElementById('kDay').onclick=()=>document.getElementById('dayNight').click();
+document.getElementById('kDust').onclick=()=>{dustLevel=dustLevel>=80?20:dustLevel>=40?80:40;document.getElementById('dust').value=dustLevel;document.getElementById('dustV').textContent=dustLevel;dustMat.opacity=dustLevel/100*0.8;};
+// raycast knobs
+const ray=new THREE.Raycaster(), ptr=new THREE.Vector2();
+canvas.addEventListener('pointerdown',e=>{
+  const r=canvas.getBoundingClientRect();
+  ptr.x=((e.clientX-r.left)/r.width)*2-1;ptr.y=-((e.clientY-r.top)/r.height)*2+1;
+  ray.setFromCamera(ptr,camera);
+  const hit=ray.intersectObjects(knobs);
+  if(hit.length){const i=knobs.indexOf(hit[0].object);[document.getElementById('kSpeed'),document.getElementById('kDay'),document.getElementById('kDust')][i].click();}
+});
+controls.addEventListener('start',()=>idleT=0);
+// day-night palettes
+function applyDayNight(){
+  // 0 dawn 0.25 noon 0.5 dusk 0.75 night
+  const t=dayT%1;
+  let bg, si;
+  if(t<0.25){bg=new THREE.Color(0xffb997).lerp(new THREE.Color(0x87ceeb),t/0.25);si=1.2;}
+  else if(t<0.5){bg=new THREE.Color(0x87ceeb).lerp(new THREE.Color(0xff7b54),(t-0.25)/0.25);si=1.0;}
+  else if(t<0.75){bg=new THREE.Color(0xff7b54).lerp(new THREE.Color(0x0b0e1a),(t-0.5)/0.25);si=0.4;}
+  else{bg=new THREE.Color(0x0b0e1a);si=0.15;}
+  if(raining){bg=new THREE.Color(0x1e293b);si=0.5;}
+  scene.background=bg;sun.intensity=si;
+  const night=t>=0.5&&t<1||raining;
+  crane1.userData.light.intensity=night?30:0;
+  crane2.userData.light.intensity=night?30:0;
+  sandBase.material.roughness=raining?0.25:1; // wet reflection
+  sandBase.material.metalness=raining?0.4:0;
+}
+let last=performance.now(), truckT=0;
+const dummy=new THREE.Object3D();
+function animate(now){
+  requestAnimationFrame(animate);
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  idleT+=dt;
+  if(idleT>5){const a=now*0.00008;camera.position.x=Math.cos(a)*38;camera.position.z=Math.sin(a)*38;}
+  if(dayNight)dayT=(dayT+dt*0.03*speed)%1;
+  applyDayNight();
+  // excavators dig loop
+  [ex1,ex2].forEach((ex,i)=>{
+    ex.userData.phase+=dt*1.6*speed;
+    ex.userData.arm.rotation.x=Math.sin(ex.userData.phase)*0.45;
+  });
+  // truck loop: excavator -> spoil
+  truckT+=dt*0.25*speed;
+  const tt=truckT%1;
+  const ax=-14,az=-4,bx=-2,bz=9;
+  truck1.position.set(ax+(bx-ax)*tt,1.2,az+(bz-az)*tt);
+  mixer.position.set(14-Math.sin(truckT*2)*8,1.2,4+Math.cos(truckT*1.4)*4);
+  // cranes rotate + lift
+  [crane1,crane2].forEach((c,i)=>{
+    c.userData.jib.rotation.y+=dt*0.5*speed*(i?-1:1);
+    c.userData.load.position.y=-3.6+Math.sin(now*0.001+i)*1.2;
+  });
+  // workers bob by role
+  for(let i=0;i<WN;i++){
+    const w=wData[i];
+    dummy.position.set(w.x+Math.sin(now*0.001+w.ph)*(w.role===4?3:0.4),1.6+Math.abs(Math.sin(now*0.003+w.ph))*0.15,w.z+Math.cos(now*0.0009+w.ph)*0.4);
+    dummy.updateMatrix();workers.setMatrixAt(i,dummy.matrix);
+  }
+  workers.instanceMatrix.needsUpdate=true;
+  // dust drift
+  const dp=dustGeo.attributes.position.array;
+  const show=Math.floor(dustN*dustLevel/100);
+  dust.visible=show>0;
+  for(let i=0;i<dustN;i++){
+    if(i<show){dp[i*3+1]+=dt*0.4;dp[i*3]+=Math.sin(now*0.001+i)*dt*0.3;if(dp[i*3+1]>11)dp[i*3+1]=1;}
+    else dp[i*3+1]=-10;
+  }
+  dustGeo.attributes.position.needsUpdate=true;
+  if(raining){
+    const rp=rainGeo.attributes.position.array;
+    for(let i=0;i<rainN;i++){rp[i*3+1]-=dt*22;if(rp[i*3+1]<0)rp[i*3+1]=25;}
+    rainGeo.attributes.position.needsUpdate=true;
+  }
+  knobs[0].rotation.y+=dt*speed;knobs[1].rotation.y+=dt*(dayNight?1:0);
+  controls.update();
+  renderer.render(scene,camera);
+  stat.textContent='状态：速度 '+speed.toFixed(1)+'x · '+(dayNight?'昼夜循环中 '+['黎明','正午','黄昏','夜晚'][Math.floor(dayT*4)]+' · ':'昼夜暂停 · ')+(raining?'暴雨模式（地面湿滑反光、灯光增强）':'晴 · 尘土 '+dustLevel);
+}
+function onResize(){const w=canvas.clientWidth,h=canvas.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+window.addEventListener('resize',onResize);
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

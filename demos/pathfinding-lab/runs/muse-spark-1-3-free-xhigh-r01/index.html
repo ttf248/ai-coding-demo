@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>寻路算法实验室</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f8fafc;color:#0f172a;overflow-x:hidden}
+header{background:#0f172a;color:#fff;padding:10px 14px}
+header h1{font-size:17px}header p{font-size:12px;color:#94a3b8}
+.wrap{max-width:1060px;margin:0 auto;padding:10px}
+.panel{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-bottom:10px}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+button,select,input[type=range]{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 10px;font-size:13px}
+button{cursor:pointer}button.primary{background:#2563eb;color:#fff;border-color:#2563eb}
+button.active{background:#0f172a;color:#fff}
+button:disabled{opacity:.5}
+#grid{width:100%;display:block;touch-action:none;border-radius:8px;border:1px solid #e2e8f0;background:#fff}
+.stats{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;margin-top:8px}
+.stats b{font-size:15px}
+.legend{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#475569;margin-top:6px}
+.sw{width:12px;height:12px;display:inline-block;border-radius:3px;border:1px solid #94a3b8;vertical-align:middle;margin-right:4px}
+.msg{margin-top:8px;font-size:13px;padding:8px 10px;border-radius:8px;background:#f1f5f9}
+.help{font-size:12px;color:#475569;line-height:1.7;margin-top:8px}
+</style>
+</head>
+<body>
+<header><h1>寻路算法实验室</h1><p>BFS · Dijkstra · A*（曼哈顿）— 四方向 · 普通代价 1 · 高代价 5 · 起点不计</p></header>
+<div class="wrap">
+<div class="panel">
+<div class="row">
+<label>算法</label>
+<select id="algo"><option value="bfs">BFS（按步数）</option><option value="dijkstra">Dijkstra（按代价）</option><option value="astar">A*（曼哈顿）</option></select>
+<label>画笔</label>
+<button data-brush="obstacle" class="active">障碍</button>
+<button data-brush="weight">高代价</button>
+<button data-brush="erase">擦除</button>
+<button id="preset1">预设·空地</button>
+<button id="preset2">预设·迷宫</button>
+<button id="preset3">预设·加权</button>
+</div>
+<div class="row" style="margin-top:8px">
+<button id="run" class="primary">运行</button>
+<button id="pause">暂停</button>
+<button id="step">单步</button>
+<button id="clearSearch">清除搜索</button>
+<button id="reset">重置地图</button>
+<label>速度</label><input id="speed" type="range" min="1" max="20" value="10"><span id="speedV">10步/帧</span>
+</div>
+<div class="stats">
+<span>状态：<b id="st">就绪</b></span>
+<span>已访问：<b id="vN">0</b></span>
+<span>前沿：<b id="fN">0</b></span>
+<span>路径步数：<b id="pS">—</b></span>
+<span>总代价：<b id="pC">—</b></span>
+</div>
+<div class="legend">
+<span><i class="sw" style="background:#22c55e"></i>起点</span>
+<span><i class="sw" style="background:#ef4444"></i>终点</span>
+<span><i class="sw" style="background:#0f172a"></i>障碍</span>
+<span><i class="sw" style="background:#f59e0b"></i>高代价(5)</span>
+<span><i class="sw" style="background:#bfdbfe"></i>前沿</span>
+<span><i class="sw" style="background:#dbeafe"></i>已访问</span>
+<span><i class="sw" style="background:#a855f7"></i>路径</span>
+</div>
+</div>
+<div class="panel">
+<canvas id="grid" width="1000" height="620"></canvas>
+<div id="msg" class="msg">拖动起点/终点移动；用画笔绘制障碍与高代价；搜索期间编辑会自动停止并清除旧搜索。起终点不可被障碍覆盖。</div>
+<div class="help">说明：BFS 按步数扩展，Dijkstra / A* 按地形代价扩展；普通格进入代价 1，高代价格 5，起点不计。封闭终点会明确显示不可达。触摸可直接绘制，390px 无水平溢出。</div>
+</div>
+</div>
+<script>
+"use strict";
+const COLS=25, ROWS=16;
+const cv=document.getElementById('grid'), ctx=cv.getContext('2d');
+let grid, start={x:2,y:8}, goal={x:22,y:8};
+let brush='obstacle', algo='bfs';
+let order=[], orderIdx=0, visitedSet=new Set(), frontierSet=new Set(), path=[], playing=false, timer=null, finished=false, unreachable=false;
+const $=id=>document.getElementById(id);
+function newGrid(){return Array.from({length:ROWS},()=>Array(COLS).fill(0));} //0 empty 1 wall 2 weight
+function resetAll(){grid=newGrid();start={x:2,y:8};goal={x:22,y:8};clearSearch();draw();}
+function clearSearch(){order=[];orderIdx=0;visitedSet=new Set();frontierSet=new Set();path=[];playing=false;finished=false;unreachable=false;clearInterval(timer);$('st').textContent='就绪';$('vN').textContent='0';$('fN').textContent='0';$('pS').textContent='—';$('pC').textContent='—';}
+function key(x,y){return x+','+y;}
+function inB(x,y){return x>=0&&y>=0&&x<COLS&&y<ROWS;}
+function cost(x,y){return grid[y][x]===2?5:1;}
+function neighbors(x,y){return [[1,0],[-1,0],[0,1],[0,-1]].map(d=>[x+d[0],y+d[1]]).filter(p=>inB(p[0],p[1])&&grid[p[1]][p[0]]!==1);}
+// full search to get visit order + path
+function computeFull(){
+  const dist={}, prev={}, visited=new Set(), ord=[];
+  const pq=[]; // [priority, steps, x,y]
+  const h=(x,y)=>Math.abs(x-goal.x)+Math.abs(y-goal.y);
+  dist[key(start.x,start.y)]=0;
+  pq.push([algo==='astar'?h(start.x,start.y):0,0,start.x,start.y]);
+  const push=(pr,st,x,y)=>{pq.push([pr,st,x,y]);};
+  while(pq.length){
+    pq.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+    const [pr,st,x,y]=pq.shift();
+    const k=key(x,y);
+    if(visited.has(k))continue;
+    visited.add(k);ord.push({x,y,front:[...pq.map(p=>p[2]+','+p[3])]});
+    if(x===goal.x&&y===goal.y)break;
+    for(const [nx,ny] of neighbors(x,y)){
+      const nk=key(nx,ny);
+      if(visited.has(nk))continue;
+      const stepCost = algo==='bfs'?1:cost(nx,ny);
+      const nd=(dist[k]||0)+stepCost;
+      const nsteps=st+1;
+      if(dist[nk]===undefined||nd<dist[nk]-1e-9||(algo==='bfs'&&nsteps< (dist[nk]||1e9))){
+        dist[nk]= algo==='bfs'?nsteps:nd;
+        prev[nk]=k;
+        const prio = algo==='bfs'?nsteps : algo==='dijkstra'?nd : nd+h(nx,ny);
+        push(prio,nsteps,nx,ny);
+      }
+    }
+  }
+  // path
+  let p=[];
+  const gk=key(goal.x,goal.y);
+  if(visited.has(gk)){
+    let cur=gk;
+    while(cur){const [x,y]=cur.split(',').map(Number);p.unshift({x,y});if(cur===key(start.x,start.y))break;cur=prev[cur];}
+  }
+  return {ord,visited,path:p,dist};
+}
+function startRun(){
+  // validate start/goal not wall
+  if(grid[start.y][start.x]===1||grid[goal.y][goal.x]===1){$('msg').textContent='起终点不可被障碍覆盖，已自动清除该格障碍。';grid[start.y][start.x]=0;grid[goal.y][goal.x]=0;}
+  clearInterval(timer);
+  const full=computeFull();
+  order=full.ord;orderIdx=0;visitedSet=new Set();frontierSet=new Set();path=[];finished=false;unreachable=!full.visited.has(key(goal.x,goal.y));
+  playing=true;$('st').textContent='搜索中…';
+  const sp=parseInt($('speed').value,10);
+  timer=setInterval(()=>{
+    const n=Math.max(1,sp);
+    for(let i=0;i<n&&orderIdx<order.length;i++){
+      const o=order[orderIdx++];
+      visitedSet.add(key(o.x,o.y));
+      frontierSet=new Set(o.front);
+    }
+    updateStats();
+    draw();
+    if(orderIdx>=order.length){
+      clearInterval(timer);playing=false;finished=true;
+      if(unreachable){$('st').textContent='不可达';$('msg').textContent='终点被封闭：无可行路径，已访问 '+visitedSet.size+' 格。';}
+      else{
+        path=full.path;
+        const steps=path.length-1;
+        let c=0;for(let i=1;i<path.length;i++)c+=cost(path[i].x,path[i].y);
+        $('pS').textContent=steps;$('pC').textContent=c;
+        $('st').textContent='完成';
+        $('msg').textContent='搜索完成：路径步数 '+steps+'，总代价 '+c+'（起点不计，普通1/高代价5）。BFS 保证步数最少，Dijkstra/A* 保证代价最小。';
+      }
+      draw();
+    }
+  },60);
+}
+function updateStats(){$('vN').textContent=visitedSet.size;$('fN').textContent=frontierSet.size;}
+function draw(){
+  const W=cv.width/COLS,H=cv.height/ROWS;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    const k=key(x,y);
+    let fill='#ffffff';
+    if(grid[y][x]===1)fill='#0f172a';
+    else if(grid[y][x]===2)fill='#fef3c7';
+    if(visitedSet.has(k)&&!(x===start.x&&y===start.y)&&!(x===goal.x&&y===goal.y))fill='#dbeafe';
+    if(frontierSet.has(k)&&!visitedSet.has(k))fill='#bfdbfe';
+    ctx.fillStyle=fill;ctx.fillRect(x*W+0.5,y*H+0.5,W-1,H-1);
+    if(grid[y][x]===2){ctx.fillStyle='#f59e0b';ctx.fillRect(x*W+W*0.3,y*H+H*0.3,W*0.4,H*0.4);}
+    if(path.some(p=>p.x===x&&p.y===y)){ctx.fillStyle='#a855f7';ctx.fillRect(x*W+1,y*H+1,W-2,H-2);}
+  }
+  // grid lines
+  ctx.strokeStyle='#e2e8f0';ctx.lineWidth=1;ctx.beginPath();
+  for(let x=0;x<=COLS;x++){ctx.moveTo(x*W,0);ctx.lineTo(x*W,cv.height);}
+  for(let y=0;y<=ROWS;y++){ctx.moveTo(0,y*H);ctx.lineTo(cv.width,y*H);}
+  ctx.stroke();
+  // start goal
+  const drawDot=(p,c,t)=>{const cx=(p.x+0.5)*W,cy=(p.y+0.5)*H;ctx.fillStyle=c;ctx.beginPath();ctx.arc(cx,cy,Math.min(W,H)*0.32,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold '+Math.floor(H*0.4)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(t,cx,cy);};
+  drawDot(start,'#22c55e','S');drawDot(goal,'#ef4444','E');
+}
+// editing
+let painting=false, dragTarget=null;
+function cellFromEvent(e){
+  const r=cv.getBoundingClientRect();
+  let cx,cy;
+  if(e.touches&&e.touches[0]){cx=e.touches[0].clientX;cy=e.touches[0].clientY;}else{cx=e.clientX;cy=e.clientY;}
+  const x=Math.floor((cx-r.left)/r.width*COLS),y=Math.floor((cy-r.top)/r.height*ROWS);
+  return {x:Math.max(0,Math.min(COLS-1,x)),y:Math.max(0,Math.min(ROWS-1,y))};
+}
+function stopIfSearching(){if(playing||finished||orderIdx>0){clearInterval(timer);playing=false;order=[];orderIdx=0;visitedSet=new Set();frontierSet=new Set();path=[];finished=false;$('st').textContent='就绪（编辑已清除旧搜索）';}}
+cv.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  const c=cellFromEvent(e);
+  if(c.x===start.x&&c.y===start.y){dragTarget='s';return;}
+  if(c.x===goal.x&&c.y===goal.y){dragTarget='g';return;}
+  painting=true;stopIfSearching();applyBrush(c);
+});
+window.addEventListener('pointermove',e=>{
+  if(dragTarget){const r=cv.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)return;const c=cellFromEvent(e);stopIfSearching();if(dragTarget==='s'){if(grid[c.y][c.x]!==1)start=c;}else{if(grid[c.y][c.x]!==1)goal=c;}clearSearchSoft();draw();return;}
+  if(!painting)return;const c=cellFromEvent(e);applyBrush(c);
+});
+window.addEventListener('pointerup',()=>{painting=false;dragTarget=null;});
+function clearSearchSoft(){visitedSet=new Set();frontierSet=new Set();path=[];}
+function applyBrush(c){
+  if(c.x===start.x&&c.y===start.y)return;
+  if(c.x===goal.x&&c.y===goal.y)return;
+  if(brush==='obstacle')grid[c.y][c.x]=1;
+  else if(brush==='weight')grid[c.y][c.x]=2;
+  else grid[c.y][c.x]=0;
+  draw();
+}
+document.querySelectorAll('[data-brush]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-brush]').forEach(x=>x.classList.remove('active'));b.classList.add('active');brush=b.dataset.brush;});
+$('algo').onchange=e=>{algo=e.target.value;stopIfSearching();draw();};
+$('speed').oninput=e=>$('speedV').textContent=e.target.value+'步/帧';
+$('run').onclick=startRun;
+$('pause').onclick=()=>{if(playing){clearInterval(timer);playing=false;$('st').textContent='已暂停';}};
+$('step').onclick=()=>{
+  if(!order.length){const full=computeFull();order=full.ord;order._full=full;}
+  if(orderIdx<order.length){const o=order[orderIdx++];visitedSet.add(key(o.x,o.y));frontierSet=new Set(o.front);updateStats();draw();
+    if(orderIdx>=order.length){finished=true;const full=order._full||computeFull();if(!full.visited.has(key(goal.x,goal.y))){$('st').textContent='不可达';}else{path=full.path;$('st').textContent='完成';let c=0;for(let i=1;i<path.length;i++)c+=cost(path[i].x,path[i].y);$('pS').textContent=path.length-1;$('pC').textContent=c;}draw();}}
+};
+$('clearSearch').onclick=()=>{clearSearch();draw();};
+$('reset').onclick=()=>{resetAll();$('msg').textContent='已重置为空地图。';};
+$('preset1').onclick=()=>{resetAll();};
+$('preset2').onclick=()=>{resetAll();for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){if(x%4===2&&y%3!==1)grid[y][x]=1;}grid[start.y][start.x]=0;grid[goal.y][goal.x]=0;draw();};
+$('preset3').onclick=()=>{resetAll();for(let y=5;y<12;y++)for(let x=8;x<17;x++)grid[y][x]=2;for(let x=5;x<20;x++)grid[8][x]=grid[8][x]===2?2:grid[8][x];draw();$('msg').textContent='加权预设：中部为高代价区（5），Dijkstra 与 A* 应给出相同最小代价。';};
+resetAll();
+</script>
+</body>
+</html>
