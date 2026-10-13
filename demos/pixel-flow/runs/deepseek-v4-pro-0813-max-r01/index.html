@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixel Flow · 图片粒子化与手势还原</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0b0e17; }
+  body { font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; color: #e6edf3; }
+  #cv { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #panel {
+    position: fixed; top: 14px; left: 14px; width: min(300px, calc(100vw - 28px));
+    background: rgba(13, 18, 30, .82); backdrop-filter: blur(10px);
+    border: 1px solid rgba(150, 170, 210, .25); border-radius: 14px; padding: 14px;
+    display: flex; flex-direction: column; gap: 10px; z-index: 10;
+  }
+  #panel h1 { margin: 0; font-size: 15px; }
+  #panel .sub { font-size: 11px; color: #8fa3c8; margin-top: 2px; }
+  #panel label.btn {
+    display: block; text-align: center; cursor: pointer; font-size: 13px;
+    background: #1f6feb; border-radius: 10px; padding: 8px 12px; color: #fff;
+  }
+  #panel label.btn:hover { background: #2b7df5; }
+  button {
+    font: inherit; cursor: pointer; border: 1px solid #30363d; background: #21262d;
+    color: #e6edf3; border-radius: 10px; padding: 8px 12px; font-size: 13px;
+  }
+  button:hover { background: #30363d; }
+  input[type=file] { display: none; }
+  #progress-wrap { height: 8px; border-radius: 6px; background: #1c2231; overflow: hidden; }
+  #progress { height: 100%; width: 0%; background: linear-gradient(90deg, #1f6feb, #7c5cf0); transition: width .2s; }
+  #status { font-size: 12px; color: #a8b7d4; min-height: 30px; }
+  #video {
+    position: fixed; right: 12px; bottom: 12px; width: 132px; border-radius: 10px;
+    border: 1px solid rgba(150,170,210,.3); transform: scaleX(-1); z-index: 10; opacity: .95;
+  }
+  #hint { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); font-size: 11px; color: #8fa3c8; white-space: nowrap; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="panel">
+  <div>
+    <h1>Pixel Flow · 图片粒子化与手势还原</h1>
+    <div class="sub">上传图片 → 拆解为粒子流 → 张开手掌吸引还原 · 握拳暂停</div>
+  </div>
+  <label class="btn" for="file">📷 选择本地图片</label>
+  <input type="file" id="file" accept="image/*">
+  <div id="progress-wrap"><div id="progress"></div></div>
+  <div id="status">请先上传一张图片，然后授权摄像头。</div>
+  <div class="sub">手势：张开手掌（粒子被吸引到原位）· 握拳（暂停吸引）· 手靠近哪块，哪块先还原。
+    摄像头不可用时自动切换为鼠标/触摸模式：按住拖动 = 张开手掌的吸引区域。</div>
+  <button id="restart">重新散开粒子</button>
+</div>
+<video id="video" autoplay muted playsinline></video>
+<div id="hint"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const cv = document.getElementById('cv');
+const statusEl = document.getElementById('status');
+const progressEl = document.getElementById('progress');
+const video = document.getElementById('video');
+const fileInput = document.getElementById('file');
+
+const S = {
+  particles: [],     // {target: Vector3, color: THREE.Color, restored: false}
+  posAttr: null, colAttr: null,
+  hand: null,        // {x, y, open} 归一化手势（世界坐标换算见 applyHand）
+  cameraMode: false,
+  gesture: 'none',   // none | open | fist
+  gestureFromCamera: false,
+  pointerActive: false,
+  pointerPos: null,
+  gridW: 0, gridH: 0,
+  viewW: 12,         // 场景世界宽度
+  radius: 1.8,       // 力场半径（世界单位）
+  locked: 0,
+};
+
+/* ============ 渲染器与场景 ============ */
+const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+renderer.setSize(window.innerWidth, window.innerHeight);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0e17);
+const camera = new THREE.OrthographicCamera(-6, 6, 3.5, -3.5, -10, 10);
+camera.position.z = 5;
+
+const flowGeo = new THREE.BufferGeometry();
+const points = new THREE.Points(flowGeo, new THREE.PointsMaterial({
+  size: 0.06, vertexColors: true, sizeAttenuation: false, depthWrite: false,
+}));
+scene.add(points);
+scene.frustumCulled = false;
+
+/* ============ 图片 → 粒子 ============ */
+function loadImageFile(file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    buildParticles(img);
+  };
+  img.onerror = () => setStatus('图片读取失败，请换一张试试。');
+  img.src = url;
+}
+fileInput.addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (f) loadImageFile(f);
+});
+
+// 视口尺寸：横向基准 12 世界单位，纵向随画布宽高比
+function viewDims() {
+  const vw = 12;
+  const vh = vw * (window.innerHeight / Math.max(window.innerWidth, 1));
+  return { vw, vh };
+}
+function applyView() {
+  const { vw, vh } = viewDims();
+  camera.left = -vw / 2; camera.right = vw / 2;
+  camera.top = vh / 2; camera.bottom = -vh / 2;
+  camera.updateProjectionMatrix();
+  S.viewW = vw;
+  if (!S.particles.length) return;
+  // 图像等比适配视口（居中，留 6% 边距）
+  const imgW = S.gridW, imgH = S.gridH;
+  const scale = Math.min((vw * 0.94) / imgW, (vh * 0.94) / imgH);
+  const ox = 0, oy = 0;
+  S.particles.forEach((p) => {
+    p.target.set((p.ix - 0.5) * imgW * scale + ox, (0.5 - p.iy) * imgH * scale + oy, 0);
+  });
+}
+function buildParticles(img) {
+  // 采样网格：长边 110 格，短边按比例（约 1 万粒子上限）
+  const longSide = 110;
+  const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  const gw = w >= h ? longSide : Math.max(8, Math.round(longSide * w / h));
+  const gh = h >= w ? longSide : Math.max(8, Math.round(longSide * h / w));
+  S.gridW = gw; S.gridH = gh;
+  const cvs = document.createElement('canvas');
+  cvs.width = gw; cvs.height = gh;
+  const ctx = cvs.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, gw, gh);
+  const data = ctx.getImageData(0, 0, gw, gh).data;
+
+  applyView();
+  const { vw, vh } = viewDims();
+
+  const particles = [];
+  for (let y = 0; y < gh; y++) {
+    for (let x = 0; x < gw; x++) {
+      const o = (y * gw + x) * 4;
+      if (data[o + 3] < 40) continue; // 跳过全透明像素
+      particles.push({
+        ix: (x + 0.5) / gw, iy: (y + 0.5) / gh,
+        target: new THREE.Vector3(), pos: new THREE.Vector3(
+          (Math.random() - 0.5) * vw * 1.6,
+          (Math.random() - 0.5) * vh * 1.6,
+          0,
+        ),
+        vel: new THREE.Vector3(),
+        color: new THREE.Color(data[o] / 255, data[o + 1] / 255, data[o + 2] / 255),
+        restored: false,
+      });
+    }
+  }
+  S.particles = particles;
+  S.locked = 0;
+  applyView();
+  const pos = new Float32Array(particles.length * 3);
+  const col = new Float32Array(particles.length * 3);
+  particles.forEach((p, i) => {
+    pos[i * 3] = p.pos.x; pos[i * 3 + 1] = p.pos.y; pos[i * 3 + 2] = 0;
+    col[i * 3] = p.color.r; col[i * 3 + 1] = p.color.g; col[i * 3 + 2] = p.color.b;
+  });
+  flowGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  flowGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  S.posAttr = flowGeo.attributes.position;
+  S.colAttr = flowGeo.attributes.color;
+  setStatus(`已拆解为 ${particles.length} 个粒子（${gw}×${gh} 采样）。` + (S.cameraMode ? '' : ' 摄像头不可用：使用鼠标/触摸拖动吸引粒子。'));
+}
+
+function scatterAll() {
+  const { vw, vh } = viewDims();
+  S.particles.forEach((p) => {
+    p.restored = false;
+    p.pos.set((Math.random() - 0.5) * vw * 1.6, (Math.random() - 0.5) * vh * 1.6, 0);
+    p.vel.set(0, 0, 0);
+  });
+  S.locked = 0;
+}
+document.getElementById('restart').onclick = () => {
+  if (!S.particles.length) { setStatus('请先上传图片。'); return; }
+  scatterAll();
+  setStatus('粒子已重新散开，用吸引区域把它们带回来。');
+};
+
+function setStatus(t) { statusEl.textContent = t; }
+
+/* ============ 手势输入（摄像头 + MediaPipe，或指针替代） ============ */
+let handLandmarker = null;
+async function initCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 320, height: 240 } });
+    video.srcObject = stream;
+    await video.play();
+    S.cameraMode = true;
+    setStatus('摄像头已开启，正在加载手部识别模型…');
+    try {
+      const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm');
+      const fileset = await vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+      handLandmarker = await vision.HandLandmarker.createFromOptions(fileset, {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+          delegate: 'GPU',
+        },
+        runningMode: 'VIDEO',
+        numHands: 1,
+      });
+      setStatus('手势识别就绪：张开手掌吸引粒子，握拳暂停。');
+    } catch (err) {
+      S.cameraMode = false;
+      setStatus('手部识别模型加载失败，已切换为鼠标/触摸模式（按住拖动 = 吸引区域）。');
+    }
+  } catch (err) {
+    S.cameraMode = false;
+    setStatus('无法访问摄像头（未授权或不可用），已切换为鼠标/触摸模式（按住拖动 = 吸引区域）。');
+  }
+}
+initCamera();
+
+let lastDetect = 0;
+async function detectHands() {
+  if (!handLandmarker || !S.cameraMode || video.readyState < 2) return;
+  const now = performance.now();
+  if (now - lastDetect < 90) return;
+  lastDetect = now;
+  try {
+    const res = handLandmarker.detectForVideo(video, now);
+    if (res.landmarks && res.landmarks.length) {
+      const lm = res.landmarks[0];
+      // 张开度：指尖到手腕平均距离 / 手部尺寸（0 号腕点与 9 号中掌根的距离）
+      const dist = (a, b) => Math.hypot(lm[a].x - lm[b].x, lm[a].y - lm[b].y);
+      const handSize = Math.max(dist(0, 9), 0.01);
+      const tips = [4, 8, 12, 16, 20];
+      const openness = tips.reduce((s, t) => s + dist(0, t), 0) / tips.length / handSize;
+      // 掌心（0、5、9、13、17 均值）
+      const cx = (lm[0].x + lm[5].x + lm[9].x + lm[13].x + lm[17].x) / 5;
+      const cy = (lm[0].y + lm[5].y + lm[9].y + lm[13].y + lm[17].y) / 5;
+      const open = openness > 1.35;
+      const fist = openness < 0.95;
+      S.gesture = open ? 'open' : fist ? 'fist' : 'none';
+      S.gestureFromCamera = true;
+      // 镜像：x 翻转；uv → 世界坐标
+      const { vw, vh } = viewDims();
+      const wx = (0.5 - (1 - cx)) * vw;
+      const wy = ((1 - cy) - 0.5) * vh;
+      S.hand = { x: wx, y: wy };
+    } else {
+      S.gesture = 'none';
+      S.gestureFromCamera = false;
+    }
+  } catch (e) { /* 忽略单帧识别错误 */ }
+}
+
+// 指针替代（摄像头不可用时）
+cv.addEventListener('pointerdown', (e) => {
+  S.pointerActive = true;
+  updatePointer(e);
+});
+cv.addEventListener('pointermove', (e) => {
+  if (S.pointerActive) updatePointer(e);
+});
+cv.addEventListener('pointerup', () => { S.pointerActive = false; S.gesture = 'none'; });
+cv.addEventListener('pointercancel', () => { S.pointerActive = false; S.gesture = 'none'; });
+function updatePointer(e) {
+  const r = cv.getBoundingClientRect();
+  const u = (e.clientX - r.left) / r.width, v = (e.clientY - r.top) / r.height;
+  const { vw, vh } = viewDims();
+  const wx = (u - 0.5) * vw;
+  const wy = (0.5 - v) * vh;
+  S.hand = { x: wx, y: wy };
+  if (!S.cameraMode || !S.gestureFromCamera) S.gesture = 'open';
+}
+
+/* ============ 粒子更新（力场吸引 + 锁定） ============ */
+function updateParticles(dt) {
+  if (!S.particles.length) return;
+  const hasField = (S.gesture === 'open' && S.hand) || (S.pointerActive && S.hand);
+  if (!hasField) return; // 握拳 / 无手势：暂停吸引
+  const hx = S.hand.x, hy = S.hand.y;
+  const R = S.radius;
+  const attr = 26;      // 吸引力加速度
+  const damp = 4.5;     // 阻尼
+  const lockEps = 0.03;
+  const pos = S.posAttr.array;
+  let changed = false;
+  S.particles.forEach((p, i) => {
+    if (p.restored) return;
+    const dx = p.pos.x - hx, dy = p.pos.y - hy;
+    const d2 = dx * dx + dy * dy;
+    if (d2 > R * R) return;
+    // 手部力场内的粒子被加速吸向目标位置
+    const tx = p.target.x - p.pos.x, ty = p.target.y - p.pos.y;
+    p.vel.x += tx * attr * dt;
+    p.vel.y += ty * attr * dt;
+    p.vel.x -= p.vel.x * damp * dt;
+    p.vel.y -= p.vel.y * damp * dt;
+    p.pos.x += p.vel.x * dt;
+    p.pos.y += p.vel.y * dt;
+    const ex = p.target.x - p.pos.x, ey = p.target.y - p.pos.y;
+    if (Math.hypot(ex, ey) < lockEps) {
+      p.restored = true;
+      p.pos.set(p.target.x, p.target.y, 0);
+      p.vel.set(0, 0, 0);
+      S.locked++;
+    }
+    pos[i * 3] = p.pos.x;
+    pos[i * 3 + 1] = p.pos.y;
+    changed = true;
+  });
+  // 未恢复粒子轻微漂移（只更新有变动的区域整体刷新）
+  if (changed) S.posAttr.needsUpdate = true;
+  // 漂移让画面持续流动
+  S.particles.forEach((p, i) => {
+    if (p.restored) return;
+    p.pos.x += Math.sin(performance.now() * 0.001 + i) * 0.0004;
+    p.pos.y += Math.cos(performance.now() * 0.0013 + i) * 0.0004;
+    pos[i * 3] = p.pos.x;
+    pos[i * 3 + 1] = p.pos.y;
+  });
+  S.posAttr.needsUpdate = true;
+}
+
+/* ============ 主循环 ============ */
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.1);
+  if (S.cameraMode) detectHands();
+  updateParticles(dt);
+  renderer.render(scene, camera);
+  const pct = S.particles.length ? Math.round((S.locked / S.particles.length) * 100) : 0;
+  progressEl.style.width = pct + '%';
+  const hint = document.getElementById('hint');
+  if (!S.particles.length) hint.textContent = '';
+  else if (S.gesture === 'open') hint.textContent = '🖐 吸引中：粒子正在还原…';
+  else if (S.gesture === 'fist') hint.textContent = '✊ 握拳：已暂停吸引';
+  else hint.textContent = `还原进度 ${pct}% · 张开手掌 / 按住拖动吸引粒子`;
+}
+animate();
+
+window.addEventListener('resize', () => {
+  applyView();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ============ 验收钩子 ============ */
+window.__PIXELFLOW = {
+  S,
+  loadImageFile,
+  buildParticles,
+  updateParticles,
+  scatterAll,
+  // 测试用手势模拟：直接驱动力场（与摄像头识别走同一数据通路）
+  simulateHand(x, y, gesture) {
+    S.hand = { x, y };
+    S.gesture = gesture;
+    S.gestureFromCamera = false;
+  },
+  async loadImageDataURL(dataUrl) {
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = dataUrl; });
+    buildParticles(img);
+  },
+  get progress() { return S.particles.length ? S.locked / S.particles.length : 0; },
+  // 同步渲染后立即读回中心像素（默认绘图缓冲在合成后被清空）
+  readPixel() {
+    renderer.render(scene, camera);
+    const gl = renderer.getContext();
+    const b = new Uint8Array(4);
+    gl.readPixels(gl.drawingBufferWidth >> 1, gl.drawingBufferHeight >> 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, b);
+    return Array.from(b);
+  },
+};
+</script>
+</body>
+</html>

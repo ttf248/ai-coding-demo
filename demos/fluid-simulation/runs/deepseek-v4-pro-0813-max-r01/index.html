@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>彩色流体实验台</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #0d1117; color: #e6edf3; font-size: 14px; line-height: 1.5;
+    min-height: 100vh;
+  }
+  header { padding: 12px 16px 8px; border-bottom: 1px solid #21262d; background: #0d1117; }
+  h1 { margin: 0; font-size: 18px; }
+  .sub { color: #8b949e; font-size: 12px; margin-top: 2px; }
+  .bar {
+    display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+    padding: 10px 16px; border-bottom: 1px solid #21262d;
+  }
+  button {
+    font: inherit; cursor: pointer; border: 1px solid #30363d; background: #21262d;
+    color: #e6edf3; border-radius: 8px; padding: 6px 12px;
+  }
+  button:hover { background: #30363d; }
+  button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  button:active { transform: scale(0.97); }
+  .ctl { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #c9d1d9; flex-wrap: wrap; }
+  .ctl label { white-space: nowrap; }
+  input[type=range] { width: 96px; accent-color: #1f6feb; }
+  input[type=color] { width: 34px; height: 26px; border: 1px solid #30363d; border-radius: 6px; background: #21262d; padding: 2px; cursor: pointer; }
+  select { font: inherit; padding: 5px 8px; border: 1px solid #30363d; border-radius: 8px; background: #21262d; color: #e6edf3; }
+  main { max-width: 920px; margin: 0 auto; padding: 12px 16px 28px; }
+  .board-wrap { border: 1px solid #21262d; border-radius: 10px; overflow: hidden; position: relative; background: #010409; text-align: center; }
+  /* 画布不使用 CSS 尺寸：属性宽高即显示尺寸（软件渲染环境如 SwiftShader 对 CSS 缩放画布会丢失上下文） */
+  canvas { display: inline-block; vertical-align: middle; touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
+  #status { position: absolute; left: 10px; bottom: 8px; font-size: 12px; color: #8b949e; pointer-events: none; }
+  .note { margin-top: 12px; color: #8b949e; font-size: 12px; border-top: 1px solid #21262d; padding-top: 8px; }
+  #error {
+    display: none; margin: 12px 16px; padding: 12px 14px; border: 1px solid #7d8590;
+    border-radius: 10px; background: #161b22; color: #f0a8a8; font-size: 14px;
+  }
+  #error b { color: #ff7b72; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🌊 彩色流体实验台</h1>
+  <div class="sub">WebGL 实时流体模拟 —— 平流 · 散度 · 压力迭代 · 速度投影 · 涡旋约束（非粒子轨迹/渐隐画布）</div>
+</header>
+<div id="error"><b>无法运行流体模拟：</b><span id="error-text"></span><br>请使用支持 WebGL2 与浮点渲染纹理的浏览器（如新版 Chrome / Edge / Firefox），或启用硬件加速。</div>
+<div class="bar">
+  <div class="ctl"><label>颜色</label><input type="color" id="color" value="#4da6ff"></div>
+  <div class="ctl"><label>注入力度</label><input type="range" id="force" min="0.2" max="3" step="0.1" value="1.2"></div>
+  <div class="ctl"><label>染料消散</label><input type="range" id="diss" min="0.9" max="1" step="0.002" value="0.985"></div>
+  <div class="ctl"><label>压力迭代</label><input type="range" id="iters" min="10" max="80" step="2" value="40"></div>
+  <div class="ctl"><label>涡旋强度</label><input type="range" id="curl" min="0" max="20" step="1" value="8"></div>
+  <div class="ctl"><label>分辨率</label><select id="res">
+    <option value="64">64</option>
+    <option value="96">96</option>
+    <option value="128" selected>128</option>
+    <option value="160">160</option>
+    <option value="192">192</option>
+  </select></div>
+  <button id="pause" class="primary">⏸ 暂停</button>
+  <button id="clear">清空</button>
+  <button id="reset">重置参数</button>
+  <button id="shot">📷 截图</button>
+</div>
+<main>
+  <div class="board-wrap">
+    <canvas id="cv" width="640" height="420"></canvas>
+    <div id="status">—</div>
+  </div>
+  <div class="note">
+    在画布上拖动注入颜色与动量（拖动方向影响流向，形成扩散、卷曲与混色）。参数说明：注入力度控制笔触半径与动量；染料消散越小颜色存留越久；
+    压力迭代次数影响速度场投影精度（迭代越多越不可压缩）；涡旋强度增加卷曲细节；分辨率改变模拟网格（改变时清空流体）。
+    暂停后画面停止演化；清空移除已有流体；截图导出当前画面 PNG。画布渲染分辨率与模拟分辨率均受上限限制：显示画布最大 640×400（设备像素比按 1 处理，兼容软件渲染环境），模拟网格上限 192。
+  </div>
+</main>
+<script>
+'use strict';
+/* ============ 状态 ============ */
+const cv = document.getElementById('cv');
+const S = {
+  paused: false,
+  color: [0.302, 0.651, 1],
+  force: 1.2,
+  diss: 0.985,
+  iters: 40,
+  curl: 8,
+  N: 128,
+  splats: [],
+  dragging: false,
+  lastPos: null,
+  lastTime: null,
+  frames: 0,
+  fps: 0,
+  notice: null,
+};
+let gl = null, N = 128;
+let floatType = null; // 'float' | 'half'
+let vel, velTmp, dye, dyeTmp, pressure, pressureTmp, divTex, curlTex;
+let displayFBO = null, displayTex = null;
+let advectProg, divProg, jacobiProg, gradProg, splatProg, curlProg, vortProg, addProg, displayProg;
+let quadVBO = null;
+
+/* ============ 初始化与能力检查 ============ */
+function initGL() {
+  const errBox = document.getElementById('error');
+  const fail = (msg) => {
+    errBox.style.display = 'block';
+    document.getElementById('error-text').textContent = msg;
+    document.querySelector('.bar').style.display = 'none';
+    return false;
+  };
+  // 注意：不设置 alpha:false —— 部分软件渲染环境（SwiftShader）下该属性会导致上下文丢失
+  gl = cv.getContext('webgl2', { antialias: false });
+  if (!gl) return fail('当前浏览器/设备不支持 WebGL2。');
+  // 优先半精度浮点（内存减半、软件渲染环境支持 LINEAR 采样）；float32 仅作回退。
+  floatType = gl.getExtension('EXT_color_buffer_half_float') ? 'half' : gl.getExtension('EXT_color_buffer_float') ? 'float' : null;
+  if (!floatType) return fail('当前浏览器/设备不支持渲染到浮点纹理（EXT_color_buffer_float / EXT_color_buffer_half_float）。');
+  const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  if (maxTex < 192) return fail('设备最大纹理尺寸 ' + maxTex + ' 过小，无法建立模拟网格。');
+  errBox.style.display = 'none';
+  document.querySelector('.bar').style.display = '';
+  return true;
+}
+function buildResources() {
+  quadVBO = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  advectProg = program(VS, ADVECT_FS);
+  divProg = program(VS, DIV_FS);
+  jacobiProg = program(VS, JACOBI_FS);
+  gradProg = program(VS, GRAD_FS);
+  splatProg = program(VS, SPLAT_FS);
+  curlProg = program(VS, CURL_FS);
+  vortProg = program(VS, VORT_FS);
+  addProg = program(VS, ADD_FS);
+  displayProg = program(VS, DISPLAY_FS);
+  gl.disable(gl.DEPTH_TEST);
+  gl.disable(gl.CULL_FACE);
+  rebuildSim();
+  // 重建显示缓冲（上下文恢复后旧对象已失效，强制重建）
+  if (displayFBO) { try { gl.deleteFramebuffer(displayFBO); gl.deleteTexture(displayTex); } catch (e) {} }
+  displayFBO = null; displayTex = null;
+  resize();
+}
+function boot() {
+  if (!initGL()) return false;
+  try {
+    buildResources();
+  } catch (err) {
+    const errBox = document.getElementById('error');
+    errBox.style.display = 'block';
+    document.getElementById('error-text').textContent = '初始化失败：' + err.message;
+    document.querySelector('.bar').style.display = 'none';
+    return false;
+  }
+  return true;
+}
+function compile(type, src) {
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+    throw new Error('shader: ' + gl.getShaderInfoLog(sh));
+  }
+  return sh;
+}
+function program(vsSrc, fsSrc) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, vsSrc));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('link: ' + gl.getProgramInfoLog(p));
+  return p;
+}
+const VS = `#version 300 es
+layout(location=0) in vec2 aPos;
+out vec2 vUv;
+void main(){ vUv = aPos*0.5+0.5; gl_Position = vec4(aPos,0.,1.); }`;
+const ADVECT_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uField; uniform sampler2D uVel;
+uniform float uDt; uniform float uDiss;
+void main(){
+  vec2 v = texture(uVel, vUv).xy;
+  vec2 pos = vUv - v*uDt;
+  o = texture(uField, pos)*uDiss;
+}`;
+const DIV_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uVel; uniform float uTexel;
+void main(){
+  float l = texture(uVel, vUv + vec2(-uTexel,0.)).x;
+  float r = texture(uVel, vUv + vec2(uTexel,0.)).x;
+  float t = texture(uVel, vUv + vec2(0.,-uTexel)).y;
+  float b = texture(uVel, vUv + vec2(0.,uTexel)).y;
+  o = vec4(0.5*(r-l+b-t),0.,0.,1.);
+}`;
+const JACOBI_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uPressure; uniform sampler2D uDiv; uniform float uTexel;
+void main(){
+  float l = texture(uPressure, vUv + vec2(-uTexel,0.)).r;
+  float r = texture(uPressure, vUv + vec2(uTexel,0.)).r;
+  float t = texture(uPressure, vUv + vec2(0.,-uTexel)).r;
+  float b = texture(uPressure, vUv + vec2(0.,uTexel)).r;
+  o = vec4((texture(uDiv, vUv).r + l+r+t+b)*0.25,0.,0.,1.);
+}`;
+const GRAD_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uVel; uniform sampler2D uPressure; uniform float uTexel;
+void main(){
+  float l = texture(uPressure, vUv + vec2(-uTexel,0.)).r;
+  float r = texture(uPressure, vUv + vec2(uTexel,0.)).r;
+  float t = texture(uPressure, vUv + vec2(0.,-uTexel)).r;
+  float b = texture(uPressure, vUv + vec2(0.,uTexel)).r;
+  vec2 v = texture(uVel, vUv).xy;
+  v -= 0.5*vec2(r-l, b-t);
+  o = vec4(v,0.,1.);
+}`;
+const SPLAT_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform vec2 uCenter; uniform float uRadius; uniform vec4 uColor;
+void main(){
+  float d = distance(vUv, uCenter);
+  float f = exp(-d*d/max(uRadius,1e-5));
+  o = uColor*f;
+}`;
+const CURL_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uVel; uniform float uTexel;
+void main(){
+  float l = texture(uVel, vUv + vec2(-uTexel,0.)).y;
+  float r = texture(uVel, vUv + vec2(uTexel,0.)).y;
+  float t = texture(uVel, vUv + vec2(0.,-uTexel)).x;
+  float b = texture(uVel, vUv + vec2(0.,uTexel)).x;
+  o = vec4(0.5*(r-l-b+t),0.,0.,1.);
+}`;
+const VORT_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uVel; uniform sampler2D uCurl;
+uniform float uTexel; uniform float uStrength;
+void main(){
+  float cl = texture(uCurl, vUv + vec2(-uTexel,0.)).r;
+  float cr = texture(uCurl, vUv + vec2(uTexel,0.)).r;
+  float ct = texture(uCurl, vUv + vec2(0.,-uTexel)).r;
+  float cb = texture(uCurl, vUv + vec2(0.,uTexel)).r;
+  vec2 n = normalize(vec2(cr-cl, cb-ct) + vec2(1e-6));
+  float w = texture(uCurl, vUv).r;
+  vec2 f = uStrength*uTexel*vec2(n.y, -n.x)*w;
+  o = vec4(f,0.,1.);
+}`;
+const ADD_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uField;
+void main(){ o = texture(uField, vUv); }`;
+const DISPLAY_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uDye;
+void main(){
+  vec3 c = texture(uDye, vUv).rgb;
+  c = pow(max(c, vec3(0.)), vec3(1./2.2));
+  float vig = smoothstep(1.15, 0.25, length(vUv-0.5)*2.0);
+  o = vec4(c*vig, 1.);
+}`;
+
+/* ============ 纹理与资源 ============ */
+function texType() { return floatType === 'half' ? gl.RGBA16F : gl.RGBA32F; }
+function makeTexture() {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  // SwiftShader 对 RGBA32F 的 LINEAR 采样会返回 0：float32 回退用 NEAREST，半精度用 LINEAR
+  const filter = floatType === 'half' ? gl.LINEAR : gl.NEAREST;
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, texType(), N, N, 0, gl.RGBA, floatType === 'half' ? gl.HALF_FLOAT : gl.FLOAT, null);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+    throw new Error('framebuffer incomplete');
+  }
+  return { tex: t, fbo };
+}
+function releaseTexture(t) {
+  if (!t) return;
+  gl.deleteFramebuffer(t.fbo);
+  gl.deleteTexture(t.tex);
+}
+function rebuildSim() {
+  [vel, velTmp, dye, dyeTmp, pressure, pressureTmp, divTex, curlTex].forEach(releaseTexture);
+  vel = makeTexture(); velTmp = makeTexture();
+  dye = makeTexture(); dyeTmp = makeTexture();
+  pressure = makeTexture(); pressureTmp = makeTexture();
+  divTex = makeTexture(); curlTex = makeTexture();
+  clearField(vel); clearField(velTmp);
+  clearField(dye); clearField(dyeTmp);
+  clearField(pressure); clearField(pressureTmp);
+  clearField(divTex); clearField(curlTex);
+}
+function clearField(t) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+  gl.viewport(0, 0, N, N);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+}
+function rebuildDisplay() {
+  if (displayFBO) { gl.deleteFramebuffer(displayFBO); gl.deleteTexture(displayTex); }
+  displayTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, displayTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, cv.width, cv.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  displayFBO = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, displayFBO);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, displayTex, 0);
+}
+
+/* ============ 绘制辅助 ============ */
+function blit(prog, target, uniforms, w, h) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target);
+  gl.viewport(0, 0, w || N, h || N);
+  gl.useProgram(prog);
+  let texUnit = 0;
+  for (const k in uniforms) {
+    const v = uniforms[k];
+    if (v && v.tex) {
+      gl.activeTexture(gl.TEXTURE0 + texUnit);
+      gl.bindTexture(gl.TEXTURE_2D, v.tex);
+      gl.uniform1i(gl.getUniformLocation(prog, k), texUnit++);
+    } else if (typeof v === 'number') {
+      gl.uniform1f(gl.getUniformLocation(prog, k), v);
+    } else if (Array.isArray(v)) {
+      gl.uniform4fv(gl.getUniformLocation(prog, k), v);
+    } else if (v && 'x' in v) {
+      gl.uniform2f(gl.getUniformLocation(prog, k), v.x, v.y);
+    }
+  }
+  gl.bindVertexArray(null);
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.disableVertexAttribArray(0);
+}
+
+/* ============ 注入 ============ */
+function splat(px, py, dx, dy) {
+  // px/py: 画布 CSS 像素坐标 → uv
+  const uv = { x: px / cv.clientWidth, y: py / cv.clientHeight };
+  const r = Math.min(0.1, Math.max(0.012, 0.05 * S.force));
+  const speed = Math.hypot(dx, dy) || 0;
+  const vx = dx / cv.clientWidth / 0.06 * S.force;
+  const vy = dy / cv.clientHeight / 0.06 * S.force;
+  // 染料注入（加色混合）
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE);
+  blit(splatProg, dye.fbo, { uCenter: uv, uRadius: r * r, uColor: [S.color[0], S.color[1], S.color[2], 0.06 * S.force] });
+  // 速度注入（动量方向 = 拖动方向）
+  if (speed > 0.5) {
+    blit(splatProg, vel.fbo, { uCenter: uv, uRadius: r * r, uColor: [vx, vy, 0, 1] });
+  }
+  gl.disable(gl.BLEND);
+}
+
+/* ============ 模拟步骤 ============ */
+function simStep(dt) {
+  const Nf = N;
+  // 1. 平流速度（速度按 uv/秒 存储，uDt 直接用 dt，无需按网格缩放）
+  blit(advectProg, velTmp.fbo, { uField: vel, uVel: vel, uDt: dt, uDiss: 0.995 });
+  const tmp = vel; vel = velTmp; velTmp = tmp;
+  // 2. 涡旋约束
+  if (S.curl > 0) {
+    blit(curlProg, curlTex.fbo, { uVel: vel, uTexel: 1 / Nf });
+    // 涡旋力先写入 velTmp 临时缓冲，再加回 vel（避免同纹理读写反馈环）
+    blit(vortProg, velTmp.fbo, { uVel: vel, uCurl: curlTex, uTexel: 1 / Nf, uStrength: S.curl * 0.6 });
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    blit(addProg, vel.fbo, { uField: velTmp });
+    gl.disable(gl.BLEND);
+  }
+  // 3. 投影：散度 → 压力迭代 → 减去梯度
+  blit(divProg, divTex.fbo, { uVel: vel, uTexel: 1 / Nf });
+  clearField(pressure);
+  for (let i = 0; i < S.iters; i++) {
+    blit(jacobiProg, pressureTmp.fbo, { uPressure: pressure, uDiv: divTex, uTexel: 1 / Nf });
+    const t = pressure; pressure = pressureTmp; pressureTmp = t;
+  }
+  blit(gradProg, velTmp.fbo, { uVel: vel, uPressure: pressure, uTexel: 1 / Nf });
+  const t2 = vel; vel = velTmp; velTmp = t2;
+  // 4. 平流染料 + 消散
+  blit(advectProg, dyeTmp.fbo, { uField: dye, uVel: vel, uDt: dt, uDiss: S.diss });
+  const t3 = dye; dye = dyeTmp; dyeTmp = t3;
+}
+
+/* ============ 主循环 ============ */
+function frame(t) {
+  requestAnimationFrame(frame);
+  if (!gl || gl.isContextLost()) return;
+  if (!S.lastTime) S.lastTime = t;
+  let dt = (t - S.lastTime) / 1000;
+  S.lastTime = t;
+  if (dt > 0.1) dt = 0.1;
+  if (!S.paused) {
+    // 应用待注入笔触
+    for (const s of S.splats) splat(s.x, s.y, s.dx, s.dy);
+    S.splats = [];
+    let acc = dt;
+    const h = 1 / 60;
+    let guard = 0;
+    while (acc > 0 && guard++ < 4) {
+      simStep(Math.min(acc, h));
+      acc -= h;
+    }
+  } else {
+    S.splats = [];
+  }
+  // 渲染到屏幕
+  blit(displayProg, displayFBO, { uDye: dye }, cv.width, cv.height);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, cv.width, cv.height);
+  gl.useProgram(displayProg);
+  let texUnit = 0;
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, displayTex);
+  gl.uniform1i(gl.getUniformLocation(displayProg, 'uDye'), 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.disableVertexAttribArray(0);
+  // FPS
+  S.frames++;
+  if (t - S.fpsT > 1000) {
+    S.fps = Math.round(S.frames * 1000 / (t - S.fpsT));
+    S.frames = 0;
+    S.fpsT = t;
+  }
+  const st = document.getElementById('status');
+  if (S.notice && t < S.notice.until) st.textContent = S.notice.text;
+  else st.textContent = `${S.fps} FPS · 网格 ${N}×${N} · ${floatType === 'float' ? 'float32' : 'float16'} · ${S.paused ? '已暂停' : '运行中'}`;
+}
+
+/* ============ 交互 ============ */
+function evtPos(e) {
+  const r = cv.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+cv.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  cv.setPointerCapture(e.pointerId);
+  S.dragging = true;
+  const p = evtPos(e);
+  S.lastPos = p;
+  S.splats.push({ x: p.x, y: p.y, dx: 0, dy: 0 });
+});
+cv.addEventListener('pointermove', (e) => {
+  if (!S.dragging) return;
+  const p = evtPos(e);
+  const dx = p.x - S.lastPos.x, dy = p.y - S.lastPos.y;
+  S.lastPos = p;
+  S.splats.push({ x: p.x, y: p.y, dx, dy });
+});
+cv.addEventListener('pointerup', () => { S.dragging = false; });
+cv.addEventListener('pointercancel', () => { S.dragging = false; });
+
+/* ============ 控件 ============ */
+const colorInput = document.getElementById('color');
+colorInput.oninput = () => {
+  const c = colorInput.value;
+  S.color = [parseInt(c.slice(1, 3), 16) / 255, parseInt(c.slice(3, 5), 16) / 255, parseInt(c.slice(5, 7), 16) / 255];
+};
+document.getElementById('force').oninput = (e) => { S.force = parseFloat(e.target.value); };
+document.getElementById('diss').oninput = (e) => { S.diss = parseFloat(e.target.value); };
+document.getElementById('iters').oninput = (e) => { S.iters = parseInt(e.target.value, 10); };
+document.getElementById('curl').oninput = (e) => { S.curl = parseInt(e.target.value, 10); };
+document.getElementById('res').onchange = (e) => {
+  N = parseInt(e.target.value, 10);
+  rebuildSim();
+  setMsg(`模拟分辨率已切换为 ${N}×${N}，流体已清空。`);
+};
+const pauseBtn = document.getElementById('pause');
+pauseBtn.onclick = () => {
+  S.paused = !S.paused;
+  pauseBtn.textContent = S.paused ? '▶ 继续' : '⏸ 暂停';
+  pauseBtn.classList.toggle('primary', !S.paused);
+};
+document.getElementById('clear').onclick = () => {
+  clearField(vel);
+  clearField(dye);
+  setMsg('已清空流体（速度与染料）。');
+};
+document.getElementById('reset').onclick = () => {
+  S.force = 1.2; S.diss = 0.985; S.iters = 40; S.curl = 8;
+  colorInput.value = '#4da6ff';
+  S.color = [0.302, 0.651, 1];
+  document.getElementById('force').value = S.force;
+  document.getElementById('diss').value = S.diss;
+  document.getElementById('iters').value = S.iters;
+  document.getElementById('curl').value = S.curl;
+  clearField(vel);
+  clearField(dye);
+  S.paused = false;
+  pauseBtn.textContent = '⏸ 暂停';
+  pauseBtn.classList.add('primary');
+  demoInject();
+  setMsg('参数已重置，并注入示例流体。');
+};
+document.getElementById('shot').onclick = () => {
+  // 渲染显示 FBO 后立即读取像素
+  blit(displayProg, displayFBO, { uDye: dye }, cv.width, cv.height);
+  const w = cv.width, h = cv.height;
+  const buf = new Uint8Array(w * h * 4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, displayFBO);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  const img = g.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) {
+    const o = i * 4;
+    // readPixels 自底向上，翻转行
+    const src = ((h - 1 - (i / w | 0)) * w + (i % w)) * 4;
+    img.data[o] = buf[src];
+    img.data[o + 1] = buf[src + 1];
+    img.data[o + 2] = buf[src + 2];
+    img.data[o + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const a = document.createElement('a');
+  a.href = c.toDataURL('image/png');
+  a.download = 'fluid-' + Date.now() + '.png';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setMsg('截图已导出 PNG。');
+};
+function setMsg(t) {
+  S.notice = { text: t, until: performance.now() + 3000 };
+}
+function demoInject() {
+  for (let i = 0; i < 24; i++) {
+    const x = cv.clientWidth * (0.3 + 0.4 * Math.random());
+    const y = cv.clientHeight * (0.3 + 0.4 * Math.random());
+    S.splats.push({ x, y, dx: (Math.random() - 0.5) * 40, dy: (Math.random() - 0.5) * 40 });
+  }
+}
+
+/* ============ 尺寸 ============ */
+function resize() {
+  // 缓冲 = 显示尺寸：上限 640×400。限制设备像素比（按 1 处理）与分辨率，
+  // 保证软件渲染环境（SwiftShader 等）合成大画布不会丢失上下文。
+  const cw = Math.max(200, cv.parentElement.clientWidth);
+  const w = Math.min(640, Math.floor(cw));
+  const h = Math.round(w * 0.625);
+  if (cv.width !== w || cv.height !== h) {
+    cv.width = w; cv.height = h;
+    rebuildDisplay();
+  }
+}
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { resizeTimer = null; resize(); }, 120);
+});
+
+/* ============ 启动 ============ */
+cv.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault(); // 允许浏览器恢复上下文
+  S.paused = true;
+  pauseBtn.textContent = '▶ 继续';
+  pauseBtn.classList.remove('primary');
+  const errBox = document.getElementById('error');
+  errBox.style.display = 'block';
+  document.getElementById('error-text').textContent = 'WebGL 上下文丢失，正在等待浏览器恢复（恢复后自动重建 GPU 资源）。';
+});
+cv.addEventListener('webglcontextrestored', () => {
+  const errBox = document.getElementById('error');
+  errBox.style.display = 'none';
+  if (boot()) {
+    S.paused = false;
+    pauseBtn.textContent = '⏸ 暂停';
+    pauseBtn.classList.add('primary');
+    S.fpsT = performance.now();
+    requestAnimationFrame(frame);
+    setMsg('WebGL 上下文已恢复，GPU 资源已重建。');
+  }
+});
+if (boot()) {
+  S.fpsT = performance.now();
+  demoInject();
+  requestAnimationFrame(frame);
+}
+
+/* ============ 供自动化验收使用 ============ */
+window.__FLUID = {
+  S, gl, splat, simStep, resize,
+  clearAll() { clearField(vel); clearField(dye); },
+  get velTex() { return vel; },
+  get dyeTex() { return dye; },
+  readSample(texture, u, v) {
+    const w = N, h = N;
+    const buf = new Float32Array(4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, texture.fbo);
+    gl.viewport(0, 0, w, h);
+    gl.readPixels(Math.round(u * w), Math.round(v * h), 1, 1, gl.RGBA, gl.FLOAT, buf);
+    return { r: buf[0], g: buf[1], b: buf[2], a: buf[3] };
+  },
+  divergenceMagnitude() {
+    // 重新计算当前速度场的散度并求总和（迭代次数越多，投影后残差越小）
+    blit(divProg, divTex.fbo, { uVel: vel, uTexel: 1 / N });
+    const buf = new Float32Array(N * N * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, divTex.fbo);
+    gl.viewport(0, 0, N, N);
+    gl.readPixels(0, 0, N, N, gl.RGBA, gl.FLOAT, buf);
+    let sum = 0;
+    for (let i = 0; i < N * N; i++) sum += Math.abs(buf[i * 4]);
+    return sum;
+  },
+};
+</script>
+</body>
+</html>
