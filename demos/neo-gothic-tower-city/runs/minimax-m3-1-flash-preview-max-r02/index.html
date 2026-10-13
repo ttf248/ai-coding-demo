@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>新哥特式塔楼城市 · 可漫游 3D</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#05070d; overflow:hidden;
+    font:14px/1.5 "PingFang SC","Microsoft YaHei",system-ui,sans-serif; color:#e8edf8; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+  .panel { position:fixed; background:rgba(10,14,24,.72); backdrop-filter:blur(10px);
+    border:1px solid rgba(150,170,210,.22); border-radius:12px; padding:12px 14px; }
+  #hud { left:16px; top:16px; max-width:300px; }
+  #hud h1 { margin:0 0 4px; font-size:16px; letter-spacing:.04em; }
+  #hud p { margin:0; font-size:12px; color:#9fb0cc; }
+  #ctrl { right:16px; top:16px; width:210px; }
+  #ctrl h2 { margin:0 0 8px; font-size:12px; color:#9fb0cc; letter-spacing:.08em; text-transform:uppercase; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  button { background:rgba(30,42,66,.85); color:#e8edf8; border:1px solid rgba(150,170,210,.28);
+    border-radius:8px; padding:7px 10px; font:inherit; font-size:13px; cursor:pointer; }
+  button:hover { border-color:#7fd4ff; }
+  button.on { background:#7fd4ff; color:#04121c; border-color:#7fd4ff; font-weight:600; }
+  label.f { display:flex; align-items:center; gap:8px; font-size:12.5px; margin:7px 0; color:#c3d0e6; }
+  label.f span:first-child { min-width:62px; color:#9fb0cc; }
+  input[type=range] { flex:1; accent-color:#7fd4ff; }
+  #todo { left:16px; bottom:16px; max-width:330px; font-size:12px; }
+  #todo h2 { margin:0 0 6px; font-size:12px; color:#ffcf7a; letter-spacing:.08em; }
+  #todo ul { margin:0; padding-left:18px; color:#d7c6a8; }
+  #todo li { margin:2px 0; }
+  #tip { right:16px; bottom:16px; font-size:12px; color:#9fb0cc; max-width:250px; }
+  #stat { position:fixed; left:16px; top:120px; font-size:11.5px; color:#8fa2c0; font-variant-numeric:tabular-nums; }
+  #load { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:#05070d; color:#9fb0cc; font-size:14px; z-index:9; }
+  @media (max-width:760px){
+    #ctrl { right:10px; top:auto; bottom:86px; width:180px; }
+    #hud { left:10px; top:10px; max-width:200px; }
+    #todo { display:none; }
+    #tip { right:10px; bottom:10px; max-width:180px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="load">正在构建新哥特式塔楼城市…</div>
+
+<div id="hud" class="panel">
+  <h1>新哥特式塔楼城市</h1>
+  <p>按真实米制比例重建：塔身高 58–168 m，窗高 3.2 m，正门 4.4 m，中央广场直径 64 m。</p>
+</div>
+
+<div id="stat" class="panel" style="padding:6px 10px"></div>
+
+<div id="ctrl" class="panel">
+  <h2>漫游与场景</h2>
+  <div class="row">
+    <button id="b-auto" class="on">自动环绕</button>
+    <button id="b-fire">篝火</button>
+    <button id="b-gull">海鸥</button>
+    <button id="b-night">夜景</button>
+  </div>
+  <label class="f"><span>漫游速度</span><input id="s-speed" type="range" min="10" max="300" value="110"><span id="v-speed"></span></label>
+  <label class="f"><span>视角高度</span><input id="s-height" type="range" min="3" max="260" value="42"><span id="v-height"></span></label>
+  <label class="f"><span>海浪强度</span><input id="s-wave" type="range" min="0" max="200" value="100"><span id="v-wave"></span></label>
+  <label class="f"><span>火焰密度</span><input id="s-fire" type="range" min="0" max="200" value="100"><span id="v-fire"></span></label>
+  <div class="row">
+    <button id="b-reset">回到全景</button>
+    <button id="b-walk">步行模式</button>
+  </div>
+</div>
+
+<div id="todo" class="panel">
+  <h2>待确认</h2>
+  <ul>
+    <li>待确认：真实比例无官方图纸，按米制合理推定的塔身比例、窗高与广场尺度，非某座实际建筑的复刻。</li>
+    <li>待确认：本地环境无任何贴图与模型资源，全部几何体、材质与纹理均由代码生成。</li>
+    <li>待确认：库依赖使用 CDN 的 Three.js r160（ES Module importmap），离线打开时无法加载；已按「遇到缺漏继续完成」处理。</li>
+  </ul>
+</div>
+
+<div id="tip" class="panel">左键拖动环视 · 滚轮缩放 · WASD / 方向键漫游 · Shift 加速 · 触摸拖动环视、双指缩放</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ------------------------------------------------------------------ */
+/* 确定性随机                                                          */
+/* ------------------------------------------------------------------ */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const rnd = mulberry32(20261013);
+const R = (a,b)=>a+(b-a)*rnd();
+
+/* ------------------------------------------------------------------ */
+/* 场景与雾                                                            */
+/* ------------------------------------------------------------------ */
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x1b3050, 0.0021);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.5, 6000);
+camera.position.set(210, 78, 230);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.28;
+document.getElementById('app').appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.target.set(0, 46, 0);
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.minDistance = 12;
+controls.maxDistance = 620;
+
+const hemi = new THREE.HemisphereLight(0xa8ccff, 0x4a4436, 1.0);
+scene.add(hemi);
+const moon = new THREE.DirectionalLight(0xcfe2ff, 1.8);
+moon.position.set(-220, 300, -160);
+scene.add(moon);
+scene.add(new THREE.AmbientLight(0x6a7a99, 0.38));
+
+/* ------------------------------------------------------------------ */
+/* 材质（全部程序生成）                                                */
+/* ------------------------------------------------------------------ */
+const stoneA = new THREE.MeshStandardMaterial({ color:0x8f8578, roughness:0.92, metalness:0.02 });
+const stoneB = new THREE.MeshStandardMaterial({ color:0x77706a, roughness:0.95, metalness:0.02 });
+const stoneC = new THREE.MeshStandardMaterial({ color:0x9b8d7c, roughness:0.88, metalness:0.03 });
+const darkStone = new THREE.MeshStandardMaterial({ color:0x4a4a52, roughness:0.9, metalness:0.05 });
+const roofMat = new THREE.MeshStandardMaterial({ color:0x2f3a4a, roughness:0.55, metalness:0.35 });
+const goldMat = new THREE.MeshStandardMaterial({ color:0xb99647, roughness:0.35, metalness:0.9 });
+const glassMat = new THREE.MeshStandardMaterial({
+  color:0x2a3d52, roughness:0.25, metalness:0.1,
+  emissive:0xffb347, emissiveIntensity:0.9
+});
+const plazaMat = new THREE.MeshStandardMaterial({ color:0x6a6a68, roughness:0.98 });
+const groundMat = new THREE.MeshStandardMaterial({ color:0x4c5340, roughness:1 });
+
+/* ------------------------------------------------------------------ */
+/* 海面：顶点着色器 Gerstner 风格波浪                                  */
+/* ------------------------------------------------------------------ */
+const waveUniforms = { uTime:{value:0}, uAmp:{value:1.0} };
+const waterMat = new THREE.ShaderMaterial({
+  uniforms: waveUniforms,
+  vertexShader: `
+    uniform float uTime; uniform float uAmp;
+    varying float vH; varying vec3 vW;
+    void main(){
+      vec3 p = position;
+      float w = sin(p.x*0.021 + uTime*1.1)*0.9
+              + sin(p.z*0.017 - uTime*0.85)*0.7
+              + sin((p.x+p.z)*0.041 + uTime*1.7)*0.35;
+      p.y += w * uAmp;
+      vH = w;
+      vec4 wp = modelMatrix * vec4(p,1.0);
+      vW = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }`,
+  fragmentShader: `
+    uniform float uTime;
+    varying float vH; varying vec3 vW;
+    void main(){
+      vec3 deep = vec3(0.035,0.095,0.175);
+      vec3 shallow = vec3(0.10,0.30,0.44);
+      float t = clamp(vH*0.35+0.5, 0.0, 1.0);
+      vec3 col = mix(deep, shallow, t);
+      float foam = smoothstep(0.85, 1.6, vH);
+      col += vec3(foam*0.28);
+      float dist = length(vW.xz);
+      col = mix(col, vec3(0.04,0.09,0.16), smoothstep(300.0, 1500.0, dist));
+      gl_FragColor = vec4(col, 1.0);
+    }`
+});
+const water = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000, 140, 140), waterMat);
+water.rotation.x = -Math.PI/2;
+scene.add(water);
+
+/* ------------------------------------------------------------------ */
+/* 岛屿与广场                                                          */
+/* ------------------------------------------------------------------ */
+function makeIsland(){
+  const size = 420, seg = 90;
+  const geo = new THREE.PlaneGeometry(size, size, seg, seg);
+  geo.rotateX(-Math.PI/2);
+  const pos = geo.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const x = pos.getX(i), z = pos.getZ(i);
+    const d = Math.sqrt(x*x+z*z);
+    let h = 6.0 * Math.exp(-(d*d)/(2*130*130));
+    h += Math.sin(x*0.05)*Math.cos(z*0.043)*1.6;
+    h += Math.sin(x*0.011+1.7)*Math.cos(z*0.013-0.4)*3.2;
+    h -= Math.max(0, (d-150)/26)*3.6;
+    pos.setY(i, h);
+  }
+  geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, groundMat);
+  scene.add(m);
+  return m;
+}
+makeIsland();
+
+const plaza = new THREE.Mesh(new THREE.CylinderGeometry(32, 32, 0.6, 64), plazaMat);
+plaza.position.y = 6.6;
+scene.add(plaza);
+const plazaRing = new THREE.Mesh(new THREE.TorusGeometry(32.4, 0.5, 8, 96), darkStone);
+plazaRing.rotation.x = Math.PI/2; plazaRing.position.y = 7.0; scene.add(plazaRing);
+
+/* ------------------------------------------------------------------ */
+/* 新哥特式建筑构件                                                    */
+/* ------------------------------------------------------------------ */
+/** 尖拱轮廓：两段圆弧构成的哥特式尖拱（真实比例，门宽 4.4 m 高 8.4 m） */
+function pointedArchShape(width, height){
+  const s = new THREE.Shape();
+  const w = width/2, r = w;                 // 两心尖拱半径等于半宽
+  const straight = height - r;              // 直腿高度
+  s.moveTo(-w, 0);
+  s.lineTo(-w, straight);
+  s.quadraticCurveTo(-w, height*0.92, 0, height);
+  s.quadraticCurveTo(w, height*0.92, w, straight);
+  s.lineTo(w, 0);
+  s.closePath();
+  return s;
+}
+const winGeoCache = new Map();
+function windowGeo(w,h){
+  const k = w.toFixed(2)+'_'+h.toFixed(2);
+  if(!winGeoCache.has(k)){
+    const g = new THREE.ExtrudeGeometry(pointedArchShape(w,h), { depth:0.35, bevelEnabled:false, curveSegments:10 });
+    g.center();
+    winGeoCache.set(k,g);
+  }
+  return winGeoCache.get(k);
+}
+
+/** 飞扶壁：从主体伸出的斜拱 */
+function flyingButtress(len, height, thickness){
+  const grp = new THREE.Group();
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, height, 0),
+    new THREE.Vector3(len*0.42, height*0.86, 0),
+    new THREE.Vector3(len*0.78, height*0.40, 0),
+    new THREE.Vector3(len, 0, 0)
+  ]);
+  const arch = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, thickness, 7, false), stoneB);
+  grp.add(arch);
+  const pier = new THREE.Mesh(new THREE.BoxGeometry(thickness*2.6, height*0.45, thickness*2.6), darkStone);
+  pier.position.set(len, height*0.225, 0);
+  grp.add(pier);
+  return grp;
+}
+
+/** 玫瑰窗（花窗） */
+function roseWindow(radius){
+  const grp = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, radius*0.09, 8, 48), goldMat);
+  grp.add(ring);
+  const petals = 10;
+  for(let i=0;i<petals;i++){
+    const a = i/petals*Math.PI*2;
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(radius*0.17, radius*0.17, 0.4, 12), glassMat);
+    p.rotation.x = Math.PI/2;
+    p.position.set(Math.cos(a)*radius*0.52, Math.sin(a)*radius*0.52, 0);
+    grp.add(p);
+  }
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(radius*0.2, radius*0.2, 0.5, 16), glassMat);
+  hub.rotation.x = Math.PI/2;
+  grp.add(hub);
+  return grp;
+}
+
+function addWindows(list){
+  // list: {x,y,z,rx,ry,rz,w,h}
+  const byMat = new Map();
+  list.forEach(v=>{
+    if(!byMat.has(v.w.toFixed(2)+'_'+v.h.toFixed(2))) byMat.set(v.w.toFixed(2)+'_'+v.h.toFixed(2), []);
+    byMat.get(v.w.toFixed(2)+'_'+v.h.toFixed(2)).push(v);
+  });
+  const group = new THREE.Group();
+  byMat.forEach((arr,key)=>{
+    const [w,h] = key.split('_').map(Number);
+    const im = new THREE.InstancedMesh(windowGeo(w,h), glassMat, arr.length);
+    const m = new THREE.Matrix4();
+    arr.forEach((v,i)=>{
+      m.compose(new THREE.Vector3(v.x,v.y,v.z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(v.rx,v.ry,v.rz)),
+        new THREE.Vector3(1,1,1));
+      im.setMatrixAt(i,m);
+    });
+    im.instanceMatrix.needsUpdate = true;
+    group.add(im);
+  });
+  scene.add(group);
+  return group;
+}
+
+/** 生成一座哥特式塔楼 */
+function makeTower(x, z, height, baseW, opts={}){
+  const g = new THREE.Group();
+  g.position.set(x, 6.6, z);
+  const wins = [];
+
+  // 主体：下段方形 + 上段收分
+  const bodyH = height*0.64;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(baseW, bodyH, baseW), stoneA);
+  body.position.y = bodyH/2;
+  g.add(body);
+
+  // 角扶壁柱
+  const pierW = baseW*0.14;
+  const corners = [[-1,-1],[1,-1],[1,1],[-1,1]];
+  corners.forEach(([sx,sz])=>{
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(pierW, bodyH*1.02, pierW), stoneB);
+    pier.position.set(sx*(baseW/2+pierW*0.34), bodyH*0.51, sz*(baseW/2+pierW*0.34));
+    g.add(pier);
+    const pinnacle = new THREE.Mesh(new THREE.ConeGeometry(pierW*0.95, pierW*3.4, 8), roofMat);
+    pinnacle.position.set(pier.position.x, bodyH*1.02 + pierW*1.7, pier.position.z);
+    g.add(pinnacle);
+  });
+
+  // 檐口
+  const cornice = new THREE.Mesh(new THREE.BoxGeometry(baseW*1.12, 1.8, baseW*1.12), stoneC);
+  cornice.position.y = bodyH + 0.9;
+  g.add(cornice);
+
+  // 上段（八角形收分塔身）
+  const upperH = height*0.13;
+  const upper = new THREE.Mesh(new THREE.CylinderGeometry(baseW*0.36, baseW*0.5, upperH, 8), stoneA);
+  upper.position.y = bodyH + 1.8 + upperH/2;
+  g.add(upper);
+
+  // 尖顶
+  const spireH = height - (bodyH + 1.8 + upperH);
+  const spire = new THREE.Mesh(new THREE.ConeGeometry(baseW*0.36, spireH, 8), roofMat);
+  spire.position.y = bodyH + 1.8 + upperH + spireH/2;
+  g.add(spire);
+
+  // 尖顶基座环
+  const torus = new THREE.Mesh(new THREE.TorusGeometry(baseW*0.40, 0.5, 6, 32), goldMat);
+  torus.rotation.x = Math.PI/2;
+  torus.position.y = bodyH + 1.8 + upperH;
+  g.add(torus);
+
+  // 正门（尖拱）
+  const doorH = 8.4, doorW = 4.4;
+  const door = new THREE.Mesh(new THREE.ExtrudeGeometry(pointedArchShape(doorW, doorH), { depth:0.8, bevelEnabled:false, curveSegments:12 }), darkStone);
+  door.position.set(0, 0, baseW/2 + 0.05);
+  g.add(door);
+
+  // 玫瑰窗
+  if(opts.rose !== false){
+    const rose = roseWindow(baseW*0.27);
+    rose.position.set(0, bodyH*0.80, baseW/2 + 0.9);
+    g.add(rose);
+  }
+
+  // 窗：沿四面均匀分布，跳过正门区域
+  const floors = Math.max(3, Math.floor(bodyH/9));
+  const perSide = Math.max(2, Math.floor(baseW/7));
+  for(let f=1; f<floors; f++){
+    const y = f*(bodyH/floors) + 2.2;
+    for(let s=0;s<4;s++){
+      const ang = s*Math.PI/2;
+      for(let k=0;k<perSide;k++){
+        const off = (k - (perSide-1)/2) * (baseW/perSide);
+        const lx = s===0 ? off : s===1 ? baseW/2 : s===2 ? -off : -baseW/2;
+        const lz = s===0 ? baseW/2 : s===1 ? off : s===2 ? -baseW/2 : -off;
+        if(y < 14 && s===0 && Math.abs(off) < doorW) continue;
+        wins.push({ x:x+lx, y:6.6+y, z:z+lz, rx:0, ry:ang, rz:0, w:2.6, h:6.2 });
+      }
+    }
+  }
+
+  // 飞扶壁 + 墙面扶壁墩
+  const butLen = baseW*0.9;
+  [0, Math.PI/2, Math.PI, Math.PI*1.5].forEach(ang=>{
+    const b = flyingButtress(butLen, bodyH*0.66, 0.7);
+    b.position.set(Math.sin(ang)*(baseW/2), 0, Math.cos(ang)*(baseW/2));
+    b.rotation.y = ang;
+    g.add(b);
+    const spandrel = new THREE.Mesh(new THREE.BoxGeometry(0.9, bodyH*0.30, baseW*0.7), stoneB);
+    spandrel.position.set(Math.sin(ang)*(baseW/2 + baseW*0.35), bodyH*0.80, Math.cos(ang)*(baseW/2 + baseW*0.35));
+    spandrel.rotation.y = ang;
+    g.add(spandrel);
+  });
+
+  scene.add(g);
+  return wins;
+}
+
+/* 城市布局 */
+const allWins = [];
+const TOWERS = [
+  { x:0, z:0, h:168, w:16, rose:true },
+  { x:-52, z:-46, h:96, w:13 },
+  { x:54, z:-42, h:112, w:14 },
+  { x:-46, z:52, h:74, w:11.5 },
+  { x:50, z:50, h:86, w:12.5 },
+  { x:0, z:-96, h:64, w:11 }
+];
+TOWERS.forEach(t=>{ allWins.push(...makeTower(t.x, t.z, t.h, t.w, { rose:t.rose })); });
+addWindows(allWins);
+
+/* ------------------------------------------------------------------ */
+/* 城墙、路灯与篝火                                                    */
+/* ------------------------------------------------------------------ */
+const wallMat = darkStone;
+for(let i=0;i<64;i++){
+  const a = i/64*Math.PI*2;
+  const rr = 158;
+  const seg = new THREE.Mesh(new THREE.BoxGeometry(18.5, 9.5, 2.6), wallMat);
+  seg.position.set(Math.cos(a)*rr, 6.6+4.75, Math.sin(a)*rr);
+  seg.rotation.y = -a;
+  scene.add(seg);
+}
+const gate = new THREE.Mesh(new THREE.BoxGeometry(14, 15, 3), stoneB);
+gate.position.set(0, 6.6+7.5, 158); scene.add(gate);
+const gateArch = new THREE.Mesh(new THREE.ExtrudeGeometry(pointedArchShape(6.2,11),{depth:2.4,bevelEnabled:false,curveSegments:12}), stoneC);
+gateArch.position.set(0, 6.6, 159.2); scene.add(gateArch);
+
+const lampPositions = [];
+for(let i=0;i<10;i++){
+  const a = i/10*Math.PI*2;
+  lampPositions.push([Math.cos(a)*36, 7, Math.sin(a)*36]);
+}
+const lampPost = new THREE.CylinderGeometry(0.16, 0.22, 5.2, 8);
+const lampGlass = new THREE.SphereGeometry(0.46, 10, 8);
+const lampMat = new THREE.MeshStandardMaterial({ color:0xffd9a0, emissive:0xffb35c, emissiveIntensity:2.4 });
+const flameSources = [];
+lampPositions.forEach(([x,y,z])=>{
+  const post = new THREE.Mesh(lampPost, darkStone);
+  post.position.set(x, y+2.6, z); scene.add(post);
+  const gl = new THREE.Mesh(lampGlass, lampMat);
+  gl.position.set(x, y+5.3, z); scene.add(gl);
+  const pl = new THREE.PointLight(0xffb35c, 12, 34, 2);
+  pl.position.copy(gl.position); scene.add(pl);
+  flameSources.push(gl.position.clone());
+});
+const braziers = [[-26,7,-26],[26,7,-26],[-26,7,26],[26,7,26]];
+braziers.forEach(([x,y,z])=>{
+  const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.1, 1.5, 12), darkStone);
+  bowl.position.set(x, y+2.2, z); scene.add(bowl);
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.42,2.2,8), darkStone);
+  leg.position.set(x, y+1.1, z); scene.add(leg);
+  const fl = new THREE.PointLight(0xff7a2a, 26, 44, 2);
+  fl.position.set(x, y+3.4, z); scene.add(fl);
+  flameSources.push(new THREE.Vector3(x, y+3.0, z));
+});
+
+/* ------------------------------------------------------------------ */
+/* 火焰粒子：自定义 shader 的点精灵                                    */
+/* ------------------------------------------------------------------ */
+const FIRE_MAX = 420;
+const fireUniforms = { uSize:{ value: 2.6 }, uOpacity:{ value: 1 }, uScale:{ value: 1 } };
+const fireMat = new THREE.ShaderMaterial({
+  uniforms: fireUniforms,
+  transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+  vertexShader: `
+    attribute float aLife; attribute float aSeed;
+    uniform float uSize; uniform float uScale;
+    varying float vLife; varying float vSeed;
+    void main(){
+      vLife = aLife; vSeed = aSeed;
+      vec4 mv = modelViewMatrix * vec4(position,1.0);
+      gl_Position = projectionMatrix * mv;
+      gl_PointSize = uSize * (0.5 + aLife) * uScale * (150.0 / max(20.0, -mv.z));
+    }`,
+  fragmentShader: `
+    uniform float uOpacity;
+    varying float vLife; varying float vSeed;
+    void main(){
+      vec2 p = gl_PointCoord - 0.5;
+      float d = length(p);
+      if(d > 0.5) discard;
+      float fall = smoothstep(0.5, 0.0, d);
+      vec3 hot  = vec3(1.0, 0.92, 0.62);
+      vec3 mid  = vec3(1.0, 0.48, 0.12);
+      vec3 cool = vec3(0.72, 0.12, 0.03);
+      float t = clamp(vLife, 0.0, 1.0);
+      vec3 col = mix(mix(cool, mid, smoothstep(0.0,0.55,t)), hot, smoothstep(0.55,1.0,t));
+      float a = fall * (0.25 + 0.75*t) * uOpacity;
+      gl_FragColor = vec4(col, a);
+    }`
+});
+const fireGeo = new THREE.BufferGeometry();
+const fPos = new Float32Array(FIRE_MAX*3);
+const fLife = new Float32Array(FIRE_MAX);
+const fSeed = new Float32Array(FIRE_MAX);
+const fVel = new Float32Array(FIRE_MAX*3);
+fireGeo.setAttribute('position', new THREE.BufferAttribute(fPos,3));
+fireGeo.setAttribute('aLife', new THREE.BufferAttribute(fLife,1));
+fireGeo.setAttribute('aSeed', new THREE.BufferAttribute(fSeed,1));
+let fireCursor = 0;
+for(let i=0;i<FIRE_MAX;i++){ fLife[i] = 0; fPos[i*3+1] = -50; fSeed[i] = Math.random(); }
+const fire = new THREE.Points(fireGeo, fireMat);
+fire.frustumCulled = false;
+scene.add(fire);
+
+function emitFire(){
+  for(let k=0;k<3;k++){
+    const i = fireCursor++ % FIRE_MAX;
+    const src = flameSources[(Math.random()*flameSources.length)|0];
+    fPos[i*3] = src.x + (Math.random()-0.5)*0.7;
+    fPos[i*3+1] = src.y + Math.random()*0.4;
+    fPos[i*3+2] = src.z + (Math.random()-0.5)*0.7;
+    fVel[i*3] = (Math.random()-0.5)*0.5;
+    fVel[i*3+1] = 1.5 + Math.random()*1.6;
+    fVel[i*3+2] = (Math.random()-0.5)*0.5;
+    fLife[i] = 0;
+    fSeed[i] = Math.random();
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 海岸浪花与海鸥                                                      */
+/* ------------------------------------------------------------------ */
+const sprayGeo = new THREE.BufferGeometry();
+const SPRAY = 240;
+const sPos = new Float32Array(SPRAY*3);
+const sLife = new Float32Array(SPRAY);
+for(let i=0;i<SPRAY;i++) sPos[i*3+1] = -50;   // 未激活的粒子放到画面外，避免初始堆在原点
+sprayGeo.setAttribute('position', new THREE.BufferAttribute(sPos,3));
+const sprayMat = new THREE.PointsMaterial({ color:0xcfe6ff, size:1.6, transparent:true, opacity:0.55, depthWrite:false });
+const spray = new THREE.Points(sprayGeo, sprayMat);
+spray.frustumCulled = false;
+scene.add(spray);
+let sprayCursor = 0;
+function emitSpray(){
+  const i = sprayCursor++ % SPRAY;
+  const a = Math.random()*Math.PI*2;
+  const r = 150 + Math.random()*24;
+  sPos[i*3] = Math.cos(a)*r;
+  sPos[i*3+1] = 3.5 + Math.random()*2.5;
+  sPos[i*3+2] = Math.sin(a)*r;
+  sLife[i] = 1;
+}
+
+const gullGeo = new THREE.BufferGeometry();
+const GULLS = 26;
+const gPos = new Float32Array(GULLS*3);
+gullGeo.setAttribute('position', new THREE.BufferAttribute(gPos,3));
+const gulls = new THREE.Points(gullGeo, new THREE.PointsMaterial({ color:0xf2f6ff, size:2.6, transparent:true, opacity:0.9, depthWrite:false }));
+gulls.frustumCulled = false;
+scene.add(gulls);
+const gullData = [];
+for(let i=0;i<GULLS;i++) gullData.push({ a:Math.random()*6.28, r:R(90,210), h:R(24,70), sp:R(0.10,0.22), ph:Math.random()*6.28 });
+let gullsOn = true;
+
+/* ------------------------------------------------------------------ */
+/* 交互：WASD 漫游、自动环绕、场景参数                                 */
+/* ------------------------------------------------------------------ */
+const keys = new Set();
+addEventListener('keydown', e=>{ keys.add(e.code); if(e.code==='Space') e.preventDefault(); });
+addEventListener('keyup', e=>keys.delete(e.code));
+
+let autoOrbit = true, walkMode = false, speed = 110, camHeight = 42, waveAmp = 1.0, fireDensity = 1.0, night = false;
+let idleTimer = 0;
+
+document.getElementById('b-auto').onclick = function(){
+  autoOrbit = !autoOrbit; this.classList.toggle('on', autoOrbit);
+};
+document.getElementById('b-fire').onclick = function(){
+  fire.visible = !fire.visible; this.classList.toggle('on', fire.visible);
+};
+document.getElementById('b-gull').onclick = function(){
+  gullsOn = !gullsOn; gulls.visible = gullsOn; this.classList.toggle('on', gullsOn);
+};
+document.getElementById('b-night').onclick = function(){
+  night = !night; this.classList.toggle('on', night);
+  hemi.intensity = night ? 0.20 : 1.0;
+  moon.intensity = night ? 0.42 : 1.8;
+  moon.color.set(night ? 0x8fa8d8 : 0xcfe2ff);
+  stoneA.color.set(night ? 0x4b4a48 : 0x8f8578);
+  stoneB.color.set(night ? 0x3d3c3e : 0x77706a);
+  stoneC.color.set(night ? 0x555049 : 0x9b8d7c);
+  groundMat.color.set(night ? 0x252b1f : 0x4c5340);
+  glassMat.emissiveIntensity = night ? 2.4 : 0.9;
+  scene.fog.color.set(night ? 0x0a1424 : 0x1b3050);
+  scene.fog.density = night ? 0.0034 : 0.0021;
+  renderer.toneMappingExposure = night ? 1.35 : 1.28;
+};
+document.getElementById('b-walk').onclick = function(){
+  walkMode = !walkMode; this.classList.toggle('on', walkMode);
+  if(walkMode){ camera.position.set(0, 8.4, 40); controls.target.set(0, 9.5, 0); autoOrbit = false;
+    document.getElementById('b-auto').classList.remove('on'); }
+};
+document.getElementById('b-reset').onclick = function(){
+  camera.position.set(210, 78, 230); controls.target.set(0, 46, 0);
+  walkMode = false; document.getElementById('b-walk').classList.remove('on');
+  autoOrbit = true; document.getElementById('b-auto').classList.add('on');
+};
+function bindRange(id, out, fn){
+  const el = document.getElementById(id);
+  const upd = ()=>{ document.getElementById(out).textContent = el.value; fn(+el.value); };
+  el.addEventListener('input', upd); upd();
+}
+bindRange('s-speed','v-speed', v=>speed=v);
+bindRange('s-height','v-height', v=>{ camHeight=v; if(!walkMode){ controls.target.y = camHeight*0.45+6; } });
+bindRange('s-wave','v-wave', v=>waveAmp = v/100);
+bindRange('s-fire','v-fire', v=>fireDensity = v/100);
+
+renderer.domElement.addEventListener('pointerdown', ()=>{ idleTimer = 0; });
+addEventListener('pointermove', e=>{ if(e.buttons) idleTimer = 0; });
+
+/* ------------------------------------------------------------------ */
+/* 主循环                                                              */
+/* ------------------------------------------------------------------ */
+const clock = new THREE.Clock();
+let emitAcc = 0, sprayAcc = 0, fpsAcc = 0, frames = 0;
+const statEl = document.getElementById('stat');
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, clock.getDelta());
+  const t = clock.elapsedTime;
+
+  waveUniforms.uTime.value = t;
+  waveUniforms.uAmp.value = waveAmp;
+  fireUniforms.uScale.value = Math.min(devicePixelRatio,2) * (renderer.getPixelRatio());
+
+  // 漫游
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+  const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0,1,0)).normalize();
+  const boost = keys.has('ShiftLeft') || keys.has('ShiftRight') ? 2.6 : 1;
+  let moved = false;
+  if(keys.has('KeyW')||keys.has('ArrowUp')){ camera.position.addScaledVector(fwd, speed*dt*boost); moved = true; }
+  if(keys.has('KeyS')||keys.has('ArrowDown')){ camera.position.addScaledVector(fwd, -speed*dt*boost); moved = true; }
+  if(keys.has('KeyA')||keys.has('ArrowLeft')){ camera.position.addScaledVector(right, -speed*dt*boost); moved = true; }
+  if(keys.has('KeyD')||keys.has('ArrowRight')){ camera.position.addScaledVector(right, speed*dt*boost); moved = true; }
+  if(keys.has('KeyQ')){ camera.position.y -= speed*dt*boost; moved = true; }
+  if(keys.has('KeyE')){ camera.position.y += speed*dt*boost; moved = true; }
+  if(moved){ idleTimer = 0; autoOrbit = false; document.getElementById('b-auto').classList.remove('on'); }
+  if(walkMode){
+    camera.position.y = 8.4 + Math.sin(t*7)*0.06;
+    const d = Math.hypot(camera.position.x, camera.position.z);
+    if(d > 148){ camera.position.x *= 148/d; camera.position.z *= 148/d; }   // 不走进海里
+  }
+
+  idleTimer += dt;
+  if(autoOrbit && idleTimer > 1.5){
+    const a = 0.055*dt;
+    const off = camera.position.clone().sub(controls.target);
+    const ca = Math.cos(a), sa = Math.sin(a);
+    camera.position.set(
+      controls.target.x + off.x*ca - off.z*sa,
+      camera.position.y,
+      controls.target.z + off.x*sa + off.z*ca
+    );
+  }
+  controls.update();
+
+  // 火焰
+  if(fire.visible){
+    emitAcc += dt * 60 * fireDensity;
+    while(emitAcc >= 1){ emitFire(); emitAcc -= 1; }
+    for(let i=0;i<FIRE_MAX;i++){
+      if(fLife[i] <= 0){ fLife[i] = 0; fPos[i*3+1] = -50; continue; }
+      fLife[i] += dt * (0.45 + fSeed[i]*0.5);
+      fPos[i*3]   += fVel[i*3]*dt + Math.sin(t*3 + fSeed[i]*9)*dt*0.6;
+      fPos[i*3+1] += fVel[i*3+1]*dt;
+      fPos[i*3+2] += fVel[i*3+2]*dt + Math.cos(t*2.6 + fSeed[i]*7)*dt*0.6;
+      if(fLife[i] > 1) fLife[i] = 0;
+    }
+    fireGeo.attributes.position.needsUpdate = true;
+    fireGeo.attributes.aLife.needsUpdate = true;
+  }
+
+  // 浪花
+  sprayAcc += dt * 22 * waveAmp;
+  while(sprayAcc >= 1){ if(waveAmp > 0.05) emitSpray(); sprayAcc -= 1; }
+  for(let i=0;i<SPRAY;i++){
+    if(sLife[i] <= 0) continue;
+    sLife[i] -= dt*0.55;
+    sPos[i*3+1] += dt*2.4;
+    sPos[i*3] += Math.sin(t*1.4+i)*dt*0.9;
+    sPos[i*3+2] += Math.cos(t*1.2+i)*dt*0.9;
+    if(sLife[i] <= 0){ sPos[i*3+1] = -50; }
+  }
+  sprayGeo.attributes.position.needsUpdate = true;
+
+  // 海鸥
+  if(gullsOn){
+    for(let i=0;i<GULLS;i++){
+      const g = gullData[i];
+      g.a += g.sp*dt;
+      gPos[i*3] = Math.cos(g.a)*g.r;
+      gPos[i*3+1] = g.h + Math.sin(t*0.8 + g.ph)*7;
+      gPos[i*3+2] = Math.sin(g.a)*g.r;
+    }
+    gullGeo.attributes.position.needsUpdate = true;
+  }
+
+  renderer.render(scene, camera);
+
+  frames++; fpsAcc += dt;
+  if(fpsAcc >= 0.5){
+    statEl.textContent = `${Math.round(frames/fpsAcc)} fps · ${renderer.info.render.triangles.toLocaleString()} 三角面 · ${TOWERS.length} 座塔楼`;
+    frames = 0; fpsAcc = 0;
+  }
+}
+animate();
+document.getElementById('load').style.display = 'none';
+
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
