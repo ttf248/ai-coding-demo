@@ -100,13 +100,11 @@
       '" alt="' +
       e(run.title + " 实际运行截图") +
       '" loading="lazy" decoding="async" width="1440" height="1050">' +
-      '<span class="cover-hint">放大预览 ↗</span></button>' +
+      '<span class="cover-hint" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="m8 8-5-5m13 5 5-5M8 16l-5 5m13-5 5 5"/></svg></span></button>' +
       '<div class="image-feedback" role="status"><span>截图加载中…</span><button data-retry-image hidden>重试</button></div>' +
-      "<figcaption><span>实际截图 · 当前展示</span><strong>" +
+      "<figcaption><span>实际截图</span><strong>" +
       e(U.modelLabel(data, run)) +
-      "</strong><span> · " +
-      e(U.effortLabel(run.effort)) +
-      "</span></figcaption></figure>"
+      "</strong></figcaption></figure>"
     );
   }
   function placeholder(title) {
@@ -117,13 +115,6 @@
     );
   }
   function setupGalleryImages() {
-    $("project-grid")
-      .querySelectorAll(".topic-body, .run-body")
-      .forEach((body) => {
-        const heading = body.querySelector("h3");
-        const actions = body.querySelector(".card-actions");
-        if (heading && actions) heading.after(actions);
-      });
     $("project-grid")
       .querySelectorAll("figure[data-screenshot-run]")
       .forEach((figure, index) => {
@@ -181,6 +172,10 @@
           .replace(
             '<div class="card-top">',
             '<div class="run-body"><div class="card-top">',
+          )
+          .replace(
+            '<a href="' + e(U.previewURL(r)) + '"',
+            '<a class="preview-link" href="' + e(U.previewURL(r)) + '"',
           )
           .replace("</article>", "</div></article>");
         return r.screenshot
@@ -281,7 +276,7 @@
           e(t.title) +
           "</a></h3><p>" +
           e(t.description) +
-          '</p><p class="topic-metrics">' +
+          '</p><div class="topic-metadata"><p class="topic-metrics">' +
           new Set(runs.map((r) => r.modelId)).size +
           " 个模型 · " +
           (runs.length !== all.length ? "匹配 " : "") +
@@ -314,7 +309,7 @@
               e(U.runSummary(data, previewRun)) +
               "</p>"
             : "") +
-          '</details><div class="card-actions">' +
+          '</details></div><div class="card-actions">' +
           (previewRun
             ? '<a class="preview-link" href="' +
               e(U.previewURL(previewRun)) +
@@ -336,7 +331,7 @@
                   " / " +
                   U.runSummary(data, recommended),
               ) +
-              '">比较模型实现</a>'
+              '">比较实现</a>'
             : "") +
           "</div></div></article>"
         );

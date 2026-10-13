@@ -26,6 +26,7 @@ test("model picker groups vendors and sorts versions on desktop and mobile", asy
       "GitHub Copilot",
       "MiniMax",
       "OpenAI",
+      "OpenCode",
       "未记录 / 多轮混合",
     ]);
     const ids = await page
@@ -54,6 +55,7 @@ test("model picker groups vendors and sorts versions on desktop and mobile", asy
     /GitHub Copilot/,
     /MiniMax/,
     /OpenAI/,
+    /OpenCode/,
     /未记录/,
   ]);
   const inspect = () =>

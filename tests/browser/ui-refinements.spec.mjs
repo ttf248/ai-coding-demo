@@ -47,14 +47,19 @@ test("mobile experiment cards show actions without horizontal scrolling and expa
 test("gallery screenshot errors can be retried without changing the preview source", async ({
   page,
 }) => {
+  await page.goto("./");
+  const source = await page
+    .locator(".topic-cover img")
+    .first()
+    .getAttribute("src");
+  const screenshotURL = new URL(source, page.url()).href;
   let fail = true;
-  await page.route("**/preview-2026-10-12.png", (route) =>
+  await page.route(screenshotURL, (route) =>
     fail ? route.abort() : route.continue(),
   );
-  await page.goto("./");
+  await page.reload();
   const figure = page.locator(".topic-cover").first();
   await expect(figure.locator(".image-feedback")).toContainText("截图加载失败");
-  const source = await figure.locator("img").getAttribute("src");
   fail = false;
   await figure.locator("[data-retry-image]").click();
   await expect(figure.locator(".image-feedback")).toBeHidden();
