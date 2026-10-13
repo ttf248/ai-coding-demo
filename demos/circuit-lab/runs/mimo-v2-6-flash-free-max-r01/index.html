@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>简化电路实验台</title>
+<style>
+  :root {
+    --bg: #101828;
+    --panel: #1d2939;
+    --line: #344054;
+    --text: #e8eef7;
+    --muted: #98a8bf;
+    --accent: #4cc2ff;
+    --wire: #7fd4ff;
+    --danger: #ff8f8f;
+    --ok: #86efac;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 12px;
+    -webkit-text-size-adjust: 100%;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .row + .row { margin-top: 8px; }
+  button, select, input[type="number"] {
+    background: #0b1220;
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 13px;
+    min-height: 34px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: #175cd3; border-color: #175cd3; font-weight: 600; }
+  button.danger { background: #7a271a; border-color: #99301f; }
+  input[type="number"] { width: 92px; cursor: text; padding: 6px 8px; }
+  label.ctl { color: var(--muted); font-size: 12px; }
+
+  .board-wrap {
+    width: 100%;
+    background: #0b1220;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 6px;
+    overflow: hidden;
+  }
+  #board {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 100 / 64;
+    background:
+      linear-gradient(rgba(76,194,255,.06) 1px, transparent 1px) 0 0 / 100% 8.3333%,
+      linear-gradient(90deg, rgba(76,194,255,.06) 1px, transparent 1px) 0 0 / 6.25% 100%;
+    border-radius: 6px;
+    touch-action: none;
+    overflow: hidden;
+  }
+  #wires { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+  #wires polyline.hit { pointer-events: stroke; cursor: pointer; }
+  .comp {
+    position: absolute;
+    height: 34px;
+    width: 18%;
+    transform: translate(-50%, -50%);
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    background: #16213a;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: grab;
+    user-select: none;
+    z-index: 2;
+    padding: 0 4px;
+    overflow: hidden;
+    white-space: nowrap;
+    touch-action: none;
+  }
+  .comp.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(76,194,255,.35); }
+  .comp.battery { background: #14301f; border-color: #2e7d4f; }
+  .comp.bulb { background: #33260f; border-color: #8a6a1d; }
+  .comp.switch { background: #2a1b3d; border-color: #6b46c1; }
+  .comp .glow {
+    position: absolute;
+    inset: -6px;
+    border-radius: 12px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .term {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    margin-left: -9px;
+    margin-top: -9px;
+    border-radius: 50%;
+    background: #0b1220;
+    border: 2px solid var(--wire);
+    z-index: 3;
+    cursor: crosshair;
+    touch-action: none;
+    padding: 0;
+  }
+  .term:hover, .term.armed { background: var(--wire); }
+  .term.err { border-color: var(--danger); background: #4a1d1d; }
+  .badge {
+    position: absolute;
+    transform: translate(-50%, -140%);
+    font-size: 11px;
+    color: var(--muted);
+    z-index: 2;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  #msg { min-height: 20px; font-size: 13px; margin-top: 8px; }
+  #msg.err { color: var(--danger); }
+  #msg.ok { color: var(--ok); }
+  #msg.info { color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 5px 4px; text-align: left; word-break: break-all; }
+  th { color: var(--muted); font-weight: 500; }
+  .dir { font-weight: 700; color: var(--accent); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; }
+  .stat { background: #0b1220; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; min-width: 0; }
+  .stat b { display: block; font-size: 15px; color: var(--accent); word-break: break-all; }
+  .stat i { font-style: normal; color: var(--muted); font-size: 11px; }
+  details.help { color: var(--muted); font-size: 12px; }
+  details.help summary { cursor: pointer; color: var(--text); }
+  details.help ul { padding-left: 18px; margin: 6px 0 0; }
+  @media (max-width: 430px) {
+    body { padding: 8px; }
+    button, select { padding: 6px 8px; font-size: 12px; }
+    .comp { height: 30px; font-size: 11px; }
+    .term { width: 20px; height: 20px; margin-left: -10px; margin-top: -10px; }
+  }
+</style>
+</head>
+<body>
+  <h1>简化电路实验台</h1>
+  <div class="sub">理想直流电池 · 电阻 · 开关 · 灯泡（固定电阻建模）· 理想导线 · 不含交流与半导体</div>
+
+  <div class="panel">
+    <div class="row">
+      <span class="ctl">添加元件</span>
+      <button type="button" data-add="battery">电池</button>
+      <button type="button" data-add="resistor">电阻</button>
+      <button type="button" data-add="bulb">灯泡</button>
+      <button type="button" data-add="switch">开关</button>
+    </div>
+    <div class="row">
+      <span class="ctl">预设与重置</span>
+      <button type="button" id="preset-series">串联预设</button>
+      <button type="button" id="preset-parallel">并联预设</button>
+      <button type="button" id="clear-board" class="danger">一键重置（清空）</button>
+      <button type="button" id="toggle-all" class="primary">切换所有开关</button>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <div id="board">
+      <svg id="wires" viewBox="0 0 100 64" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </div>
+  </div>
+
+  <div class="panel" id="props" style="margin-top:10px">
+    <div id="props-empty" class="ctl">未选中元件：点击元件选中后可修改参数、切换开关或删除；从一个端子拖到另一个端子即可连线。</div>
+    <div id="props-body" hidden>
+      <div class="row">
+        <strong id="p-title">元件</strong>
+        <span class="ctl" id="p-hint"></span>
+      </div>
+      <div class="row" id="p-value-row">
+        <label class="ctl" for="p-value" id="p-value-label">参数</label>
+        <input id="p-value" type="number" min="0" step="0.5" />
+        <span class="ctl" id="p-unit"></span>
+      </div>
+      <div class="row">
+        <button type="button" id="p-toggle">切换开关</button>
+        <button type="button" id="p-delete" class="danger">删除元件</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="stats">
+      <div class="stat"><b id="s-source">-</b><i>电源电压</i></div>
+      <div class="stat"><b id="s-total">-</b><i>总电流</i></div>
+      <div class="stat"><b id="s-nodes">-</b><i>电路节点数</i></div>
+      <div class="stat"><b id="s-elements">-</b><i>元件数 / 导线</i></div>
+    </div>
+    <div id="msg" role="status" aria-live="polite"></div>
+  </div>
+
+  <div class="panel">
+    <div style="overflow-x:auto">
+      <table id="result-table">
+        <thead>
+          <tr><th>元件</th><th>电压</th><th>电流</th><th>方向 / 状态</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <details class="help">
+      <summary>操作说明与模型边界</summary>
+      <ul>
+        <li><b>添加</b>：点上方按钮新增元件，新元件出现在画布中部，可拖到任意位置。</li>
+        <li><b>连线</b>：按住一个端子（圆点）拖到另一个端子松开即连线；连到同一端子或重复连线会提示。</li>
+        <li><b>选中与修改</b>：点击元件选中，可在下方修改电池电压、电阻值或切换开关；“删除元件”会同时清除相关连线。</li>
+        <li><b>移动</b>：拖动元件本体即可移动，连线跟随元件，连接关系保持不变。</li>
+        <li><b>删除</b>：选中元件后在下方点“删除元件”（会同时清除相关连线）；点击某条导线可单独删除该导线。</li>
+        <li><b>计算</b>：任意改动后立即重新求解串联、并联及混合电路，显示每个元件的电压、电流与方向。</li>
+        <li>开路（未形成回路）显示电流为 0；电源被理想导线或闭合开关直接短接、理想电源相互冲突、方程无唯一解时给出明确提示，不输出 NaN 或伪造的有限电流。</li>
+        <li><b>简化模型</b>：灯泡按固定电阻（8Ω）建模，亮度由耗散功率给出，仅代表简化模型，不代表真实灯泡的伏安特性。</li>
+        <li>只含理想直流电池、电阻、开关、灯泡与理想导线；不含交流、电容、电感与半导体，也不依赖服务器或网络。</li>
+      </ul>
+    </details>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ==================== 常量与状态 ==================== */
+
+  var W = 100, H = 64;          // 画布逻辑坐标
+  var TERM_DX = 9;              // 端子距元件中心的水平距离（逻辑单位）
+  var SWITCH_R = 1e-4;          // 闭合开关的等效电阻（近似理想）
+  var BULB_R = 8;               // 灯泡按固定电阻建模
+
+  var comps = [];               // 元件
+  var wires = [];               // 导线
+  var nextId = 1;
+  var selected = null;
+  var result = null;            // 求解结果
+  var messages = [];            // {kind, text}
+
+  var board = document.getElementById("board");
+  var svg = document.getElementById("wires");
+  var msgEl = document.getElementById("msg");
+  var tbody = document.querySelector("#result-table tbody");
+
+  var NS = "http://www.w3.org/2000/svg";
+
+  function makeId() { return "c" + nextId++; }
+
+  function typeLabel(t) {
+    return { battery: "电池", resistor: "电阻", bulb: "灯泡", "switch": "开关" }[t];
+  }
+
+  /* ==================== 坐标与元件 ==================== */
+
+  function termPos(comp, side) {
+    var dx = side === "a" ? -TERM_DX : TERM_DX;
+    return { x: comp.x + dx, y: comp.y };
+  }
+
+  function addComp(type, x, y) {
+    var c = { id: makeId(), type: type, x: x, y: y, value: 12, closed: true };
+    if (type === "resistor") c.value = 100;
+    if (type === "bulb") c.value = BULB_R;
+    if (type === "switch") c.value = 0;
+    if (type === "battery") c.value = 12;
+    // 避免与已有元件完全重叠
+    var guard = 0;
+    while (guard++ < 60 && comps.some(function (o) { return Math.abs(o.x - x) < 12 && Math.abs(o.y - y) < 8; })) {
+      y += 9;
+      if (y > H - 6) { y = 6; x += 14; }
+      if (x > W - 8) x = 12;
+    }
+    c.x = x; c.y = y;
+    comps.push(c);
+    select(c.id);
+    changed("已添加" + typeLabel(type) + "，拖动端子连线即可接入电路。");
+    return c;
+  }
+
+  function removeComp(id) {
+    comps = comps.filter(function (c) { return c.id !== id; });
+    wires = wires.filter(function (w) {
+      return w.a.c !== id && w.b.c !== id;
+    });
+    if (selected === id) selected = null;
+    changed("已删除元件及相关连线。");
+  }
+
+  function findComp(id) {
+    return comps.filter(function (c) { return c.id === id; })[0];
+  }
+
+  function connected(a, b) {
+    return wires.some(function (w) {
+      return (w.a.c === a.c && w.a.s === a.s && w.b.c === b.c && w.b.s === b.s) ||
+             (w.b.c === a.c && w.b.s === a.s && w.a.c === b.c && w.a.s === b.s);
+    });
+  }
+
+  function addWire(a, b) {
+    if (a.c === b.c && a.s === b.s) { flashTerm(a, true); setMsg("不能把端子连到它自己。", "err"); return false; }
+    if (connected(a, b)) { setMsg("这两个端子之间已经有导线了。", "err"); flashTerm(b, true); return false; }
+    wires.push({ id: makeId(), a: a, b: b });
+    changed("已连线。");
+    return true;
+  }
+
+  /* ==================== 并查集 ==================== */
+
+  function UF() { this.p = Object.create(null); }
+  UF.prototype.find = function (k) {
+    if (!(k in this.p)) this.p[k] = k;
+    while (this.p[k] !== k) { this.p[k] = this.p[this.p[k]]; k = this.p[k]; }
+    return k;
+  };
+  UF.prototype.union = function (a, b) {
+    var ra = this.find(a), rb = this.find(b);
+    if (ra !== rb) this.p[ra] = rb;
+  };
+
+  var tkey = function (id, side) { return id + ":" + side; };
+
+  /* ==================== 求解 ==================== */
+
+  function resistanceOf(c) {
+    if (c.type === "resistor" || c.type === "bulb") return Math.max(1e-6, Number(c.value) || 0);
+    if (c.type === "switch") return c.closed ? SWITCH_R : Infinity;
+    return Infinity; // 电池不按电阻处理
+  }
+
+  function analyze() {
+    messages = [];
+    var res = { byId: {}, sourceVoltage: 0, totalCurrent: 0, nodeCount: 0 };
+
+    if (!comps.length) {
+      res.nodeCount = 0;
+      return res;
+    }
+    res.nodeV = Object.create(null);
+
+    // 1) 理想连接：导线 + 闭合开关（用于节点归并与短路判定）
+    var ufWire = new UF();   // 仅导线：用于 MNA 节点归并
+    var ufIdeal = new UF();  // 导线 + 闭合开关：用于短路检测
+    wires.forEach(function (w) {
+      ufWire.union(tkey(w.a.c, w.a.s), tkey(w.b.c, w.b.s));
+      ufIdeal.union(tkey(w.a.c, w.a.s), tkey(w.b.c, w.b.s));
+    });
+    comps.forEach(function (c) {
+      if (c.type === "switch" && c.closed)
+        ufIdeal.union(tkey(c.id, "a"), tkey(c.id, "b"));
+    });
+
+    var supW = function (c, side) { return ufWire.find(tkey(c.id, side)); };
+
+    // 2) 短路检测：电池两端落在同一理想连通组，波及整组元件
+    var shortGroups = Object.create(null);
+    var shorted = Object.create(null);
+    comps.forEach(function (c) {
+      if (c.type !== "battery") return;
+      var ra = ufIdeal.find(tkey(c.id, "a")), rb = ufIdeal.find(tkey(c.id, "b"));
+      if (ra === rb) {
+        shorted[c.id] = true;
+        shortGroups[ra] = true;
+        messages.push({ kind: "err", text: "电源短路：电池 " + labelOf(c) +
+          " 两端被理想导线 / 闭合开关直接相连，电流无有限解。" });
+      }
+    });
+    var affectedByShort = function (c) {
+      return !!shortGroups[ufIdeal.find(tkey(c.id, "a"))] ||
+             !!shortGroups[ufIdeal.find(tkey(c.id, "b"))];
+    };
+    comps.forEach(function (c) {
+      if (affectedByShort(c)) res.byId[c.id] = { v: null, i: null, lr: null };
+    });
+
+    // 3) 组织边：电池 / 电阻 / 灯泡 / 闭合开关（开路开关不是边）
+    var edges = comps.filter(function (c) {
+      if (c.type === "switch" && !c.closed) return false;
+      if (affectedByShort(c)) return false;
+      return true;
+    });
+
+    // 4) 按连通分量分组
+    var ufComp = new UF();
+    edges.forEach(function (c) { ufComp.union(supW(c, "a"), supW(c, "b")); });
+    var groups = Object.create(null);
+    edges.forEach(function (c) {
+      var root = ufComp.find(supW(c, "a"));
+      (groups[root] = groups[root] || []).push(c);
+    });
+
+    // 5) 对每个分量求解
+    var totalCurrent = 0;
+    Object.keys(groups).forEach(function (root) {
+      var list = groups[root];
+      var nodeSet = Object.create(null);
+      list.forEach(function (c) { nodeSet[supW(c, "a")] = 1; nodeSet[supW(c, "b")] = 1; });
+      var nodes = Object.keys(nodeSet);
+      res.nodeCount += nodes.length;
+
+      var hasBattery = list.some(function (c) { return c.type === "battery"; });
+      var isTree = list.length < nodes.length; // 连通分量：E < V 即无回路
+
+      var localShort = list.some(function (c) { return c.type === "battery" && shorted[c.id]; });
+
+      if (!hasBattery) {
+        // 无电源：全部为 0
+        nodes.forEach(function (n) { res.nodeV[n] = 0; });
+        list.forEach(function (c) { res.byId[c.id] = { v: 0, i: 0, lr: 0 }; });
+        return;
+      }
+
+      if (isTree) {
+        // 未形成回路 = 开路：电流为 0，节点电压由电源约束推导
+        var volts = propagateTree(list, supW);
+        Object.keys(volts).forEach(function (n) { res.nodeV[n] = volts[n]; });
+        list.forEach(function (c) {
+          var va = volts[supW(c, "a")], vb = volts[supW(c, "b")];
+          res.byId[c.id] = { v: (va === undefined || vb === undefined) ? null : Math.abs(va - vb), i: 0, lr: 0 };
+        });
+        messages.push({ kind: "info", text: "开路：该连通部分没有形成回路，相关支路电流为 0。" });
+        return;
+      }
+
+      if (localShort) {
+        list.forEach(function (c) { res.byId[c.id] = { v: null, i: null, lr: null }; });
+        return;
+      }
+
+      // 理想电源回路冲突检测
+      var conflict = findSourceConflict(list, supW);
+      if (conflict) {
+        list.forEach(function (c) { res.byId[c.id] = { v: null, i: null, lr: null }; });
+        messages.push({ kind: "err", text: "相互冲突的理想电源：" + conflict });
+        return;
+      }
+
+      var solved = solveMNA(list, nodes, supW);
+      if (!solved) {
+        list.forEach(function (c) { res.byId[c.id] = { v: null, i: null, lr: null }; });
+        messages.push({ kind: "err", text: "该电路无唯一解（理想约束矛盾或矩阵奇异），已停止输出以免给出伪造电流。" });
+        return;
+      }
+
+      list.forEach(function (c) {
+        var va = solved.V[supW(c, "a")], vb = solved.V[supW(c, "b")];
+        var lr;
+        if (c.type === "battery") {
+          lr = solved.batteryCurrent[c.id];
+        } else {
+          var r = resistanceOf(c);
+          lr = (va - vb) / r;
+        }
+        if (!Number.isFinite(va) || !Number.isFinite(vb) || !Number.isFinite(lr)) {
+          res.byId[c.id] = { v: null, i: null, lr: null };
+          messages.push({ kind: "err", text: "数值异常已拦截：" + labelOf(c) + " 的解不是有限值。" });
+        } else {
+          res.byId[c.id] = { v: Math.abs(va - vb), i: Math.abs(lr), lr: lr };
+        }
+      });
+      Object.keys(solved.V).forEach(function (n) { res.nodeV[n] = solved.V[n]; });
+
+      var batteries = list.filter(function (c) { return c.type === "battery"; });
+      if (batteries.length) {
+        var b0 = batteries[0];
+        var st = res.byId[b0.id];
+        if (st && st.i !== null) {
+          res.sourceVoltage = b0.value;
+          totalCurrent += Math.abs(st.lr);
+        }
+      }
+    });
+
+    // 开路开关：电流为 0；两端节点电位可确定时给出两端电压
+    comps.forEach(function (c) {
+      if (c.type !== "switch" || c.closed) return;
+      var ka = ufWire.find(tkey(c.id, "a")), kb = ufWire.find(tkey(c.id, "b"));
+      // 两端须属于同一求解分量，否则参考电位不同，两端电压不可确定
+      var sameGroup = ufComp.find(ka) === ufComp.find(kb);
+      var va = res.nodeV[ka], vb = res.nodeV[kb];
+      var v = (sameGroup && va !== undefined && vb !== undefined) ? Math.abs(va - vb) : null;
+      res.byId[c.id] = { v: v, i: 0, lr: 0 };
+    });
+
+    res.totalCurrent = totalCurrent;
+
+    // 汇总信息
+    var dup = Object.create(null);
+    messages = messages.filter(function (m) {
+      if (dup[m.text]) return false;
+      dup[m.text] = 1;
+      return true;
+    });
+    return res;
+  }
+
+  function labelOf(c) {
+    if (c.type === "battery") return "电池(" + c.value + "V)";
+    if (c.type === "resistor") return "电阻(" + c.value + "Ω)";
+    if (c.type === "bulb") return "灯泡(8Ω)";
+    return "开关" + (c.closed ? "(闭合)" : "(断开)");
+  }
+
+  function propagateTree(list, supW) {
+    var volts = Object.create(null);
+    var start = supW(list[0], "a");
+    volts[start] = 0;
+    var changed = true, guard = 0;
+    while (changed && guard++ < 200) {
+      changed = false;
+      list.forEach(function (c) {
+        var a = supW(c, "a"), b = supW(c, "b");
+        if (c.type === "battery") {
+          if (volts[a] !== undefined && volts[b] === undefined) { volts[b] = volts[a] - c.value; changed = true; }
+          else if (volts[b] !== undefined && volts[a] === undefined) { volts[a] = volts[b] + c.value; changed = true; }
+        } else {
+          if (volts[a] !== undefined && volts[b] === undefined) { volts[b] = volts[a]; changed = true; }
+          else if (volts[b] !== undefined && volts[a] === undefined) { volts[a] = volts[b]; changed = true; }
+        }
+      });
+    }
+    return volts;
+  }
+
+  // 只看理想电源构成的子图，检测电压环不一致
+  function findSourceConflict(list, supW) {
+    var batteries = list.filter(function (c) { return c.type === "battery"; });
+    if (batteries.length < 2) return null;
+    var volts = Object.create(null);
+    var seen = Object.create(null);
+    var found = null;
+    function visit(node, v) {
+      if (found) return;
+      if (volts[node] !== undefined) {
+        if (Math.abs(volts[node] - v) > 1e-6)
+          found = "同一回路中理想电源电压之和不为 0（" + volts[node].toFixed(3) + "V ≠ " + v.toFixed(3) + "V）。";
+        return;
+      }
+      volts[node] = v;
+      batteries.forEach(function (c) {
+        if (found) return;
+        var a = supW(c, "a"), b = supW(c, "b");
+        if (a === node && !seen[c.id]) { seen[c.id] = 1; visit(b, v - c.value); }
+        else if (b === node && !seen[c.id]) { seen[c.id] = 1; visit(a, v + c.value); }
+      });
+    }
+    visit(supW(batteries[0], "a"), 0);
+    return found;
+  }
+
+  function solveMNA(list, nodes, supW) {
+    var batteries = list.filter(function (c) { return c.type === "battery"; });
+    // 参考节点：优先选第一个电池的负极（b 端），否则任选
+    var ref = batteries.length ? supW(batteries[0], "b") : nodes[0];
+    var idx = Object.create(null);
+    var nid = [];
+    nodes.forEach(function (n) {
+      if (n === ref) return;
+      idx[n] = nid.length;
+      nid.push(n);
+    });
+    var N = nid.length, M = batteries.length, size = N + M;
+    if (size === 0) return { V: Object.create(null), batteryCurrent: Object.create(null) };
+
+    var A = [], b = new Array(size).fill(0), i, j;
+    for (i = 0; i < size; i++) { A.push(new Array(size).fill(0)); }
+
+    function stampG(a, n, G) {
+      if (a in idx) { A[idx[a]][idx[a]] += G; A[idx[a]][idx[n]] -= G; }
+      if (n in idx) { A[idx[n]][idx[n]] += G; A[idx[n]][idx[a]] -= G; }
+    }
+
+    list.forEach(function (c) {
+      if (c.type === "battery") return;
+      var a = supW(c, "a"), n = supW(c, "b");
+      var r = resistanceOf(c);
+      if (!Number.isFinite(r) || r <= 0) return;
+      stampG(a, n, 1 / r);
+    });
+
+    batteries.forEach(function (c, k) {
+      var p = supW(c, "a"), n = supW(c, "b");
+      var col = N + k;
+      if (p in idx) A[idx[p]][col] += 1;
+      if (n in idx) A[idx[n]][col] -= 1;
+      if (p in idx) A[col][idx[p]] += 1;
+      if (n in idx) A[col][idx[n]] -= 1;
+      b[col] = c.value;
+    });
+
+    var x = gauss(A, b);
+    if (!x) return null;
+
+    var V = Object.create(null);
+    V[ref] = 0;
+    nid.forEach(function (n, k) { V[n] = x[k]; });
+    var batteryCurrent = Object.create(null);
+    batteries.forEach(function (c, k) { batteryCurrent[c.id] = x[N + k]; });
+    return { V: V, batteryCurrent: batteryCurrent };
+  }
+
+  function gauss(A, b) {
+    var n = b.length, i, r, c;
+    for (i = 0; i < n; i++) {
+      var p = i;
+      for (r = i + 1; r < n; r++) if (Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r;
+      if (!(Math.abs(A[p][i]) > 1e-12)) return null;
+      if (p !== i) { var t = A[p]; A[p] = A[i]; A[i] = t; var tb = b[p]; b[p] = b[i]; b[i] = tb; }
+      for (r = i + 1; r < n; r++) {
+        var f = A[r][i] / A[i][i];
+        if (!f) continue;
+        for (c = i; c < n; c++) A[r][c] -= f * A[i][c];
+        b[r] -= f * b[i];
+      }
+    }
+    var x = new Array(n).fill(0);
+    for (i = n - 1; i >= 0; i--) {
+      var s = b[i];
+      for (c = i + 1; c < n; c++) s -= A[i][c] * x[c];
+      x[i] = s / A[i][i];
+    }
+    for (i = 0; i < n; i++) if (!Number.isFinite(x[i])) return null;
+    return x;
+  }
+
+  /* ==================== 渲染 ==================== */
+
+  function changed(note) {
+    result = analyze();
+    render();
+    var errs = messages.filter(function (m) { return m.kind === "err"; })
+      .map(function (m) { return m.text; }).join(" ");
+    if (errs) setMsg((note ? note + " " : "") + errs, "err");
+    else if (note) setMsg(note, "info");
+    else renderMessages();
+  }
+
+  function setMsg(text, kind) {
+    msgEl.textContent = text || "";
+    msgEl.className = kind || "";
+  }
+
+  function renderMessages() {
+    if (!messages.length) { setMsg("电路已求解。", "ok"); return; }
+    var errs = messages.filter(function (m) { return m.kind === "err"; });
+    var infos = messages.filter(function (m) { return m.kind === "info"; });
+    if (errs.length) setMsg(errs.map(function (m) { return m.text; }).join(" "), "err");
+    else setMsg(infos.map(function (m) { return m.text; }).join(" "), "info");
+  }
+
+  function fmtV(v) {
+    if (v === null || v === undefined || !Number.isFinite(v)) return "—";
+    return (Math.round(v * 1000) / 1000).toFixed(3).replace(/0+$/, "").replace(/\.$/, "") + " V";
+  }
+
+  function fmtI(i) {
+    if (i === null || i === undefined || !Number.isFinite(i)) return "—";
+    var a = Math.abs(i);
+    if (a < 5e-4) return "0 A（开路/无电流）";
+    if (a >= 1) return a.toFixed(3) + " A";
+    return (a * 1000).toFixed(2) + " mA（" + a.toFixed(3) + " A）";
+  }
+
+  function bulbPower(c, st) {
+    if (!st || st.i === null) return 0;
+    return st.i * st.i * BULB_R;
+  }
+
+  function render() {
+    // 重建元件与端子（数量少，直接全量重建）
+    Array.prototype.slice.call(board.querySelectorAll(".comp,.term,.badge")).forEach(function (n) { n.remove(); });
+
+    comps.forEach(function (c) {
+      var el = document.createElement("div");
+      el.className = "comp " + c.type + (selected === c.id ? " selected" : "");
+      el.style.left = (c.x / W * 100) + "%";
+      el.style.top = (c.y / H * 100) + "%";
+      el.setAttribute("data-id", c.id);
+      el.setAttribute("role", "button");
+      el.setAttribute("tabindex", "0");
+
+      var st = (result && result.byId[c.id]) || null;
+      var text = "";
+      if (c.type === "battery") text = "电池 " + c.value + "V";
+      else if (c.type === "resistor") text = "电阻 " + c.value + "Ω";
+      else if (c.type === "bulb") text = "灯泡 8Ω";
+      else text = c.closed ? "开关 闭合" : "开关 断开";
+
+      if (c.type === "bulb") {
+        var p = bulbPower(c, st);
+        var level = Math.max(0, Math.min(1, p / 6));
+        var glow = document.createElement("span");
+        glow.className = "glow";
+        glow.style.opacity = level ? String(0.25 + level * 0.75) : "0";
+        glow.style.background = "radial-gradient(circle at 50% 50%, rgba(255,226,138," +
+          (0.15 + level * 0.7) + "), rgba(255,180,60,0) 70%)";
+        el.appendChild(glow);
+        text += " · " + (level > 0.66 ? "亮" : level > 0.2 ? "微亮" : "熄");
+      }
+      el.appendChild(document.createTextNode(text));
+      board.appendChild(el);
+
+      ["a", "b"].forEach(function (side) {
+        var pos = termPos(c, side);
+        var t = document.createElement("button");
+        t.type = "button";
+        t.className = "term";
+        t.style.left = (pos.x / W * 100) + "%";
+        t.style.top = (pos.y / H * 100) + "%";
+        t.setAttribute("data-c", c.id);
+        t.setAttribute("data-s", side);
+        t.setAttribute("aria-label", labelOf(c) + (side === "a" ? " 左端子" : " 右端子"));
+        board.appendChild(t);
+      });
+    });
+
+    drawWires(null);
+    renderTable();
+    renderStats();
+    renderProps();
+  }
+
+  function wirePath(a, b) {
+    var midY = (a.y + b.y) / 2;
+    if (Math.abs(a.y - b.y) < 0.01) return a.x + "," + a.y + " " + b.x + "," + b.y;
+    if (Math.abs(a.x - b.x) < 0.01) return a.x + "," + a.y + " " + b.x + "," + b.y;
+    return a.x + "," + a.y + " " + a.x + "," + midY + " " + b.x + "," + midY + " " + b.x + "," + b.y;
+  }
+
+  function drawWires(temp) {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    wires.forEach(function (w) {
+      var ca = findComp(w.a.c), cb = findComp(w.b.c);
+      if (!ca || !cb) return;
+      var pts = wirePath(termPos(ca, w.a.s), termPos(cb, w.b.s));
+      var hit = document.createElementNS(NS, "polyline");
+      hit.setAttribute("points", pts);
+      hit.setAttribute("fill", "none");
+      hit.setAttribute("stroke", "rgba(0,0,0,0)");
+      hit.setAttribute("stroke-width", "14");
+      hit.setAttribute("vector-effect", "non-scaling-stroke");
+      hit.setAttribute("class", "hit");
+      hit.setAttribute("data-wire", w.id);
+      svg.appendChild(hit);
+      var pl = document.createElementNS(NS, "polyline");
+      pl.setAttribute("points", pts);
+      pl.setAttribute("fill", "none");
+      pl.setAttribute("stroke", "#7fd4ff");
+      pl.setAttribute("stroke-width", "3");
+      pl.setAttribute("vector-effect", "non-scaling-stroke");
+      pl.setAttribute("stroke-linecap", "round");
+      svg.appendChild(pl);
+    });
+    if (temp) {
+      var pl2 = document.createElementNS(NS, "polyline");
+      pl2.setAttribute("points", temp);
+      pl2.setAttribute("fill", "none");
+      pl2.setAttribute("stroke", "#ffd166");
+      pl2.setAttribute("stroke-width", "3");
+      pl2.setAttribute("stroke-dasharray", "6 5");
+      pl2.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.appendChild(pl2);
+    }
+  }
+
+  function renderTable() {
+    tbody.innerHTML = "";
+    if (!comps.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="ctl">画布为空，请添加元件或载入预设。</td></tr>';
+      return;
+    }
+    comps.forEach(function (c) {
+      var st = (result && result.byId[c.id]) || { v: null, i: null, lr: null };
+      var tr = document.createElement("tr");
+      var dir = "—";
+      if (st.lr !== null && st.lr !== undefined) {
+        if (Math.abs(st.lr) < 5e-4) dir = "无电流";
+        else if (c.type === "battery") dir = '<span class="dir">' + (st.lr > 0 ? "→" : "←") + "</span> " + (st.lr < 0 ? "放电（正极流出）" : "充电（正极流入）");
+        else dir = '<span class="dir">' + (st.lr > 0 ? "→" : "←") + "</span> " + (st.lr > 0 ? "电流从左到右" : "电流从右到左");
+      } else dir = "无唯一解 / 短路";
+      if (c.type === "switch" && !c.closed) dir = "开关断开，开路";
+      tr.innerHTML = "<td>" + labelOf(c) + "</td><td>" + fmtV(st.v) + "</td><td>" +
+        fmtI(st.i) + "</td><td>" + dir + "</td>";
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderStats() {
+    document.getElementById("s-source").textContent =
+      result.sourceVoltage ? result.sourceVoltage + " V" : (comps.some(function (c) { return c.type === "battery"; }) ? "见下表" : "无电源");
+    document.getElementById("s-total").textContent =
+      result.totalCurrent ? fmtI(result.totalCurrent) : "0 A";
+    document.getElementById("s-nodes").textContent = String(result.nodeCount);
+    document.getElementById("s-elements").textContent =
+      comps.length + " / " + wires.length;
+  }
+
+  function renderProps() {
+    var empty = document.getElementById("props-empty");
+    var body = document.getElementById("props-body");
+    var c = selected ? findComp(selected) : null;
+    if (!c) { empty.hidden = false; body.hidden = true; return; }
+    empty.hidden = true; body.hidden = false;
+    document.getElementById("p-title").textContent = labelOf(c);
+    var row = document.getElementById("p-value-row");
+    var toggle = document.getElementById("p-toggle");
+    if (c.type === "battery") {
+      row.hidden = false;
+      document.getElementById("p-value-label").textContent = "电压";
+      document.getElementById("p-unit").textContent = "V（0–120）";
+      document.getElementById("p-value").value = c.value;
+      toggle.hidden = true;
+    } else if (c.type === "resistor") {
+      row.hidden = false;
+      document.getElementById("p-value-label").textContent = "电阻";
+      document.getElementById("p-unit").textContent = "Ω（1–2000）";
+      document.getElementById("p-value").value = c.value;
+      toggle.hidden = true;
+    } else if (c.type === "bulb") {
+      row.hidden = false;
+      document.getElementById("p-value-label").textContent = "灯泡";
+      document.getElementById("p-unit").textContent = "固定电阻模型 8Ω（不可改）";
+      document.getElementById("p-value").value = BULB_R;
+      document.getElementById("p-value").disabled = true;
+      toggle.hidden = true;
+    } else {
+      row.hidden = false;
+      document.getElementById("p-value-label").textContent = "开关";
+      document.getElementById("p-unit").textContent = c.closed ? "当前闭合（等效 0Ω）" : "当前断开（开路）";
+      document.getElementById("p-value").value = "—";
+      document.getElementById("p-value").disabled = true;
+      toggle.hidden = false;
+      toggle.textContent = c.closed ? "断开开关" : "闭合开关";
+    }
+    if (c.type !== "bulb" && c.type !== "switch") document.getElementById("p-value").disabled = false;
+    document.getElementById("p-hint").textContent = "改动后立即重新计算。";
+  }
+
+  function select(id) {
+    selected = id;
+    render();
+  }
+
+  /* ==================== 交互 ==================== */
+
+  function boardPoint(ev) {
+    var rect = board.getBoundingClientRect();
+    return {
+      x: (ev.clientX - rect.left) / rect.width * W,
+      y: (ev.clientY - rect.top) / rect.height * H
+    };
+  }
+
+  var mode = null;          // "move" | "wire"
+  var moveComp = null, moveOff = { x: 0, y: 0 };
+  var wireFrom = null;
+  var suppressClick = false;
+
+  board.addEventListener("pointerdown", function (ev) {
+    suppressClick = false;
+    var term = ev.target.closest ? ev.target.closest(".term") : null;
+    var compEl = ev.target.closest ? ev.target.closest(".comp") : null;
+    if (term) {
+      ev.preventDefault();
+      mode = "wire";
+      wireFrom = { c: term.getAttribute("data-c"), s: term.getAttribute("data-s") };
+      term.classList.add("armed");
+      board.setPointerCapture(ev.pointerId);
+      return;
+    }
+    if (compEl) {
+      ev.preventDefault();
+      var id = compEl.getAttribute("data-id");
+      select(id);
+      mode = "move";
+      moveComp = findComp(id);
+      var p = boardPoint(ev);
+      moveOff = { x: moveComp.x - p.x, y: moveComp.y - p.y };
+      board.setPointerCapture(ev.pointerId);
+    }
+  });
+
+  board.addEventListener("pointermove", function (ev) {
+    if (!mode) return;
+    ev.preventDefault();
+    var p = boardPoint(ev);
+    if (mode === "move" && moveComp) {
+      moveComp.x = Math.max(TERM_DX + 1, Math.min(W - TERM_DX - 1, p.x + moveOff.x));
+      moveComp.y = Math.max(5, Math.min(H - 5, p.y + moveOff.y));
+      render();
+    } else if (mode === "wire" && wireFrom) {
+      var ca = findComp(wireFrom.c);
+      if (!ca) return;
+      var from = termPos(ca, wireFrom.s);
+      drawWires(wirePath(from, { x: p.x, y: p.y }));
+    }
+  });
+
+  function finishPointer(ev) {
+    var was = mode;
+    if (mode === "wire" && wireFrom) {
+      var el = document.elementFromPoint(ev.clientX, ev.clientY);
+      var term = el && el.closest ? el.closest(".term") : null;
+      if (term) {
+        var target = { c: term.getAttribute("data-c"), s: term.getAttribute("data-s") };
+        if (target.c === wireFrom.c && target.s === wireFrom.s) {
+          setMsg("不能把端子连到它自己。", "err");
+        } else {
+          addWire(wireFrom, target);
+        }
+      } else {
+        setMsg("连线已取消：请松开在另一个端子上。", "info");
+        render();
+      }
+    }
+    if (mode === "move") render();
+    if (was === "move" || was === "wire") suppressClick = true;
+    mode = null; moveComp = null; wireFrom = null;
+    render();
+  }
+  board.addEventListener("pointerup", finishPointer);
+  board.addEventListener("pointercancel", function () {
+    mode = null; moveComp = null; wireFrom = null; render();
+  });
+
+  board.addEventListener("click", function (ev) {
+    if (suppressClick) { suppressClick = false; return; }
+    var compEl = ev.target.closest ? ev.target.closest(".comp") : null;
+    if (compEl) { select(compEl.getAttribute("data-id")); return; }
+    var wireId = ev.target.getAttribute ? ev.target.getAttribute("data-wire") : null;
+    if (wireId) {
+      wires = wires.filter(function (x) { return x.id !== wireId; });
+      changed("已删除导线。");
+      return;
+    }
+    if (!ev.target.closest(".term")) { selected = null; render(); }
+  });
+
+  function flashTerm(t, isError) {
+    var el = board.querySelector('.term[data-c="' + t.c + '"][data-s="' + t.s + '"]');
+    if (!el) return;
+    el.classList.toggle("err", !!isError);
+    setTimeout(function () { el.classList.remove("err"); }, 700);
+  }
+
+  /* ==================== 控件 ==================== */
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-add]"), function (btn) {
+    btn.addEventListener("click", function () {
+      var t = btn.getAttribute("data-add");
+      addComp(t, W / 2, H / 2);
+    });
+  });
+
+  document.getElementById("p-value").addEventListener("change", function (ev) {
+    var c = selected ? findComp(selected) : null;
+    if (!c) return;
+    var v = Number(ev.target.value);
+    if (!Number.isFinite(v)) { setMsg("请输入有效数字。", "err"); renderProps(); return; }
+    if (c.type === "battery") {
+      v = Math.max(0, Math.min(120, v));
+      c.value = Math.round(v * 10) / 10;
+      changed("电池电压已改为 " + c.value + "V，重新计算。");
+    } else if (c.type === "resistor") {
+      v = Math.max(1, Math.min(2000, v));
+      c.value = Math.round(v * 10) / 10;
+      changed("电阻已改为 " + c.value + "Ω，重新计算。");
+    }
+  });
+
+  document.getElementById("p-toggle").addEventListener("click", function () {
+    var c = selected ? findComp(selected) : null;
+    if (!c || c.type !== "switch") return;
+    c.closed = !c.closed;
+    changed(c.closed ? "开关已闭合。" : "开关已断开，相关支路电流应为 0。");
+  });
+
+  document.getElementById("p-delete").addEventListener("click", function () {
+    if (selected) removeComp(selected);
+  });
+
+  document.getElementById("clear-board").addEventListener("click", function () {
+    comps = []; wires = []; selected = null;
+    changed("已清空画布（一键重置）。");
+  });
+
+  document.getElementById("toggle-all").addEventListener("click", function () {
+    var sw = comps.filter(function (c) { return c.type === "switch"; });
+    if (!sw.length) { setMsg("当前没有开关元件。", "info"); return; }
+    var anyOpen = sw.some(function (c) { return !c.closed; });
+    sw.forEach(function (c) { c.closed = anyOpen; });
+    changed(anyOpen ? "全部开关已闭合。" : "全部开关已断开，相关支路电流为 0。");
+  });
+
+  /* ==================== 预设 ==================== */
+
+  function loadSeries() {
+    comps = []; wires = []; nextId = 1;
+    var bat = push("battery", 30, 10, 12);
+    var sw = push("switch", 70, 10, 0, true);
+    var r1 = push("resistor", 30, 54, 100);
+    var r2 = push("resistor", 70, 54, 200);
+    wires.push(w(bat, "b", sw, "a"), w(sw, "b", r2, "b"), w(r2, "a", r1, "b"), w(r1, "a", bat, "a"));
+    selected = null;
+    changed("已载入串联预设：12V 电池 + 开关 + 100Ω + 200Ω，理论电流 0.04A。");
+  }
+
+  function loadParallel() {
+    comps = []; wires = []; nextId = 1;
+    var bat = push("battery", 30, 10, 12);
+    var sw = push("switch", 70, 10, 0, true);
+    var r1 = push("resistor", 30, 40, 100);
+    var r2 = push("resistor", 30, 56, 200);
+    wires.push(w(bat, "b", sw, "a"), w(sw, "b", r1, "b"),
+      w(r1, "a", bat, "a"), w(r1, "a", r2, "a"), w(r1, "b", r2, "b"));
+    selected = null;
+    changed("已载入并联预设：12V 电池对 100Ω//200Ω，理论支路电流 0.12A / 0.06A，总电流 0.18A。");
+  }
+
+  function push(type, x, y, value, closed) {
+    var c = { id: makeId(), type: type, x: x, y: y, value: value, closed: !!closed };
+    comps.push(c);
+    return c;
+  }
+
+  function w(ca, sa, cb, sb) {
+    return { id: makeId(), a: { c: ca.id, s: sa }, b: { c: cb.id, s: sb } };
+  }
+
+  document.getElementById("preset-series").addEventListener("click", loadSeries);
+  document.getElementById("preset-parallel").addEventListener("click", loadParallel);
+
+  /* ==================== 启动 ==================== */
+
+  loadSeries();
+  setMsg("已载入串联预设，电路可直接求解。", "ok");
+})();
+</script>
+</body>
+</html>
