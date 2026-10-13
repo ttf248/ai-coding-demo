@@ -1,0 +1,1149 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>奇幻地图生成器</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0d1117;
+        --panel: #141c26;
+        --panel-2: #1c2733;
+        --line: #2a3746;
+        --text: #e8eef6;
+        --muted: #93a4b8;
+        --accent: #d9b06a;
+        --accent2: #7fb2d6;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.6 "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          system-ui,
+          sans-serif;
+        min-height: 100vh;
+      }
+      header {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--line);
+        background: #101823;
+      }
+      h1 {
+        margin: 0;
+        font-size: 18px;
+      }
+      h1 span {
+        color: var(--accent);
+      }
+      .sub {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 296px minmax(0, 1fr);
+        gap: 12px;
+        padding: 12px;
+        align-items: start;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .panel + .panel {
+        margin-top: 12px;
+      }
+      .panel h2 {
+        margin: 0 0 8px;
+        font-size: 13px;
+        color: var(--accent);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .row label {
+        flex: 0 0 74px;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .row output {
+        flex: 0 0 52px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
+        font-size: 12.5px;
+      }
+      input[type="text"],
+      input[type="number"],
+      select {
+        width: 100%;
+        font: inherit;
+        color: var(--text);
+        background: #0e1620;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 7px 9px;
+      }
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent);
+      }
+      button {
+        font: inherit;
+        color: var(--text);
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 8px 10px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      button:hover {
+        background: #24313f;
+      }
+      button.primary {
+        background: linear-gradient(180deg, #b8863b, #96682a);
+        border-color: #c99a4c;
+        color: #1a1206;
+        font-weight: 600;
+      }
+      button.on {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .grid2 .full {
+        grid-column: span 2;
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .stage {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 16px;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .toolbar b {
+        color: var(--text);
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        border-radius: 8px;
+        background: #0a0f16;
+        touch-action: none;
+        cursor: crosshair;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+        margin-top: 10px;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .legend i {
+        display: inline-block;
+        width: 14px;
+        height: 12px;
+        border-radius: 3px;
+        border: 1px solid #3a4a5c;
+        margin-right: 6px;
+        vertical-align: -2px;
+      }
+      details {
+        border-top: 1px solid var(--line);
+        padding-top: 8px;
+        margin-top: 10px;
+      }
+      summary {
+        cursor: pointer;
+        color: var(--accent2);
+        font-size: 13px;
+      }
+      @media (max-width: 900px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 420px) {
+        .layout {
+          padding: 8px;
+          gap: 8px;
+        }
+        .grid2 {
+          grid-template-columns: 1fr;
+        }
+        .grid2 .full {
+          grid-column: span 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>奇幻地图生成器 <span>· Fantasy Island Cartographer</span></h1>
+      <p class="sub">
+        手绘风格岛屿地图：同一 seed 与参数生成同一张地图；海平面与地形粗糙度可调；河流沿地势下降，不会翻越山脊；支持升高 / 降低地形、平移缩放、城镇标签与 PNG 导出。
+      </p>
+    </header>
+
+    <div class="layout">
+      <div>
+        <div class="panel">
+          <h2>种子与生成</h2>
+          <div class="row">
+            <label for="seed">种子 seed</label>
+            <input id="seed" type="text" value="eldoria" />
+          </div>
+          <div class="grid2">
+            <button class="primary full" id="btnGen">生成地图</button>
+            <button id="btnRandom">随机种子</button>
+            <button id="btnExport">导出 PNG</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>地形参数</h2>
+          <div class="row">
+            <label for="sea">海平面</label>
+            <input id="sea" type="range" min="20" max="62" value="42" />
+            <output id="seaOut">0.42</output>
+          </div>
+          <div class="row">
+            <label for="rough">地形粗糙度</label>
+            <input id="rough" type="range" min="0" max="100" value="45" />
+            <output id="roughOut">0.45</output>
+          </div>
+          <div class="row">
+            <label for="radius">画笔半径</label>
+            <input id="radius" type="range" min="1" max="12" value="4" />
+            <output id="radiusOut">4</output>
+          </div>
+          <p class="hint" style="margin: 8px 0 0">
+            参数变化立即重新生成；画笔编辑后海岸线与河流随之更新。
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2>工具</h2>
+          <div class="grid2">
+            <button data-tool="raise" class="on">升高地形</button>
+            <button data-tool="lower">降低地形</button>
+            <button class="full" data-tool="pan">平移视图</button>
+            <button class="full" id="btnFit">适应窗口</button>
+          </div>
+          <label class="row" style="cursor: pointer">
+            <input type="checkbox" id="showTowns" checked style="width: auto" />
+            <span style="flex: 1">显示城镇标签</span>
+          </label>
+          <p class="hint" style="margin: 8px 0 0">
+            鼠标滚轮 / 双指捏合缩放；按住拖动使用当前工具。触摸设备同样可用。
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2>说明与模型</h2>
+          <details open>
+            <summary>地图是怎么生成的</summary>
+            <ul class="hint" style="margin: 8px 0 0; padding-left: 18px">
+              <li>高度场 = 多倍频值噪声 × 岛屿衰减掩膜；seed 决定噪声查找表与所有随机细节。</li>
+              <li>海平面把高度切成海洋与陆地的分界，靠近海平面的陆地成为海岸带。</li>
+              <li>额外一张湿度噪声决定平原与森林；高出海平面很多的陆地是山脉。</li>
+              <li>河流从高处沿最陡下降方向逐格流向海洋；到达洼地则汇成内陆小湖，不会上坡翻越山脊。</li>
+              <li>画笔直接修改高度场，因此改地形会连带更新海岸线、河流与城镇位置。</li>
+              <li>导出为 PNG 位图，包含当前地图、标题与图例，不含交互状态。</li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="toolbar" id="info"></div>
+        <canvas id="map" width="960" height="720"></canvas>
+        <div class="legend">
+          <span><i style="background: rgb(26, 62, 92)"></i>海洋（越深越暗）</span>
+          <span><i style="background: rgb(110, 154, 178)"></i>近岸浅海</span>
+          <span><i style="background: rgb(233, 218, 172)"></i>海岸</span>
+          <span><i style="background: rgb(214, 214, 160)"></i>平原</span>
+          <span><i style="background: rgb(140, 168, 116)"></i>森林</span>
+          <span><i style="background: rgb(168, 158, 132)"></i>山脉</span>
+          <span><i style="background: rgb(63, 111, 156)"></i>河流</span>
+          <span><i style="background: rgb(138, 43, 43)"></i>城镇标签</span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        /* ================= 常量 ================= */
+        var W = 144,
+          H = 108,
+          CELL = 10;
+        var OCEAN_DEEP = [26, 62, 92],
+          OCEAN = [58, 106, 140],
+          SHALLOW = [110, 154, 178],
+          SAND = [233, 218, 172],
+          PLAIN = [214, 214, 160],
+          PLAIN_HI = [196, 199, 146],
+          FOREST = [140, 168, 116],
+          ROCK = [168, 158, 132],
+          SNOW = [236, 234, 226];
+        var RIVER = "#3f6f9c",
+          COAST = "#6a5333",
+          INK = "#5c4a2e";
+
+        var height = new Float32Array(W * H);
+        var moisture = new Float32Array(W * H);
+        var rivers = [];
+        var lakes = [];
+        var towns = [];
+        var seaLevel = 0.42;
+        var roughness = 0.45;
+        var brushRadius = 4;
+        var tool = "raise";
+        var showTowns = true;
+        var seedText = "eldoria";
+
+        var base = document.createElement("canvas");
+        base.width = W * CELL;
+        base.height = H * CELL;
+        var bctx = base.getContext("2d");
+
+        var canvas = document.getElementById("map");
+        var ctx = canvas.getContext("2d");
+        var view = { scale: 1, tx: 0, ty: 0 };
+        var fitted = false;
+
+        /* ================= 随机与噪声 ================= */
+        function mulberry32(a) {
+          return function () {
+            a |= 0;
+            a = (a + 0x6d2b79f5) | 0;
+            var t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function hashSeed(text) {
+          var h = 2166136261 >>> 0;
+          for (var i = 0; i < text.length; i++) {
+            h ^= text.charCodeAt(i);
+            h = Math.imul(h, 16777619) >>> 0;
+          }
+          return h >>> 0;
+        }
+
+        function makeNoise(seed) {
+          var rand = mulberry32(seed);
+          var p = new Uint8Array(256);
+          for (var i = 0; i < 256; i++) p[i] = i;
+          for (var j = 255; j > 0; j--) {
+            var k = Math.floor(rand() * (j + 1));
+            var t = p[j];
+            p[j] = p[k];
+            p[k] = t;
+          }
+          var perm = new Uint8Array(512);
+          for (var m = 0; m < 512; m++) perm[m] = p[m & 255];
+          function value(ix, iy) {
+            return perm[(perm[ix & 255] + (iy & 255)) & 255] / 255;
+          }
+          return function (x, y) {
+            var x0 = Math.floor(x),
+              y0 = Math.floor(y);
+            var fx = x - x0,
+              fy = y - y0;
+            var sx = fx * fx * (3 - 2 * fx),
+              sy = fy * fy * (3 - 2 * fy);
+            var n00 = value(x0, y0),
+              n10 = value(x0 + 1, y0),
+              n01 = value(x0, y0 + 1),
+              n11 = value(x0 + 1, y0 + 1);
+            return (
+              (n00 * (1 - sx) + n10 * sx) * (1 - sy) +
+              (n01 * (1 - sx) + n11 * sx) * sy
+            );
+          };
+        }
+
+        function fbm(noise, x, y) {
+          var amp = 1,
+            freq = 1,
+            sum = 0,
+            norm = 0;
+          var persistence = 0.36 + roughness * 0.46;
+          for (var o = 0; o < 5; o++) {
+            sum += amp * noise(x * freq, y * freq);
+            norm += amp;
+            amp *= persistence;
+            freq *= 2;
+          }
+          return sum / norm;
+        }
+
+        function shade(col, amount) {
+          var m = /rgb\((\d+),(\d+),(\d+)\)/.exec(col);
+          if (!m) return col;
+          return (
+            "rgb(" +
+            clamp(Number(m[1]) + amount, 0, 255).toFixed(0) +
+            "," +
+            clamp(Number(m[2]) + amount, 0, 255).toFixed(0) +
+            "," +
+            clamp(Number(m[3]) + amount, 0, 255).toFixed(0) +
+            ")"
+          );
+        }
+
+        function clamp(v, a, b) {
+          return v < a ? a : v > b ? b : v;
+        }
+        function smoothstep(a, b, x) {
+          var t = clamp((x - a) / (b - a), 0, 1);
+          return t * t * (3 - 2 * t);
+        }
+        function mix(a, b, t) {
+          return a + (b - a) * t;
+        }
+        function rgb(c, t) {
+          if (t == null) t = 0;
+          return (
+            "rgb(" +
+            Math.round(clamp(c[0] + t, 0, 255)) +
+            "," +
+            Math.round(clamp(c[1] + t, 0, 255)) +
+            "," +
+            Math.round(clamp(c[2] + t, 0, 255)) +
+            ")"
+          );
+        }
+
+        /* ================= 生成 ================= */
+        function generate() {
+          var seed = hashSeed(seedText || "seed");
+          var nz = makeNoise(seed);
+          var nz2 = makeNoise((seed ^ 0x9e3779b9) >>> 0);
+          var contrast = 0.85 + roughness * 0.75;
+
+          for (var y = 0; y < H; y++) {
+            for (var x = 0; x < W; x++) {
+              var nx = (x / (W - 1)) * 2 - 1;
+              var ny = (y / (H - 1)) * 2 - 1;
+              var d = Math.sqrt(nx * nx * 1.0 + ny * ny * 1.28);
+              var warp = nz(x * 0.032, y * 0.032) - 0.5;
+              var mask = 1 - smoothstep(0.46, 1.18, d + warp * 0.26);
+              var e = fbm(nz, x * 0.045, y * 0.045);
+              var h = (e - 0.5) * 1.85 + 0.60;
+              h = Math.pow(clamp(h, 0, 1), 1 / clamp(contrast, 0.5, 2));
+              h = h * mask + (1 - mask) * 0.06;
+              height[y * W + x] = clamp(h, 0, 1);
+
+              var mo = fbm(nz2, x * 0.03 + 40, y * 0.03 + 40);
+              moisture[y * W + x] = clamp((mo - 0.3) * 2.0, 0, 1);
+            }
+          }
+          computeRivers();
+          computeTowns();
+          renderBase();
+        }
+
+        function terrainAt(x, y) {
+          var h = height[y * W + x];
+          if (h < seaLevel) return "ocean";
+          if (h < seaLevel + 0.022) return "coast";
+          if (h > seaLevel + 0.30) return "mountain";
+          if (h > seaLevel + 0.19) return "rock";
+          return moisture[y * W + x] > 0.52 ? "forest" : "plain";
+        }
+
+        function isLand(x, y) {
+          return x >= 0 && y >= 0 && x < W && y < H && height[y * W + x] >= seaLevel;
+        }
+
+        /* ---------- 河流 ---------- */
+        function computeRivers() {
+          rivers = [];
+          lakes = [];
+          var candidates = [];
+          for (var y = 1; y < H - 1; y++)
+            for (var x = 1; x < W - 1; x++)
+              if (height[y * W + x] > seaLevel + 0.24)
+                candidates.push({ x: x, y: y, h: height[y * W + x] });
+          candidates.sort(function (a, b) {
+            return b.h - a.h;
+          });
+
+          var picked = [];
+          for (var i = 0; i < candidates.length && picked.length < 16; i++) {
+            var c = candidates[i];
+            var ok = true;
+            for (var j = 0; j < picked.length; j++) {
+              var dx = picked[j].x - c.x,
+                dy = picked[j].y - c.y;
+              if (dx * dx + dy * dy < 13 * 13) {
+                ok = false;
+                break;
+              }
+            }
+            if (ok) picked.push(c);
+          }
+
+          var occupied = {};
+          picked.forEach(function (src) {
+            var path = traceRiver(src.x, src.y, occupied);
+            if (path.length > 5) rivers.push(path);
+          });
+        }
+
+        function traceRiver(sx, sy, occupied) {
+          var path = [{ x: sx, y: sy }];
+          var seen = {};
+          var x = sx,
+            y = sy,
+            climb = 0;
+          for (var step = 0; step < 3000; step++) {
+            var k = y * W + x;
+            if (seen[k]) break;
+            seen[k] = true;
+            if (height[k] < seaLevel) break; // 入海
+            var cur = height[k];
+            var best = Infinity,
+              bx = -1,
+              by = -1;
+            for (var dy = -1; dy <= 1; dy++) {
+              for (var dx = -1; dx <= 1; dx++) {
+                if (!dx && !dy) continue;
+                var nx = x + dx,
+                  ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                var nh = height[ny * W + nx];
+                if (nh < best) {
+                  best = nh;
+                  bx = nx;
+                  by = ny;
+                }
+              }
+            }
+            if (bx < 0) break;
+            if (best > cur) {
+              // 局部洼地：允许极小幅度脱离浅坑，超出预算就形成内陆湖
+              climb += best - cur;
+              if (climb > 0.028) {
+                lakes.push({ x: x, y: y });
+                break;
+              }
+            }
+            x = bx;
+            y = by;
+            path.push({ x: x, y: y });
+            if (occupied[y * W + x]) break; // 汇入已有河流
+            occupied[y * W + x] = true;
+          }
+          return path;
+        }
+
+        /* ---------- 城镇 ---------- */
+        function computeTowns() {
+          towns = [];
+          var rng = mulberry32(hashSeed(seedText + "|towns"));
+          var pre = ["艾", "洛", "瓦", "银", "晨", "石", "风", "暮", "星", "海", "碧", "寒"];
+          var mid = ["尔", "德", "兰", "斯", "里", "诺", "菲", "恩"];
+          var suf = ["港", "镇", "堡", "村", "城", "湾", "营地", "渡口"];
+          var tries = 0;
+          while (towns.length < 9 && tries++ < 4000) {
+            var x = 6 + Math.floor(rng() * (W - 12));
+            var y = 5 + Math.floor(rng() * (H - 10));
+            var h = height[y * W + x];
+            if (h < seaLevel + 0.03 || h > seaLevel + 0.20) continue;
+            var far = true;
+            for (var i = 0; i < towns.length; i++) {
+              var dx = towns[i].x - x,
+                dy = towns[i].y - y;
+              if (dx * dx + dy * dy < 17 * 17) far = false;
+            }
+            if (!far) continue;
+            var nearWater = false;
+            for (var r = 1; r <= 4 && !nearWater; r++)
+              for (var dy2 = -r; dy2 <= r; dy2++)
+                for (var dx2 = -r; dx2 <= r; dx2++) {
+                  var px = x + dx2,
+                    py = y + dy2;
+                  if (px < 0 || py < 0 || px >= W || py >= H) continue;
+                  if (height[py * W + px] < seaLevel) nearWater = true;
+                }
+            if (!nearWater && towns.length > 3) continue;
+            towns.push({
+              x: x,
+              y: y,
+              name:
+                pre[Math.floor(rng() * pre.length)] +
+                mid[Math.floor(rng() * mid.length)] +
+                suf[Math.floor(rng() * suf.length)],
+            });
+          }
+        }
+
+        /* ================= 渲染 ================= */
+        var noiseForSketch = mulberry32(12345);
+        function sketch(amount) {
+          return (noiseForSketch() - 0.5) * amount;
+        }
+        function reseedSketch() {
+          noiseForSketch = mulberry32(
+            hashSeed(seedText + "|sketch" + seaLevel.toFixed(3) + roughness.toFixed(3)),
+          );
+        }
+
+        function renderBase() {
+          reseedSketch();
+          bctx.clearRect(0, 0, base.width, base.height);
+          var x, y;
+          for (y = 0; y < H; y++) {
+            for (x = 0; x < W; x++) {
+              var h = height[y * W + x];
+              var t = terrainAt(x, y);
+              var col;
+              if (t === "ocean") {
+                var depth = clamp((seaLevel - h) / 0.42, 0, 1);
+                col = rgb([
+                  mix(OCEAN[0], OCEAN_DEEP[0], depth),
+                  mix(OCEAN[1], OCEAN_DEEP[1], depth),
+                  mix(OCEAN[2], OCEAN_DEEP[2], depth),
+                ]);
+              } else if (t === "coast") col = rgb(SAND);
+              else if (t === "mountain") col = rgb(ROCK, (h - seaLevel - 0.3) * 90);
+              else if (t === "rock") col = rgb(PLAIN_HI, (h - seaLevel - 0.19) * 120);
+              else if (t === "forest") col = rgb(FOREST);
+              else col = rgb(PLAIN, (h - seaLevel) * 40);
+              // 每格轻微色差，减少方块感，接近手绘填色
+              bctx.fillStyle = shade(col, (noiseForSketch() - 0.5) * 18);
+              bctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+            }
+          }
+
+          // 浅海
+          for (y = 0; y < H; y++)
+            for (x = 0; x < W; x++) {
+              if (
+                height[y * W + x] < seaLevel &&
+                height[y * W + x] > seaLevel - 0.035
+              ) {
+                bctx.fillStyle = "rgba(160,198,214,0.35)";
+                bctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+              }
+            }
+
+          // 手绘海岸线：只画陆地与水相接的那条边
+          bctx.strokeStyle = COAST;
+          bctx.lineWidth = 2;
+          bctx.lineCap = "round";
+          for (y = 0; y < H; y++) {
+            for (x = 0; x < W; x++) {
+              if (!isLand(x, y)) continue;
+              var px = x * CELL,
+                py = y * CELL;
+              var edges = [];
+              if (!isLand(x - 1, y)) edges.push([px, py, px, py + CELL]);
+              if (!isLand(x + 1, y))
+                edges.push([px + CELL, py, px + CELL, py + CELL]);
+              if (!isLand(x, y - 1)) edges.push([px, py, px + CELL, py]);
+              if (!isLand(x, y + 1))
+                edges.push([px, py + CELL, px + CELL, py + CELL]);
+              if (!edges.length) continue;
+              bctx.beginPath();
+              for (var e = 0; e < edges.length; e++) {
+                var s = edges[e];
+                bctx.moveTo(s[0] + sketch(2), s[1] + sketch(2));
+                bctx.lineTo(s[2] + sketch(2), s[3] + sketch(2));
+              }
+              bctx.stroke();
+            }
+          }
+
+          // 森林
+          for (y = 0; y < H; y++)
+            for (x = 0; x < W; x++) {
+              if (terrainAt(x, y) !== "forest") continue;
+              var r1 = noiseForSketch();
+              if (r1 > 0.42) continue;
+              drawTree(x * CELL + sketch(4) + CELL / 2, y * CELL + sketch(4) + CELL / 2);
+            }
+
+          // 山脉
+          for (y = 0; y < H; y++)
+            for (x = 0; x < W; x++) {
+              var tt = terrainAt(x, y);
+              if (tt !== "mountain") continue;
+              var r2 = noiseForSketch();
+              if (r2 > 0.5) continue;
+              drawPeak(
+                x * CELL + sketch(3) + CELL / 2,
+                y * CELL + sketch(3) + CELL / 2,
+                height[y * W + x],
+              );
+            }
+
+          // 河流
+          bctx.strokeStyle = RIVER;
+          bctx.lineJoin = "round";
+          bctx.lineCap = "round";
+          rivers.forEach(function (path) {
+            bctx.beginPath();
+            for (var i = 0; i < path.length; i++) {
+              var cx = path[i].x * CELL + CELL / 2;
+              var cy = path[i].y * CELL + CELL / 2;
+              if (i === 0) bctx.moveTo(cx, cy);
+              else bctx.lineTo(cx, cy);
+            }
+            bctx.lineWidth = Math.max(2.2, Math.min(5, path.length / 22));
+            bctx.stroke();
+          });
+          lakes.forEach(function (l) {
+            bctx.fillStyle = RIVER;
+            bctx.beginPath();
+            bctx.arc(l.x * CELL + CELL / 2, l.y * CELL + CELL / 2, CELL * 0.9, 0, Math.PI * 2);
+            bctx.fill();
+          });
+
+          // 海浪装饰
+          bctx.strokeStyle = "rgba(226,240,246,0.5)";
+          bctx.lineWidth = 1.6;
+          for (y = 2; y < H - 2; y += 3)
+            for (x = 2; x < W - 2; x += 3) {
+              if (height[y * W + x] >= seaLevel - 0.05) continue;
+              if (noiseForSketch() > 0.20) continue;
+              var wx = x * CELL,
+                wy = y * CELL;
+              bctx.beginPath();
+              bctx.moveTo(wx + 1, wy + 5);
+              bctx.quadraticCurveTo(wx + 5, wy + 1, wx + 9, wy + 5);
+              bctx.stroke();
+            }
+        }
+
+        function drawTree(cx, cy) {
+          bctx.fillStyle = "rgba(74,100,58,0.75)";
+          bctx.beginPath();
+          bctx.moveTo(cx, cy - 5.2);
+          bctx.lineTo(cx + 4.4, cy + 3.6);
+          bctx.lineTo(cx - 4.4, cy + 3.6);
+          bctx.closePath();
+          bctx.fill();
+        }
+
+        function drawPeak(cx, cy, h) {
+          bctx.fillStyle = "rgba(118,106,84,0.85)";
+          bctx.beginPath();
+          bctx.moveTo(cx, cy - 6.4);
+          bctx.lineTo(cx + 5.6, cy + 4.2);
+          bctx.lineTo(cx - 5.6, cy + 4.2);
+          bctx.closePath();
+          bctx.fill();
+          if (h > seaLevel + 0.42) {
+            bctx.fillStyle = "rgba(246,244,238,0.9)";
+            bctx.beginPath();
+            bctx.moveTo(cx, cy - 6.4);
+            bctx.lineTo(cx + 2.4, cy - 2.2);
+            bctx.lineTo(cx - 2.4, cy - 2.2);
+            bctx.closePath();
+            bctx.fill();
+          }
+        }
+
+        /* ---------- 主画布 ---------- */
+        function layout() {
+          var dpr = Math.min(window.devicePixelRatio || 1, 2);
+          var cssW = canvas.clientWidth || 960;
+          var cssH = Math.round((cssW * H) / W);
+          canvas.style.height = cssH + "px";
+          canvas.width = Math.round(cssW * dpr);
+          canvas.height = Math.round(cssH * dpr);
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          canvas._cssW = cssW;
+          canvas._cssH = cssH;
+          if (!fitted) fit();
+          else draw();
+        }
+
+        function fit() {
+          var cssW = canvas._cssW,
+            cssH = canvas._cssH;
+          var s = Math.min(cssW / base.width, cssH / base.height);
+          view.scale = s;
+          view.tx = (cssW - base.width * s) / 2;
+          view.ty = (cssH - base.height * s) / 2;
+          fitted = true;
+          draw();
+        }
+
+        function draw() {
+          var cssW = canvas._cssW,
+            cssH = canvas._cssH;
+          ctx.save();
+          ctx.setTransform(
+            Math.min(window.devicePixelRatio || 1, 2),
+            0,
+            0,
+            Math.min(window.devicePixelRatio || 1, 2),
+            0,
+            0,
+          );
+          ctx.clearRect(0, 0, cssW, cssH);
+          ctx.fillStyle = "#0a0f16";
+          ctx.fillRect(0, 0, cssW, cssH);
+          ctx.translate(view.tx, view.ty);
+          ctx.scale(view.scale, view.scale);
+          ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(base, 0, 0);
+          ctx.restore();
+
+          if (showTowns) {
+            ctx.save();
+            ctx.setTransform(
+              Math.min(window.devicePixelRatio || 1, 2),
+              0,
+              0,
+              Math.min(window.devicePixelRatio || 1, 2),
+              0,
+              0,
+            );
+            towns.forEach(function (t) {
+              var sx = (t.x * CELL + CELL / 2) * view.scale + view.tx;
+              var sy = (t.y * CELL + CELL / 2) * view.scale + view.ty;
+              ctx.beginPath();
+              ctx.arc(sx, sy, 3.2, 0, Math.PI * 2);
+              ctx.fillStyle = "#8a2b2b";
+              ctx.fill();
+              ctx.strokeStyle = "rgba(20,12,6,0.85)";
+              ctx.lineWidth = 1.2;
+              ctx.stroke();
+              ctx.font = "600 12px 'PingFang SC', 'Microsoft YaHei', sans-serif";
+              ctx.textAlign = "left";
+              ctx.textBaseline = "middle";
+              ctx.lineWidth = 3;
+              ctx.strokeStyle = "rgba(255,250,235,0.9)";
+              ctx.strokeText(t.name, sx + 6, sy);
+              ctx.fillStyle = "#3a2a12";
+              ctx.fillText(t.name, sx + 6, sy);
+            });
+            ctx.restore();
+          }
+          updateInfo();
+        }
+
+        function updateInfo() {
+          var land = 0;
+          for (var i = 0; i < height.length; i++) if (height[i] >= seaLevel) land++;
+          document.getElementById("info").innerHTML =
+            "seed <b>" +
+            String(seedText).replace(/[<>&]/g, "") +
+            "</b> · 海平面 <b>" +
+            seaLevel.toFixed(2) +
+            "</b> · 粗糙度 <b>" +
+            roughness.toFixed(2) +
+            "</b> · 陆地占比 <b>" +
+            ((land / height.length) * 100).toFixed(1) +
+            "%</b> · 河流 <b>" +
+            rivers.length +
+            "</b> 条 · 城镇 <b>" +
+            towns.length +
+            "</b> · 缩放 <b>" +
+            view.scale.toFixed(2) +
+            "×</b>";
+        }
+
+        /* ================= 交互 ================= */
+        function screenToWorld(sx, sy) {
+          return {
+            x: (sx - view.tx) / view.scale / CELL,
+            y: (sy - view.ty) / view.scale / CELL,
+          };
+        }
+
+        function localPoint(evt) {
+          var r = canvas.getBoundingClientRect();
+          return { x: evt.clientX - r.left, y: evt.clientY - r.top };
+        }
+
+        function paint(wx, wy, sign) {
+          var r = brushRadius;
+          var changed = false;
+          var cx = Math.floor(wx),
+            cy = Math.floor(wy);
+          for (var dy = -r; dy <= r; dy++)
+            for (var dx = -r; dx <= r; dx++) {
+              var d = Math.sqrt(dx * dx + dy * dy);
+              if (d > r) continue;
+              var x = cx + dx,
+                y = cy + dy;
+              if (x < 0 || y < 0 || x >= W || y >= H) continue;
+              var falloff = 1 - d / (r + 0.001);
+              height[y * W + x] = clamp(
+                height[y * W + x] + sign * 0.06 * (0.35 + falloff),
+                0,
+                1,
+              );
+              changed = true;
+            }
+          return changed;
+        }
+
+        var painting = null;
+        var pointers = {};
+        var pinch = null;
+        var baseDirty = false;
+
+        function scheduleBase() {
+          if (baseDirty) return;
+          baseDirty = true;
+          requestAnimationFrame(function () {
+            baseDirty = false;
+            renderBase();
+            draw();
+          });
+        }
+
+        canvas.addEventListener("pointerdown", function (evt) {
+          evt.preventDefault();
+          try {
+            canvas.setPointerCapture(evt.pointerId);
+          } catch (e) {}
+          pointers[evt.pointerId] = localPoint(evt);
+          var keys = Object.keys(pointers);
+          if (keys.length === 2) {
+            var a = pointers[keys[0]],
+              b = pointers[keys[1]];
+            pinch = {
+              dist: Math.hypot(a.x - b.x, a.y - b.y),
+              mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+              scale: view.scale,
+              tx: view.tx,
+              ty: view.ty,
+            };
+            painting = null;
+            return;
+          }
+          var p = localPoint(evt);
+          if (tool === "pan") {
+            painting = { mode: "pan", sx: p.x, sy: p.y, tx: view.tx, ty: view.ty };
+            return;
+          }
+          var w = screenToWorld(p.x, p.y);
+          painting = { mode: "brush", sign: tool === "raise" ? 1 : -1 };
+          paint(w.x, w.y, painting.sign);
+          scheduleBase();
+        });
+
+        canvas.addEventListener("pointermove", function (evt) {
+          if (!pointers[evt.pointerId]) return;
+          pointers[evt.pointerId] = localPoint(evt);
+          var keys = Object.keys(pointers);
+          if (pinch && keys.length === 2) {
+            var a = pointers[keys[0]],
+              b = pointers[keys[1]];
+            var dist = Math.hypot(a.x - b.x, a.y - b.y);
+            var mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+            var factor = pinch.dist > 0 ? dist / pinch.dist : 1;
+            var ns = clamp(pinch.scale * factor, 0.15, 8);
+            // 以捏合起始状态为基准换算，避免逐帧相对更新造成的漂移
+            var wx = (pinch.mid.x - pinch.tx) / pinch.scale;
+            var wy = (pinch.mid.y - pinch.ty) / pinch.scale;
+            view.scale = ns;
+            view.tx = mid.x - wx * ns;
+            view.ty = mid.y - wy * ns;
+            draw();
+            return;
+          }
+          if (!painting) return;
+          evt.preventDefault();
+          var p = localPoint(evt);
+          if (painting.mode === "pan") {
+            view.tx = painting.tx + (p.x - painting.sx);
+            view.ty = painting.ty + (p.y - painting.sy);
+            draw();
+            return;
+          }
+          var w = screenToWorld(p.x, p.y);
+          if (paint(w.x, w.y, painting.sign)) scheduleBase();
+        });
+
+        function releasePointer(evt) {
+          delete pointers[evt.pointerId];
+          if (Object.keys(pointers).length < 2) pinch = null;
+          if (painting && painting.mode === "brush") {
+            computeRivers();
+            computeTowns();
+            renderBase();
+            draw();
+          }
+          painting = null;
+        }
+        canvas.addEventListener("pointerup", releasePointer);
+        canvas.addEventListener("pointercancel", releasePointer);
+        canvas.addEventListener("pointerleave", function (evt) {
+          if (evt.buttons === 0) releasePointer(evt);
+        });
+
+        canvas.addEventListener(
+          "wheel",
+          function (evt) {
+            evt.preventDefault();
+            var p = localPoint(evt);
+            var factor = Math.exp(-evt.deltaY * 0.0015);
+            var ns = clamp(view.scale * factor, 0.15, 8);
+            var w = screenToWorld(p.x, p.y);
+            view.scale = ns;
+            view.tx = p.x - w.x * CELL * ns;
+            view.ty = p.y - w.y * CELL * ns;
+            draw();
+          },
+          { passive: false },
+        );
+
+        /* ================= 控件 ================= */
+        document.getElementById("seed").addEventListener("input", function () {
+          seedText = this.value;
+          generate();
+          draw();
+        });
+
+        var seaInput = document.getElementById("sea");
+        seaInput.addEventListener("input", function () {
+          seaLevel = Number(this.value) / 100;
+          document.getElementById("seaOut").textContent = seaLevel.toFixed(2);
+          computeRivers();
+          computeTowns();
+          renderBase();
+          draw();
+        });
+
+        var roughInput = document.getElementById("rough");
+        roughInput.addEventListener("input", function () {
+          roughness = Number(this.value) / 100;
+          document.getElementById("roughOut").textContent = roughness.toFixed(2);
+          generate();
+          draw();
+        });
+
+        var radiusInput = document.getElementById("radius");
+        radiusInput.addEventListener("input", function () {
+          brushRadius = Number(this.value);
+          document.getElementById("radiusOut").textContent = String(brushRadius);
+        });
+
+        document.querySelectorAll("[data-tool]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            tool = b.dataset.tool;
+            document.querySelectorAll("[data-tool]").forEach(function (o) {
+              o.classList.toggle("on", o === b);
+            });
+            canvas.style.cursor = tool === "pan" ? "grab" : "crosshair";
+          });
+        });
+
+        document.getElementById("btnGen").addEventListener("click", function () {
+          seedText = document.getElementById("seed").value || "seed";
+          generate();
+          draw();
+        });
+
+        document.getElementById("btnRandom").addEventListener("click", function () {
+          var s = "";
+          var alpha = "abcdefghijklmnopqrstuvwxyz";
+          for (var i = 0; i < 7; i++)
+            s += alpha[Math.floor(Math.random() * alpha.length)];
+          document.getElementById("seed").value = s;
+          seedText = s;
+          generate();
+          draw();
+        });
+
+        document.getElementById("btnFit").addEventListener("click", fit);
+
+        document.getElementById("showTowns").addEventListener("change", function () {
+          showTowns = this.checked;
+          draw();
+        });
+
+        document.getElementById("btnExport").addEventListener("click", function () {
+          var margin = 34;
+          var out = document.createElement("canvas");
+          out.width = base.width + margin * 2;
+          out.height = base.height + margin * 2 + 54;
+          var g = out.getContext("2d");
+          g.fillStyle = "#efe3c4";
+          g.fillRect(0, 0, out.width, out.height);
+          g.strokeStyle = "#7a6338";
+          g.lineWidth = 3;
+          g.strokeRect(10, 10, out.width - 20, out.height - 20);
+          g.lineWidth = 1;
+          g.strokeRect(16, 16, out.width - 32, out.height - 32);
+          g.drawImage(base, margin, margin);
+          g.fillStyle = "#4a3a1c";
+          g.font = "600 20px 'PingFang SC', 'Microsoft YaHei', sans-serif";
+          g.fillText(
+            "奇幻地图 · seed " + seedText + " · 海平面 " + seaLevel.toFixed(2) + " · 粗糙度 " + roughness.toFixed(2),
+            24,
+            base.height + margin + 34,
+          );
+          var link = document.createElement("a");
+          link.download = "fantasy-map-" + seedText + ".png";
+          link.href = out.toDataURL("image/png");
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
+
+        window.addEventListener("resize", layout);
+
+        /* ================= 启动 ================= */
+        generate();
+        layout();
+        window.addEventListener("load", function () {
+          layout();
+        });
+      })();
+    </script>
+  </body>
+</html>

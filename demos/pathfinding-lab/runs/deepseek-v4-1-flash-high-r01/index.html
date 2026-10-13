@@ -1,0 +1,1019 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>寻路算法实验室</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a1018;
+        --panel: #121b28;
+        --panel-2: #1a2738;
+        --line: #26364b;
+        --text: #e6edf7;
+        --muted: #8fa2bd;
+        --accent: #38bdf8;
+        --visited: #1e3a5f;
+        --frontier: #2c6fa8;
+        --path: #fbbf24;
+        --wall: #33455f;
+        --rough: #6b4b1f;
+        --start: #34d399;
+        --goal: #f87171;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.6 "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          system-ui,
+          sans-serif;
+        min-height: 100vh;
+      }
+      header {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--line);
+        background: #0d1521;
+      }
+      h1 {
+        margin: 0;
+        font-size: 18px;
+      }
+      h1 span {
+        color: var(--accent);
+      }
+      .sub {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        gap: 12px;
+        padding: 12px;
+        align-items: start;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .panel + .panel {
+        margin-top: 12px;
+      }
+      .panel h2 {
+        margin: 0 0 8px;
+        font-size: 13px;
+        color: #7dd3fc;
+      }
+      .stage {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        margin-bottom: 10px;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .stats b {
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        border-radius: 8px;
+        background: #070d15;
+        touch-action: none;
+        cursor: crosshair;
+      }
+      button {
+        font: inherit;
+        color: var(--text);
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 8px 10px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      button:hover {
+        background: #22334a;
+      }
+      button.primary {
+        background: linear-gradient(180deg, #1d4ed8, #1e40af);
+        border-color: #2563eb;
+      }
+      button.on {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .grid2 .full {
+        grid-column: span 2;
+      }
+      select,
+      input[type="range"] {
+        width: 100%;
+        font: inherit;
+        color: var(--text);
+        background: #0d1725;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 8px;
+        accent-color: var(--accent);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0 0;
+      }
+      .row label {
+        flex: 0 0 54px;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .legend {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .legend i {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        margin-right: 6px;
+        vertical-align: -2px;
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .algo-note {
+        margin: 8px 0 0;
+        font-size: 12.5px;
+        color: #bfdbfe;
+        background: #10243b;
+        border: 1px solid #1e4568;
+        border-radius: 8px;
+        padding: 7px 9px;
+      }
+      details {
+        border-top: 1px solid var(--line);
+        padding-top: 8px;
+        margin-top: 8px;
+      }
+      summary {
+        cursor: pointer;
+        color: #7dd3fc;
+        font-size: 13px;
+      }
+      @media (max-width: 900px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 420px) {
+        .layout {
+          padding: 8px;
+          gap: 8px;
+        }
+        .grid2 {
+          grid-template-columns: 1fr;
+        }
+        .grid2 .full {
+          grid-column: span 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>寻路算法实验室 <span>· BFS / Dijkstra / A*</span></h1>
+      <p class="sub">
+        四方向网格搜索。BFS 按步数搜索；Dijkstra 与 A* 按地形代价搜索，A* 使用曼哈顿距离启发。起点代价不计入，普通格进入代价 1，高代价格代价 5。
+      </p>
+    </header>
+
+    <div class="layout">
+      <div>
+        <div class="panel">
+          <h2>算法与控制</h2>
+          <select id="algo">
+            <option value="bfs">BFS（按步数）</option>
+            <option value="dijkstra">Dijkstra（按地形代价）</option>
+            <option value="astar" selected>A*（按地形代价，曼哈顿启发）</option>
+          </select>
+          <p class="algo-note" id="algoNote"></p>
+          <div class="grid2" style="margin-top: 8px">
+            <button class="primary full" id="btnRun">运行</button>
+            <button id="btnStep">单步</button>
+            <button id="btnClear">清除搜索</button>
+            <button class="full" id="btnResetMap">重置地图（清空障碍与地形）</button>
+          </div>
+          <div class="row">
+            <label>速度</label>
+            <input
+              type="range"
+              id="speed"
+              min="0"
+              max="100"
+              value="62"
+              aria-label="搜索速度"
+            />
+          </div>
+          <p class="hint" id="speedLabel" style="margin: 4px 0 0"></p>
+        </div>
+
+        <div class="panel">
+          <h2>绘制工具</h2>
+          <div class="grid2">
+            <button data-tool="wall" class="on">障碍</button>
+            <button data-tool="erase">橡皮</button>
+            <button data-tool="rough">高代价地形</button>
+            <button data-tool="start">起点</button>
+            <button data-tool="goal" class="full">终点</button>
+          </div>
+          <p class="hint" style="margin: 8px 0 0">
+            按住拖动连续绘制；直接拖动起点/终点网格也可移动它们。搜索期间编辑地图会立即停止并清除旧搜索。
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2>预设地图（可重复）</h2>
+          <div class="grid2">
+            <button data-preset="empty">空地图</button>
+            <button data-preset="maze">经典迷宫</button>
+            <button data-preset="weighted">加权地形</button>
+            <button data-preset="closed">封闭终点</button>
+          </div>
+          <p class="hint" style="margin: 8px 0 0">
+            同一预设每次生成完全相同的地图（固定随机种子）。
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2>图例与模型</h2>
+          <div class="legend">
+            <span><i style="background: var(--start)"></i>起点</span>
+            <span><i style="background: var(--goal)"></i>终点</span>
+            <span><i style="background: var(--wall)"></i>障碍（不可通行）</span>
+            <span><i style="background: var(--rough)"></i>高代价地形（5）</span>
+            <span><i style="background: var(--frontier)"></i>搜索前沿</span>
+            <span><i style="background: var(--visited)"></i>已访问</span>
+            <span><i style="background: var(--path)"></i>最终路径</span>
+            <span><i style="background: #16243a"></i>普通格（1）</span>
+          </div>
+          <details open>
+            <summary>代价与判定</summary>
+            <ul class="hint" style="margin: 8px 0 0; padding-left: 18px">
+              <li>起点代价不计入；进入普通格 +1，进入高代价地形 +5。</li>
+              <li>BFS 忽略代价，只按步数最少搜索，因此其路径步数最少，但总代价可能不是最小。</li>
+              <li>Dijkstra 与 A* 都按地形代价搜索，应当得到相同的最小总代价（可切换对比）。</li>
+              <li>终点被障碍完全封闭时显示“不可达”，而不是给出错误路径。</li>
+              <li>障碍不能覆盖起点或终点，绘制会被忽略。</li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stats" id="stats"></div>
+        <canvas id="grid" width="960" height="600"></canvas>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var COLS = 31,
+          ROWS = 19;
+        var EMPTY = 0,
+          WALL = 1,
+          ROUGH = 2;
+        var COST = { 0: 1, 2: 5 };
+
+        var DIRS = [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ];
+        var ROLE_NAMES = { bfs: "BFS", dijkstra: "Dijkstra", astar: "A*" };
+        var NOTE = {
+          bfs: "BFS 使用先进先出队列，每步代价视为 1，按步数最少搜索；不使用启发式，也不读取地形代价。",
+          dijkstra: "Dijkstra 使用优先队列按累计地形代价扩展，无启发式，保证得到最小总代价。",
+          astar: "A* 使用优先队列，优先级 f = g + h，h 为到终点的曼哈顿距离（最小单步代价为 1，因此启发可采纳）。",
+        };
+
+        var cells = [];
+        var start = { x: 1, y: 1 };
+        var goal = { x: COLS - 2, y: ROWS - 2 };
+        var tool = "wall";
+        var search = null;
+        var running = false;
+        var lastTime = 0;
+        var rateAcc = 0;
+        var speed = 62;
+        var stats = { expanded: 0, frontier: 0, ms: 0 };
+        var searchStart = 0;
+
+        function idx(x, y) {
+          return y * COLS + x;
+        }
+        function inBounds(x, y) {
+          return x >= 0 && y >= 0 && x < COLS && y < ROWS;
+        }
+        function isWall(x, y) {
+          return cells[idx(x, y)] === WALL;
+        }
+        function isStart(x, y) {
+          return start.x === x && start.y === y;
+        }
+        function isGoal(x, y) {
+          return goal.x === x && goal.y === y;
+        }
+        function canPaint(x, y) {
+          return inBounds(x, y) && !isStart(x, y) && !isGoal(x, y);
+        }
+
+        /* ---------- 确定性随机（固定种子，保证预设可重复） ---------- */
+        function makeRng(seed) {
+          var s = seed >>> 0;
+          return function () {
+            s = (s * 1664525 + 1013904223) >>> 0;
+            return s / 4294967296;
+          };
+        }
+
+        /* ---------- 地图 ---------- */
+        function blankMap() {
+          cells = new Array(COLS * ROWS).fill(EMPTY);
+        }
+
+        function buildMaze(seed) {
+          var rng = makeRng(seed);
+          cells = new Array(COLS * ROWS).fill(WALL);
+          var stack = [[1, 1]];
+          cells[idx(1, 1)] = EMPTY;
+          while (stack.length) {
+            var cur = stack[stack.length - 1];
+            var x = cur[0],
+              y = cur[1];
+            var dirs = DIRS.slice();
+            for (var i = dirs.length - 1; i > 0; i--) {
+              var j = Math.floor(rng() * (i + 1));
+              var t = dirs[i];
+              dirs[i] = dirs[j];
+              dirs[j] = t;
+            }
+            var moved = false;
+            for (var d = 0; d < dirs.length; d++) {
+              var nx = x + dirs[d][0] * 2,
+                ny = y + dirs[d][1] * 2;
+              if (
+                nx > 0 &&
+                ny > 0 &&
+                nx < COLS - 1 &&
+                ny < ROWS - 1 &&
+                cells[idx(nx, ny)] === WALL
+              ) {
+                cells[idx(nx, ny)] = EMPTY;
+                cells[idx(x + dirs[d][0], y + dirs[d][1])] = EMPTY;
+                stack.push([nx, ny]);
+                moved = true;
+                break;
+              }
+            }
+            if (!moved) stack.pop();
+          }
+          start = { x: 1, y: 1 };
+          goal = { x: COLS - 2, y: ROWS - 2 };
+          cells[idx(start.x, start.y)] = EMPTY;
+          cells[idx(goal.x, goal.y)] = EMPTY;
+          cells[idx(goal.x - 1, goal.y)] = EMPTY;
+        }
+
+        function buildWeighted() {
+          blankMap();
+          // 中央高代价地带：横穿要付 4×5，绕行上方或下方只多 8 步
+          // 于是“步数最少”与“代价最小”会给出不同路径，便于对比 BFS 与 Dijkstra / A*
+          for (var x = 14; x <= 17; x++)
+            for (var y = 6; y <= 12; y++) cells[idx(x, y)] = ROUGH;
+          // 两处小沼泽，仅作视觉层次，不影响最优解
+          for (var i = 0; i < 3; i++)
+            for (var j = 0; j < 2; j++) {
+              var px = 3 + i * 2,
+                py = 2 + j;
+              if (canPaint(px, py)) cells[idx(px, py)] = ROUGH;
+            }
+          for (var i2 = 0; i2 < 3; i2++)
+            for (var j2 = 0; j2 < 2; j2++) {
+              var qx = COLS - 6 + i2 * 2,
+                qy = ROWS - 4 + j2;
+              if (canPaint(qx, qy)) cells[idx(qx, qy)] = ROUGH;
+            }
+          start = { x: 1, y: Math.floor(ROWS / 2) };
+          goal = { x: COLS - 2, y: Math.floor(ROWS / 2) };
+          cells[idx(start.x, start.y)] = EMPTY;
+          cells[idx(goal.x, goal.y)] = EMPTY;
+        }
+
+        function buildClosed() {
+          blankMap();
+          start = { x: 1, y: Math.floor(ROWS / 2) };
+          goal = { x: COLS - 3, y: Math.floor(ROWS / 2) };
+          var gx = goal.x,
+            gy = goal.y;
+          for (var dx = -2; dx <= 2; dx++)
+            for (var dy = -2; dy <= 2; dy++) {
+              var x = gx + dx,
+                y = gy + dy;
+              if (!inBounds(x, y)) continue;
+              var ring = Math.abs(dx) === 2 || Math.abs(dy) === 2;
+              if (ring) cells[idx(x, y)] = WALL;
+            }
+        }
+
+        function preset(name) {
+          stopAndClearSearch();
+          if (name === "empty") {
+            blankMap();
+            start = { x: 1, y: Math.floor(ROWS / 2) };
+            goal = { x: COLS - 2, y: Math.floor(ROWS / 2) };
+          } else if (name === "maze") {
+            buildMaze(20261013);
+          } else if (name === "weighted") {
+            buildWeighted();
+          } else if (name === "closed") {
+            buildClosed();
+          }
+          cells[idx(start.x, start.y)] = EMPTY;
+          cells[idx(goal.x, goal.y)] = EMPTY;
+          drawStats();
+          draw();
+        }
+
+        /* ---------- 二叉堆 ---------- */
+        function Heap() {
+          this.items = [];
+        }
+        Heap.prototype.push = function (node, priority) {
+          var items = this.items;
+          items.push({ node: node, priority: priority });
+          var i = items.length - 1;
+          while (i > 0) {
+            var p = (i - 1) >> 1;
+            if (items[p].priority <= items[i].priority) break;
+            var t = items[p];
+            items[p] = items[i];
+            items[i] = t;
+            i = p;
+          }
+        };
+        Heap.prototype.pop = function () {
+          var items = this.items;
+          if (!items.length) return null;
+          var top = items[0];
+          var last = items.pop();
+          if (items.length) {
+            items[0] = last;
+            var i = 0;
+            for (;;) {
+              var l = i * 2 + 1,
+                r = l + 1,
+                m = i;
+              if (l < items.length && items[l].priority < items[m].priority) m = l;
+              if (r < items.length && items[r].priority < items[m].priority) m = r;
+              if (m === i) break;
+              var t = items[m];
+              items[m] = items[i];
+              items[i] = t;
+              i = m;
+            }
+          }
+          return top.node;
+        };
+        Heap.prototype.size = function () {
+          return this.items.length;
+        };
+
+        /* ---------- 搜索 ---------- */
+        function keyOf(x, y) {
+          return x + "," + y;
+        }
+        function manhattan(x, y) {
+          return Math.abs(x - goal.x) + Math.abs(y - goal.y);
+        }
+
+        function newSearch() {
+          var algo = document.getElementById("algo").value;
+          var s = {
+            algo: algo,
+            dist: {},
+            prev: {},
+            visited: {},
+            frontier: {},
+            done: false,
+            found: false,
+            path: [],
+            expanded: 0,
+            order: 0,
+          };
+          s.dist[keyOf(start.x, start.y)] = 0;
+          if (algo === "bfs") {
+            s.queue = [[start.x, start.y]];
+            s.visited[keyOf(start.x, start.y)] = true;
+            s.frontier[keyOf(start.x, start.y)] = true;
+          } else {
+            s.heap = new Heap();
+            s.heap.push({ x: start.x, y: start.y }, 0);
+            s.frontier[keyOf(start.x, start.y)] = true;
+          }
+          searchStart = performance.now();
+          return s;
+        }
+
+        function relax(s, x, y, nx, ny, stepCost) {
+          var k = keyOf(nx, ny);
+          var g = s.dist[keyOf(x, y)] + stepCost;
+          if (s.visited[k]) return;
+          if (s.dist[k] == null || g < s.dist[k]) {
+            s.dist[k] = g;
+            s.prev[k] = { x: x, y: y };
+            s.frontier[k] = true;
+            s.heap.push(
+              { x: nx, y: ny },
+              s.algo === "astar" ? g + manhattan(nx, ny) : g,
+            );
+          }
+        }
+
+        function stepOnce() {
+          var s = search;
+          if (!s || s.done) return false;
+
+          if (s.algo === "bfs") {
+            while (s.queue.length) {
+              var cur = s.queue.shift();
+              var k = keyOf(cur[0], cur[1]);
+              delete s.frontier[k];
+              s.expanded++;
+              if (cur[0] === goal.x && cur[1] === goal.y) {
+                finish(true);
+                return false;
+              }
+              for (var i = 0; i < DIRS.length; i++) {
+                var nx = cur[0] + DIRS[i][0],
+                  ny = cur[1] + DIRS[i][1];
+                if (!inBounds(nx, ny) || isWall(nx, ny)) continue;
+                var nk = keyOf(nx, ny);
+                if (s.visited[nk]) continue;
+                s.visited[nk] = true;
+                s.frontier[nk] = true;
+                s.prev[nk] = { x: cur[0], y: cur[1] };
+                s.dist[nk] = s.dist[k] + 1;
+                s.queue.push([nx, ny]);
+              }
+              return true;
+            }
+            finish(false);
+            return false;
+          }
+
+          var guard = 0;
+          while (guard++ < 4000) {
+            var node = s.heap.pop();
+            if (!node) {
+              finish(false);
+              return false;
+            }
+            var nkey = keyOf(node.x, node.y);
+            if (s.visited[nkey]) continue;
+            s.visited[nkey] = true;
+            delete s.frontier[nkey];
+            s.expanded++;
+            if (node.x === goal.x && node.y === goal.y) {
+              finish(true);
+              return false;
+            }
+            for (var j = 0; j < DIRS.length; j++) {
+              var ax = node.x + DIRS[j][0],
+                ay = node.y + DIRS[j][1];
+              if (!inBounds(ax, ay) || isWall(ax, ay)) continue;
+              relax(s, node.x, node.y, ax, ay, COST[cells[idx(ax, ay)]] || 1);
+            }
+            return true;
+          }
+          return true;
+        }
+
+        function finish(found) {
+          var s = search;
+          if (!s) return;
+          s.done = true;
+          s.found = found;
+          running = false;
+          stats.ms = performance.now() - searchStart;
+          if (found) {
+            var path = [];
+            var cur = { x: goal.x, y: goal.y };
+            while (cur) {
+              path.push(cur);
+              cur = s.prev[keyOf(cur.x, cur.y)];
+            }
+            path.reverse();
+            s.path = path;
+          }
+          updateRunButton();
+          drawStats();
+          draw();
+        }
+
+        function stopAndClearSearch() {
+          search = null;
+          running = false;
+          stats = { expanded: 0, frontier: 0, ms: 0 };
+          rateAcc = 0;
+          updateRunButton();
+          drawStats();
+        }
+
+        function clearSearchOnly() {
+          stopAndClearSearch();
+          draw();
+        }
+
+        function pathCost(path) {
+          var total = 0;
+          for (var i = 1; i < path.length; i++)
+            total += COST[cells[idx(path[i].x, path[i].y)]] || 1;
+          return total;
+        }
+
+        /* ---------- 绘制 ---------- */
+        var canvas = document.getElementById("grid");
+        var ctx = canvas.getContext("2d");
+        var view = { cell: 20, ox: 0, oy: 0, w: 0, h: 0 };
+
+        function layout() {
+          var dpr = Math.min(window.devicePixelRatio || 1, 2);
+          var cssW = canvas.clientWidth || 960;
+          var cell = Math.max(8, cssW / COLS);
+          var cssH = cell * ROWS;
+          canvas.style.height = cssH + "px";
+          canvas.width = Math.round(cssW * dpr);
+          canvas.height = Math.round(cssH * dpr);
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          view.cell = cell;
+          view.ox = 0;
+          view.oy = 0;
+          view.w = cssW;
+          view.h = cssH;
+          draw();
+        }
+
+        function draw() {
+          var cell = view.cell;
+          ctx.clearRect(0, 0, view.w, view.h);
+          var s = search;
+
+          for (var y = 0; y < ROWS; y++) {
+            for (var x = 0; x < COLS; x++) {
+              var v = cells[idx(x, y)];
+              var px = view.ox + x * cell,
+                py = view.oy + y * cell;
+              var fill = "#16243a";
+              if (v === WALL) fill = "#33455f";
+              else if (v === ROUGH) fill = "#6b4b1f";
+              ctx.fillStyle = fill;
+              ctx.fillRect(px, py, cell - 1, cell - 1);
+            }
+          }
+
+          if (s) {
+            ctx.fillStyle = "#1d3a5e";
+            for (var k in s.visited) {
+              var p = k.split(",");
+              ctx.fillRect(
+                view.ox + p[0] * cell,
+                view.oy + p[1] * cell,
+                cell - 1,
+                cell - 1,
+              );
+            }
+            ctx.fillStyle = "#2f7cc4";
+            for (var k2 in s.frontier) {
+              var q = k2.split(",");
+              ctx.fillRect(
+                view.ox + q[0] * cell,
+                view.oy + q[1] * cell,
+                cell - 1,
+                cell - 1,
+              );
+            }
+          }
+
+          if (s && s.path.length > 1) {
+            ctx.strokeStyle = "#fbbf24";
+            ctx.lineWidth = Math.max(2, cell * 0.22);
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            for (var i = 0; i < s.path.length; i++) {
+              var cx = view.ox + s.path[i].x * cell + cell / 2;
+              var cy = view.oy + s.path[i].y * cell + cell / 2;
+              if (i === 0) ctx.moveTo(cx, cy);
+              else ctx.lineTo(cx, cy);
+            }
+            ctx.stroke();
+          }
+
+          drawMarker(start, "#34d399", "起");
+          drawMarker(goal, "#f87171", "终");
+        }
+
+        function drawMarker(p, color, label) {
+          var cell = view.cell;
+          var cx = view.ox + p.x * cell + cell / 2;
+          var cy = view.oy + p.y * cell + cell / 2;
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.38, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#08111c";
+          ctx.font = "bold " + Math.max(8, cell * 0.5) + "px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(label, cx, cy + 1);
+        }
+
+        /* ---------- 统计 ---------- */
+        function drawStats() {
+          var s = search;
+          var algo = ROLE_NAMES[document.getElementById("algo").value];
+          var state = "就绪";
+          var steps = "—",
+            cost = "—";
+          if (s) {
+            if (!s.done) state = running ? "搜索中" : "已暂停";
+            else state = s.found ? "已找到路径" : "不可达";
+            if (s.found && s.path.length) {
+              steps = String(s.path.length - 1);
+              cost = String(pathCost(s.path));
+            }
+          }
+          var frontierCount = 0;
+          if (s) for (var k in s.frontier) frontierCount++;
+          var visitedCount = 0;
+          if (s) for (var k2 in s.visited) visitedCount++;
+          document.getElementById("stats").innerHTML =
+            "算法 <b>" +
+            algo +
+            "</b>" +
+            " · 状态 <b>" +
+            state +
+            "</b>" +
+            " · 展开节点 <b>" +
+            (s ? s.expanded : 0) +
+            "</b>" +
+            " · 已访问 <b>" +
+            visitedCount +
+            "</b>" +
+            " · 前沿 <b>" +
+            frontierCount +
+            "</b>" +
+            " · 路径步数 <b>" +
+            steps +
+            "</b>" +
+            " · 路径总代价 <b>" +
+            cost +
+            "</b>" +
+            (s && s.done ? " · 用时 <b>" + stats.ms.toFixed(0) + " ms</b>" : "");
+        }
+
+        /* ---------- 交互 ---------- */
+        function cellFromEvent(evt) {
+          var rect = canvas.getBoundingClientRect();
+          var x = Math.floor((evt.clientX - rect.left - view.ox) / view.cell);
+          var y = Math.floor((evt.clientY - rect.top - view.oy) / view.cell);
+          if (!inBounds(x, y)) return null;
+          return { x: x, y: y };
+        }
+
+        function applyTool(c) {
+          if (!c) return;
+          if (tool === "start") {
+            if (isWall(c.x, c.y) || isGoal(c.x, c.y)) return;
+            start = { x: c.x, y: c.y };
+            return;
+          }
+          if (tool === "goal") {
+            if (isWall(c.x, c.y) || isStart(c.x, c.y)) return;
+            goal = { x: c.x, y: c.y };
+            return;
+          }
+          if (!canPaint(c.x, c.y)) return;
+          var v = tool === "wall" ? WALL : tool === "erase" ? EMPTY : ROUGH;
+          cells[idx(c.x, c.y)] = v;
+        }
+
+        var painting = null;
+        var dirty = false;
+
+        canvas.addEventListener("pointerdown", function (evt) {
+          evt.preventDefault();
+          try {
+            canvas.setPointerCapture(evt.pointerId);
+          } catch (e) {}
+          var c = cellFromEvent(evt);
+          if (!c) return;
+          if (isStart(c.x, c.y)) painting = "start";
+          else if (isGoal(c.x, c.y)) painting = "goal";
+          else painting = "paint";
+          if (painting !== "paint") dirty = true;
+          applyTool(c);
+          editGuard();
+          draw();
+        });
+
+        canvas.addEventListener("pointermove", function (evt) {
+          if (!painting) return;
+          evt.preventDefault();
+          var c = cellFromEvent(evt);
+          if (!c) return;
+          if (painting === "start") {
+            if (isWall(c.x, c.y) || isGoal(c.x, c.y)) return;
+            start = { x: c.x, y: c.y };
+          } else if (painting === "goal") {
+            if (isWall(c.x, c.y) || isStart(c.x, c.y)) return;
+            goal = { x: c.x, y: c.y };
+          } else {
+            applyTool(c);
+          }
+          editGuard();
+          draw();
+        });
+
+        function endPaint() {
+          painting = null;
+          if (dirty) {
+            dirty = false;
+            drawStats();
+          }
+        }
+        canvas.addEventListener("pointerup", endPaint);
+        canvas.addEventListener("pointercancel", endPaint);
+        canvas.addEventListener("pointerleave", endPaint);
+
+        function editGuard() {
+          if (search && !search.done) {
+            stopAndClearSearch();
+          }
+          dirty = true;
+          drawStats();
+        }
+
+        /* ---------- 控制 ---------- */
+        var btnRun = document.getElementById("btnRun");
+        function updateRunButton() {
+          var s = search;
+          if (!s || s.done) {
+            btnRun.textContent = "运行";
+            btnRun.classList.remove("on");
+          } else {
+            btnRun.textContent = running ? "暂停" : "继续";
+            btnRun.classList.toggle("on", running);
+          }
+        }
+
+        btnRun.addEventListener("click", function () {
+          if (!search || search.done) {
+            search = newSearch();
+            stats.ms = 0;
+          }
+          running = !running;
+          updateRunButton();
+          drawStats();
+          if (running) {
+            lastTime = performance.now();
+            requestAnimationFrame(tick);
+          }
+        });
+
+        document.getElementById("btnStep").addEventListener("click", function () {
+          if (!search || search.done) {
+            search = newSearch();
+            stats.ms = 0;
+          }
+          running = false;
+          updateRunButton();
+          stepOnce();
+          drawStats();
+          draw();
+        });
+
+        document.getElementById("btnClear").addEventListener("click", function () {
+          clearSearchOnly();
+        });
+
+        document.getElementById("btnResetMap").addEventListener("click", function () {
+          preset("empty");
+        });
+
+        document.getElementById("algo").addEventListener("change", function () {
+          document.getElementById("algoNote").textContent =
+            NOTE[this.value] || "";
+          stopAndClearSearch();
+          draw();
+        });
+
+        document.querySelectorAll("[data-tool]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            tool = b.dataset.tool;
+            document.querySelectorAll("[data-tool]").forEach(function (o) {
+              o.classList.toggle("on", o === b);
+            });
+          });
+        });
+
+        document.querySelectorAll("[data-preset]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            preset(b.dataset.preset);
+          });
+        });
+
+        var speedInput = document.getElementById("speed");
+        function speedRate() {
+          return Math.pow(2, (speed / 100) * 11); // 1 .. 2048 次/秒
+        }
+        function updateSpeedLabel() {
+          var r = speedRate();
+          document.getElementById("speedLabel").textContent =
+            r < 10 ? r.toFixed(1) + " 次 / 秒" : Math.round(r) + " 次 / 秒";
+        }
+        speedInput.addEventListener("input", function () {
+          speed = Number(speedInput.value);
+          updateSpeedLabel();
+        });
+
+        function tick(now) {
+          if (!running || !search || search.done) return;
+          var dt = Math.max(0, (now - lastTime) / 1000);
+          lastTime = now;
+          rateAcc += dt * speedRate();
+          // 按速率累积：低速率时一帧可能不推进，也不强制每帧至少一步，否则最慢档也等于 60 步/秒
+          var budget = Math.floor(rateAcc);
+          rateAcc -= budget;
+          if (budget > 20000) budget = 20000;
+          for (var i = 0; i < budget; i++) {
+            if (!stepOnce()) break;
+          }
+          drawStats();
+          draw();
+          if (running) requestAnimationFrame(tick);
+        }
+
+        window.addEventListener("resize", layout);
+
+        /* ---------- 启动 ---------- */
+        document.getElementById("algoNote").textContent = NOTE.astar;
+        updateSpeedLabel();
+        preset("weighted");
+        updateRunButton();
+        layout();
+        drawStats();
+      })();
+    </script>
+  </body>
+</html>
