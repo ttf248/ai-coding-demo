@@ -23,10 +23,7 @@ test("homepage covers use registered run screenshots and direct previews", async
     return {
       path: `${run.directory}/${run.screenshot}`,
       modelId: run.modelId,
-      label:
-        window.ArchiveUI.modelLabel(window.ARCHIVE, run) +
-        " · " +
-        window.ArchiveUI.effortLabel(run.effort),
+      label: window.ArchiveUI.modelLabel(window.ARCHIVE, run),
     };
   }, topic.id);
   await expect(card.locator(".topic-cover img")).toHaveAttribute(
@@ -290,6 +287,14 @@ test("cover preview keeps screenshot, selected version and direct entry aligned"
   await card.locator(".cover-preview").click();
   await expect(page.locator("#preview-dialog")).toBeVisible();
   await expect(page.locator("#preview-version")).toHaveValue(id);
+  const effort = await page.evaluate(
+    (runId) =>
+      window.ArchiveUI.effortLabel(
+        window.ARCHIVE.runs.find((run) => run.id === runId).effort,
+      ),
+    id,
+  );
+  await expect(page.locator("#preview-caption")).toContainText(effort);
   await expect(page.locator("#preview-stage img")).toHaveAttribute("src", src);
   await expect(page.locator("#preview-open")).toHaveAttribute("href", href);
   await expect(page.locator("iframe")).toHaveCount(0);

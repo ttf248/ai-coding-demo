@@ -22,6 +22,7 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
     "GitHub Copilot",
     "MiniMax",
     "OpenAI",
+    "OpenCode",
     "未记录 / 多轮混合",
   ]);
   expect(
@@ -33,6 +34,7 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
     "GitHub Copilot",
     "MiniMax",
     "OpenAI",
+    "OpenCode",
     "未记录 / 多轮混合",
   ]);
   await expect(page.locator("#model option")).toHaveText([
@@ -55,6 +57,8 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
     "GPT-6 Sol",
     "GPT-5.6 Luna",
     "GPT-5.6 Sol",
+    "MiMo-V2.6-Flash Free",
+    "Muse Spark 1.3 Free",
     "未记录 / 多轮混合",
   ]);
   await page.locator("#advanced-filters > summary").click();
