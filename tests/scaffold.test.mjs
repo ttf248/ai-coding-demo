@@ -16,7 +16,7 @@ test("new demo scaffolding reuses prompts, allocates repeat runs and refuses unk
     fs.writeFileSync(file, value);
   };
   try {
-    for (const name of ["lib.mjs", "new-demo.mjs"])
+    for (const name of ["lib.mjs", "site-output.mjs", "new-demo.mjs"])
       write(
         "scripts/" + name,
         fs.readFileSync(path.join(ROOT, "scripts", name)),

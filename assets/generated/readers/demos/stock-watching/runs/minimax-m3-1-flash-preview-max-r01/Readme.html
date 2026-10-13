@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f7f9"><title>自选股全栈小系统 · AI Coding Demo</title><meta name="description" content="按任务正文 v1 产出的全栈自选股系统：React 18 前端 + Go Gin/GORM 后端 + PostgreSQL，支持多市场切换与合约的新增、删除、修改、查询，列表展示基础行情；后端提供 CORS、参数校验、统一错误结构与请求/应答日志，前后端两侧都打印通信日志，后端不可用时前端给出明确告警并自动重试。"><meta property="og:title" content="自选股全栈小系统"><meta property="og:description" content="按任务正文 v1 产出的全栈自选股系统：React 18 前端 + Go Gin/GORM 后端 + PostgreSQL，支持多市场切换与合约的新增、删除、修改、查询，列表展示基础行情；后端提供 CORS、参数校验、统一错误结构与请求/应答日志，前后端两侧都打印通信日志，后端不可用时前端给出明确告警并自动重试。"><meta property="og:type" content="article"><link rel="stylesheet" href="../../../../../../site.css"><link rel="stylesheet" href="../../../../../../document.css"><script src="../../../../../../document.js" defer></script></head><body class="document-page"><a class="skip-link" href="#document-content">跳到正文</a><header class="site-header"><div class="container header-inner"><a class="brand" href="../../../../../../../index.html"><span class="brand-mark">AI</span>CODING / DEMO</a><nav aria-label="主导航"><a href="../../../../../../../index.html#projects">实验目录</a><a href="../../../../../../../compare.html">模型对比</a><a href="../../../../../../../index.html#guides">技术索引</a></nav></div></header><main class="container document-layout"><aside class="document-sidebar"><details open><summary>本页目录</summary><nav aria-label="文档目录"><a class="toc-level-1" href="#自选股全栈小系统任务正文-v1">自选股全栈小系统（任务正文 v1）</a><a class="toc-level-2" href="#目录">目录</a><a class="toc-level-2" href="#本地运行">本地运行</a><a class="toc-level-2" href="#接口">接口</a><a class="toc-level-2" href="#关键实现">关键实现</a><a class="toc-level-3" href="#跨域">跨域</a><a class="toc-level-3" href="#校验与错误处理">校验与错误处理</a><a class="toc-level-3" href="#日志">日志</a><a class="toc-level-3" href="#后端不可用">后端不可用</a><a class="toc-level-3" href="#行情数据源">行情数据源</a><a class="toc-level-2" href="#验证记录">验证记录</a><a class="toc-level-2" href="#已知边界">已知边界</a><a class="toc-level-2" href="#当前归档信息自动生成">当前归档信息（自动生成）</a><a class="toc-level-3" href="#部署适配记录">部署适配记录</a></nav></details></aside><div><div class="document-actions"><a href="../../../../../../../demos/stock-watching/runs/minimax-m3-1-flash-preview-max-r01/Readme.md" download>下载 Markdown 原文 ↗</a><a href="../../../../../../../topic.html?id=stock-watching">查看主题与版本 →</a></div><p class="document-context">MiniMax M3.1 Flash Preview · max · 实验日期 2026-09-29 · 归档日期 未记录</p><article id="document-content" class="document-content"><h1 id="自选股全栈小系统任务正文-v1">自选股全栈小系统（任务正文 v1）</h1>
+<p>一个可运行的全栈自选股系统：<strong>React 18 前端 + Go Gin/GORM 后端 + PostgreSQL</strong>。
+支持 A 股 / 港股 / 美股切换，自选股的新增、删除、修改、查询，列表直接展示基础行情；
+后端提供跨域、参数校验、统一错误结构与请求 / 应答日志，前端打印每一次通信的请求与应答，
+后端不可用时页面给出明确告警并自动重试。</p>
+<blockquote>
+<p>本项目是全栈应用，没有可公开访问的静态预览地址，因此归档中不登记 <code>external</code>。
+源码与运行方式都在本目录，按下面的步骤即可在本地跑起来。</p>
+</blockquote>
+<h2 id="目录">目录</h2>
+<pre><code>docker-compose.yml          一条命令起 PostgreSQL
+backend/                    Go 服务
+  main.go                   启动、优雅退出、超时配置
+  .env.example              全部可配置项
+  migrations/001_init.sql   参考 DDL（服务启动时用 AutoMigrate 自动建表）
+  internal/
+    config/                 环境变量读取
+    database/               连接池、AutoMigrate、种子数据
+    models/                 实体与出入参结构
+    repository/             自选股与基础数据访问
+    service/                行情数据源（接口 + 模拟实现）
+    handler/                HTTP 接口
+    middleware/             CORS、请求日志、panic 恢复、请求 ID
+    apperr/                 统一错误类型
+frontend/                   React 应用
+  src/api.js                接口封装 + 通信日志
+  src/App.jsx               页面编排、轮询、告警与重试
+  src/components/           表格、弹窗、通信日志面板
+</code></pre>
+<h2 id="本地运行">本地运行</h2>
+<pre><code class="language-sh"># 1. 数据库
+docker compose up -d          # 或者用本机已有的 PostgreSQL
+
+# 2. 后端
+cd backend
+cp .env.example .env          # 按需修改
+go run .                      # 默认监听 :8080
+
+# 3. 前端（另开一个终端）
+cd frontend
+npm ci
+npm run dev                   # http://localhost:5173
+</code></pre>
+<p>前端开发服务器把 <code>/api</code> 代理到 <code>http://127.0.0.1:8080</code>，因此本地不需要额外处理跨域；
+但后端仍然实现了完整的 CORS 中间件，直接跨域访问时把前端地址加进 <code>CORS_ORIGINS</code> 即可。</p>
+<p>首次启动时后端会自动建表，并写入 A 股 / 港股 / 美股三个市场与 15 个示例代码。</p>
+<h2 id="接口">接口</h2>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>路径</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/health</code></td>
+<td>健康检查。数据库不通时返回 503 + <code>status: degraded</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/markets</code></td>
+<td>市场列表</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/markets/:marketCode/symbols</code></td>
+<td>某市场下的代码列表</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/watchlist?market=&amp;q=</code></td>
+<td>查询自选股（可按市场过滤、按关键字搜索）</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/v1/watchlist</code></td>
+<td>新增，重复添加返回 409</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/v1/watchlist/:id</code></td>
+<td>修改备注 / 提醒价 / 排序（部分更新）</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/v1/watchlist/:id</code></td>
+<td>删除</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/quotes?market=&amp;codes=</code></td>
+<td>批量行情</td>
+</tr>
+</tbody>
+</table>
+<p>用户维度由请求头 <code>X-User-Key</code> 区分，缺省为 <code>demo</code>。</p>
+<p>统一响应结构：</p>
+<pre><code class="language-json">{ &quot;requestId&quot;: &quot;…&quot;, &quot;data&quot;: { } }
+{ &quot;requestId&quot;: &quot;…&quot;, &quot;error&quot;: { &quot;code&quot;: &quot;INVALID_INPUT&quot;, &quot;message&quot;: &quot;请求参数不合法&quot;, &quot;fields&quot;: { &quot;note&quot;: &quot;备注不能超过 200 字&quot; } } }
+</code></pre>
+<h2 id="关键实现">关键实现</h2>
+<h3 id="跨域">跨域</h3>
+<p><code>middleware.CORS</code> 接受白名单来源列表，回显 <code>Access-Control-Allow-Origin</code>，
+放行 <code>Content-Type / Authorization / X-User-Key / X-Request-Id</code>，
+<code>OPTIONS</code> 预检直接返回 204 并带 10 分钟 <code>Max-Age</code>。</p>
+<h3 id="校验与错误处理">校验与错误处理</h3>
+<ul>
+<li>请求体用结构体 tag 做必填校验，业务规则（备注长度、提醒价非负、排序非负、id 为正整数）在 handler 里显式校验，
+错误信息带字段名返回，前端可以直接标红对应输入框。</li>
+<li>数据库层的「记录不存在」统一映射为 404，重复添加映射为 409。</li>
+<li><code>middleware.Recovery</code> 兜住 panic，返回同一套错误结构并打印堆栈。</li>
+<li>包级 <code>ErrXxx</code> 是只读模板，<code>WithField</code> / <code>WithCause</code> 返回副本，避免并发请求串字段。</li>
+</ul>
+<h3 id="日志">日志</h3>
+<ul>
+<li>后端：<code>middleware.RequestID</code> 生成或透传 <code>X-Request-Id</code>；<code>middleware.Logger</code> 打印
+<code>[req] 方法 路径 来源IP query 请求体摘要</code> 与 <code>[resp] 状态码 字节数 耗时</code>，5xx 额外记录底层原因。
+请求体读取后会被放回，handler 仍能正常解析。</li>
+<li>前端：<code>src/api.js</code> 在每次请求前后打一条日志，同时输出到浏览器控制台和页面底部的
+「通信日志」折叠面板（可按全部 / 失败 / 成功过滤）。</li>
+</ul>
+<h3 id="后端不可用">后端不可用</h3>
+<p>三层保护：</p>
+<ol>
+<li>数据库连不上时后端不退出，以只读模式继续监听，数据库接口统一返回 503；</li>
+<li>前端把「代理层 5xx（不含后端 error.code）」和「fetch 直接失败」都判定为后端不可用，
+停止轮询，顶部出现两条告警（一条说明原因与排查方式，一条说明数据为缓存且 8 秒后自动重试）；</li>
+<li>恢复后自动重新拉取健康检查并恢复行情刷新。</li>
+</ol>
+<h3 id="行情数据源">行情数据源</h3>
+<p><code>service.QuoteProvider</code> 是接口，当前实现 <code>SimulatedProvider</code> 按「代码 + 15 秒时间桶」确定性生成
+价格、昨收、今开、最高、最低、成交量与涨跌幅：同一时刻重复请求结果一致，随时间自然变化，
+响应里 <code>source: &quot;simulated&quot;</code> 标明来源。接真实行情时新增一个实现并切换 <code>QUOTE_MODE</code> 即可，
+handler 与前端都不需要改。</p>
+<h2 id="验证记录">验证记录</h2>
+<ul>
+<li><code>go build ./...</code>、<code>go vet ./...</code>、<code>gofmt</code> 均通过。</li>
+<li><code>go run .</code> 实际启动后逐项核对：跨域响应头、预检 204、<code>X-Request-Id</code> 回传、
+备注超长 / 缺少必填 / id 非法三种校验错误、数据库缺失时的 503、以及 <code>[req]</code> <code>[resp]</code> 两条日志。</li>
+<li>前端 <code>npm run build</code> 通过；用真实浏览器打开开发服务器，确认后端宕机时出现「后端不可用」告警与通信日志面板。</li>
+<li><strong>未覆盖</strong>：测试环境没有可用的 PostgreSQL 实例，带数据库的自选股读写链路（自动建表、种子数据、
+实际落库的增删改查）没有在真实数据库上跑通，只经过编译与接口契约检查。</li>
+</ul>
+<h2 id="已知边界">已知边界</h2>
+<ul>
+<li>没有鉴权与登录，<code>X-User-Key</code> 只是用来区分数据归属的占位做法。</li>
+<li>行情为模拟数据，不接任何真实行情供应商。</li>
+<li>前端没有做分页，自选股数量大时一次性返回。</li>
+<li>没有写测试用例（Go 单测与前端测试均未包含）。</li>
+</ul>
+<p>&lt;!-- archive:start --&gt;</p>
+<h2 id="当前归档信息自动生成">当前归档信息（自动生成）</h2>
+<ul>
+<li>实验 ID：<code>stock-watching--minimax-m3-1-flash-preview-max-r01</code></li>
+<li>模型：MiniMax M3.1 Flash Preview；推理档位：max</li>
+<li>类型：fullstack；预览：none；网络：required</li>
+<li><a href="../../../../../../../demos/stock-watching/runs/minimax-m3-1-flash-preview-max-r01/prompt.md">完整原始输入快照</a> · <a href="../../../../../../../topic.html?id=stock-watching">主题与其他版本</a></li>
+<li>输入记录：用户指令、覆盖范围确认与任务正文 v1 原文均已完整留存，无图片、附件或历史上下文。任务正文提到「基于项目原型图」，但该原型图未随本轮输入提供，本轮按文字描述自行设计信息架构。</li>
+<li>工具：Claude Code（当前会话）。模型 MiniMax M3.1 Flash Preview，推理档位 max，单会话直接执行，未委派子代理。已验证：go build / go vet / gofmt 通过，go run 启动后 CORS 头、请求 ID、参数校验（备注超长、缺少必填、id 非法）、统一错误结构、预检请求、数据库缺失时的 503 与前后端日志均按预期输出；前端 vite build 通过，并用真实浏览器验证了「后端不可用」告警与通信日志面板。测试环境没有可用的 PostgreSQL 实例，因此带数据库的读写链路（自动建表、种子数据、自选股 CRUD 的实际落库）未在真实库上跑通，这部分只经过编译与接口契约检查。</li>
+<li>运行方式：无静态预览，参见上方历史说明与源码。</li>
+</ul>
+<h3 id="部署适配记录">部署适配记录</h3>
+<ul>
+<li>行情数据：任务正文未指定行情来源，这里抽象出 service.QuoteProvider 接口并提供 SimulatedProvider 实现（按「代码 + 15 秒时间桶」确定性生成价格，同一时刻多次请求一致、随时间自然变化），响应中带 source 字段标明来源。接真实行情只需新增一个实现并切换 QUOTE_MODE，handler 与前端不改。</li>
+<li>后端不可用时的行为：数据库连不上时服务不退出，仍监听端口并以只读模式启动，数据库相关接口统一返回 503 与 {code, message, fields} 结构；/api/v1/health 返回 status=degraded，前端据此展示「后端降级」。</li>
+<li>错误对象改为不可变：包级 ErrXxx 作为只读模板，WithField / WithCause 返回副本，避免并发请求之间互相污染 fields（初版直接改共享对象，实测出现跨请求串字段）。</li>
+<li>前端补充网关错误识别：Vite dev proxy 与反向代理在后端宕机时返回的是代理自己的 5xx（不含后端的 error.code），前端据此判定为「后端不可用」而不是普通业务错误。</li>
+<li>归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/stock-watching/runs/minimax-m3-1-flash-preview-max-r01；保留该测试轮号。
+&lt;!-- archive:end --&gt;</li>
+</ul>
+</article><p class="document-copy-status" role="status"></p></div></main><footer><div class="container">AI CODING DEMO / 实验记录与技术说明。</div></footer></body></html>

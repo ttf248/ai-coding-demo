@@ -18,12 +18,18 @@ function fixture() {
   };
   for (const name of [
     "lib.mjs",
+    "site-output.mjs",
     "new-demo.mjs",
     "topic-status.mjs",
     "topic-lifecycle.mjs",
     "serve.mjs",
   ])
     write("scripts/" + name, fs.readFileSync(path.join(ROOT, "scripts", name)));
+  fs.symlinkSync(
+    path.join(ROOT, "node_modules"),
+    path.join(directory, "node_modules"),
+    "junction",
+  );
   fs.mkdirSync(path.join(directory, "demos"));
   write("catalog/models.json", '[{"id":"unknown","label":"Unknown"}]');
   write("catalog/categories.json", "[]");

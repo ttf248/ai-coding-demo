@@ -5,8 +5,15 @@
   const topic = data.topics.find(
     (t) => t.id === new URLSearchParams(location.search).get("id"),
   );
-  const heading = document.querySelector(".page-heading");
-  if (!topic || !heading) return;
+  if (!topic) return;
+  let heading = document.querySelector(".page-heading");
+  if (!heading) {
+    await new Promise((resolve) =>
+      document.addEventListener("archive:topic-ready", resolve, { once: true }),
+    );
+    heading = document.querySelector(".page-heading");
+  }
+  if (!heading) return;
   const archived = U.isTopicArchived(topic);
   heading.insertAdjacentHTML(
     "beforeend",

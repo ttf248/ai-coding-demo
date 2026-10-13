@@ -9,6 +9,7 @@
     q: params.get("q") || "",
     category: params.get("category") || "",
     provider: params.get("provider") || "",
+    tool: params.get("tool") || "",
     model: params.get("model") || "",
     type: params.get("type") || "",
     prompt: params.get("prompt") || "",
@@ -23,6 +24,25 @@
     view: params.get("view") || "grid",
   };
   let visible = 9;
+  let restoredScroll = 0;
+  try {
+    const saved = JSON.parse(
+      sessionStorage.getItem("archive-home-return") || "null",
+    );
+    const navigation = performance.getEntriesByType("navigation")[0];
+    if (saved?.url === location.href && navigation?.type === "back_forward") {
+      visible = saved.visible;
+      restoredScroll = saved.scroll;
+    }
+  } catch {}
+  addEventListener("pagehide", () => {
+    try {
+      sessionStorage.setItem(
+        "archive-home-return",
+        JSON.stringify({ url: location.href, visible, scroll: scrollY }),
+      );
+    } catch {}
+  });
   $("stats").innerHTML = [
     [data.topics.length, "实验主题"],
     [data.runs.length, "实验记录"],
@@ -75,6 +95,10 @@
     "type",
     [...new Set(data.runs.map((r) => r.type))].map((t) => [t, t]),
   );
+  options("tool", [
+    ...data.tools.map((tool) => [tool.id, tool.label]),
+    ["unknown", "未记录工具"],
+  ]);
   options(
     "prompt",
     data.prompts.map((p) => [
@@ -86,6 +110,18 @@
   const previewScopes = new Map();
   function galleryFigure(run, className, source = U.screenshotURL(run)) {
     if (!source) return "";
+    const variants =
+      source === U.screenshotURL(run) ? U.screenshotVariants(run) : [];
+    const thumbnail = variants.at(-1)?.path || source;
+    const responsive = variants.length
+      ? '" srcset="' +
+        e(
+          variants
+            .map((variant) => variant.path + " " + variant.width + "w")
+            .join(", "),
+        ) +
+        '" sizes="(max-width: 700px) calc(100vw - 40px), (max-width: 1100px) 46vw, 580px'
+      : "";
     return (
       '<figure class="' +
       className +
@@ -96,10 +132,17 @@
       '" aria-label="放大预览：' +
       e(run.title + " · " + U.runSummary(data, run)) +
       '"><img src="' +
+      e(thumbnail) +
+      responsive +
+      '" data-original="' +
       e(source) +
       '" alt="' +
       e(run.title + " 实际运行截图") +
-      '" loading="lazy" decoding="async" width="1440" height="1050">' +
+      '" loading="lazy" decoding="async" width="' +
+      (run.screenshotInfo?.width || 1440) +
+      '" height="' +
+      (run.screenshotInfo?.height || 1050) +
+      '">' +
       '<span class="cover-hint" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="m8 8-5-5m13 5 5-5M8 16l-5 5m13-5 5 5"/></svg></span></button>' +
       '<div class="image-feedback" role="status"><span>截图加载中…</span><button data-retry-image hidden>重试</button></div>' +
       "<figcaption><span>实际截图</span><strong>" +
@@ -138,8 +181,11 @@
           retry.hidden = true;
           figure.classList.remove("image-failed");
           const source = img.getAttribute("src");
+          const srcset = img.getAttribute("srcset");
+          img.removeAttribute("srcset");
           img.removeAttribute("src");
           img.setAttribute("src", source);
+          if (srcset) img.setAttribute("srcset", srcset);
         });
         if (index < 2) {
           img.loading = "eager";
@@ -191,6 +237,7 @@
       );
       if (
         !state.provider &&
+        !state.tool &&
         !state.model &&
         !state.type &&
         !state.prompt &&
@@ -368,6 +415,7 @@
       "q",
       "category",
       "provider",
+      "tool",
       "model",
       "type",
       "prompt",
@@ -380,14 +428,19 @@
       "aria-pressed",
       String(state.preview === "yes"),
     );
-    const filterCount = ["provider", "type", "prompt", "preview"].filter(
-      (key) => state[key],
-    ).length;
+    const filterCount = [
+      "provider",
+      "tool",
+      "type",
+      "prompt",
+      "preview",
+    ].filter((key) => state[key]).length;
     $("filter-count").textContent = filterCount ? "· " + filterCount : "";
     const mobileCount = [
       "category",
       "model",
       "provider",
+      "tool",
       "type",
       "prompt",
       "preview",
@@ -398,6 +451,7 @@
       "q",
       "category",
       "provider",
+      "tool",
       "model",
       "type",
       "prompt",
@@ -448,12 +502,48 @@
       if (v) search.set(k, v);
     });
     history.replaceState(null, "", "?" + search.toString() + location.hash);
+    updateFacetCounts();
     selection();
+  }
+  function updateFacetCounts() {
+    for (const key of [
+      "category",
+      "model",
+      "provider",
+      "tool",
+      "type",
+      "prompt",
+      "preview",
+    ]) {
+      const candidates = U.filterRuns(data, { ...state, [key]: "" });
+      for (const option of $(key).options) {
+        option.dataset.label ||= option.textContent;
+        const count = candidates.filter((run) => {
+          if (!option.value) return true;
+          const topic = data.topics.find((topic) => topic.id === run.topicId);
+          return (
+            {
+              category: topic.category,
+              model: run.modelId,
+              provider:
+                data.models.find((model) => model.id === run.modelId)
+                  ?.provider || "unknown",
+              tool: run.environment.toolId || "unknown",
+              type: run.type,
+              prompt: run.topicId + "/" + run.promptId,
+              preview: run.preview.kind === "none" ? "no" : "yes",
+            }[key] === option.value
+          );
+        }).length;
+        option.textContent = option.dataset.label + " · " + count;
+      }
+    }
   }
   [
     "q",
     "category",
     "provider",
+    "tool",
     "model",
     "type",
     "prompt",
@@ -505,6 +595,7 @@
         q: "",
         category: "",
         provider: "",
+        tool: "",
         model: "",
         type: "",
         prompt: "",
@@ -525,6 +616,7 @@
   });
   $("advanced-filters").open = !!(
     state.provider ||
+    state.tool ||
     state.group !== "topics" ||
     state.view !== "grid" ||
     state.category ||
@@ -683,31 +775,53 @@
     document.body.classList.remove("preview-open");
     previewTrigger?.focus({ preventScroll: true });
   });
-  $("recent-list").innerHTML = U.filterRuns(data, { testing: "active" })
-    .slice(0, 5)
-    .map(
-      (r) =>
-        '<a href="topic.html?id=' +
-        e(r.topicId) +
-        "&prompt=" +
-        e(r.promptId) +
-        "&view=list#run-" +
-        e(r.id) +
-        '"><span>' +
-        e(data.topics.find((t) => t.id === r.topicId).title) +
-        '</span><strong class="recent-model">' +
-        e(U.modelLabel(data, r)) +
-        "</strong><small><span>" +
-        e(U.effortLabel(r.effort)) +
-        " · " +
-        e(U.roundLabel(r)) +
-        "</span>" +
-        (U.executionMode(r) === "unknown" ? "" : U.executionModeBadge(r)) +
-        "<time>" +
-        e(r.date || "日期未记录") +
-        "</time></small></a>",
-    )
-    .join("");
+  function recent(mode = "experiment") {
+    document
+      .querySelectorAll("[data-recent]")
+      .forEach((button) =>
+        button.setAttribute(
+          "aria-pressed",
+          String(button.dataset.recent === mode),
+        ),
+      );
+    const dateField = mode === "archive" ? "archivedAt" : "date";
+    const recentRuns = U.filterRuns(data, { testing: "active" })
+      .filter((run) => run[dateField])
+      .sort((a, b) => b[dateField].localeCompare(a[dateField]));
+    $("recent-list").innerHTML =
+      recentRuns
+        .slice(0, 5)
+        .map(
+          (r) =>
+            '<a href="topic.html?id=' +
+            e(r.topicId) +
+            "&prompt=" +
+            e(r.promptId) +
+            "&view=list#run-" +
+            e(r.id) +
+            '"><span>' +
+            e(data.topics.find((t) => t.id === r.topicId).title) +
+            '</span><strong class="recent-model">' +
+            e(U.modelLabel(data, r)) +
+            "</strong><small><span>" +
+            e(U.effortLabel(r.effort)) +
+            " · " +
+            e(U.roundLabel(r)) +
+            "</span>" +
+            (U.executionMode(r) === "unknown" ? "" : U.executionModeBadge(r)) +
+            "<time>" +
+            e(r[dateField]) +
+            "</time></small></a>",
+        )
+        .join("") ||
+      '<p class="muted">归档日期尚未留存；新增记录可登记归档日期。</p>';
+  }
+  document
+    .querySelectorAll("[data-recent]")
+    .forEach((button) =>
+      button.addEventListener("click", () => recent(button.dataset.recent)),
+    );
+  recent();
   function guides() {
     const q = $("guide-search").value.toLowerCase();
     const list = data.guides.filter((g) =>
@@ -721,10 +835,12 @@
           "</span><h3>" +
           e(g.title) +
           '</h3><a href="' +
-          g.document +
+          g.reader +
           '">说明</a> · <a href="' +
           g.example +
-          '">运行示例 ↗</a></article>',
+          '">运行示例 ↗</a><small>' +
+          (g.network === "offline" ? "离线可用" : "外部素材需要联网") +
+          "</small></article>",
       )
       .join("");
     $("guide-empty").hidden = !!list.length;
@@ -750,4 +866,5 @@
   if (location.hash === "#guides") $("guides").open = true;
   guides();
   render();
+  if (restoredScroll) requestAnimationFrame(() => scrollTo(0, restoredScroll));
 })();

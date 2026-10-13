@@ -120,6 +120,9 @@ writeJSON(`${dir}/run.json`, {
   description: "待补充",
   type,
   status: "draft",
+  archivedAt: new Date().toISOString().slice(0, 10),
+  sourceRunId: null,
+  screenshotCapturedAt: null,
   stack: [],
   tags: [],
   input: {
@@ -128,7 +131,7 @@ writeJSON(`${dir}/run.json`, {
     completeness: "unknown",
     notes: "待补充",
   },
-  environment: { tool: null, notes: "未记录" },
+  environment: { tool: null, toolId: null, notes: "未记录" },
   changes:
     values["allow-archived"] &&
     catalog.topics.find((t) => t.id === topic)?.testingStatus === "archived"

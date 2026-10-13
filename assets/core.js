@@ -118,12 +118,94 @@
     data.prompts.find(
       (p) => p.topicId === run.topicId && p.id === run.promptId,
     );
+  const completenessLabel = (value) =>
+    ({
+      recorded: "原始输入已记录",
+      partial: "输入留存不完整",
+      unknown: "未记录",
+    })[value] || "未记录";
+  const hasRecordedInput = (run) =>
+    !!run &&
+    (typeof run.raw === "string" ? !!run.raw.trim() : !!run.hasRaw) &&
+    run.input.completeness !== "unknown";
+  const documentURL = (run) => run?.reader || run?.document;
+  const screenshotVariants = (run) => run?.screenshotInfo?.variants || [];
+  const screenshotThumbnailURL = (run) =>
+    screenshotVariants(run).at(-1)?.path || screenshotURL(run);
+  const requests = new Map();
+  function fetchJSON(href) {
+    if (!requests.has(href))
+      requests.set(
+        href,
+        fetch(href)
+          .then((response) => {
+            if (!response.ok)
+              throw Error("数据文件不可用：HTTP " + response.status);
+            return response.json();
+          })
+          .catch((error) => {
+            requests.delete(href);
+            throw error;
+          }),
+      );
+    return requests.get(href);
+  }
+  async function ensureDetails(data, runs) {
+    await Promise.all(
+      [
+        ...new Set(
+          runs
+            .filter(Boolean)
+            .map((run) => run.detailsHref)
+            .filter(Boolean),
+        ),
+      ].map(async (href) => {
+        const details = await fetchJSON(href);
+        for (const item of details.runs) {
+          const run = data.runs.find((run) => run.id === item.id);
+          if (run && !run.detailsLoaded) {
+            Object.assign(run, item);
+            if (run.billing?.type === "batch")
+              run.billing = {
+                ...data.batches.find(
+                  (batch) => batch.batchId === run.billing.batchId,
+                ),
+                ...run.billing,
+              };
+            run.detailsLoaded = true;
+          }
+        }
+      }),
+    );
+  }
+  async function ensureTexts(data, runs, includeRaw = true) {
+    await Promise.all(
+      runs.filter(Boolean).flatMap((run) => {
+        const prompt = promptFor(data, run);
+        return [
+          includeRaw && typeof run.raw !== "string" && run.rawHref
+            ? fetchJSON(run.rawHref).then((raw) => {
+                run.raw = raw;
+              })
+            : null,
+          prompt && typeof prompt.text !== "string" && prompt.textHref
+            ? fetchJSON(prompt.textHref).then((text) => {
+                prompt.text = text;
+              })
+            : null,
+        ].filter(Boolean);
+      }),
+    );
+  }
+  const toolLabel = (data, run) =>
+    data.tools?.find((tool) => tool.id === run.environment?.toolId)?.label ||
+    "工具未记录";
   function relation(data, a, b) {
     if (!a || !b) return "请选择两个实验";
     if (a.topicId !== b.topicId) return "跨主题对比";
     if (
-      !a.raw.trim() ||
-      !b.raw.trim() ||
+      !hasRecordedInput(a) ||
+      !hasRecordedInput(b) ||
       a.input.completeness === "unknown" ||
       b.input.completeness === "unknown"
     )
@@ -184,6 +266,8 @@
           (!state.category || t.category === state.category) &&
           (!state.provider || modelProviderId(data, r) === state.provider) &&
           (!state.model || r.modelId === state.model) &&
+          (!state.tool ||
+            (r.environment?.toolId || "unknown") === state.tool) &&
           (!state.type || r.type === state.type) &&
           (!state.prompt || `${r.topicId}/${r.promptId}` === state.prompt) &&
           (!state.preview ||
@@ -195,6 +279,7 @@
               r.description,
               modelProvider(data, r),
               modelLabel(data, r),
+              toolLabel(data, r),
               r.effort,
               ...r.tags,
               ...r.stack,
@@ -485,13 +570,21 @@
           '" target="_blank" rel="noopener">打开预览 ↗</a>'
         : "") +
       '<a href="' +
-      escape(r.document) +
+      escape(documentURL(r)) +
       '">记录</a><button data-compare="' +
       escape(r.id) +
       '" aria-pressed="false">加入对比</button></div></article>'
     );
   }
   global.ArchiveUI = {
+    completenessLabel,
+    hasRecordedInput,
+    documentURL,
+    screenshotVariants,
+    screenshotThumbnailURL,
+    ensureDetails,
+    ensureTexts,
+    toolLabel,
     escape,
     modelLabel,
     modelProviderId,

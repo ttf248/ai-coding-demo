@@ -16,51 +16,26 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
   page,
 }) => {
   await page.goto("./");
-  await expect(page.locator("#provider option")).toHaveText([
-    "全部厂商",
-    "Anthropic",
-    "GitHub Copilot",
-    "MiniMax",
-    "OpenAI",
-    "OpenCode",
-    "未记录 / 多轮混合",
-  ]);
+  const names = await page
+    .locator("#provider option")
+    .evaluateAll((options) => options.map((option) => option.dataset.label));
+  const providers = [
+    ...new Set(data.models.map((model) => model.provider).filter(Boolean)),
+  ].sort((a, b) => a.localeCompare(b, "en"));
+  expect(names).toEqual(["全部厂商", ...providers, "未记录 / 多轮混合"]);
   expect(
     await page
       .locator("#model optgroup")
-      .evaluateAll((groups) => groups.map((g) => g.label)),
-  ).toEqual([
-    "Anthropic",
-    "GitHub Copilot",
-    "MiniMax",
-    "OpenAI",
-    "OpenCode",
-    "未记录 / 多轮混合",
-  ]);
-  await expect(page.locator("#model option")).toHaveText([
-    "全部模型",
-    "Claude Sonnet 5.5",
-    "Claude 4.0",
-    "Claude Haiku 5.5",
-    "Claude Opus 5.5",
-    "Claude Haiku 4.5",
-    "Gemini 3.8 Flash",
-    "Kimi K3",
-    "MiniMax M3.1 Flash Preview",
-    "MiniMax M3",
-    "MiniMax M2.1",
-    "MiniMax M2",
-    "GPT-6.1 Sol",
-    "GPT-6",
-    "GPT-6 Astra",
-    "GPT-6 Luna",
-    "GPT-6 Sol",
-    "GPT-5.6 Luna",
-    "GPT-5.6 Sol",
-    "MiMo-V2.6-Flash Free",
-    "Muse Spark 1.3 Free",
-    "未记录 / 多轮混合",
-  ]);
+      .evaluateAll((groups) => groups.map((group) => group.label)),
+  ).toEqual([...providers, "未记录 / 多轮混合"]);
+  const ids = await page
+    .locator("#model option")
+    .evaluateAll((options) => options.slice(1).map((option) => option.value));
+  expect(ids).toHaveLength(data.models.length);
+  for (const model of data.models)
+    await expect(
+      page.locator('#model option[value="' + model.id + '"]'),
+    ).toHaveAttribute("data-label", model.label);
   await page.locator("#advanced-filters > summary").click();
   await page.locator("#model").selectOption("gpt-6-1-sol");
   await page.reload();
@@ -73,11 +48,11 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
   await page.reload();
   await expect(page.locator("#provider")).toHaveValue("MiniMax");
   await page.locator("#model").selectOption("");
-  await page.locator("#provider").selectOption("GitHub Copilot");
+  await page.locator("#provider").selectOption("");
+  await page.locator("#tool").selectOption("github-copilot");
   const copilotCount = data.runs.filter(
     (run) =>
-      data.models.find((model) => model.id === run.modelId)?.provider ===
-        "GitHub Copilot" &&
+      run.environment.toolId === "github-copilot" &&
       data.topics.find((topic) => topic.id === run.topicId)?.testingStatus !==
         "archived",
   ).length;

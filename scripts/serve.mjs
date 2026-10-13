@@ -13,6 +13,7 @@ const mime = {
   ".json": "application/json; charset=utf-8",
   ".md": "text/plain; charset=utf-8",
   ".png": "image/png",
+  ".webp": "image/webp",
   ".jpg": "image/jpeg",
   ".svg": "image/svg+xml",
   ".woff2": "font/woff2",
@@ -87,6 +88,18 @@ const server = http
       if (fs.existsSync(file) && fs.statSync(file).isDirectory())
         file = path.join(file, "index.html");
       if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
+        if (
+          req.method === "GET" &&
+          req.headers.accept?.includes("text/html") &&
+          fs.existsSync(path.join(ROOT, "404.html"))
+        ) {
+          res.writeHead(404, {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+          });
+          fs.createReadStream(path.join(ROOT, "404.html")).pipe(res);
+          return;
+        }
         res.writeHead(404).end("Not found");
         return;
       }

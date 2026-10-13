@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f7f9"><title>图片粒子化与手势还原应用 · AI Coding Demo</title><meta name="description" content="按任务正文 v1 产出的单页 Web 应用：本地图片被采样为 Three.js 粒子并以飘散的粒子流呈现，MediaPipe Hands 实时识别张开手掌 / 握拳 / 捏合 / 比二四种手势，通过跟随手部的力场把粒子吸引回原图完成还原。"><meta property="og:title" content="图片粒子化与手势还原应用"><meta property="og:description" content="按任务正文 v1 产出的单页 Web 应用：本地图片被采样为 Three.js 粒子并以飘散的粒子流呈现，MediaPipe Hands 实时识别张开手掌 / 握拳 / 捏合 / 比二四种手势，通过跟随手部的力场把粒子吸引回原图完成还原。"><meta property="og:type" content="article"><link rel="stylesheet" href="../../../../../../site.css"><link rel="stylesheet" href="../../../../../../document.css"><script src="../../../../../../document.js" defer></script></head><body class="document-page"><a class="skip-link" href="#document-content">跳到正文</a><header class="site-header"><div class="container header-inner"><a class="brand" href="../../../../../../../index.html"><span class="brand-mark">AI</span>CODING / DEMO</a><nav aria-label="主导航"><a href="../../../../../../../index.html#projects">实验目录</a><a href="../../../../../../../compare.html">模型对比</a><a href="../../../../../../../index.html#guides">技术索引</a></nav></div></header><main class="container document-layout"><aside class="document-sidebar"><details open><summary>本页目录</summary><nav aria-label="文档目录"><a class="toc-level-1" href="#pixel-flow-图片粒子化与手势还原任务正文-v1">Pixel Flow · 图片粒子化与手势还原（任务正文 v1）</a><a class="toc-level-2" href="#技术栈">技术栈</a><a class="toc-level-2" href="#实现要点">实现要点</a><a class="toc-level-3" href="#1-图片-粒子">1. 图片 → 粒子</a><a class="toc-level-3" href="#2-力场">2. 力场</a><a class="toc-level-3" href="#3-手势识别">3. 手势识别</a><a class="toc-level-3" href="#4-阶段与状态">4. 阶段与状态</a><a class="toc-level-2" href="#参数">参数</a><a class="toc-level-2" href="#运行">运行</a><a class="toc-level-2" href="#已知边界">已知边界</a><a class="toc-level-2" href="#当前归档信息自动生成">当前归档信息（自动生成）</a><a class="toc-level-3" href="#部署适配记录">部署适配记录</a></nav></details></aside><div><div class="document-actions"><a href="../../../../../../../demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01/Readme.md" download>下载 Markdown 原文 ↗</a><a href="../../../../../../../topic.html?id=pixel-flow">查看主题与版本 →</a></div><p class="document-context">MiniMax M3.1 Flash Preview · max · 实验日期 2026-09-29 · 归档日期 未记录</p><article id="document-content" class="document-content"><h1 id="pixel-flow-图片粒子化与手势还原任务正文-v1">Pixel Flow · 图片粒子化与手势还原（任务正文 v1）</h1>
+<p>把一张本地图片拆成动态粒子流，再用摄像头捕捉的手势把粒子「捞」回原图。
+纯 Vanilla JS 单页应用，无构建步骤，双击 <code>index.html</code> 即可打开（需联网加载 CDN 依赖）。</p>
+<h2 id="技术栈">技术栈</h2>
+<ul>
+<li>前端：原生 JavaScript + HTML + CSS</li>
+<li>3D：Three.js r160（<code>THREE.Points</code> + 自定义 <code>ShaderMaterial</code>）</li>
+<li>手势：MediaPipe Hands（<code>hands.js</code> + 打包的 wasm / 模型资源）</li>
+<li>图像处理：HTML Canvas 2D <code>getImageData</code> 取像素</li>
+</ul>
+<h2 id="实现要点">实现要点</h2>
+<h3 id="1-图片-粒子">1. 图片 → 粒子</h3>
+<p><code>buildFromImage()</code> 先把图片按 <code>采样密度</code>（默认 12px 一个采样点）缩到小尺寸画布，再 <code>getImageData</code>
+逐像素读取。每个采样点生成一个粒子，记录三组数据：</p>
+<ul>
+<li><code>target</code>：它在原图中的目标坐标（映射到 XY 平面，z 按亮度做一点点厚度）；</li>
+<li><code>scatter</code>：它在球壳里的初始飘散位置；</li>
+<li><code>colors</code>：原图颜色。</li>
+</ul>
+<p><code>target</code> 与 <code>scatter</code> 一起作为自定义 attribute 传入 ShaderMaterial，运行时在两者之间插值。</p>
+<h3 id="2-力场">2. 力场</h3>
+<p>手部关键点的掌心（0、5、9、13、17 号点均值）从 MediaPipe 的归一化坐标映射到粒子平面的 XY，
+作为力场中心。半径内的粒子按 <code>dt × force × (1 - d/r) × boost</code> 累加还原度，越靠近中心吸引越强。</p>
+<h3 id="3-手势识别">3. 手势识别</h3>
+<p>用「指尖到手腕的距离 &gt; PIP 到手腕距离 × 1.06」判断手指是否伸直，组合出：</p>
+<table>
+<thead>
+<tr>
+<th>手势</th>
+<th>判定</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>张开手掌</td>
+<td>4 指伸直</td>
+<td>激活力场吸引</td>
+</tr>
+<tr>
+<td>握拳</td>
+<td>4 指全收</td>
+<td>暂停吸引，保持当前进度</td>
+</tr>
+<tr>
+<td>捏合</td>
+<td>拇指与食指距离 &lt; 0.055 且其余手指收起</td>
+<td>吸引强度 ×2.4</td>
+</tr>
+<tr>
+<td>比二</td>
+<td>仅食指与中指伸直</td>
+<td>立即完成还原（全图 progress = 1）</td>
+</tr>
+</tbody>
+</table>
+<p>还原度用二次缓动 <code>e = p&lt;0.5 ? 2p² : 1-(-2p+2)²/2</code>，前半段慢、后半段快，粒子落位时不会突兀。</p>
+<h3 id="4-阶段与状态">4. 阶段与状态</h3>
+<p>平均还原度 &gt;2% 进入「聚集还原」，&gt;99.5% 进入「完整还原」，三个阶段在粒子画布下方以进度条呈现。
+右侧实时显示粒子数、平均还原度、FPS 与手部检测状态。</p>
+<h2 id="参数">参数</h2>
+<p>采样密度、粒子大小、力场半径、吸引强度、飘散流速，以及三套配色（原图 / 冷调 / 霓虹）。
+另有「打散」「自动还原演示」「切换配色」三个快捷操作。</p>
+<h2 id="运行">运行</h2>
+<p>摄像头依赖 <code>https</code> 或 <code>localhost</code>（浏览器安全策略）。本地验证可以：</p>
+<pre><code class="language-sh">npx serve .          # 或任意静态服务器
+# 打开 http://localhost:3000
+</code></pre>
+<p>没有摄像头时点「鼠标控制力场」：鼠标在粒子画布内移动即等价于张开手掌，按住 <code>Shift</code> 等价于捏合加速。</p>
+<h2 id="已知边界">已知边界</h2>
+<ul>
+<li>首次进入会自动载入一张程序化生成的示例图（山峦日落），避免空屏；也可以自行选择本地图片。</li>
+<li>摄像头模型在页面加载后才按需拉取（约 5 MB），首次开启会有等待。</li>
+<li>只跟踪单手；MediaPipe 偶尔丢帧时会跳过该帧继续下一帧。</li>
+<li>「比二」为瞬时完成手势，不区分左右手。</li>
+</ul>
+<p>&lt;!-- archive:start --&gt;</p>
+<h2 id="当前归档信息自动生成">当前归档信息（自动生成）</h2>
+<ul>
+<li>实验 ID：<code>pixel-flow--minimax-m3-1-flash-preview-max-r01</code></li>
+<li>模型：MiniMax M3.1 Flash Preview；推理档位：max</li>
+<li>类型：app；预览：static；网络：required</li>
+<li><a href="../../../../../../../demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01/prompt.md">完整原始输入快照</a> · <a href="../../../../../../../topic.html?id=pixel-flow">主题与其他版本</a></li>
+<li>输入记录：用户指令、覆盖范围确认与任务正文 v1 原文均已完整留存（任务正文含中英双版本）。无图片、附件或历史上下文。</li>
+<li>工具：Claude Code（当前会话）。模型 MiniMax M3.1 Flash Preview，推理档位 max，单会话直接执行，未委派子代理。Three.js 与 MediaPipe 走 unpkg CDN，需要联网；摄像头在测试环境中不可用，手势链路按代码逻辑与 HUD 状态核对，未做真人摄像头验证。</li>
+<li>运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。</li>
+<li><a href="../../../../../../../demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01/index.html">应用入口</a></li>
+</ul>
+<h3 id="部署适配记录">部署适配记录</h3>
+<ul>
+<li>降级能力：浏览器只在 https 或 localhost 下开放 getUserMedia，直接打开本地文件时摄像头不可用。补充「鼠标控制力场」开关，鼠标在粒子画布内移动即等价于张开手掌，按住 Shift 等价于捏合加速，使无摄像头环境也能完整验证力场与还原逻辑。</li>
+<li>渲染修正：粒子全部归位后加色混合会过曝成白块，改为普通混合并按还原度微调亮度，完整还原时能正确还原出原图配色。</li>
+<li>归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01；保留该测试轮号。</li>
+<li>2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
+&lt;!-- archive:end --&gt;</li>
+</ul>
+</article><p class="document-copy-status" role="status"></p></div></main><footer><div class="container">AI CODING DEMO / 实验记录与技术说明。</div></footer></body></html>

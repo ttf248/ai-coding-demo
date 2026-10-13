@@ -51,7 +51,7 @@ test("gallery screenshot errors can be retried without changing the preview sour
   const source = await page
     .locator(".topic-cover img")
     .first()
-    .getAttribute("src");
+    .evaluate((img) => img.currentSrc);
   const screenshotURL = new URL(source, page.url()).href;
   let fail = true;
   await page.route(screenshotURL, (route) =>
@@ -63,7 +63,7 @@ test("gallery screenshot errors can be retried without changing the preview sour
   fail = false;
   await figure.locator("[data-retry-image]").click();
   await expect(figure.locator(".image-feedback")).toBeHidden();
-  await expect(figure.locator("img")).toHaveAttribute("src", source);
+  await expect(figure.locator("img")).toHaveJSProperty("currentSrc", source);
   expect(
     await figure.locator("img").evaluate((img) => img.naturalWidth),
   ).toBeGreaterThan(0);
