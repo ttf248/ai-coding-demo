@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>暮钟之城 · 新哥特式塔楼城市漫游</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #05070d;
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; color: #dfe7f5; }
+  #scene { position: fixed; inset: 0; display: block; touch-action: none; cursor: grab; }
+  #scene.dragging { cursor: grabbing; }
+  .glass { background: rgba(12, 16, 27, .72); border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 13px; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); }
+  #title { position: fixed; top: 14px; left: 14px; padding: 12px 15px; z-index: 10; max-width: 320px; }
+  #title h1 { font-size: 16px; letter-spacing: 1px; font-weight: 700;
+    background: linear-gradient(90deg, #cdb98a, #8fb0d8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #title p { font-size: 11px; color: #8c9cb8; margin-top: 5px; line-height: 1.7; }
+  #controls { position: fixed; top: 14px; right: 14px; padding: 10px 12px; z-index: 10;
+    display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: #9db0cf; }
+  #controls button { font: inherit; font-size: 12px; color: #e8eefc; background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.14); border-radius: 8px; padding: 6px 11px; cursor: pointer; }
+  #controls button:hover { background: rgba(255,255,255,.16); }
+  #controls button.on { background: #29406b; border-color: #4a6fae; }
+  #stats { position: fixed; left: 14px; bottom: 14px; padding: 8px 12px; font-size: 11px; color: #7d8fae; z-index: 10; }
+  #hint { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+    font-size: 12px; color: #93a4c3; z-index: 10; padding: 8px 16px; text-align: center; }
+  #fallback { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 30;
+    background: radial-gradient(120% 90% at 50% 30%, #1a2238 0%, #05070d 70%); text-align: center; padding: 24px; }
+  #fallback.show { display: flex; }
+  #fallback .box { max-width: 460px; }
+  #fallback h2 { font-size: 18px; color: #d9c79a; margin-bottom: 10px; }
+  #fallback p { font-size: 13px; color: #93a4c3; line-height: 1.8; }
+  #fallback .tag { display: inline-block; margin-top: 12px; padding: 4px 10px; border-radius: 20px;
+    border: 1px dashed #6c7c9c; color: #b9c7dd; font-size: 12px; }
+  @media (max-width: 720px) {
+    #title { max-width: 240px; padding: 10px; }
+    #title p { display: none; }
+    #hint { display: none; }
+  }
+</style>
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="title" class="glass">
+  <h1>暮钟之城 · 新哥特式塔楼城市</h1>
+  <p>海面之上 120 米处的塔楼城邦：尖塔、飞扶壁、桥廊与长燃不熄的火焰。镜头自行漫游，「拖拽」环视、「滚轮 / 双指」缩放。</p>
+</div>
+
+<div id="controls" class="glass">
+  <button id="btnRoam" class="on">自动漫游：开</button>
+  <button id="btnPauseFx">粒子动效：开</button>
+</div>
+
+<div id="stats" class="glass">加载中…</div>
+<div id="hint" class="glass">拖拽环视会暂停自动漫游，8 秒后自动恢复</div>
+
+<div id="fallback">
+  <div class="box">
+    <h2>无法启动 WebGL 城市场景</h2>
+    <p id="fallbackMsg">浏览器或设备缺少 WebGL 支持。</p>
+    <span class="tag">待确认：three.js 依赖来自 CDN，离线环境将进入此回退界面</span>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+
+const $ = (id) => document.getElementById(id);
+const fallback = (msg) => { $("fallbackMsg").textContent = msg; $("fallback").classList.add("show"); };
+
+let renderer = null;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas: $("scene"), antialias: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+} catch (err) {
+  fallback("WebGL 初始化失败：" + String(err && err.message || err));
+}
+if (!renderer) {
+  window.__city = { state: { ready: false, three: !!THREE.REVISION } };
+} else {
+  boot();
+}
+
+function boot() {
+/* ================= 基础 ================= */
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a1020, 0.0016);
+const camera = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, 0.5, 2600);
+camera.position.set(190, 78, 190);
+
+/* 确定性随机（同一次加载布局稳定） */
+let seed = 20261013;
+const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+  let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+  return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+
+const state = { ready: false, towers: 0, fires: 0, stars: 0, autoRoam: true, fxOn: true, yawOffset: 0, pitchOffset: 0, zoom: 1, lastInteract: -1e9 };
+
+/* ================= 材质 ================= */
+const stoneMat = (tint) => new THREE.MeshStandardMaterial({
+  color: tint, roughness: 0.86, metalness: 0.08, flatShading: true,
+});
+const roofMat = new THREE.MeshStandardMaterial({ color: 0x2e4459, roughness: 0.55, metalness: 0.45, flatShading: true });
+const winMat = new THREE.MeshBasicMaterial({ color: 0xffc36b });
+const fireMat = new THREE.MeshBasicMaterial({ color: 0xff9a3c });
+
+const stonePalette = [0x6b7280, 0x76707f, 0x6d7689, 0x7b7280, 0x68727c];
+
+/* ================= 岛屿基座 ================= */
+const island = new THREE.Group();
+{
+  const baseGeo = new THREE.CylinderGeometry(150, 205, 86, 10, 4);
+  const pos = baseGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    if (y < 20) {
+      pos.setX(i, pos.getX(i) * (1 + (rnd() - 0.5) * 0.22));
+      pos.setZ(i, pos.getZ(i) * (1 + (rnd() - 0.5) * 0.22));
+      pos.setY(i, y + (rnd() - 0.5) * 9);
+    }
+  }
+  baseGeo.computeVertexNormals();
+  island.add(new THREE.Mesh(baseGeo, stoneMat(0x565d68)));
+  const top = new THREE.Mesh(new THREE.CircleGeometry(150, 24), stoneMat(0x777b85));
+  top.rotation.x = -Math.PI / 2; top.position.y = 43.2;
+  top.receiveShadow = true;
+  island.add(top);
+  island.position.y = -35;      // 岛顶世界高度 y ≈ 8，海面 y = 0
+  scene.add(island);
+}
+
+/* ================= 塔楼构件 ================= */
+const city = new THREE.Group();
+scene.add(city);
+function addTower(x, z, h, r, withButtress) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.72, r, h, 8), stoneMat(stonePalette[(rnd() * stonePalette.length) | 0]));
+  body.position.y = h / 2; body.castShadow = true; body.receiveShadow = true;
+  g.add(body);
+  // 束柱
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2;
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.09, r * 0.11, h * 1.02, 5), stoneMat(0x7d8494));
+    col.position.set(Math.cos(a) * r * 0.86, h * 0.51, Math.sin(a) * r * 0.86);
+    g.add(col);
+  }
+  // 檐口
+  const ledge = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.05, r * 1.05, 3, 8), stoneMat(0x83899a));
+  ledge.position.y = h * 0.72; g.add(ledge);
+  // 尖顶
+  const spire = new THREE.Mesh(new THREE.ConeGeometry(r * 0.78, h * 0.62, 8), roofMat);
+  spire.position.y = h + h * 0.31; spire.castShadow = true;
+  g.add(spire);
+  for (let i = 0; i < 5; i++) {
+    const a = (i + 0.5) / 5 * Math.PI * 2;
+    const pin = new THREE.Mesh(new THREE.ConeGeometry(r * 0.14, h * 0.22, 5), roofMat);
+    pin.position.set(Math.cos(a) * r * 0.7, h + h * 0.10, Math.sin(a) * r * 0.7);
+    g.add(pin);
+  }
+  // 窗（自发光小面片）
+  const rows = Math.max(2, Math.round(h / 22));
+  for (let row = 0; row < rows; row++) {
+    const yy = 10 + row * (h - 14) / rows;
+    const n = 4;
+    for (let i = 0; i < n; i++) {
+      if (rnd() < 0.42) continue;
+      const a = i / n * Math.PI * 2 + 0.4;
+      const w = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 5.4), winMat);
+      w.position.set(Math.cos(a) * r * 0.99, yy, Math.sin(a) * r * 0.99);
+      w.rotation.y = Math.PI / 2 - a;          // 朝塔外
+      g.add(w);
+    }
+  }
+  // 飞扶壁
+  if (withButtress) {
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(r * 2.1, r * 0.13, 6, 10, Math.PI * 0.55), stoneMat(0x707887));
+    arc.position.y = h * 0.62;
+    arc.rotation.z = Math.PI * 0.22;
+    arc.rotation.y = rnd() * Math.PI * 2;
+    g.add(arc);
+  }
+  g.position.set(x, 0, z);
+  city.add(g);
+  state.towers++;
+  return { x, z, h, r: r * 0.86 };
+}
+function addBridge(a, b) {
+  const ax = (a.x + b.x) / 2, az = (a.z + b.z) / 2;
+  const y = Math.min(a.h, b.h) * 0.58;
+  const len = Math.hypot(a.x - b.x, a.z - b.z);
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(len, 1.6, 5), stoneMat(0x6d7482));
+  deck.position.set(ax, y, az);
+  deck.lookAt(b.x, y, b.z);
+  deck.rotation.set(0, deck.rotation.y, 0);
+  deck.castShadow = true;
+  city.add(deck);
+  for (const side of [-2.2, 2.2]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 3.4, 0.7), stoneMat(0x77808f));
+    rail.position.set(ax, y + 2.4, az);
+    rail.lookAt(b.x, y + 2.4, b.z);
+    rail.rotation.set(0, rail.rotation.y, 0);
+    rail.translateZ(side);
+    city.add(rail);
+  }
+}
+
+/* 中央大教堂 + 环形塔楼群 */
+const center = addTower(0, 0, 150, 26, false);
+{
+  const c2 = addTower(31, 18, 96, 15, true);
+  const ring = [];
+  const N = 9;
+  for (let i = 0; i < N; i++) {
+    const a = i / N * Math.PI * 2 + 0.42;
+    const rr = 86 + (rnd() - 0.5) * 22;
+    const h = 58 + rnd() * 66;
+    ring.push(addTower(Math.cos(a) * rr, Math.sin(a) * rr, h, 10 + rnd() * 6, rnd() < 0.5));
+  }
+  addBridge(center, c2);
+  addBridge(center, ring[1]);
+  addBridge(center, ring[5]);
+  for (let i = 0; i < N; i += 2) addBridge(ring[i], ring[(i + 1) % N]);
+  // 外圈矮塔与城墙
+  for (let i = 0; i < 14; i++) {
+    const a = i / 14 * Math.PI * 2 + 1.1;
+    const rr = 136 + rnd() * 16;
+    addTower(Math.cos(a) * rr, Math.sin(a) * rr, 20 + rnd() * 24, 7 + rnd() * 3, false);
+  }
+  const wall = new THREE.Mesh(new THREE.TorusGeometry(128, 4.5, 6, 40), stoneMat(0x5f6773));
+  wall.rotation.x = Math.PI / 2;
+  wall.position.y = 4.5;
+  wall.castShadow = true;
+  city.add(wall);
+}
+city.position.y = 8;
+
+/* ================= 海面（正弦波 + 高光） ================= */
+let seaMatRef = null;
+{
+  const seaGeo = new THREE.PlaneGeometry(4000, 4000, 128, 128);
+  const seaMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uDeep: { value: new THREE.Color(0x0a1c2e) }, uShallow: { value: new THREE.Color(0x14405c) } },
+    vertexShader: `
+      uniform float uTime;
+      varying vec3 vNormal; varying vec3 vPos; varying float vWave;
+      float wave(vec2 p, float t) {
+        return sin(p.x * 0.02 + t * 0.9) * 2.6 + sin(p.y * 0.031 - t * 0.7) * 2.0
+             + sin((p.x + p.y) * 0.011 + t * 1.3) * 3.4;
+      }
+      void main() {
+        vec3 pos = position;
+        float w = wave(position.xy, uTime);
+        pos.z += w;
+        float w2 = wave(position.xy + vec2(2.0, 0.0), uTime);
+        float w3 = wave(position.xy + vec2(0.0, 2.0), uTime);
+        vNormal = normalize(vec3(-(w2 - w) * 0.1, -(w3 - w) * 0.1, 1.0));
+        vPos = pos;
+        vWave = w;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 uDeep; uniform vec3 uShallow;
+      varying vec3 vNormal; varying vec3 vPos; varying float vWave;
+      void main() {
+        vec3 n = normalize(vNormal);
+        float fres = pow(1.0 - abs(n.z), 2.2);
+        vec3 col = mix(uDeep, uShallow, fres + max(0.0, vWave) * 0.02);
+        float spec = pow(max(dot(n, normalize(vec3(0.4, 0.35, 0.85))), 0.0), 60.0);
+        col += vec3(0.55, 0.65, 0.9) * spec * 0.9;
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+  const sea = new THREE.Mesh(seaGeo, seaMat);
+  sea.rotation.x = -Math.PI / 2;
+  sea.position.y = 0;
+  scene.add(sea);
+  seaMatRef = seaMat;
+}
+
+/* ================= 天空 / 月亮 / 星 ================= */
+{
+  const skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: { uTop: { value: new THREE.Color(0x060a18) }, uBottom: { value: new THREE.Color(0x1c2c4a) } },
+    vertexShader: `varying vec3 vP; void main() { vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `
+      uniform vec3 uTop; uniform vec3 uBottom; varying vec3 vP;
+      void main() {
+        float h = clamp(normalize(vP).y * 0.5 + 0.5, 0.0, 1.0);
+        vec3 col = mix(uBottom, uTop, pow(h, 0.75));
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(1600, 24, 16), skyMat));
+  const starGeo = new THREE.BufferGeometry();
+  const starN = 900, starPos = new Float32Array(starN * 3);
+  for (let i = 0; i < starN; i++) {
+    const v = new THREE.Vector3().setFromSphericalCoords(1450, Math.acos(1 - Math.random() * 0.72), Math.random() * Math.PI * 2);
+    starPos.set([v.x, v.y, v.z], i * 3);
+  }
+  starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xbcd0ea, size: 2.4, sizeAttenuation: false, transparent: true, opacity: 0.85 })));
+  state.stars = starN;
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(30, 24, 16), new THREE.MeshBasicMaterial({ color: 0xf4ecd4 }));
+  moon.position.set(-520, 420, -820);
+  scene.add(moon);
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(46, 24, 16),
+    new THREE.MeshBasicMaterial({ color: 0xdfe8ff, transparent: true, opacity: 0.12 }));
+  glow.position.copy(moon.position);
+  scene.add(glow);
+}
+
+/* ================= 火焰粒子（塔顶火盆） ================= */
+const fires = [];
+{
+  // 火盆放在塔身檐口上，向外偏移到塔半径处，避免与尖顶穿插
+  const firePositions = [[26.5, 110, 6.5], [42.5, 73, 27.7]];
+  for (const t of city.children) {
+    if (t.type === "Group" && t.children.length && fires.length < 7) {
+      const hh = t.children[0].geometry?.parameters?.height;
+      if (!hh || hh < 40) continue;
+      const rr = Math.hypot(t.position.x, t.position.z);
+      if (rr > 60 && rr < 140) {
+        const rad = t.children[0].geometry.parameters.radiusBottom || 10;
+        firePositions.push([
+          t.position.x + Math.cos(0.7) * rad,
+          hh * 0.74 + 2,
+          t.position.z + Math.sin(0.7) * rad,
+        ]);
+      }
+    }
+  }
+  for (const [x, y, z] of firePositions) {
+    const N = 90;
+    const geo = new THREE.BufferGeometry();
+    const p = new Float32Array(N * 3), s = new Float32Array(N), v = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      p.set([x, y, z], i * 3);
+      s[i] = Math.random(); v[i] = 0.6 + Math.random() * 0.9;
+    }
+    geo.setAttribute("position", new THREE.BufferAttribute(p, 3));
+    geo.setAttribute("aSeed", new THREE.BufferAttribute(s, 1));
+    geo.setAttribute("aSpeed", new THREE.BufferAttribute(v, 1));
+    const mat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { uTime: { value: 0 }, uOrigin: { value: new THREE.Vector3(x, y, z) }, uScale: { value: 1 } },
+      vertexShader: `
+        uniform float uTime; uniform vec3 uOrigin; attribute float aSeed; attribute float aSpeed;
+        varying float vLife;
+        void main() {
+          float life = fract(aSeed + uTime * 0.5 * aSpeed);
+          vLife = 1.0 - life;
+          vec3 pos = uOrigin;
+          float sway = sin(uTime * 3.0 + aSeed * 40.0) * (1.5 + life * 4.0);
+          pos.x += sway; pos.z += cos(uTime * 2.4 + aSeed * 31.0) * (1.2 + life * 3.0);
+          pos.y += life * 16.0;
+          vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+          gl_PointSize = (6.0 + 9.0 * (1.0 - life)) * (130.0 / -mv.z);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        varying float vLife;
+        void main() {
+          vec2 c = gl_PointCoord - 0.5;
+          float d = length(c);
+          if (d > 0.5) discard;
+          float a = smoothstep(0.5, 0.05, d) * vLife;
+          vec3 col = mix(vec3(1.0, 0.35, 0.08), vec3(1.0, 0.85, 0.35), vLife);
+          gl_FragColor = vec4(col, a * 0.85);
+        }`,
+    });
+    const pts = new THREE.Points(geo, mat);
+    city.add(pts);
+    fires.push(pts);
+    state.fires += N;
+    const brazier = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.4, 4, 6), fireMat);
+    brazier.position.set(x, y - 3, z);
+    city.add(brazier);
+  }
+}
+
+/* ================= 光照 ================= */
+scene.add(new THREE.AmbientLight(0x4a5c80, 2.1));
+const moonLight = new THREE.DirectionalLight(0xb6cdf2, 2.3);
+moonLight.position.set(-420, 520, -680);
+moonLight.castShadow = true;
+moonLight.shadow.mapSize.set(2048, 2048);
+moonLight.shadow.camera.left = -260; moonLight.shadow.camera.right = 260;
+moonLight.shadow.camera.top = 260; moonLight.shadow.camera.bottom = -260;
+moonLight.shadow.camera.far = 1600;
+scene.add(moonLight);
+const warmA = new THREE.PointLight(0xff9a4d, 260, 300, 2); warmA.position.set(0, 170, 0); scene.add(warmA);
+const warmB = new THREE.PointLight(0xff8a3d, 150, 240, 2); warmB.position.set(-90, 60, 70); scene.add(warmB);
+const warmC = new THREE.PointLight(0xffa05a, 130, 220, 2); warmC.position.set(80, 50, -80); scene.add(warmC);
+
+/* ================= 摄像机漫游与交互 ================= */
+const canvas = $("scene");
+const clock = new THREE.Clock();
+let dragging = false, lastX = 0, lastY = 0;
+let pinchDist = 0;
+
+canvas.addEventListener("pointerdown", (e) => {
+  if (e.pointerType === "touch" && e.isPrimary === false) return;
+  canvas.setPointerCapture(e.pointerId);
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  canvas.classList.add("dragging");
+  state.lastInteract = performance.now();
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (!dragging) return;
+  state.yawOffset -= (e.clientX - lastX) * 0.0032;
+  state.pitchOffset = Math.max(-0.5, Math.min(0.75, state.pitchOffset + (e.clientY - lastY) * 0.0022));
+  lastX = e.clientX; lastY = e.clientY;
+  state.lastInteract = performance.now();
+});
+function endDrag() { dragging = false; canvas.classList.remove("dragging"); state.lastInteract = performance.now(); }
+canvas.addEventListener("pointerup", endDrag);
+canvas.addEventListener("pointercancel", endDrag);
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  state.zoom = Math.max(0.45, Math.min(2.6, state.zoom * (e.deltaY > 0 ? 1.1 : 0.9)));
+  state.lastInteract = performance.now();
+}, { passive: false });
+canvas.addEventListener("touchmove", (e) => {
+  if (e.touches.length === 2) {
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    if (pinchDist) state.zoom = Math.max(0.45, Math.min(2.6, state.zoom * pinchDist / d));
+    pinchDist = d;
+    e.preventDefault();
+  }
+}, { passive: false });
+canvas.addEventListener("touchend", () => { pinchDist = 0; });
+
+$("btnRoam").addEventListener("click", () => {
+  state.autoRoam = !state.autoRoam;
+  $("btnRoam").textContent = "自动漫游：" + (state.autoRoam ? "开" : "关");
+  $("btnRoam").classList.toggle("on", state.autoRoam);
+});
+$("btnPauseFx").addEventListener("click", () => {
+  state.fxOn = !state.fxOn;
+  $("btnPauseFx").textContent = "粒子动效：" + (state.fxOn ? "开" : "关");
+  $("btnPauseFx").classList.toggle("on", state.fxOn);
+});
+
+const lookTarget = new THREE.Vector3(0, 78, 0);
+const camPos = new THREE.Vector3(190, 78, 190);
+let roamAngle = 0;                        // 仅在漫游时推进；拖拽 8 秒内暂停
+function updateCamera(t, dt) {
+  const idle = performance.now() - state.lastInteract > 8000;
+  if (state.autoRoam && idle) roamAngle += dt * 0.05;
+  const angle = roamAngle + state.yawOffset;
+  const radius = (300 + Math.sin(roamAngle * 1.15) * 55) * state.zoom;
+  const height = 96 + Math.sin(roamAngle * 1.7) * 34 + state.pitchOffset * 130;
+  const targetPos = new THREE.Vector3(
+    Math.cos(angle) * radius,
+    Math.max(14, height),
+    Math.sin(angle) * radius,
+  );
+  camPos.lerp(targetPos, Math.min(1, dt * 0.85));
+  camera.position.copy(camPos);
+  const lookY = 80 + Math.sin(roamAngle * 1.4) * 22;
+  lookTarget.lerp(new THREE.Vector3(0, lookY, 0), Math.min(1, dt * 0.6));
+  camera.lookAt(lookTarget);
+}
+
+/* ================= 主循环 ================= */
+let frames = 0, fps = 0, fpsT = 0;
+const elStats = $("stats");
+function animate() {
+  const dt = Math.min(0.05, clock.getDelta());
+  const t = clock.elapsedTime;
+  if (seaMatRef && state.fxOn) seaMatRef.uniforms.uTime.value = t;
+  if (state.fxOn) for (const f of fires) f.material.uniforms.uTime.value = t;
+  for (const f of fires) f.material.uniforms.uScale.value = state.fxOn ? 1 : 0;
+  if (state.fxOn) {
+    warmA.intensity = 240 + Math.sin(t * 7.3) * 60 + Math.sin(t * 13.7) * 30;
+    warmB.intensity = 140 + Math.sin(t * 5.9 + 2) * 40;
+    warmC.intensity = 120 + Math.sin(t * 8.7 + 4) * 35;
+  }
+  updateCamera(t, dt);
+  renderer.render(scene, camera);
+  frames++; fpsT += dt;
+  if (fpsT >= 0.5) {
+    fps = Math.round(frames / fpsT); frames = 0; fpsT = 0;
+    elStats.textContent = `${state.towers} 座塔楼 · 火焰粒子 ${state.fires} · 星 ${state.stars} · ${fps} FPS`;
+  }
+  requestAnimationFrame(animate);
+}
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+animate();
+state.ready = true;
+
+/* ================= 自动化只读接口 ================= */
+window.__city = {
+  get state() {
+    return {
+      ready: state.ready, towers: state.towers, fires: state.fires, stars: state.stars,
+      autoRoam: state.autoRoam, fxOn: state.fxOn, zoom: state.zoom,
+      yawOffset: state.yawOffset, pitchOffset: state.pitchOffset,
+      camera: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+      fps,
+    };
+  },
+  brightness() {          // 读回帧缓冲平均亮度（验证画面非全黑）
+    const gl = renderer.getContext();
+    renderer.render(scene, camera);
+    const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+    const px = new Uint8Array(4 * 100);
+    let sum = 0;
+    for (let i = 0; i < 100; i++) {
+      const x = Math.floor((i % 10 + 0.5) / 10 * w);
+      const y = Math.floor((Math.floor(i / 10) + 0.5) / 10 * h);
+      gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px.subarray(i * 4, i * 4 + 4));
+      sum += px[i * 4] + px[i * 4 + 1] + px[i * 4 + 2];
+    }
+    return sum;
+  },
+  setRoam(v) {
+    state.autoRoam = !!v;
+    $("btnRoam").textContent = "自动漫游：" + (state.autoRoam ? "开" : "关");
+  },
+};
+}
+</script>
+</body>
+</html>
