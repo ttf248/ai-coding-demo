@@ -7,4 +7,4 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [寻路算法实验室](../../demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](../../demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](../../demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/index.html) |

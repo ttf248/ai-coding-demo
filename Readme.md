@@ -10,8 +10,8 @@
 ## 项目统计
 
 - 实验主题：12
-- 实验记录：0
-- 可预览记录：0
+- 实验记录：11
+- 可预览记录：11
 - 技术主题：14
 
 ## 实验目录
@@ -22,7 +22,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [小蓝书瀑布流社区](demos/bluebook/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v2](demos/bluebook/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](previews/bluebook/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 简化电路实验台
 
@@ -30,7 +30,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [简化电路实验台](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 奇幻地图生成器
 
@@ -38,7 +38,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [奇幻地图生成器](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 彩色流体实验台
 
@@ -46,7 +46,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [彩色流体实验台](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 生活情绪日记
 
@@ -54,7 +54,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [AI 情绪日记 App 原型](demos/life-diary/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/life-diary/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/life-diary/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 冥想 iOS App
 
@@ -62,7 +62,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [冥想 App 完整原型](demos/meditation/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/meditation/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/meditation/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 新哥特式塔楼城市
 
@@ -70,7 +70,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [新哥特式塔楼城市漫游](demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 寻路算法实验室
 
@@ -78,7 +78,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [寻路算法实验室](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### Pixel Flow
 
@@ -86,7 +86,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [图片粒子化与手势还原](demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### 自选股实战
 
@@ -102,7 +102,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [体素微缩建筑工地沙盘](demos/voxel-construction-site/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/voxel-construction-site/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ### YouTube UI 模块
 
@@ -110,7 +110,7 @@
 
 | 实验 | 模型 / 档位 | 日期 | 提示词 | 预览 |
 |---|---|---|---|---|
-
+| [视频社区 App UI/UX 参考图](demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 
 ## 技术文档
 
