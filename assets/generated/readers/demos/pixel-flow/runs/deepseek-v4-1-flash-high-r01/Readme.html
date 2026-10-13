@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f7f9"><title>图片粒子化与手势还原 · AI Coding Demo</title><meta name="description" content="单文件 Three.js + MediaPipe 应用：把上传图片逐像素变成粒子流，用摄像头手势（张掌吸引 / 握拳暂停）配合力场把粒子还原成原图；无摄像头时回退为鼠标 / 触摸手势。"><meta property="og:title" content="图片粒子化与手势还原"><meta property="og:description" content="单文件 Three.js + MediaPipe 应用：把上传图片逐像素变成粒子流，用摄像头手势（张掌吸引 / 握拳暂停）配合力场把粒子还原成原图；无摄像头时回退为鼠标 / 触摸手势。"><meta property="og:type" content="article"><link rel="stylesheet" href="../../../../../../site.css"><link rel="stylesheet" href="../../../../../../document.css"><script src="../../../../../../document.js" defer></script></head><body class="document-page"><a class="skip-link" href="#document-content">跳到正文</a><header class="site-header"><div class="container header-inner"><a class="brand" href="../../../../../../../index.html"><span class="brand-mark">AI</span>CODING / DEMO</a><nav aria-label="主导航"><a href="../../../../../../../index.html#projects">实验目录</a><a href="../../../../../../../compare.html">模型对比</a><a href="../../../../../../../index.html#guides">技术索引</a></nav></div></header><main class="container document-layout"><aside class="document-sidebar"><details open><summary>本页目录</summary><nav aria-label="文档目录"><a class="toc-level-1" href="#图片粒子化与手势还原deepseek-v41-flash-high-r01">图片粒子化与手势还原（DeepSeek-V4.1-Flash · high · r01）</a><a class="toc-level-2" href="#原始提示词">原始提示词</a><a class="toc-level-2" href="#实现要点">实现要点</a><a class="toc-level-2" href="#验收自测">验收自测</a><a class="toc-level-2" href="#运行与复盘">运行与复盘</a><a class="toc-level-2" href="#当前归档信息自动生成">当前归档信息（自动生成）</a><a class="toc-level-3" href="#部署适配记录">部署适配记录</a></nav></details></aside><div><div class="document-actions"><a href="../../../../../../../demos/pixel-flow/runs/deepseek-v4-1-flash-high-r01/Readme.md" download>下载 Markdown 原文 ↗</a><a href="../../../../../../../topic.html?id=pixel-flow">查看主题与版本 →</a></div><p class="document-context">DeepSeek-V4.1-Flash · high · 实验日期 2026-10-13 · 归档日期 未记录</p><article id="document-content" class="document-content"><h1 id="图片粒子化与手势还原deepseek-v41-flash-high-r01">图片粒子化与手势还原（DeepSeek-V4.1-Flash · high · r01）</h1>
+<p>单文件网页，直接打开 <a href="../../../../../../../demos/pixel-flow/runs/deepseek-v4-1-flash-high-r01/index.html">index.html</a> 即可运行。<strong>需要联网</strong>：通过 import map 加载 Three.js r160，并从 CDN 动态加载 MediaPipe Tasks Vision 的手部模型。无后端、无构建步骤。</p>
+<h2 id="原始提示词">原始提示词</h2>
+<p>见 <a href="../../../../../../../demos/pixel-flow/runs/deepseek-v4-1-flash-high-r01/prompt.md">完整原始输入</a>；任务正文与 <a href="../../../../../../../demos/pixel-flow/prompts/v1/prompt.md">v1 任务正文</a> 逐字一致（该正文含中英双语同一份需求）。</p>
+<h2 id="实现要点">实现要点</h2>
+<ul>
+<li><strong>流程</strong>：<code>&lt;input type=&quot;file&quot;&gt;</code> 上传本地图片 → 离屏 Canvas 取像素 → 按可调采样间隔把每个采样点变成一个 Three.js <code>Points</code> 粒子，并记录其原图位置与颜色。</li>
+<li>初始状态是<strong>随机球状分布的飘散粒子流</strong>，不是原图。粒子围绕各自的「漂浮基准位置」做带阻尼的振荡，因此粒子云始终有界，不会越飘越远。</li>
+<li><strong>手势</strong>：MediaPipe <code>HandLandmarker</code>（VIDEO 模式）逐帧检测手部关键点；以腕到指尖与腕到指节的距离比判断「张开手掌」（≥3 指伸展）还是「握拳」，掌心取 landmark 9。</li>
+<li><strong>力场</strong>：手指移动时，以掌心为圆心、可调半径的吸引区域跟随移动；场内粒子被强吸引，场外保留较弱的全局吸引——挥动手掌能明显看到局部被&quot;吸&quot;回原图，松开手掌（握拳）则粒子重新散开。</li>
+<li>内置示例图由代码用 Canvas 绘制（星云 + 环形 + 五角星 + 文字），因此<strong>不依赖任何外部图片资源</strong>即可演示完整流程。</li>
+<li>摄像头不可用（无 <code>getUserMedia</code>、拒绝授权）或 MediaPipe 模型加载失败时，都会给出明确的中文提示，并回退到<strong>鼠标 / 触摸手势</strong>：按住画面等同于「张开手掌」，面板上同步显示按压状态。</li>
+</ul>
+<h2 id="验收自测">验收自测</h2>
+<p>无头 Chromium + SwiftShader：</p>
+<table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>实测</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>无脚本错误</td>
+<td><code>pageerror</code> 与 console error 均为空</td>
+</tr>
+<tr>
+<td>载入图片生成粒子</td>
+<td>内置示例图 → 11,025 个粒子（采样间隔 4px）；上传自备图片同样生效</td>
+</tr>
+<tr>
+<td>初始为飘散粒子流</td>
+<td>首次渲染还原度 0%</td>
+</tr>
+<tr>
+<td>手势还原</td>
+<td>按住画面（等价张掌）连续 6 秒：1% → 7% → 95% → 100% → 100% → 100%，三次运行一致</td>
+</tr>
+<tr>
+<td>握拳 / 松开暂停</td>
+<td>松开后粒子重新散开，还原度回落</td>
+</tr>
+<tr>
+<td>力场跟随手部</td>
+<td>光圈位置与半径随指针 / 掌心移动，半径与真实力场一致</td>
+</tr>
+<tr>
+<td>采样间隔可调</td>
+<td>4px→10px 时粒子由 11,025 重建为 1,764</td>
+</tr>
+<tr>
+<td>打散 / 还原按钮</td>
+<td>「打散粒子流」回到 0%；「还原图片」在 3 秒窗口内完成归位</td>
+</tr>
+<tr>
+<td>摄像头手势</td>
+<td>伪设备下 MediaPipe 模型成功加载并报告「未检测到手」；授权失败或模型不可用时给出提示并回退到指针手势</td>
+</tr>
+<tr>
+<td>390px 无水平溢出</td>
+<td>溢出 0px</td>
+</tr>
+</tbody>
+</table>
+<p><strong>未验证项</strong>：伪摄像头视频中没有真实手掌，因此真实的手掌识别成功率、张掌 / 握拳判定阈值没有实测数据，只验证了模型加载、推理调用与回退链路。</p>
+<h2 id="运行与复盘">运行与复盘</h2>
+<ul>
+<li>运行方式：联网状态下用浏览器直接打开本目录 <code>index.html</code>；摄像头手势需要 <code>https</code> 或 <code>localhost</code> 等安全上下文，<code>file://</code> 下部分浏览器会拒绝摄像头。</li>
+<li>复盘：首轮生成后经自查修正多处，均为首轮内部问题，<code>changes</code> 为空。关键一处：飘散分支原先只叠加正弦速度、没有任何回复力，粒子会无限漂移（实测 5 秒后单颗粒子已漂到 5 个单位外），导致还原几乎不可见（3 秒仅 6%）；改为围绕「漂浮基准位置」的带阻尼振荡后，还原稳定在 3~4 秒内到达 100%。另外两处：力场半径最初只有视口宽度的约四分之一且场外完全没有吸引，按住手掌几乎无效，改为场内强吸引 + 场外弱吸引并把光环半径与真实力场对齐；「还原图片」按钮的强制吸引标志被指针分支覆盖而失效。最后把指针模式的按压状态显示到面板上，用户能确认手势已被识别。</li>
+</ul>
+<p>&lt;!-- archive:start --&gt;</p>
+<h2 id="当前归档信息自动生成">当前归档信息（自动生成）</h2>
+<ul>
+<li>实验 ID：<code>pixel-flow--deepseek-v4-1-flash-high-r01</code></li>
+<li>模型：DeepSeek-V4.1-Flash；推理档位：high</li>
+<li>类型：single-html；预览：static；网络：required</li>
+<li><a href="../../../../../../../demos/pixel-flow/runs/deepseek-v4-1-flash-high-r01/prompt.md">完整原始输入快照</a> · <a href="../../../../../../../topic.html?id=pixel-flow">主题与其他版本</a></li>
+<li>输入记录：本次批量执行的完整指令 + 主题任务正文；正文与 demos/pixel-flow/prompts/v1/prompt.md 逐字一致（该正文含中英双语同一份需求）。历史来源为 demos/pixel-flow/runs/unknown-unknown-r01/prompt.md，原始上下文未留存。</li>
+<li>工具：Claude Code。模型名称由用户指定为 DeepSeek-V4.1-Flash；会话内模型标识为 deepseek-flash[1m]。单会话直接执行，未委派子代理。Windows 11 + Node 22.16.0。摄像头路径用无头 Chromium 的伪设备（--use-fake-device-for-media-stream）验证：MediaPipe 模型可正常加载并给出「未检测到手」，伪视频中没有真实手掌，因此真实手势识别精度未验证。</li>
+<li>运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。</li>
+<li>费用记录：Deepseek 批次合计 2.71 CNY（11 个案例；批次 deepseek-v4-1-flash-high-2026-10-13；未记录单案例费用）</li>
+<li><a href="../../../../../../../demos/pixel-flow/runs/deepseek-v4-1-flash-high-r01/index.html">主页面</a></li>
+</ul>
+<h3 id="部署适配记录">部署适配记录</h3>
+<ul>
+<li>迁移来源：F:\dev\ai-coding-demo-test（model-test-base 工作区）/demos/pixel-flow/runs/deepseek-v4-1-flash-high-r01；保留原测试轮次 r01 与完整输入快照。</li>
+<li>迁移验收：通过本地 HTTP 实际入口补拍 desktop screenshot.png；390px 页面无横向溢出。静态入口也通过 file:// 直接打开检查。
+&lt;!-- archive:end --&gt;</li>
+</ul>
+</article><p class="document-copy-status" role="status"></p></div></main><footer><div class="container">AI CODING DEMO / 实验记录与技术说明。</div></footer></body></html>

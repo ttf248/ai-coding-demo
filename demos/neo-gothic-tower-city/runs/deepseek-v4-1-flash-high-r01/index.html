@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>新哥特式塔楼城市 · 可漫游 3D 场景</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #e9eef6;
+        --muted: #9fb0c6;
+        --gold: #e0b978;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #05070c;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+      }
+      canvas {
+        display: block;
+        touch-action: none;
+      }
+      .hud {
+        position: fixed;
+        left: 14px;
+        top: 14px;
+        max-width: min(360px, 78vw);
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgba(9, 13, 20, 0.62);
+        border: 1px solid rgba(224, 185, 120, 0.24);
+        backdrop-filter: blur(7px);
+        color: var(--ink);
+        font:
+          13px/1.6 "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          system-ui,
+          sans-serif;
+        pointer-events: none;
+      }
+      .hud h1 {
+        margin: 0 0 4px;
+        font-size: 16px;
+        letter-spacing: 0.6px;
+      }
+      .hud h1 em {
+        font-style: normal;
+        color: var(--gold);
+      }
+      .hud p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .hud dl {
+        margin: 8px 0 0;
+        font-size: 12px;
+        color: var(--muted);
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 2px 10px;
+      }
+      .hud dt {
+        color: var(--gold);
+      }
+      .hud dd {
+        margin: 0;
+      }
+      .panel {
+        position: fixed;
+        right: 14px;
+        top: 14px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(9, 13, 20, 0.62);
+        border: 1px solid rgba(224, 185, 120, 0.24);
+        backdrop-filter: blur(7px);
+        color: var(--ink);
+        font:
+          12.5px/1.7 "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          system-ui,
+          sans-serif;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 168px;
+      }
+      .panel label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+      }
+      .panel .stat {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .note {
+        position: fixed;
+        left: 50%;
+        bottom: 14px;
+        transform: translateX(-50%);
+        padding: 7px 14px;
+        border-radius: 999px;
+        background: rgba(9, 13, 20, 0.66);
+        border: 1px solid rgba(224, 185, 120, 0.2);
+        color: var(--muted);
+        font:
+          12px/1.4 "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          system-ui,
+          sans-serif;
+        white-space: nowrap;
+        max-width: 92vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: 10px;
+        text-align: center;
+        background: #05070c;
+        color: var(--ink);
+        font:
+          14px/1.7 "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          system-ui,
+          sans-serif;
+        transition: opacity 0.7s;
+        z-index: 10;
+      }
+      #boot.hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #boot .bar {
+        width: 220px;
+        height: 3px;
+        background: #1a2434;
+        border-radius: 999px;
+        overflow: hidden;
+        margin: 0 auto;
+      }
+      #boot .bar i {
+        display: block;
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #b8863b, #f0d9a0);
+        transition: width 0.3s;
+      }
+      @media (max-width: 720px) {
+        .hud {
+          max-width: 62vw;
+          padding: 9px 11px;
+        }
+        .hud dl {
+          display: none;
+        }
+        .panel {
+          min-width: 0;
+          padding: 8px 10px;
+          font-size: 12px;
+        }
+        .note {
+          font-size: 11px;
+          bottom: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div class="hud">
+      <h1>新哥特式塔楼城市 <em>· Neo-Gothic Tower City</em></h1>
+      <p>以真实比例重建的海崖塔楼群：塔身、尖顶、扶壁、玫瑰花窗与灯火。</p>
+      <dl>
+        <dt>拖拽</dt>
+        <dd>环视相机</dd>
+        <dt>滚轮</dt>
+        <dd>推进 / 后退</dd>
+        <dt>W A S D</dt>
+        <dd>人眼高度行走</dd>
+        <dt>空格</dt>
+        <dd>立即回到电影视角</dd>
+      </dl>
+    </div>
+
+    <div class="panel">
+      <label><input type="checkbox" id="autoCam" checked /> 电影运镜</label>
+      <label><input type="checkbox" id="embersOn" checked /> 火星粒子</label>
+      <label><input type="checkbox" id="gullsOn" checked /> 海鸥</label>
+      <label><input type="checkbox" id="moonOn" checked /> 月光</label>
+      <span class="stat" id="stat">初始化…</span>
+    </div>
+
+    <div class="note" id="note">正在加载 Three.js 与场景资源…</div>
+
+    <div id="boot">
+      <div>正在建造塔楼城市…</div>
+      <div class="bar"><i id="bootBar"></i></div>
+      <div id="bootMsg" style="color: #7f8ea3; font-size: 12px">
+        需要联网加载 Three.js（CDN）
+      </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+
+      const bootBar = document.getElementById("bootBar");
+      const bootMsg = document.getElementById("bootMsg");
+      const boot = document.getElementById("boot");
+      const note = document.getElementById("note");
+      const statEl = document.getElementById("stat");
+      const setProgress = (p, msg) => {
+        bootBar.style.width = Math.round(p * 100) + "%";
+        if (msg) bootMsg.textContent = msg;
+      };
+
+      setProgress(0.15, "初始化 WebGL 渲染器…");
+
+      /* ------------------------------------------------------------------ *
+       * 世界尺度约定（单位 = 米）：
+       *   人眼高度 1.7 m，塔楼 46~138 m，主教堂尖顶 168 m，海崖 34 m，
+       *   岛屿直径约 640 m。所有尺寸都按真实比例设定。
+       * ------------------------------------------------------------------ */
+
+      const app = document.getElementById("app");
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        powerPreference: "high-performance",
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.18;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      app.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x0b1522, 0.0026);
+
+      const camera = new THREE.PerspectiveCamera(
+        52,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        4000,
+      );
+      camera.position.set(230, 96, 268);
+
+      /* ---------------------------- 随机数 ---------------------------- */
+      function mulberry32(a) {
+        return function () {
+          a |= 0;
+          a = (a + 0x6d2b79f5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      const rand = mulberry32(20261013);
+
+      /* ---------------------------- 天空与雾 ---------------------------- */
+      const skyGeo = new THREE.SphereGeometry(2200, 40, 24);
+      const skyMat = new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: {
+          top: { value: new THREE.Color(0x081020) },
+          horizon: { value: new THREE.Color(0x2b4560) },
+          glow: { value: new THREE.Color(0x6d5334) },
+        },
+        vertexShader: `
+          varying vec3 vDir;
+          void main(){
+            vDir = normalize(position);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }`,
+        fragmentShader: `
+          uniform vec3 top; uniform vec3 horizon; uniform vec3 glow;
+          varying vec3 vDir;
+          void main(){
+            float h = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
+            vec3 c = mix(horizon, top, pow(h, 0.62));
+            // 地平线附近的暖色余晖
+            float g = exp(-pow(abs(vDir.y) * 5.2, 1.5));
+            c = mix(c, glow, g * 0.45);
+            gl_FragColor = vec4(c, 1.0);
+          }`,
+      });
+      scene.add(new THREE.Mesh(skyGeo, skyMat));
+
+      /* ---------------------------- 灯光 ---------------------------- */
+      const hemi = new THREE.HemisphereLight(0xa8c8ee, 0x243040, 0.95);
+      scene.add(hemi);
+      scene.add(new THREE.AmbientLight(0x38506e, 0.55));
+
+      const moon = new THREE.DirectionalLight(0xd6e6ff, 2.1);
+      moon.position.set(-260, 340, 190);
+      moon.castShadow = true;
+      moon.shadow.mapSize.set(2048, 2048);
+      moon.shadow.camera.near = 10;
+      moon.shadow.camera.far = 900;
+      const sw = 340;
+      moon.shadow.camera.left = -sw;
+      moon.shadow.camera.right = sw;
+      moon.shadow.camera.top = sw;
+      moon.shadow.camera.bottom = -sw;
+      moon.shadow.bias = -0.0007;
+      scene.add(moon);
+
+      // 暖侧光：给塔身补一点轮廓，避免整座城变成剪影
+      const warm = new THREE.DirectionalLight(0xffb070, 0.75);
+      warm.position.set(240, 90, -200);
+      scene.add(warm);
+
+      // 冷轮廓光：从镜头方向压出边缘
+      const rim = new THREE.DirectionalLight(0x8fc4ff, 0.55);
+      rim.position.set(-180, 120, 260);
+      scene.add(rim);
+
+      /* ---------------------------- 材质 ---------------------------- */
+      const stoneMat = new THREE.MeshStandardMaterial({
+        color: 0x6a6d73,
+        roughness: 0.92,
+        metalness: 0.04,
+      });
+      const darkStoneMat = new THREE.MeshStandardMaterial({
+        color: 0x4a4d54,
+        roughness: 0.95,
+        metalness: 0.03,
+      });
+      const roofMat = new THREE.MeshStandardMaterial({
+        color: 0x2f4a55,
+        roughness: 0.62,
+        metalness: 0.34,
+      });
+      const goldMat = new THREE.MeshStandardMaterial({
+        color: 0xb8912f,
+        roughness: 0.34,
+        metalness: 0.85,
+        emissive: 0x4a3208,
+        emissiveIntensity: 0.9,
+      });
+      const windowMat = new THREE.MeshStandardMaterial({
+        color: 0x3a2a12,
+        emissive: 0xffb04a,
+        emissiveIntensity: 2.4,
+        roughness: 0.5,
+      });
+      const roseMat = new THREE.MeshStandardMaterial({
+        color: 0x2a1c08,
+        emissive: 0xff8a3c,
+        emissiveIntensity: 3.0,
+        roughness: 0.4,
+      });
+      const glazingMat = new THREE.MeshStandardMaterial({
+        color: 0x1a2a3a,
+        emissive: 0x2a6fa8,
+        emissiveIntensity: 0.9,
+        roughness: 0.25,
+        metalness: 0.4,
+      });
+
+      /* 建筑几何收集：把同类构件合并，减少 draw call */
+      const buckets = {
+        stone: [],
+        dark: [],
+        roof: [],
+        gold: [],
+        windows: [],
+        rose: [],
+        glazing: [],
+      };
+      const tmpMatrix = new THREE.Matrix4();
+      const tmpQuat = new THREE.Quaternion();
+      const tmpEuler = new THREE.Euler();
+      const tmpScale = new THREE.Vector3(1, 1, 1);
+      const tmpPos = new THREE.Vector3();
+
+      // rotX 用于把圆柱压成朝向 ±Z 的圆盘（玫瑰花窗、圆窗）
+      function push(bucket, geo, x, y, z, rotY = 0, sx = 1, sy = 1, sz = 1, rotX = 0) {
+        tmpEuler.set(rotX, rotY, 0, "YXZ");
+        tmpQuat.setFromEuler(tmpEuler);
+        tmpPos.set(x, y, z);
+        tmpMatrix.compose(tmpPos, tmpQuat, tmpScale.set(sx, sy, sz));
+        const g = geo.clone();
+        g.applyMatrix4(tmpMatrix);
+        buckets[bucket].push(g);
+      }
+
+      const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+      const cylGeo = new THREE.CylinderGeometry(1, 1, 1, 12);
+      const coneGeo = new THREE.ConeGeometry(1, 1, 10);
+      const sphereGeo = new THREE.SphereGeometry(1, 10, 8);
+
+      /* ---------------------------- 建筑构件 ---------------------------- */
+
+      // 塔楼：方形塔身 + 收分 + 尖顶 + 角楼 + 扶壁 + 拱窗
+      function addTower(opts) {
+        const {
+          x,
+          z,
+          baseY,
+          width = 11,
+          height = 82,
+          rotY = 0,
+          spireHeight = 30,
+          tiers = 3,
+          lit = true,
+          crown = true,
+        } = opts;
+
+        let y = baseY;
+        let w = width;
+        const tierH = height / tiers;
+
+        for (let t = 0; t < tiers; t++) {
+          const segH = tierH * (t === tiers - 1 ? 1 : 0.97);
+          push("stone", boxGeo, x, y + segH / 2, z, rotY, w, segH, w);
+
+          // 层间束带
+          const beltH = 1.5;
+          push(
+            "dark",
+            boxGeo,
+            x,
+            y + segH + beltH / 2,
+            z,
+            rotY,
+            w * 1.14,
+            beltH,
+            w * 1.14,
+          );
+          y += segH + beltH;
+
+          // 每层四面的拱窗（两扇一列）
+          if (lit) {
+            const perSide = Math.max(1, Math.round(w / 5));
+            for (let s = 0; s < 4; s++) {
+              const a = rotY + (s * Math.PI) / 2;
+              const nx = Math.sin(a);
+              const nz = Math.cos(a);
+              for (let i = 0; i < perSide; i++) {
+                const off = (i - (perSide - 1) / 2) * (w / perSide);
+                const wx = x + nx * (w / 2 + 0.42) + nz * off;
+                const wz = z + nz * (w / 2 + 0.42) - nx * off;
+                const winH = Math.min(segH * 0.42, 6.4);
+                push(
+                  "windows",
+                  boxGeo,
+                  wx,
+                  y - segH + segH * 0.52,
+                  wz,
+                  a,
+                  1.5,
+                  winH,
+                  0.5,
+                );
+                // 尖拱：窗顶的小三角
+                push(
+                  "windows",
+                  coneGeo,
+                  wx,
+                  y - segH + segH * 0.52 + winH / 2 + 0.9,
+                  wz,
+                  a,
+                  1.0,
+                  1.9,
+                  0.45,
+                );
+              }
+            }
+          }
+
+          // 扶壁
+          const buttressCount = 4;
+          for (let i = 0; i < buttressCount; i++) {
+            const a = rotY + Math.PI / 4 + (i * Math.PI) / 2;
+            const bx = x + Math.sin(a) * (w / 2 + 2.6);
+            const bz = z + Math.cos(a) * (w / 2 + 2.6);
+            push(
+              "dark",
+              boxGeo,
+              bx,
+              y - segH + segH * 0.24,
+              bz,
+              a,
+              2.0,
+              segH * 0.48,
+              2.6,
+            );
+            // 斜撑
+            push("dark", coneGeo, bx, y - segH + segH * 0.5, bz, a, 1.5, 4.5, 1.5);
+          }
+
+          // 收分：越往上越细
+          w *= 0.9;
+        }
+
+        // 顶部角楼
+        if (crown) {
+          const cnr = w / 2 + 1.6;
+          for (let i = 0; i < 4; i++) {
+            const a = rotY + Math.PI / 4 + (i * Math.PI) / 2;
+            const cx = x + Math.sin(a) * cnr * 0.72;
+            const cz = z + Math.cos(a) * cnr * 0.72;
+            push("stone", cylGeo, cx, y + 3.2, cz, 0, 2.1, 6.4, 2.1);
+            push("roof", coneGeo, cx, y + 6.4 + 3.4, cz, 0, 2.5, 6.8, 2.5);
+            push("gold", sphereGeo, cx, y + 6.4 + 7.4, cz, 0, 0.6, 0.6, 0.6);
+          }
+        }
+
+        // 尖顶
+        if (spireHeight > 0) {
+          push("roof", coneGeo, x, y + spireHeight / 2, z, rotY, w * 0.92, spireHeight, w * 0.92);
+          push("gold", sphereGeo, x, y + spireHeight + 2.2, z, 0, 1.1, 1.1, 1.1);
+          push("gold", cylGeo, x, y + spireHeight + 4.6, z, 0, 0.22, 4.6, 0.22);
+          // 尖顶上的四只小尖塔
+          for (let i = 0; i < 4; i++) {
+            const a = rotY + (i * Math.PI) / 2;
+            const px = x + Math.sin(a) * w * 0.62;
+            const pz = z + Math.cos(a) * w * 0.62;
+            push("stone", cylGeo, px, y + 3.0, pz, 0, 1.1, 6.0, 1.1);
+            push("roof", coneGeo, px, y + 6.0 + 2.6, pz, 0, 1.3, 5.2, 1.3);
+          }
+        }
+
+        return { x, z, top: y + spireHeight, width: w };
+      }
+
+      // 玫瑰花窗：朝向 -Z 的圆盘 + 外圈石框
+      function addRoseWindow(x, y, z, radius) {
+        push("dark", cylGeo, x, y, z + 0.7, 0, radius * 1.2, 1.0, radius * 1.2, Math.PI / 2);
+        push("rose", cylGeo, x, y, z, 0, radius, 0.8, radius, Math.PI / 2);
+      }
+
+      // 连廊 / 飞扶壁
+      function addBridge(a, b, y, thickness = 2.6) {
+        const dx = b.x - a.x;
+        const dz = b.z - a.z;
+        const len = Math.hypot(dx, dz);
+        const ang = Math.atan2(dx, dz);
+        const cx = (a.x + b.x) / 2;
+        const cz = (a.z + b.z) / 2;
+        push("stone", boxGeo, cx, y, cz, ang, 4.2, thickness, len);
+        // 栏杆
+        push("dark", boxGeo, cx, y + 2.2, cz, ang, 4.8, 0.6, len);
+        for (let i = 0; i < Math.floor(len / 7); i++) {
+          const t = (i + 0.5) / Math.floor(len / 7);
+          const px = a.x + dx * t;
+          const pz = a.z + dz * t;
+          push("dark", boxGeo, px, y + 3.4, pz, ang, 0.7, 2.4, 0.7);
+        }
+      }
+
+      /* ---------------------------- 主教堂 ---------------------------- */
+      function addCathedral() {
+        const cx = 0;
+        const cz = 0;
+        const baseY = 34;
+        const group = [];
+
+        // 中殿
+        push("stone", boxGeo, cx, baseY + 26, cz - 6, 0, 46, 52, 96);
+        // 侧廊
+        push("stone", boxGeo, cx - 30, baseY + 15, cz - 6, 0, 16, 30, 92);
+        push("stone", boxGeo, cx + 30, baseY + 15, cz - 6, 0, 16, 30, 92);
+        // 中殿屋顶
+        push("roof", coneGeo, cx, baseY + 52 + 15, cz - 6, Math.PI / 4, 33, 30, 33);
+        // 侧廊屋顶
+        push("roof", coneGeo, cx - 30, baseY + 30 + 8, cz - 6, Math.PI / 4, 12, 16, 12);
+        push("roof", coneGeo, cx + 30, baseY + 30 + 8, cz - 6, Math.PI / 4, 12, 16, 12);
+
+        // 后殿
+        push("stone", cylGeo, cx, baseY + 24, cz + 46, 0, 26, 48, 26);
+        push("roof", coneGeo, cx, baseY + 48 + 14, cz + 46, 0, 27, 28, 27);
+
+        // 西立面两座钟塔
+        group.push(
+          addTower({
+            x: cx - 26,
+            z: cz - 58,
+            baseY,
+            width: 15,
+            height: 118,
+            spireHeight: 46,
+            tiers: 4,
+          }),
+        );
+        group.push(
+          addTower({
+            x: cx + 26,
+            z: cz - 58,
+            baseY,
+            width: 15,
+            height: 118,
+            spireHeight: 46,
+            tiers: 4,
+          }),
+        );
+
+        // 中央尖塔（最高点 168 m）
+        push("stone", boxGeo, cx, baseY + 26 + 30, cz - 6, Math.PI / 4, 22, 60, 22);
+        push("roof", coneGeo, cx, baseY + 56 + 78, cz - 6, Math.PI / 4, 17, 156, 17);
+        push("gold", sphereGeo, cx, baseY + 134 + 22, cz - 6, 0, 1.8, 1.8, 1.8);
+
+        // 正面玫瑰花窗
+        addRoseWindow(cx, baseY + 42, cz - 54.2, 11);
+        addRoseWindow(cx - 26, baseY + 74, cz - 65.2, 5.4);
+        addRoseWindow(cx + 26, baseY + 74, cz - 65.2, 5.4);
+        // 侧面色窗（贴着 x = ±38.3 的墙面，沿 X 方向很薄）
+        for (let i = 0; i < 6; i++) {
+          const z = cz - 44 + i * 16;
+          push("glazing", boxGeo, cx - 38.6, baseY + 20, z, 0, 0.6, 16, 9);
+          push("glazing", boxGeo, cx + 38.6, baseY + 20, z, 0, 0.6, 16, 9);
+        }
+        // 大门
+        push("dark", boxGeo, cx, baseY + 12, cz - 54.4, 0, 16, 24, 1.2);
+        push("glazing", boxGeo, cx, baseY + 11, cz - 54.6, 0, 12, 20, 0.6);
+
+        // 飞扶壁：侧廊到中殿
+        for (let i = 0; i < 5; i++) {
+          const z = cz - 40 + i * 18;
+          push("stone", boxGeo, cx - 30, baseY + 34, z, 0, 18, 2.2, 3.2);
+          push("stone", boxGeo, cx + 30, baseY + 34, z, 0, 18, 2.2, 3.2);
+          push("dark", cylGeo, cx - 38, baseY + 22, z, 0, 2.4, 36, 2.4);
+          push("dark", cylGeo, cx + 38, baseY + 22, z, 0, 2.4, 36, 2.4);
+        }
+
+        return group;
+      }
+
+      /* ---------------------------- 地形与海 ---------------------------- */
+      setProgress(0.35, "雕刻海崖与岛屿…");
+
+      const islandGroup = new THREE.Group();
+      scene.add(islandGroup);
+
+      // 岛屿主体：低多边形岩体
+      const islandGeo = new THREE.CylinderGeometry(300, 330, 68, 64, 6);
+      islandGeo.translate(0, -1, 0);
+      const pos = islandGeo.attributes.position;
+      const rockRand = mulberry32(777);
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        const z = pos.getZ(i);
+        const r = Math.hypot(x, z);
+        if (r > 10) {
+          const n = (rockRand() - 0.5) * 26 * (r / 300);
+          pos.setX(i, x + (x / r) * n);
+          pos.setZ(i, z + (z / r) * n);
+          pos.setY(i, y + (rockRand() - 0.5) * 7);
+        }
+      }
+      islandGeo.computeVertexNormals();
+      const island = new THREE.Mesh(islandGeo, darkStoneMat);
+      island.position.y = 0;
+      island.castShadow = true;
+      island.receiveShadow = true;
+      islandGroup.add(island);
+
+      // 顶部平台（城市基座）
+      const plateau = new THREE.Mesh(
+        new THREE.CylinderGeometry(258, 268, 12, 64),
+        stoneMat,
+      );
+      plateau.position.y = 36;
+      plateau.castShadow = true;
+      plateau.receiveShadow = true;
+      islandGroup.add(plateau);
+
+      /* 海面：自定义着色器，多层正弦波 + 菲涅尔色调 */
+      const seaGeo = new THREE.PlaneGeometry(5200, 5200, 300, 300);
+      seaGeo.rotateX(-Math.PI / 2);
+      const seaMat = new THREE.ShaderMaterial({
+        transparent: true,
+        uniforms: {
+          uTime: { value: 0 },
+          uDeep: { value: new THREE.Color(0x05111d) },
+          uShallow: { value: new THREE.Color(0x1a4d69) },
+          uFoam: { value: new THREE.Color(0xbcd8e4) },
+          uHorizon: { value: new THREE.Color(0x2b4560) },
+        },
+        vertexShader: `
+          uniform float uTime;
+          varying float vWave;
+          varying vec3 vWorld;
+          float wave(vec2 p, vec2 d, float f, float a, float sp){
+            return sin(dot(p, d) * f + uTime * sp) * a;
+          }
+          void main(){
+            vec3 p = position;
+            vec2 q = p.xz;
+            float h = 0.0;
+            h += wave(q, normalize(vec2(1.0, 0.35)), 0.011, 2.1, 0.75);
+            h += wave(q, normalize(vec2(-0.6, 1.0)), 0.021, 1.2, 1.05);
+            h += wave(q, normalize(vec2(0.25, -1.0)), 0.045, 0.5, 1.7);
+            h += wave(q, normalize(vec2(1.0, 1.0)), 0.092, 0.2, 2.4);
+            p.y += h;
+            vWave = h;
+            vec4 w = modelMatrix * vec4(p, 1.0);
+            vWorld = w.xyz;
+            gl_Position = projectionMatrix * viewMatrix * w;
+          }`,
+        fragmentShader: `
+          uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uFoam; uniform vec3 uHorizon;
+          uniform float uTime;
+          varying float vWave;
+          varying vec3 vWorld;
+          void main(){
+            float t = clamp(vWave * 0.28 + 0.5, 0.0, 1.0);
+            vec3 col = mix(uDeep, uShallow, t);
+            // 波峰泡沫
+            float crest = smoothstep(0.62, 1.15, vWave);
+            col = mix(col, uFoam, crest * 0.34);
+            // 远处融入地平线颜色，配合雾
+            float d = length(vWorld.xz);
+            col = mix(col, uHorizon, smoothstep(900.0, 3000.0, d));
+            float spec = pow(max(vWave, 0.0) * 0.6, 2.0);
+            col += vec3(0.10, 0.13, 0.16) * spec;
+            gl_FragColor = vec4(col, 0.96);
+          }`,
+      });
+      const sea = new THREE.Mesh(seaGeo, seaMat);
+      sea.position.y = -18;
+      scene.add(sea);
+
+      /* ---------------------------- 城市布局 ---------------------------- */
+      setProgress(0.55, "布置塔楼与连廊…");
+
+      const towers = [];
+      addCathedral();
+
+      // 三环塔楼，越靠外越矮，形成城市天际线
+      const rings = [
+        { radius: 86, count: 7, minH: 74, maxH: 112, width: 11.5 },
+        { radius: 148, count: 11, minH: 58, maxH: 92, width: 10.5 },
+        { radius: 212, count: 15, minH: 46, maxH: 74, width: 9.5 },
+      ];
+
+      const baseY = 42;
+      rings.forEach((ring, ri) => {
+        for (let i = 0; i < ring.count; i++) {
+          const a = (i / ring.count) * Math.PI * 2 + ri * 0.31;
+          const jitter = (rand() - 0.5) * 16;
+          const r = ring.radius + jitter;
+          const x = Math.cos(a) * r;
+          const z = Math.sin(a) * r;
+          // 不要把塔盖在教堂上
+          if (Math.abs(x) < 52 && z > -80 && z < 76) continue;
+          const h = ring.minH + rand() * (ring.maxH - ring.minH);
+          towers.push(
+            addTower({
+              x,
+              z,
+              baseY: baseY - 4,
+              width: ring.width + rand() * 2,
+              height: h,
+              rotY: a + (rand() - 0.5) * 0.4,
+              spireHeight: 18 + rand() * 26,
+              tiers: h > 80 ? 4 : 3,
+              lit: rand() > 0.12,
+            }),
+          );
+        }
+      });
+
+      // 同环相邻塔之间的空中连廊
+      for (let ri = 0; ri < rings.length; ri++) {
+        const ringTowers = towers.filter(
+          (t) =>
+            Math.abs(Math.hypot(t.x, t.z) - rings[ri].radius) < 22 &&
+            t.z !== undefined,
+        );
+        for (let i = 0; i + 1 < ringTowers.length; i += 2) {
+          const a = ringTowers[i];
+          const b = ringTowers[i + 1];
+          const dist = Math.hypot(a.x - b.x, a.z - b.z);
+          if (dist > 22 && dist < 95)
+            addBridge(a, b, baseY + 30 + (ri === 0 ? 12 : 0));
+        }
+      }
+
+      // 城墙与垛口
+      const wallR = 244;
+      const wallSeg = 96;
+      for (let i = 0; i < wallSeg; i++) {
+        const a = (i / wallSeg) * Math.PI * 2;
+        const x = Math.cos(a) * wallR;
+        const z = Math.sin(a) * wallR;
+        push("dark", boxGeo, x, baseY + 1, z, a, 18, 22, 4.2);
+        if (i % 3 === 0)
+          push("dark", boxGeo, x, baseY + 14, z, a, 18, 5, 5.4);
+      }
+
+      // 码头与栈桥
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + 0.4;
+        const x1 = Math.cos(a) * 262;
+        const z1 = Math.sin(a) * 262;
+        const x2 = Math.cos(a) * 350;
+        const z2 = Math.sin(a) * 350;
+        const ang = Math.atan2(x2 - x1, z2 - z1);
+        push("dark", boxGeo, (x1 + x2) / 2, -6, (z1 + z2) / 2, ang, 24, 4, 92);
+        for (let k = 0; k < 9; k++) {
+          const t = k / 8;
+          push(
+            "dark",
+            cylGeo,
+            x1 + (x2 - x1) * t,
+            -20,
+            z1 + (z2 - z1) * t,
+            0,
+            1.6,
+            30,
+            1.6,
+          );
+        }
+        // 立面上的灯塔
+        push("stone", cylGeo, x1 * 0.92, baseY + 16, z1 * 0.92, 0, 5.5, 34, 5.5);
+        push("roof", coneGeo, x1 * 0.92, baseY + 33 + 6, z1 * 0.92, 0, 6.4, 12, 6.4);
+        push(
+          "windows",
+          sphereGeo,
+          x1 * 0.92,
+          baseY + 27,
+          z1 * 0.92,
+          0,
+          3.4,
+          3.4,
+          3.4,
+        );
+      }
+
+      // 街道、石阶与广场（薄板即可读出尺度）
+      for (let i = 0; i < 3; i++) {
+        const r = 62 + i * 58;
+        const seg = 40 + i * 12;
+        for (let k = 0; k < seg; k++) {
+          const a = (k / seg) * Math.PI * 2;
+          push(
+            "dark",
+            boxGeo,
+            Math.cos(a) * r,
+            baseY - 3.2,
+            Math.sin(a) * r,
+            a,
+            26,
+            1.6,
+            5.5,
+          );
+        }
+      }
+
+      /* 几何合并 */
+      setProgress(0.72, "合并几何体…");
+      function buildMesh(bucket, material, shadows) {
+        if (!buckets[bucket].length) return null;
+        const merged = mergeGeometries(buckets[bucket], false);
+        if (!merged) return null;
+        const mesh = new THREE.Mesh(merged, material);
+        mesh.castShadow = shadows !== false;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        return mesh;
+      }
+      buildMesh("stone", stoneMat);
+      buildMesh("dark", darkStoneMat);
+      buildMesh("roof", roofMat);
+      buildMesh("gold", goldMat);
+      buildMesh("windows", windowMat, false);
+      buildMesh("rose", roseMat, false);
+      buildMesh("glazing", glazingMat, false);
+
+      /* ---------------------------- 火星粒子 ---------------------------- */
+      setProgress(0.84, "点燃火盆与火星…");
+
+      const EMBER_COUNT = 2600;
+      const emberGeo = new THREE.BufferGeometry();
+      const emberPos = new Float32Array(EMBER_COUNT * 3);
+      const emberSeed = new Float32Array(EMBER_COUNT);
+      const emberOrigins = [];
+      for (let i = 0; i < EMBER_COUNT; i++) {
+        // 火星火源分布在塔基、城墙与码头
+        const src = Math.floor(rand() * 3);
+        let ox, oy, oz;
+        if (src === 0) {
+          const a = rand() * Math.PI * 2;
+          const r = 60 + rand() * 190;
+          ox = Math.cos(a) * r;
+          oz = Math.sin(a) * r;
+          oy = baseY + 3;
+        } else if (src === 1) {
+          const a = rand() * Math.PI * 2;
+          ox = Math.cos(a) * 244;
+          oz = Math.sin(a) * 244;
+          oy = baseY + 14;
+        } else {
+          const a = rand() * Math.PI * 2;
+          ox = Math.cos(a) * 300;
+          oz = Math.sin(a) * 300;
+          oy = -4;
+        }
+        emberOrigins.push(ox, oy, oz);
+        emberPos[i * 3] = ox;
+        emberPos[i * 3 + 1] = oy;
+        emberPos[i * 3 + 2] = oz;
+        emberSeed[i] = rand();
+      }
+      emberGeo.setAttribute("position", new THREE.BufferAttribute(emberPos, 3));
+      emberGeo.setAttribute("aSeed", new THREE.BufferAttribute(emberSeed, 1));
+      emberGeo.setAttribute(
+        "aOrigin",
+        new THREE.BufferAttribute(new Float32Array(emberOrigins), 3),
+      );
+
+      const emberMat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        uniforms: { uTime: { value: 0 } },
+        vertexShader: `
+          attribute float aSeed;
+          attribute vec3 aOrigin;
+          uniform float uTime;
+          varying float vLife;
+          void main(){
+            float life = fract(aSeed + uTime * (0.06 + aSeed * 0.09));
+            vLife = life;
+            float rise = life * (26.0 + aSeed * 40.0);
+            // 水平漂移 + 涡旋，让火星不呈直线上浮
+            float sway = sin(uTime * (0.7 + aSeed) + aSeed * 31.4) * (2.2 + aSeed * 3.4) * life;
+            float sway2 = cos(uTime * (0.5 + aSeed * 0.7) + aSeed * 17.0) * (1.6 + aSeed * 2.6) * life;
+            vec3 p = aOrigin + vec3(sway, rise, sway2);
+            vec4 mv = modelViewMatrix * vec4(p, 1.0);
+            gl_Position = projectionMatrix * mv;
+            float size = (1.1 + aSeed * 3.4) * (1.0 - life * 0.55);
+            gl_PointSize = size * (300.0 / max(-mv.z, 1.0));
+          }`,
+        fragmentShader: `
+          varying float vLife;
+          void main(){
+            vec2 d = gl_PointCoord - 0.5;
+            float r = length(d);
+            if (r > 0.5) discard;
+            float a = smoothstep(0.5, 0.0, r) * (1.0 - vLife);
+            vec3 c = mix(vec3(1.0, 0.92, 0.62), vec3(1.0, 0.36, 0.09), vLife);
+            gl_FragColor = vec4(c, a * 0.85);
+          }`,
+      });
+      const embers = new THREE.Points(emberGeo, emberMat);
+      embers.frustumCulled = false;
+      scene.add(embers);
+
+      // 火盆
+      const brazierPositions = [];
+      for (let i = 0; i < 26; i++) {
+        const a = (i / 26) * Math.PI * 2;
+        const r = 70 + (i % 3) * 62;
+        brazierPositions.push(new THREE.Vector3(Math.cos(a) * r, baseY, Math.sin(a) * r));
+      }
+      const brazierMat = new THREE.MeshStandardMaterial({
+        color: 0x2a1608,
+        emissive: 0xff7a1a,
+        emissiveIntensity: 3.2,
+        roughness: 0.5,
+      });
+      const brazierGeo = new THREE.CylinderGeometry(1.8, 1.1, 3.4, 8);
+      brazierPositions.forEach((p, i) => {
+        const mesh = new THREE.Mesh(brazierGeo, brazierMat);
+        mesh.position.set(p.x, p.y + 1.7, p.z);
+        scene.add(mesh);
+        // 只给一部分火盆真实点光源：光太多会明显拖慢着色器
+        if (i % 4 === 0) {
+          const light = new THREE.PointLight(0xffa050, 26, 90, 2);
+          light.position.set(p.x, p.y + 5.2, p.z);
+          scene.add(light);
+        }
+      });
+
+      /* ---------------------------- 海鸥 ---------------------------- */
+      const GULL_COUNT = 44;
+      const gullGeo = new THREE.BufferGeometry();
+      const gullPos = new Float32Array(GULL_COUNT * 3);
+      const gullSeed = new Float32Array(GULL_COUNT);
+      for (let i = 0; i < GULL_COUNT; i++) {
+        gullSeed[i] = rand();
+        gullPos[i * 3] = 0;
+        gullPos[i * 3 + 1] = 0;
+        gullPos[i * 3 + 2] = 0;
+      }
+      gullGeo.setAttribute("position", new THREE.BufferAttribute(gullPos, 3));
+      gullGeo.setAttribute("aSeed", new THREE.BufferAttribute(gullSeed, 1));
+      const gullMat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        uniforms: { uTime: { value: 0 } },
+        vertexShader: `
+          attribute float aSeed;
+          uniform float uTime;
+          varying float vWing;
+          void main(){
+            float t = uTime * (0.05 + aSeed * 0.07) + aSeed * 62.8;
+            float radius = 150.0 + aSeed * 220.0;
+            float height = 96.0 + aSeed * 120.0 + sin(t * 3.1) * 8.0;
+            vec3 p = vec3(cos(t) * radius, height, sin(t) * radius);
+            p.y += sin(t * 7.0 + aSeed * 12.0) * 3.0;
+            vWing = sin(uTime * 6.0 + aSeed * 40.0);
+            vec4 mv = modelViewMatrix * vec4(p, 1.0);
+            gl_Position = projectionMatrix * mv;
+            gl_PointSize = 2.6 * (900.0 / max(-mv.z, 1.0));
+          }`,
+        fragmentShader: `
+          varying float vWing;
+          void main(){
+            vec2 d = gl_PointCoord - 0.5;
+            float a = smoothstep(0.5, 0.16, length(d));
+            float w = smoothstep(0.5, 0.0, abs(d.x) * 2.0) * (0.5 + 0.5 * vWing);
+            gl_FragColor = vec4(vec3(0.92, 0.95, 1.0), a * w * 0.4);
+          }`,
+      });
+      const gulls = new THREE.Points(gullGeo, gullMat);
+      gulls.frustumCulled = false;
+      scene.add(gulls);
+
+      /* ---------------------------- 相机控制 ---------------------------- */
+      setProgress(0.95, "启动相机…");
+
+      const autoCurve = new THREE.CatmullRomCurve3(
+        [
+          new THREE.Vector3(430, 250, 430),
+          new THREE.Vector3(120, 150, 470),
+          new THREE.Vector3(-360, 120, 260),
+          new THREE.Vector3(-430, 230, -230),
+          new THREE.Vector3(-60, 130, -470),
+          new THREE.Vector3(370, 190, -300),
+          new THREE.Vector3(470, 150, 40),
+        ],
+        true,
+        "catmullrom",
+        0.5,
+      );
+
+      const state = {
+        auto: true,
+        yaw: Math.PI * 0.25,
+        pitch: -0.28,
+        distance: 380,
+        target: new THREE.Vector3(0, 80, 0),
+        walk: new THREE.Vector3(180, 1.7 + 42, 180),
+        walking: false,
+        autoT: 0,
+        idle: 0,
+        keys: Object.create(null),
+      };
+
+      const pointer = { down: false, x: 0, y: 0 };
+
+      renderer.domElement.addEventListener("pointerdown", (e) => {
+        pointer.down = true;
+        pointer.x = e.clientX;
+        pointer.y = e.clientY;
+        state.auto = false;
+        state.idle = 0;
+        document.getElementById("autoCam").checked = false;
+        renderer.domElement.setPointerCapture(e.pointerId);
+      });
+      renderer.domElement.addEventListener("pointermove", (e) => {
+        if (!pointer.down) return;
+        const dx = e.clientX - pointer.x;
+        const dy = e.clientY - pointer.y;
+        pointer.x = e.clientX;
+        pointer.y = e.clientY;
+        state.yaw -= dx * 0.0035;
+        state.pitch = Math.max(-1.35, Math.min(1.1, state.pitch - dy * 0.0028));
+        state.idle = 0;
+      });
+      const endPointer = () => {
+        pointer.down = false;
+      };
+      renderer.domElement.addEventListener("pointerup", endPointer);
+      renderer.domElement.addEventListener("pointercancel", endPointer);
+
+      renderer.domElement.addEventListener(
+        "wheel",
+        (e) => {
+          e.preventDefault();
+          state.auto = false;
+          document.getElementById("autoCam").checked = false;
+          state.idle = 0;
+          state.distance = Math.max(26, Math.min(900, state.distance * Math.exp(e.deltaY * 0.0012)));
+        },
+        { passive: false },
+      );
+
+      window.addEventListener("keydown", (e) => {
+        state.keys[e.code] = true;
+        if (e.code === "Space") {
+          state.auto = true;
+          state.walking = false;
+          document.getElementById("autoCam").checked = true;
+          e.preventDefault();
+        }
+        if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) {
+          state.walking = true;
+          state.auto = false;
+          document.getElementById("autoCam").checked = false;
+          state.idle = 0;
+        }
+      });
+      window.addEventListener("keyup", (e) => {
+        state.keys[e.code] = false;
+      });
+
+      document.getElementById("autoCam").addEventListener("change", function () {
+        state.auto = this.checked;
+        state.walking = false;
+        state.idle = 0;
+      });
+      document.getElementById("embersOn").addEventListener("change", function () {
+        embers.visible = this.checked;
+      });
+      document.getElementById("gullsOn").addEventListener("change", function () {
+        gulls.visible = this.checked;
+      });
+      document.getElementById("moonOn").addEventListener("change", function () {
+        moon.intensity = this.checked ? 2.1 : 0.35;
+        hemi.intensity = this.checked ? 0.95 : 0.3;
+        rim.intensity = this.checked ? 0.55 : 0.12;
+      });
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      /* ---------------------------- 主循环 ---------------------------- */
+      const clock = new THREE.Clock();
+      let frames = 0;
+      let fpsTime = 0;
+      let fps = 0;
+
+      function tick() {
+        const dt = Math.min(clock.getDelta(), 0.05);
+        const t = clock.elapsedTime;
+
+        seaMat.uniforms.uTime.value = t;
+        emberMat.uniforms.uTime.value = t;
+        gullMat.uniforms.uTime.value = t;
+
+        if (state.auto) {
+          state.autoT = (state.autoT + dt * 0.012) % 1;
+          const p = autoCurve.getPointAt(state.autoT);
+          const look = autoCurve.getPointAt((state.autoT + 0.16) % 1);
+          camera.position.lerp(p, 0.06);
+          state.target.lerp(
+            new THREE.Vector3(look.x * 0.18, 70 + look.y * 0.06, look.z * 0.18),
+            0.06,
+          );
+          camera.lookAt(state.target);
+        } else if (state.walking) {
+          const speed = 22 * dt;
+          const dir = new THREE.Vector3(
+            Math.sin(state.yaw),
+            0,
+            Math.cos(state.yaw),
+          );
+          const right = new THREE.Vector3(dir.z, 0, -dir.x);
+          const move = new THREE.Vector3();
+          if (state.keys.KeyW) move.add(dir);
+          if (state.keys.KeyS) move.sub(dir);
+          if (state.keys.KeyD) move.add(right);
+          if (state.keys.KeyA) move.sub(right);
+          if (move.lengthSq() > 0) {
+            move.normalize().multiplyScalar(speed);
+            state.walk.add(move);
+            // 站上城市平台
+            const r = Math.hypot(state.walk.x, state.walk.z);
+            if (r > 246) {
+              state.walk.x *= 246 / r;
+              state.walk.z *= 246 / r;
+            }
+            state.walk.y = baseY + 1.7;
+          }
+          camera.position.copy(state.walk);
+          const look = new THREE.Vector3(
+            state.walk.x + Math.sin(state.yaw) * 60,
+            state.walk.y + Math.sin(-state.pitch) * 34,
+            state.walk.z + Math.cos(state.yaw) * 60,
+          );
+          camera.lookAt(look);
+          state.idle += dt;
+          if (state.idle > 9) {
+            // 长时间无输入后交还给电影运镜
+            state.auto = true;
+            state.walking = false;
+            document.getElementById("autoCam").checked = true;
+          }
+        } else {
+          const x =
+            state.target.x + Math.sin(state.yaw) * Math.cos(state.pitch) * state.distance;
+          const y = state.target.y - Math.sin(state.pitch) * state.distance;
+          const z =
+            state.target.z + Math.cos(state.yaw) * Math.cos(state.pitch) * state.distance;
+          camera.position.lerp(new THREE.Vector3(x, y, z), 0.18);
+          camera.lookAt(state.target);
+          state.idle += dt;
+          if (state.idle > 9) {
+            state.auto = true;
+            document.getElementById("autoCam").checked = true;
+          }
+        }
+
+        renderer.render(scene, camera);
+
+        frames++;
+        fpsTime += dt;
+        if (fpsTime >= 0.5) {
+          fps = frames / fpsTime;
+          frames = 0;
+          fpsTime = 0;
+          statEl.textContent =
+            Math.round(fps) +
+            " FPS · 三角面 " +
+            renderer.info.render.triangles.toLocaleString() +
+            " · draw call " +
+            renderer.info.render.calls;
+        }
+        requestAnimationFrame(tick);
+      }
+
+      setProgress(1, "完成");
+      setTimeout(() => boot.classList.add("hide"), 260);
+      note.textContent =
+        "拖拽环视 · 滚轮缩放 · WASD 行走 · 空格回到电影视角 · 空闲 9 秒自动恢复运镜";
+
+      // 首帧先渲染，避免出现空白等待
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    </script>
+  </body>
+</html>

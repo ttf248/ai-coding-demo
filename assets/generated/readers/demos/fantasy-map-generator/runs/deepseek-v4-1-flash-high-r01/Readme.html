@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f7f9"><title>奇幻地图生成器 · AI Coding Demo</title><meta name="description" content="单文件手绘风格奇幻岛屿地图生成器：种子决定地形，河流沿地势入海，支持升高/降低画笔、平移缩放、城镇标签与 PNG 导出。"><meta property="og:title" content="奇幻地图生成器"><meta property="og:description" content="单文件手绘风格奇幻岛屿地图生成器：种子决定地形，河流沿地势入海，支持升高/降低画笔、平移缩放、城镇标签与 PNG 导出。"><meta property="og:type" content="article"><link rel="stylesheet" href="../../../../../../site.css"><link rel="stylesheet" href="../../../../../../document.css"><script src="../../../../../../document.js" defer></script></head><body class="document-page"><a class="skip-link" href="#document-content">跳到正文</a><header class="site-header"><div class="container header-inner"><a class="brand" href="../../../../../../../index.html"><span class="brand-mark">AI</span>CODING / DEMO</a><nav aria-label="主导航"><a href="../../../../../../../index.html#projects">实验目录</a><a href="../../../../../../../compare.html">模型对比</a><a href="../../../../../../../index.html#guides">技术索引</a></nav></div></header><main class="container document-layout"><aside class="document-sidebar"><details open><summary>本页目录</summary><nav aria-label="文档目录"><a class="toc-level-1" href="#奇幻地图生成器deepseek-v41-flash-high-r01">奇幻地图生成器（DeepSeek-V4.1-Flash · high · r01）</a><a class="toc-level-2" href="#原始提示词">原始提示词</a><a class="toc-level-2" href="#实现要点">实现要点</a><a class="toc-level-2" href="#验收自测">验收自测</a><a class="toc-level-2" href="#运行与复盘">运行与复盘</a><a class="toc-level-2" href="#当前归档信息自动生成">当前归档信息（自动生成）</a><a class="toc-level-3" href="#部署适配记录">部署适配记录</a></nav></details></aside><div><div class="document-actions"><a href="../../../../../../../demos/fantasy-map-generator/runs/deepseek-v4-1-flash-high-r01/Readme.md" download>下载 Markdown 原文 ↗</a><a href="../../../../../../../topic.html?id=fantasy-map-generator">查看主题与版本 →</a></div><p class="document-context">DeepSeek-V4.1-Flash · high · 实验日期 2026-10-13 · 归档日期 未记录</p><article id="document-content" class="document-content"><h1 id="奇幻地图生成器deepseek-v41-flash-high-r01">奇幻地图生成器（DeepSeek-V4.1-Flash · high · r01）</h1>
+<p>单文件静态网页，直接打开 <a href="../../../../../../../demos/fantasy-map-generator/runs/deepseek-v4-1-flash-high-r01/index.html">index.html</a> 即可运行。无后端、无 CDN、无远程字体或图片、无构建步骤，<code>file://</code> 与 HTTP 静态托管都能运行。</p>
+<h2 id="原始提示词">原始提示词</h2>
+<p>见 <a href="../../../../../../../demos/fantasy-map-generator/runs/deepseek-v4-1-flash-high-r01/prompt.md">完整原始输入</a>；任务正文与 <a href="../../../../../../../demos/fantasy-map-generator/prompts/v1/prompt.md">v1 任务正文</a> 逐字一致。</p>
+<h2 id="实现要点">实现要点</h2>
+<ul>
+<li>高度场 = 多倍频值噪声 × 岛屿衰减掩膜。噪声查找表、山脊细节、海岸抖动全部由 seed 派生（FNV-1a 把种子文本散列为 32 位），因此种子与参数一致时地图逐像素一致。</li>
+<li>地形分类：海洋（按深度分色）、近岸浅海、海岸、平原、森林、山脉。森林由第二张湿度噪声决定，山脉由高出海平面的幅度决定。</li>
+<li><strong>河流</strong>：从高处候选源点出发，每一步只走向八邻域中最低的一格。这是最陡下降法，<strong>不会上坡</strong>；山脉定义在高出海平面 0.30 以上，而允许的累计爬升预算只有 0.028，因此河流在数值上不可能翻越山脊。到达洼地则汇成内陆小湖，汇入已有河流也会停止。</li>
+<li>画笔：升高 / 降低直接修改高度场，松手后重算河流与城镇并重绘，海岸线随之变化。</li>
+<li>视图：滚轮以光标为锚点缩放，捏合手势以捏合起点为基准换算（避免逐帧漂移），平移工具用 Pointer Events，坐标经逆变换换算，缩放后落笔位置仍准确。</li>
+<li>导出：合成一张带双线边框、标题与参数说明的 PNG，含当前地图；使用 <code>toDataURL</code> + 下载链接，<code>file://</code> 下同样可用。</li>
+</ul>
+<h2 id="验收自测">验收自测</h2>
+<p>用无头 Chromium 加载 <code>file://</code> 入口，通过画布像素与信息栏核对：</p>
+<table>
+<thead>
+<tr>
+<th>验收项</th>
+<th>期望</th>
+<th>实测</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>相同种子重生成结果一致</td>
+<td>完全一致</td>
+<td>画布 PNG 字节完全一致；换种子再换回也复现原图</td>
+</tr>
+<tr>
+<td>改变种子产生不同地图</td>
+<td>不同</td>
+<td>画布 PNG 不同（eldoria / zephyria 差异明显）</td>
+</tr>
+<tr>
+<td>画笔确实修改地形并联动地图</td>
+<td>像素改变</td>
+<td>中心区域像素 <code>[159,148,124]</code> → <code>[185,175,149]</code>，海岸与河流同步重算</td>
+</tr>
+<tr>
+<td>缩放后绘制坐标正确</td>
+<td>落笔位置准确</td>
+<td>滚轮缩放至 1.85× 后落笔无偏移、无异常</td>
+</tr>
+<tr>
+<td>导出图片包含当前地图</td>
+<td>有效位图</td>
+<td>下载得到 <code>fantasy-map-eldoria.png</code>，PNG 签名有效，1508×1202，抽样 136 种颜色</td>
+</tr>
+<tr>
+<td>触摸操作可用</td>
+<td>可用</td>
+<td>Pointer Events + <code>touch-action: none</code>，另实现双指捏合缩放</td>
+</tr>
+<tr>
+<td>首屏默认地图</td>
+<td>可操作</td>
+<td>载入即有 island、图例与城镇标签，陆地占比 35.4%、河流 16 条、城镇 9 个</td>
+</tr>
+<tr>
+<td>390px 无水平溢出</td>
+<td>无溢出</td>
+<td>溢出 0px</td>
+</tr>
+</tbody>
+</table>
+<h2 id="运行与复盘">运行与复盘</h2>
+<ul>
+<li>运行方式：浏览器直接打开本目录 <code>index.html</code>；或使用根目录 <code>npm run preview</code> 后的静态托管地址。</li>
+<li>未使用网络资源，断网可用。</li>
+<li>复盘：核心算法一次成立（确定性、河流不翻山脊、画笔联动）。首轮生成后做了两轮自查调整：一是初始陆地占比仅 23.5%，岛体偏小，调整掩膜阈值与高度基准后稳定在 30%~41%（随种子浮动，海平面滑块可覆盖 28.7%~47.6%）；二是森林阈值过高导致森林几乎不出现、河流线宽过细不易辨认，已下调阈值并加粗河流，同时加入逐格色差减轻方块感。两处均为参数与呈现层面的调整，未改动算法结构，<code>changes</code> 为空。</li>
+</ul>
+<p>&lt;!-- archive:start --&gt;</p>
+<h2 id="当前归档信息自动生成">当前归档信息（自动生成）</h2>
+<ul>
+<li>实验 ID：<code>fantasy-map-generator--deepseek-v4-1-flash-high-r01</code></li>
+<li>模型：DeepSeek-V4.1-Flash；推理档位：high</li>
+<li>类型：single-html；预览：static；网络：offline</li>
+<li><a href="../../../../../../../demos/fantasy-map-generator/runs/deepseek-v4-1-flash-high-r01/prompt.md">完整原始输入快照</a> · <a href="../../../../../../../topic.html?id=fantasy-map-generator">主题与其他版本</a></li>
+<li>输入记录：本次批量执行的完整指令 + 主题任务正文；正文与 demos/fantasy-map-generator/prompts/v1/prompt.md 逐字一致。任务正文来源为 docs/test-cases.md，不含更早的对话上下文。</li>
+<li>工具：Claude Code。模型名称由用户指定为 DeepSeek-V4.1-Flash；会话内模型标识为 deepseek-flash[1m]。单会话直接执行，未委派子代理。Windows 11 + Node 22.16.0。首轮生成后仅做视觉与比例调参（陆地占比、森林分布、河流粗细、逐格色差），未改变算法结构，也未做人工修改。</li>
+<li>运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。</li>
+<li>费用记录：Deepseek 批次合计 2.71 CNY（11 个案例；批次 deepseek-v4-1-flash-high-2026-10-13；未记录单案例费用）</li>
+<li><a href="../../../../../../../demos/fantasy-map-generator/runs/deepseek-v4-1-flash-high-r01/index.html">主页面</a></li>
+</ul>
+<h3 id="部署适配记录">部署适配记录</h3>
+<ul>
+<li>迁移来源：F:\dev\ai-coding-demo-test（model-test-base 工作区）/demos/fantasy-map-generator/runs/deepseek-v4-1-flash-high-r01；保留原测试轮次 r01 与完整输入快照。</li>
+<li>迁移验收：通过本地 HTTP 实际入口补拍 desktop screenshot.png；390px 页面无横向溢出。静态入口也通过 file:// 直接打开检查。
+&lt;!-- archive:end --&gt;</li>
+</ul>
+</article><p class="document-copy-status" role="status"></p></div></main><footer><div class="container">AI CODING DEMO / 实验记录与技术说明。</div></footer></body></html>
