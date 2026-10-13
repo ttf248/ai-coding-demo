@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pixel Flow · 图片粒子化与手势还原</title>
+<style>
+  html,body { margin:0; padding:0; height:100%; overflow:hidden; background:#0b0d12; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+  .ui { position:fixed; top:14px; left:16px; right:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; font-family:"PingFang SC","Microsoft YaHei",sans-serif; z-index:10; }
+  .btn { background:#1b2030; color:#e8ecf8; border:1px solid #2c3550; border-radius:10px; padding:9px 14px; font-size:13px; cursor:pointer; }
+  .btn:hover { border-color:#5fb0ff; }
+  #status { color:#9fb0d0; font-size:13px; }
+  #video { position:fixed; right:16px; bottom:16px; width:180px; border-radius:12px; border:1px solid #2c3550; transform:scaleX(-1); display:none; z-index:10; }
+  #sample { position:fixed; left:16px; bottom:16px; color:#9fb0d0; font-size:12px; z-index:10; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<div class="ui">
+  <label class="btn">上传图片<input type="file" id="file" accept="image/*" style="display:none"/></label>
+  <button class="btn" id="cam">启用摄像头</button>
+  <button class="btn" id="scatter">重新打散</button>
+  <span id="status">请上传一张本地图片开始体验。</span>
+</div>
+<video id="video" playsinline muted></video>
+<div id="sample">Three.js 粒子 · MediaPipe 手势追踪（无摄像头时可用鼠标拖动还原）</div>
+<script type="module">
+import * as THREE from 'three';
+
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0d12);
+const camera = new THREE.OrthographicCamera(-1,1,1,-1,0.1,10);
+camera.position.z = 5;
+
+let points = null, N = 0;
+let curPos, tgtPos, colorArr;
+const ASPECT = 1.0;
+let handX = 0, handY = 0, handActive = false, hasHand = false, handR = 1.6;
+
+function setCamera(aspect){
+  const a = Math.max(0.4, Math.min(3.0, aspect));
+  camera.left = -a; camera.right = a; camera.top = 1; camera.bottom = -1;
+  camera.updateProjectionMatrix();
+}
+
+function scatter(){
+  if (!curPos) return;
+  for (let i=0;i<N;i++){
+    const a = Math.random()*Math.PI*2, r = 2.5 + Math.random()*3;
+    curPos[i*3] = Math.cos(a)*r;
+    curPos[i*3+1] = Math.sin(a)*r*0.8;
+    curPos[i*3+2] = 0;
+  }
+  points.geometry.attributes.position.needsUpdate = true;
+}
+
+function loadImage(file){
+  const img = new Image();
+  img.onload = ()=>{
+    const W = 150, H = Math.round(W * img.height / img.width);
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const cx = cv.getContext('2d', { willReadFrequently:true });
+    cx.drawImage(img, 0, 0, W, H);
+    const data = cx.getImageData(0,0,W,H).data;
+    buildParticles(data, W, H);
+    setCamera(W/H);
+    document.getElementById('status').textContent = `已生成 ${N} 个粒子。张开手掌还原 / 握拳暂停；无摄像头时按住鼠标还原。`;
+  };
+  img.src = URL.createObjectURL(file);
+}
+document.getElementById('file').addEventListener('change', e=>{ if (e.target.files[0]) loadImage(e.target.files[0]); });
+
+function buildParticles(data, W, H){
+  const step = 1;
+  const cells = [];
+  for (let y=0;y<H;y+=step) for (let x=0;x<W;x+=step){
+    const i = (y*W+x)*4;
+    if (data[i+3] < 20) continue;
+    cells.push([x,y,data[i],data[i+1],data[i+2]]);
+  }
+  N = cells.length;
+  curPos = new Float32Array(N*3);
+  tgtPos = new Float32Array(N*3);
+  colorArr = new Float32Array(N*3);
+  const aspect = W/H;
+  for (let k=0;k<N;k++){
+    const [x,y,r,g,b] = cells[k];
+    const px = aspect*(2*x/(W-1) - 1); // x∈[0,W-1] → [-aspect, aspect]
+    const py = 1 - 2*y/(H-1);          // y∈[0,H-1] → [1,-1]
+    tgtPos[k*3] = px; tgtPos[k*3+1] = py; tgtPos[k*3+2] = 0;
+    const a = Math.random()*Math.PI*2, rr = 2.5+Math.random()*3;
+    curPos[k*3] = Math.cos(a)*rr; curPos[k*3+1] = Math.sin(a)*rr*0.8; curPos[k*3+2] = 0;
+    colorArr[k*3]=r/255; colorArr[k*3+1]=g/255; colorArr[k*3+2]=b/255;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(curPos,3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colorArr,3));
+  const mat = new THREE.PointsMaterial({ size:0.026, vertexColors:true, sizeAttenuation:false });
+  if (points) { scene.remove(points); points.geometry.dispose(); }
+  points = new THREE.Points(geo, mat);
+  scene.add(points);
+}
+document.getElementById('scatter').addEventListener('click', scatter);
+
+// ---- 手势 / 鼠标 ----
+let mouseDown = false, mouseX = 0, mouseY = 0;
+addEventListener('pointerdown', e=>{ mouseDown = true; });
+addEventListener('pointerup', e=>{ mouseDown = false; });
+addEventListener('pointermove', e=>{ mouseX = e.clientX; mouseY = e.clientY; });
+
+// MediaPipe 手势追踪
+let handLandmarker = null, video = document.getElementById('video');
+async function initHands(){
+  try {
+    const vision = await window.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+    handLandmarker = await window.HandLandmarker.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", delegate: "GPU" },
+      runningMode: "VIDEO", numHands: 1,
+    });
+  } catch(e){ console.warn('MediaPipe 初始化失败，使用鼠标回退', e); }
+}
+document.getElementById('cam').addEventListener('click', async ()=>{
+  try {
+    await initHands();
+    const stream = await navigator.mediaDevices.getUserMedia({ video:{width:640,height:480} });
+    video.srcObject = stream; await video.play();
+    video.style.display = 'block';
+    document.getElementById('status').textContent = '摄像头已开启，伸出手掌还原图片。';
+  } catch(e){ document.getElementById('status').textContent = '无法访问摄像头（需 HTTPS 或 localhost），改用鼠标还原。'; }
+});
+
+function detectHand(now){
+  if (!handLandmarker || video.readyState < 2) return;
+  try {
+    const res = handLandmarker.detectForVideo(video, now);
+    if (res.landmarks && res.landmarks.length){
+      const lm = res.landmarks[0];
+      const wrist = lm[0];
+      // 指尖到手腕的平均距离 → 判断张掌/握拳
+      let d = 0; for (const ti of [8,12,16,20]) d += Math.hypot(lm[ti].x-wrist.x, lm[ti].y-wrist.y);
+      d /= 4;
+      handActive = d > 0.34;
+      hasHand = true;
+      const palm = lm[9];
+      // 归一化 → 平面坐标
+      handX = (palm.x - 0.5) * 2 * camera.right;
+      handY = (0.5 - palm.y) * 2;
+    } else { hasHand = false; }
+  } catch(e){}
+}
+
+// ---- 动画 ----
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  detectHand(performance.now());
+
+  // 鼠标回退（无手时）：按住鼠标=还原，位置=鼠标
+  let hx, hy, active, has;
+  if (hasHand){ hx=handX; hy=handY; active=handActive; has=true; }
+  else {
+    const rect = renderer.domElement.getBoundingClientRect();
+    hx = (mouseX-rect.left)/rect.width * 2 * camera.right - camera.right;
+    hy = (1 - (mouseY-rect.top)/rect.height)*2 - 1;
+    active = mouseDown; has = mouseDown;
+  }
+
+  if (points && N){
+    const pos = points.geometry.attributes.position.array;
+    const R2 = handR*handR;
+    const boost = 0.16;
+    for (let i=0;i<N;i++){
+      const ix=i*3, iy=i*3+1;
+      let f = active ? 0.04 : 0.0;
+      if (has){
+        const dx = hx-pos[ix], dy = hy-pos[iy];
+        const d2 = dx*dx+dy*dy;
+        if (d2 < R2) f += (1 - d2/R2) * boost;
+      }
+      pos[ix] += (tgtPos[ix]-pos[ix]) * f;
+      pos[iy] += (tgtPos[iy]-pos[iy]) * f;
+      // 打散时的微弱漂浮
+      if (f < 0.001){
+        pos[ix] += Math.sin(t*0.8 + i)*0.0004;
+        pos[iy] += Math.cos(t*0.7 + i)*0.0004;
+      }
+    }
+    points.geometry.attributes.position.needsUpdate = true;
+  }
+  renderer.render(scene, camera);
+}
+animate();
+
+addEventListener('resize', ()=>{ renderer.setSize(innerWidth, innerHeight); });
+</script>
+</body>
+</html>

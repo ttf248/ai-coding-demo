@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>寻路算法实验室</title>
+<style>
+  :root {
+    --bg: #0f1220;
+    --panel: #171a2b;
+    --panel2: #1e2238;
+    --text: #e7e9f2;
+    --muted: #9aa0b8;
+    --accent: #4f8cff;
+    --accent2: #6ee7b7;
+    --wall: #2a2f47;
+    --cost: #8a6d3b;
+    --start: #34d399;
+    --end: #f472b6;
+    --visited: rgba(79, 140, 255, 0.18);
+    --frontier: rgba(110, 231, 183, 0.4);
+    --path: #ffd166;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  header {
+    padding: 14px 16px 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+  h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .wrap { padding: 0 16px 24px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid #262b44;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row + .row { margin-top: 8px; }
+  button {
+    background: var(--panel2);
+    color: var(--text);
+    border: 1px solid #303752;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #07101f; font-weight: 600; }
+  button.active { background: var(--accent); border-color: var(--accent); color: #07101f; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  select, input[type="range"] { background: var(--panel2); color: var(--text); border: 1px solid #303752; border-radius: 8px; padding: 7px 10px; font-size: 13px; }
+  .chip { padding: 4px 9px; border-radius: 20px; font-size: 12px; border: 1px solid #303752; background: var(--panel2); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 4px; vertical-align: -2px; }
+  #status { font-size: 13px; color: var(--accent2); min-height: 20px; }
+  #canvasWrap { position: relative; width: 100%; }
+  canvas { display: block; width: 100%; border-radius: 10px; background: #0b0e1a; border: 1px solid #262b44; touch-action: none; }
+  @media (max-width: 390px) {
+    button { padding: 7px 9px; font-size: 12px; }
+    h1 { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>寻路算法实验室</h1>
+  <span class="hint">BFS / Dijkstra / A* · 四方向移动 · 高代价地形</span>
+</header>
+<div class="wrap">
+  <div class="panel">
+    <div class="row">
+      <select id="algo">
+        <option value="astar">A*（曼哈顿）</option>
+        <option value="dijkstra">Dijkstra</option>
+        <option value="bfs">BFS（按步数）</option>
+      </select>
+      <button id="btnRun" class="primary">运行</button>
+      <button id="btnPause">暂停</button>
+      <button id="btnStep">单步</button>
+      <button id="btnClear">清除搜索</button>
+      <button id="btnReset">重置地图</button>
+    </div>
+    <div class="row">
+      <span class="chip">速度</span>
+      <input type="range" id="speed" min="1" max="60" value="20" />
+      <select id="preset">
+        <option value="">预设地图…</option>
+        <option value="open">空旷网格</option>
+        <option value="maze">迷宫围墙</option>
+        <option value="weighted">加权地形</option>
+      </select>
+    </div>
+    <div class="row legend">
+      <span><i style="background:#34d399"></i>起点</span>
+      <span><i style="background:#f472b6"></i>终点</span>
+      <span><i style="background:#2a2f47"></i>障碍</span>
+      <span><i style="background:#8a6d3b"></i>高代价(5)</span>
+      <span><i style="background:#ffd166"></i>路径</span>
+    </div>
+    <div class="row">
+      <button id="toolWall" class="active">画障碍</button>
+      <button id="toolErase">擦除</button>
+      <button id="toolCost">高代价地形</button>
+      <button id="toolStart">拖起点</button>
+      <button id="toolEnd">拖终点</button>
+    </div>
+    <div class="row" id="status">就绪。选择算法后点击“运行”，可拖动起点/终点，绘制障碍或高代价地形。</div>
+  </div>
+  <div id="canvasWrap"><canvas id="grid"></canvas></div>
+</div>
+<script>
+"use strict";
+const COLS = 32, ROWS = 20;
+const EMPTY = 0, WALL = 1, COST = 2;
+let grid = Array.from({length: ROWS}, () => Array(COLS).fill(EMPTY));
+let start = {r: 9, c: 4}, end = {r: 9, c: 27};
+let tool = 'wall';
+let algo = 'astar';
+let running = false, paused = false, speed = 20;
+// 搜索状态
+let search = null; // {order, parent, dist, frontier}
+let stepQueue = null;
+
+const canvas = document.getElementById('grid');
+const ctx = canvas.getContext('2d');
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+function resize() {
+  const wrap = document.getElementById('canvasWrap');
+  const w = wrap.clientWidth;
+  canvas.width = Math.round(w * DPR);
+  canvas.height = Math.round((w * ROWS / COLS) * DPR);
+  canvas.style.height = (w * ROWS / COLS) + 'px';
+  draw();
+}
+window.addEventListener('resize', resize);
+
+function cellSize() {
+  return canvas.clientWidth / COLS;
+}
+
+function key(r, c) { return r * COLS + c; }
+function inBounds(r, c) { return r >= 0 && r < ROWS && c >= 0 && c < COLS; }
+
+function resetMap() {
+  grid = Array.from({length: ROWS}, () => Array(COLS).fill(EMPTY));
+  start = {r: 9, c: 4}; end = {r: 9, c: 27};
+  clearSearch();
+  draw();
+  setStatus('地图已重置。');
+}
+
+function clearSearch() {
+  search = null; stepQueue = null; running = false; paused = false;
+  document.getElementById('btnPause').textContent = '暂停';
+}
+
+function setStatus(t) { document.getElementById('status').textContent = t; }
+
+function draw() {
+  const s = cellSize();
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const x = c * s, y = r * s;
+      if (grid[r][c] === WALL) ctx.fillStyle = '#2a2f47';
+      else if (grid[r][c] === COST) ctx.fillStyle = '#8a6d3b';
+      else ctx.fillStyle = '#12152a';
+      ctx.fillRect(x, y, s, s);
+    }
+  }
+  // 搜索覆盖层
+  if (search) {
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const st = search.cellState[key(r,c)];
+      if (st === 'visited') { ctx.fillStyle = 'rgba(79,140,255,0.20)'; }
+      else if (st === 'frontier') { ctx.fillStyle = 'rgba(110,231,183,0.42)'; }
+      else continue;
+      ctx.fillRect(c*s, r*s, s, s);
+    }
+  }
+  // 网格线
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let c = 0; c <= COLS; c++) { ctx.beginPath(); ctx.moveTo(c*s, 0); ctx.lineTo(c*s, ROWS*s); ctx.stroke(); }
+  for (let r = 0; r <= ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r*s); ctx.lineTo(COLS*s, r*s); ctx.stroke(); }
+  // 路径
+  if (search && search.path) {
+    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = Math.max(2, s*0.3); ctx.lineJoin = 'round';
+    ctx.beginPath();
+    search.path.forEach((p, i) => {
+      const px = p.c*s + s/2, py = p.r*s + s/2;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+  }
+  // 起点终点
+  drawCellMarker(start.r, start.c, '#34d399', 'S', s);
+  drawCellMarker(end.r, end.c, '#f472b6', 'E', s);
+}
+
+function drawCellMarker(r, c, color, label, s) {
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(c*s + s/2, r*s + s/2, s*0.32, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#0b0e1a'; ctx.font = `bold ${Math.max(9, s*0.4)}px sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, c*s + s/2, r*s + s/2 + 1);
+}
+
+function neighbors(r, c) {
+  return [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].filter(([rr,cc]) => inBounds(rr,cc) && grid[rr][cc] !== WALL);
+}
+
+function terrainCost(cell) { return cell === COST ? 5 : 1; }
+
+// 初始化搜索：返回 {order, parent, dist, frontierQueue, cellState}
+function initSearch() {
+  const order = []; const parent = new Map(); const dist = new Map();
+  const cellState = {};
+  const startKey = key(start.r, start.c);
+  dist.set(startKey, 0);
+  cellState[startKey] = 'frontier';
+  const frontier = [];
+  if (algo === 'bfs') {
+    frontier.push({k: startKey, d: 0});
+  } else {
+    frontier.push({k: startKey, d: 0, h: heuristic(start.r, start.c)});
+  }
+  return {order, parent, dist, frontier, cellState, done: false, found: false};
+}
+
+function heuristic(r, c) { return Math.abs(r - end.r) + Math.abs(c - end.c); }
+
+// 单步执行：从 frontier 弹出一个节点并扩展。返回是否仍在进行。
+function stepOnce(s) {
+  if (s.done) return false;
+  if (s.frontier.length === 0) { s.done = true; return false; }
+  let idx = 0;
+  if (algo === 'dijkstra' || algo === 'astar') {
+    // 取最小 f = d + h
+    let best = Infinity;
+    for (let i = 0; i < s.frontier.length; i++) {
+      const f = s.frontier[i].d + (s.frontier[i].h || 0);
+      if (f < best) { best = f; idx = i; }
+    }
+  }
+  const cur = s.frontier.splice(idx, 1)[0];
+  const k = cur.k;
+  if (s.cellState[k] === 'visited') return stepOnce(s); // 已处理，跳过
+  s.cellState[k] = 'visited';
+  const r = Math.floor(k / COLS), c = k % COLS;
+  s.order.push({r, c});
+  if (r === end.r && c === end.c) {
+    s.done = true; s.found = true; s.cellState[k] = 'path';
+    s.path = reconstruct(s.parent, k);
+    return false;
+  }
+  for (const [nr, nc] of neighbors(r, c)) {
+    const nk = key(nr, nc);
+    if (s.cellState[nk] === 'visited') continue;
+    const stepCost = algo === 'bfs' ? 1 : terrainCost(grid[nr][nc]);
+    const nd = s.dist.get(k) + stepCost;
+    if (!s.dist.has(nk) || nd < s.dist.get(nk)) {
+      s.dist.set(nk, nd);
+      s.parent.set(nk, k);
+      s.cellState[nk] = 'frontier';
+      s.frontier.push({k: nk, d: nd, h: (algo === 'astar') ? heuristic(nr, nc) : 0});
+    }
+  }
+  return true;
+}
+
+function reconstruct(parent, goalKey) {
+  const path = [];
+  let k = goalKey;
+  while (k !== undefined) {
+    const r = Math.floor(k / COLS), c = k % COLS;
+    path.push({r, c});
+    k = parent.get(k);
+  }
+  path.reverse();
+  // 标记路径上的节点（不含搜索其他状态）
+  path.forEach(p => { if (search) search.cellState[key(p.r,p.c)] = 'path'; });
+  return path;
+}
+
+function run() {
+  if (running && !paused) return;
+  clearSearch();
+  search = initSearch();
+  running = true; paused = false;
+  document.getElementById('btnPause').textContent = '暂停';
+  loop();
+}
+
+function loop() {
+  if (!running || paused) return;
+  let steps = Math.max(1, Math.round(speed / 2));
+  let advanced = true;
+  while (steps-- > 0 && advanced) advanced = stepOnce(search);
+  draw();
+  if (search.done) {
+    running = false;
+    if (search.found) {
+      const cost = search.dist.get(key(end.r, end.c));
+      setStatus(`完成：路径 ${search.path.length} 步，总代价 ${cost}（起点不计入）。`);
+    } else {
+      setStatus('终点不可达：搜索已遍历全部可达区域。');
+    }
+    return;
+  }
+  setTimeout(loop, 1000 / Math.max(1, speed * 2));
+}
+
+function pause() {
+  if (!running) return;
+  paused = !paused;
+  document.getElementById('btnPause').textContent = paused ? '继续' : '暂停';
+  if (!paused) loop();
+}
+
+function step() {
+  if (!search) { search = initSearch(); }
+  if (search.done) return;
+  stepOnce(search);
+  draw();
+  if (search.done) {
+    running = false;
+    if (search.found) {
+      const cost = search.dist.get(key(end.r, end.c));
+      setStatus(`完成：路径 ${search.path.length} 步，总代价 ${cost}。`);
+    } else setStatus('终点不可达。');
+  }
+}
+
+// 交互：鼠标 + 触摸
+function posToCell(ev) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (ev.clientX ?? ev.touches[0].clientX) - rect.left;
+  const y = (ev.clientY ?? ev.touches[0].clientY) - rect.top;
+  const s = cellSize();
+  return { r: Math.floor(y / s), c: Math.floor(x / s) };
+}
+
+let painting = false, draggingStart = false, draggingEnd = false;
+
+function applyTool(cell) {
+  if (!cell || !inBounds(cell.r, cell.c)) return;
+  const {r, c} = cell;
+  if ((r === start.r && c === start.c) || (r === end.r && c === end.c)) return; // 起终点不可被覆盖
+  if (tool === 'wall') grid[r][c] = WALL;
+  else if (tool === 'erase') grid[r][c] = EMPTY;
+  else if (tool === 'cost') { if (grid[r][c] !== WALL) grid[r][c] = COST; }
+}
+
+canvas.addEventListener('pointerdown', (ev) => {
+  canvas.setPointerCapture(ev.pointerId);
+  const cell = posToCell(ev);
+  if (tool === 'start') { if (grid[cell.r][cell.c] !== WALL) { start = {r: cell.r, c: cell.c}; clearSearch(); } draggingStart = true; }
+  else if (tool === 'end') { if (grid[cell.r][cell.c] !== WALL) { end = {r: cell.r, c: cell.c}; clearSearch(); } draggingEnd = true; }
+  else { painting = true; applyTool(cell); }
+  draw();
+});
+canvas.addEventListener('pointermove', (ev) => {
+  const cell = posToCell(ev);
+  if (draggingStart) { if (grid[cell.r][cell.c] !== WALL) start = {r: cell.r, c: cell.c}; }
+  else if (draggingEnd) { if (grid[cell.r][cell.c] !== WALL) end = {r: cell.r, c: cell.c}; }
+  else if (painting) applyTool(cell);
+  else return;
+  if (running) clearSearch(); // 搜索期间编辑停止并清除旧搜索
+  draw();
+});
+function up() { painting = false; draggingStart = false; draggingEnd = false; }
+canvas.addEventListener('pointerup', up);
+canvas.addEventListener('pointercancel', up);
+
+// 控件绑定
+document.getElementById('algo').addEventListener('change', e => { algo = e.target.value; clearSearch(); draw(); });
+document.getElementById('btnRun').addEventListener('click', run);
+document.getElementById('btnPause').addEventListener('click', pause);
+document.getElementById('btnStep').addEventListener('click', step);
+document.getElementById('btnClear').addEventListener('click', () => { clearSearch(); draw(); setStatus('已清除搜索。'); });
+document.getElementById('btnReset').addEventListener('click', resetMap);
+document.getElementById('speed').addEventListener('input', e => { speed = +e.target.value; });
+document.getElementById('preset').addEventListener('change', e => applyPreset(e.target.value));
+const toolBtns = {
+  toolWall: 'wall', toolErase: 'erase', toolCost: 'cost', toolStart: 'start', toolEnd: 'end'
+};
+for (const [id, t] of Object.entries(toolBtns)) {
+  document.getElementById(id).addEventListener('click', () => {
+    tool = t;
+    document.querySelectorAll('[id^="tool"]').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  });
+}
+
+function applyPreset(p) {
+  if (!p) return;
+  grid = Array.from({length: ROWS}, () => Array(COLS).fill(EMPTY));
+  start = {r: 9, c: 4}; end = {r: 9, c: 27};
+  if (p === 'maze') {
+    for (let c = 6; c < 26; c += 2) for (let r = 2; r < 18; r++) grid[r][c] = WALL;
+    for (let c = 7; c < 26; c += 2) for (let r = 18; r >= 2; r--) if ((c - 7) % 4 === 0) grid[r][c] = WALL;
+    // 开几个口子
+    grid[5][6] = EMPTY; grid[13][8] = EMPTY; grid[7][10] = EMPTY; grid[15][12] = EMPTY; grid[5][14] = EMPTY; grid[13][16] = EMPTY; grid[7][18] = EMPTY; grid[15][20] = EMPTY; grid[5][22] = EMPTY;
+  } else if (p === 'weighted') {
+    for (let r = 0; r < ROWS; r++) for (let c = 8; c <= 20; c++) if ((r + c) % 3 === 0) grid[r][c] = COST;
+    // 保留一条普通走廊
+    for (let c = 8; c <= 20; c++) grid[9][c] = EMPTY;
+  }
+  clearSearch();
+  draw();
+  setStatus('已载入预设地图。');
+  document.getElementById('preset').value = '';
+}
+
+resize();
+draw();
+</script>
+</body>
+</html>
