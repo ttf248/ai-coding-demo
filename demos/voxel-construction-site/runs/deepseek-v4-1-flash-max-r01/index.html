@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>体素微缩建筑工地 · 桌面沙盘</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #060608;
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; color: #e6ecf5; }
+  #scene { position: fixed; inset: 0; display: block; touch-action: none; cursor: grab; }
+  #scene.dragging { cursor: grabbing; }
+  .glass { background: rgba(15, 17, 24, .74); border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); }
+  #hud { position: fixed; top: 12px; left: 12px; padding: 11px 14px; z-index: 10; max-width: 330px; }
+  #hud h1 { font-size: 15px; font-weight: 700; letter-spacing: .5px; color: #ffd9a0; }
+  #hud p { font-size: 11px; color: #93a0b8; margin-top: 5px; line-height: 1.7; }
+  #btns { position: fixed; top: 12px; right: 12px; z-index: 10; display: flex; flex-direction: column; gap: 6px; width: 148px; }
+  #btns button { font: inherit; font-size: 12px; color: #e6ecf5; background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.14); border-radius: 9px; padding: 7px 10px; cursor: pointer; text-align: left; }
+  #btns button:hover { background: rgba(255,255,255,.16); }
+  #btns button.on { background: #8a5a1d; border-color: #d99a4d; }
+  #stats { position: fixed; left: 12px; bottom: 12px; padding: 7px 11px; font-size: 11px; color: #8593ab; z-index: 10; }
+  #hint { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+    font-size: 12px; color: #97a4bc; z-index: 10; padding: 8px 16px; text-align: center; max-width: 92vw; }
+  #fallback { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: radial-gradient(120% 90% at 50% 30%, #221c14 0%, #060608 70%); z-index: 30; text-align: center; padding: 24px; }
+  #fallback.show { display: flex; }
+  #fallback h2 { color: #ffd9a0; font-size: 18px; margin-bottom: 10px; }
+  #fallback p { color: #93a4c3; font-size: 13px; line-height: 1.8; }
+  @media (max-width: 760px) {
+    #hud { max-width: 220px; padding: 9px 10px; }
+    #hud p { display: none; }
+    #btns { width: 118px; }
+    #hint { display: none; }
+  }
+</style>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+</script>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="hud" class="glass">
+  <h1>体素微缩建筑工地 · 桌面沙盘</h1>
+  <p>深色实木桌面上的完整工地：基坑、塔吊、渣土车、工人与昼夜循环。拖拽环视，滚轮缩放；
+    点击桌面右前的实体旋钮或右上按钮可切换速度 / 昼夜 / 尘土，按空格模拟暴雨。</p>
+</div>
+
+<div id="btns" class="glass" style="padding:8px; display:flex; flex-direction:column; gap:6px;">
+  <button id="btnSpeed">设备速度：标准</button>
+  <button id="btnCycle" class="on">昼夜循环：开</button>
+  <button id="btnDust">尘土：轻</button>
+  <button id="btnRain">模拟暴雨（空格）</button>
+  <button id="btnView">重置视角</button>
+</div>
+
+<div id="stats" class="glass">加载中…</div>
+<div id="hint" class="glass">点击桌面上的实体旋钮也可控制：速度 / 昼夜 / 尘土</div>
+
+<div id="fallback">
+  <div class="box">
+    <h2>无法启动 WebGL 工地场景</h2>
+    <p id="fallbackMsg">浏览器或设备缺少 WebGL 支持。</p>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+
+const $ = (id) => document.getElementById(id);
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas: $("scene"), antialias: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.75));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+} catch (e) {
+  $("fallbackMsg").textContent = "WebGL 初始化失败：" + (e && e.message || e);
+  $("fallback").classList.add("show");
+}
+if (renderer) boot();
+
+function boot() {
+/* ============ 基础 ============ */
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0b0d14, 90, 240);
+const camera = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 0.1, 600);
+
+let seed = 42;
+const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+  let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+  return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+
+const V = 0.62;                                  // 体素边长
+const DESK = { w: 64, d: 44, top: 0 };           // 桌面范围（工地沙盘边界）
+const state = {
+  ready: false, phase: 0.28, cycleOn: true, cycleSpeed: 1, equipSpeed: 1, speedLevel: 1,
+  dustLevel: 1, rain: false, wetness: 0, nightLevel: 0,
+  machines: 0, workers: 0, fences: 0, frames: 0, fps: 0,
+};
+
+/* ============ 程序化贴图 ============ */
+function woodTexture() {
+  const c = document.createElement("canvas"); c.width = 512; c.height = 512;
+  const g = c.getContext("2d");
+  g.fillStyle = "#3a2417"; g.fillRect(0, 0, 512, 512);
+  for (let p = 0; p < 8; p++) {
+    const y0 = p * 64;
+    g.fillStyle = `rgb(${58 + ((p * 13) % 18)}, ${36 + ((p * 7) % 12)}, ${22 + ((p * 3) % 8)})`;
+    g.fillRect(0, y0, 512, 62);
+    for (let i = 0; i < 46; i++) {
+      g.strokeStyle = `rgba(20,10,5,${0.06 + rnd() * 0.13})`;
+      g.lineWidth = 1 + rnd() * 1.4;
+      const yy = y0 + rnd() * 62;
+      g.beginPath(); g.moveTo(0, yy);
+      for (let x = 0; x <= 512; x += 64) g.lineTo(x, yy + (rnd() - 0.5) * 5);
+      g.stroke();
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 2);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function signTexture(text, bg, fg) {
+  const c = document.createElement("canvas"); c.width = 256; c.height = 128;
+  const g = c.getContext("2d");
+  g.fillStyle = bg; g.fillRect(0, 0, 256, 128);
+  g.strokeStyle = fg; g.lineWidth = 6; g.strokeRect(8, 8, 240, 112);
+  g.fillStyle = fg; g.font = "bold 44px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(text, 128, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function blueprintTexture() {
+  const c = document.createElement("canvas"); c.width = 256; c.height = 180;
+  const g = c.getContext("2d");
+  g.fillStyle = "#1c3f70"; g.fillRect(0, 0, 256, 180);
+  g.strokeStyle = "rgba(255,255,255,.75)"; g.lineWidth = 2;
+  g.strokeRect(22, 20, 150, 110);
+  g.strokeRect(70, 44, 60, 40);
+  g.beginPath(); g.moveTo(22, 130); g.lineTo(172, 130); g.stroke();
+  g.beginPath(); g.moveTo(60, 20); g.lineTo(60, 130); g.stroke();
+  g.font = "bold 16px monospace"; g.fillStyle = "rgba(255,255,255,.85)";
+  g.fillText("F2 · 标高 12m", 20, 160);
+  g.strokeStyle = "rgba(150,220,255,.5)";
+  for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(i * 32, 0); g.lineTo(i * 32, 180); g.stroke(); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/* ============ 合并体素工具 ============ */
+function boxGeo(w, h, d, x, y, z, color, ry = 0) {
+  const g = new THREE.BoxGeometry(w, h, d);
+  if (ry) g.rotateY(ry);
+  g.translate(x, y, z);
+  const col = new THREE.Color(color);
+  const n = g.attributes.position.count;
+  const arr = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { arr[i * 3] = col.r; arr[i * 3 + 1] = col.g; arr[i * 3 + 2] = col.b; }
+  g.setAttribute("color", new THREE.BufferAttribute(arr, 3));
+  return g;
+}
+const lambertV = () => new THREE.MeshLambertMaterial({ vertexColors: true });
+function mergedMesh(list, castShadow = true) {
+  const merged = mergeGeometries(list.map(b => b.geo ?? b), false);
+  const m = new THREE.Mesh(merged, lambertV());
+  m.castShadow = castShadow; m.receiveShadow = true;
+  return m;
+}
+
+/* ============ 桌面 / 房间 / 桌面物件 ============ */
+{
+  const room = new THREE.Mesh(new THREE.BoxGeometry(360, 190, 360), new THREE.MeshLambertMaterial({ color: 0x101218, side: THREE.BackSide }));
+  room.position.y = 40; scene.add(room);
+  const desk = new THREE.Mesh(new THREE.BoxGeometry(DESK.w + 8, 3, DESK.d + 8),
+    new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: .82, metalness: .05, color: 0xffffff }));
+  desk.position.y = -1.5; desk.receiveShadow = true; scene.add(desk);
+  for (const [lx, lz] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(3, 26, 3), new THREE.MeshLambertMaterial({ color: 0x17120d }));
+    leg.position.set(lx * (DESK.w / 2 - 2), -16, lz * (DESK.d / 2 - 2));
+    scene.add(leg);
+  }
+  // 桌面角落杂物
+  const decor = [];
+  // 蓝图
+  const bp = new THREE.Mesh(new THREE.PlaneGeometry(11, 7.6), new THREE.MeshLambertMaterial({ map: blueprintTexture() }));
+  bp.rotation.x = -Math.PI / 2; bp.rotation.z = 0.35; bp.position.set(-24.5, 0.07, 15);
+  scene.add(bp);
+  const bp2 = bp.clone(); bp2.rotation.z = -0.2; bp2.position.set(24, 0.07, 16.5); scene.add(bp2);
+  // 钢卷尺
+  decor.push(boxGeo(3.4, 1.6, 3.4, -25, 0.8, -16, 0xf2c230));
+  decor.push(boxGeo(0.5, 1.1, 1.6, -25, 0.5, -13.8, 0x2a2a2e));
+  // 安全帽（半球近似）与水平仪、马克杯
+  decor.push(boxGeo(3.6, 1.2, 3.6, 25.5, 0.6, -16, 0xffb020));
+  decor.push(boxGeo(4.6, 0.9, 1.4, 25.5, 1.1, -16, 0xffb020));
+  decor.push(boxGeo(10, 0.8, 1.2, 15, 0.4, -19.5, 0xb8c2cc));
+  decor.push(boxGeo(1.2, 2.6, 1.2, -15, 1.3, 19, 0xe8e0d0));
+  decor.push(boxGeo(2.2, 0.4, 2.2, -15, 2.7, 19, 0xe8e0d0));
+  scene.add(mergedMesh(decor));
+}
+
+/* ============ 工地地面与分区 ============ */
+let siteGround = null;
+{
+  const parts = [];
+  // 沙土地基（顶面 y = 0.8，机械与工人的接地高度）
+  parts.push(boxGeo(54, 1.6, 36, 0, 0, 0, 0x8a7a5c));
+  // 临时施工道路（环形）
+  parts.push(boxGeo(46, 0.14, 3.2, 0, 0.86, 12.5, 0x4d4a45));
+  parts.push(boxGeo(46, 0.14, 3.2, 0, 0.86, -12.5, 0x4d4a45));
+  parts.push(boxGeo(3.2, 0.14, 22, -21.5, 0.86, 0, 0x4d4a45));
+  parts.push(boxGeo(3.2, 0.14, 22, 21.5, 0.86, 0, 0x4d4a45));
+  // 基坑：四周沿口条 + 下沉的深色坑底
+  for (const [w, d, x, z] of [[17, 0.9, -9, -7.1], [17, 0.9, -9, 3.1], [0.9, 9.8, -16.1, -2], [0.9, 9.8, -1.9, -2]])
+    parts.push(boxGeo(w, 0.5, d, x, 0.95, z, 0x6f6248));
+  const pit = new THREE.Mesh(new THREE.BoxGeometry(15.2, 0.3, 9.8), new THREE.MeshLambertMaterial({ color: 0x4a4033 }));
+  pit.position.set(-9, 0.35, -2); scene.add(pit);
+  // 各功能区标色（贴在沙地上的薄色块）
+  parts.push(boxGeo(10, 0.14, 7, 8, 0.86, -8.5, 0x7b7263));    // 钢筋加工棚区
+  parts.push(boxGeo(8, 0.14, 6, -19, 0.86, -10, 0x8b7f66));    // 物料堆放区
+  parts.push(boxGeo(11, 0.14, 8, -2, 0.86, 8.2, 0x857a63));    // 在建楼房基座
+  parts.push(boxGeo(9, 0.14, 6, 16, 0.86, 7.5, 0x7f746a));     // 板房办公区
+  siteGround = mergedMesh(parts, false);
+  scene.add(siteGround);
+  // 渣土堆放区（右侧）
+  const spoil = [];
+  for (let i = 0; i < 4; i++) {
+    const s = 7 - i * 1.6;
+    spoil.push(boxGeo(s, 1.1, 5 - i, 15.5, 0.7 + i * 1.0, -2.5, i % 2 ? 0x6e5f47 : 0x79694e));
+  }
+  scene.add(mergedMesh(spoil));
+}
+
+/* ============ 固定设施 ============ */
+{
+  const parts = [];
+  // 板房办公区（两栋，窗户独立以便夜间发光）
+  for (const [ox, oz, w] of [[13.2, 6.4, 4.6], [19.6, 8.6, 4.6]]) {
+    parts.push(boxGeo(w, 3.2, 3.4, ox, 2.4, oz, 0x5570a0));
+    parts.push(boxGeo(w + 0.6, 0.5, 3.9, ox, 4.2, oz, 0xd8dde6));
+    parts.push(boxGeo(w + 0.8, 0.3, 4.1, ox, 0.7, oz, 0x3c4c6e));
+  }
+  // 钢筋加工棚：立柱 + 顶棚
+  for (const [px, pz] of [[4.4, -11.6], [11.6, -11.6], [4.4, -5.4], [11.6, -5.4]])
+    parts.push(boxGeo(0.7, 5, 0.7, px, 3.4, pz, 0x8a5a2b));
+  parts.push(boxGeo(8.6, 0.5, 7.4, 8, 6.1, -8.5, 0x707a86));
+  // 在建楼基座 + 脚手架（两层）
+  parts.push(boxGeo(9.4, 1.6, 6.4, -2, 1.0, 8.2, 0x9aa3ad));
+  parts.push(boxGeo(7.6, 1.2, 4.8, -2, 2.4, 8.2, 0x8b949e));
+  for (let sx = -6; sx <= 2; sx += 2)
+    for (const sz of [4.6, 11.8]) {
+      parts.push(boxGeo(0.42, 7.4, 0.42, sx, 3.7, sz, 0xc8a24a));
+    }
+  for (let sy = 2.2; sy <= 6.4; sy += 2.1) {
+    parts.push(boxGeo(9.4, 0.34, 0.34, -2, sy, 4.6, 0xb8933f));
+    parts.push(boxGeo(9.4, 0.34, 0.34, -2, sy, 11.8, 0xb8933f));
+    parts.push(boxGeo(0.34, 0.34, 7.4, -6, sy, 8.2, 0xb8933f));
+    parts.push(boxGeo(0.34, 0.34, 7.4, 2, sy, 8.2, 0xb8933f));
+  }
+  // 围挡（四边，留出大门）
+  const fx = DESK.w / 2 - 5.2, fz = DESK.d / 2 - 5.2;
+  for (let x = -fx; x <= fx; x += 2.2) {
+    if (Math.abs(x) > 3.4) { parts.push(boxGeo(2.1, 2.6, 0.24, x, 1.9, -fz, 0x5f87bd)); continue; }
+    parts.push(boxGeo(0.24, 3.2, 0.24, x, 2.2, -fz, 0x9aa3ad));   // 大门两侧立柱
+  }
+  for (let x = -fx; x <= fx; x += 2.2) parts.push(boxGeo(2.1, 2.6, 0.24, x, 1.9, fz, 0x5f87bd));
+  for (let z = -fz + 2.2; z <= fz - 2.2; z += 2.2) {
+    parts.push(boxGeo(0.24, 2.6, 2.1, fx, 1.9, z, 0x5f87bd));
+    parts.push(boxGeo(0.24, 2.6, 2.1, -fx, 1.9, z, 0x5f87bd));
+  }
+  // 大门横梁 + 门头牌
+  parts.push(boxGeo(8, 0.6, 0.5, 0, 4.2, -fz, 0x9aa3ad));
+  // 物料堆：钢筋捆（避开行车道的左侧车道）
+  for (let i = 0; i < 3; i++)
+    for (let j = 0; j < 2; j++)
+      parts.push(boxGeo(6.4, 0.55, 0.55, -21.8 + i * 0.2, 1.3 + i * 0.6, -11.5 + j * 1.1, 0x9a6b3f));
+  // 水泥堆 / 砂石堆
+  for (let i = 0; i < 3; i++)
+    parts.push(boxGeo(2.2 - i * 0.3, 1.0, 1.6, -21.5, 1.0 + i * 1.0, -7.2, 0xb9b3a8));
+  for (let i = 0; i < 3; i++)
+    parts.push(boxGeo(3.2 - i * 0.5, 0.9, 2.4 - i * 0.4, -21.5, 1.0 + i * 0.9, -3.6, 0xc2a97a));
+  // 塔吊基座 ×2、水电杆、路灯杆
+  parts.push(boxGeo(2.8, 1.2, 2.8, 0, 0.8, -2, 0x666e78));
+  parts.push(boxGeo(2.8, 1.2, 2.8, 12, 0.8, 4, 0x666e78));
+  parts.push(boxGeo(0.6, 9, 0.6, -12, 4.8, 4.5, 0x7c5a34));
+  parts.push(boxGeo(2.8, 0.3, 0.3, -11, 8.6, 4.5, 0x5b4527));
+  parts.push(boxGeo(2.8, 0.3, 0.3, -13, 7.9, 4.5, 0x5b4527));
+  scene.add(mergedMesh(parts));
+  state.fences = Math.floor(4 * (fx * 2 / 2.2));
+
+  // 安全标识牌
+  for (const [sx, sz, text, bg, fg, ry] of [
+    [0, -fz + 0.4, "进入施工现场", "#e8b23a", "#20242c", 0],
+    [-fx + 0.5, -4, "必须戴安全帽", "#e8e8e8", "#c0392b", Math.PI / 2],
+  ]) {
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 2.3), new THREE.MeshLambertMaterial({ map: signTexture(text, bg, fg) }));
+    sign.position.set(sx, 3.1, sz); sign.rotation.y = ry;
+    scene.add(sign);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.9, 0.3), new THREE.MeshLambertMaterial({ color: 0x9aa3ad }));
+    post.position.set(sx, 1.0, sz); scene.add(post);
+  }
+}
+
+/* ============ 夜间发光元素（窗 / 指示灯 / 探照灯） ============ */
+const nightLights = { windows: [], spots: [], halos: [], indicators: [] };
+{
+  // 板房窗户
+  for (const [ox, oz] of [[13.2, 6.4], [19.6, 8.6]]) {
+    for (const dx of [-1.2, 0.2, 1.6]) {
+      const w = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9),
+        new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0 }));
+      w.position.set(ox + dx, 2.6, oz - 1.72);
+      scene.add(w);
+      nightLights.windows.push(w);
+    }
+  }
+  // 探照灯（灯杆 + 灯头 + 光锥 + 聚光）
+  for (const [x, z, ry] of [[-24, 14, 0.7], [24, 14, -0.7], [0, 17, 0]]) {
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.5, 7.4, 0.5), new THREE.MeshLambertMaterial({ color: 0xd8b04a }));
+    pole.position.set(x, 5.7, z); scene.add(pole);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.1, 1.0), new THREE.MeshLambertMaterial({ color: 0x6e7480 }));
+    head.position.set(x, 9.6, z); head.rotation.y = ry; scene.add(head);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(3.4, 8.5, 12, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffe6b0, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+    cone.position.set(x - Math.sin(ry) * 2.2, 5.4, z - Math.cos(ry) * 2.2);
+    cone.rotation.set(0.62, ry, 0, "YXZ");
+    scene.add(cone);
+    nightLights.halos.push(cone);
+    const spot = new THREE.SpotLight(0xffe2a8, 0, 46, 0.62, 0.45, 1.6);
+    spot.position.set(x, 9.4, z);
+    spot.target.position.set(x - Math.sin(ry) * 14, 0, z - Math.cos(ry) * 14);
+    scene.add(spot); scene.add(spot.target);
+    nightLights.spots.push(spot);
+  }
+  // 工地指示灯（塔吊臂尖 + 围挡角）
+  const indGeo = new THREE.SphereGeometry(0.32, 8, 6);
+  for (const [x, y, z] of [[0, 26, 0], [12, 24, 4], [-fx0(), 3.6, -fz0()], [fx0(), 3.6, fz0()]]) {
+    const m = new THREE.Mesh(indGeo, new THREE.MeshBasicMaterial({ color: 0xff4444 }));
+    m.position.set(x, y, z); scene.add(m);
+    nightLights.indicators.push(m);
+  }
+  function fx0() { return DESK.w / 2 - 5.2; }
+  function fz0() { return DESK.d / 2 - 5.2; }
+}
+
+/* ============ 塔吊 ×2 ============ */
+const cranes = [];
+function buildCrane(x, z, baseRot, hue) {
+  const g = new THREE.Group();
+  const mastH = 24;
+  const mast = new THREE.Mesh(new THREE.BoxGeometry(1.6, mastH, 1.6), new THREE.MeshLambertMaterial({ color: hue }));
+  mast.position.y = mastH / 2; mast.castShadow = true; g.add(mast);
+  const slewing = new THREE.Group();
+  slewing.position.y = mastH;
+  g.add(slewing);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.2, 2.2), new THREE.MeshLambertMaterial({ color: 0xf2b73a }));
+  cab.position.set(1.6, -0.6, 0); slewing.add(cab);
+  const jib = new THREE.Mesh(new THREE.BoxGeometry(22, 0.9, 0.9), new THREE.MeshLambertMaterial({ color: hue }));
+  jib.position.set(6, 0, 0); jib.castShadow = true; jib.rotation.z = 0.03; slewing.add(jib);
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(5, 1.2, 1.2), new THREE.MeshLambertMaterial({ color: 0x606a76 }));
+  counter.position.set(-3.4, 0.1, 0); slewing.add(counter);
+  const tie1 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 5.4, 0.2), new THREE.MeshLambertMaterial({ color: 0xb8c2cc }));
+  tie1.position.set(0, 2.7, 0); slewing.add(tie1);
+  const trolley = new THREE.Group();
+  slewing.add(trolley);
+  const hook = new THREE.Group();
+  trolley.add(hook);
+  const cable = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1, 0.12), new THREE.MeshLambertMaterial({ color: 0xc9d2dc }));
+  cable.position.y = -0.5; hook.add(cable);
+  function payload(color, w, h, d) {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color }));
+    p.position.y = -h / 2 - 1.2; hook.add(p);
+    p.castShadow = true;
+    return p;
+  }
+  const load = payload(0x9a6b3f, 4.6, 0.8, 1.2);   // 钢筋束
+  const crane = { g, slewing, trolley, hook, cable, load, x, z, baseRot,
+    phase: rnd() * Math.PI * 2, mastH };
+  scene.add(g);
+  g.position.set(x, 0.8, z);
+  state.machines++;
+  return crane;
+}
+cranes.push(buildCrane(0, -2, 0.3, 0xe8b23a));
+cranes.push(buildCrane(12, 4, 2.4, 0xd9a02e));
+
+/* ============ 挖掘机 ×2 / 渣土车 ×2 / 搅拌车 / 装载机 ============ */
+function buildExcavator(x, z, ry) {
+  const g = new THREE.Group();
+  const orange = new THREE.MeshLambertMaterial({ color: 0xf08c1e });
+  const dark = new THREE.MeshLambertMaterial({ color: 0x2f3338 });
+  const tracks = new THREE.Mesh(new THREE.BoxGeometry(6.4, 1.8, 4.4), dark);
+  tracks.position.y = 0.9; tracks.castShadow = true; g.add(tracks);
+  const body = new THREE.Group(); body.position.y = 2.2; body.rotation.y = ry; g.add(body);
+  body.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(5, 2.4, 4), orange), { castShadow: true }));
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.4, 2.2), new THREE.MeshLambertMaterial({ color: 0x7fb4d8 }));
+  cab.position.set(-1.2, 2.2, 0); body.add(cab);
+  const boomPivot = new THREE.Group(); boomPivot.position.set(2.2, 0.6, 0); body.add(boomPivot);
+  const boom = new THREE.Mesh(new THREE.BoxGeometry(7, 1.1, 1.1), orange);
+  boom.position.set(3, 0, 0); boom.castShadow = true; boomPivot.add(boom);
+  const armPivot = new THREE.Group(); armPivot.position.set(6.4, 0, 0); boomPivot.add(armPivot);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.9, 0.9), orange);
+  arm.position.set(2, 0, 0); arm.castShadow = true; armPivot.add(arm);
+  const bucketPivot = new THREE.Group(); bucketPivot.position.set(4.2, 0, 0); armPivot.add(bucketPivot);
+  const bucket = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.6, 2.2), new THREE.MeshLambertMaterial({ color: 0x54595f }));
+  bucket.position.set(0.4, -0.6, 0); bucket.castShadow = true; bucketPivot.add(bucket);
+  g.position.set(x, 0.8, z);
+  scene.add(g);
+  state.machines++;
+  return { g, body, boomPivot, armPivot, bucketPivot, phase: rnd() * 6 };
+}
+const excavators = [
+  buildExcavator(-10.5, -5.2, 0.9),
+  buildExcavator(-5.6, 1.6, 2.5),
+];
+function buildTruck(color) {
+  const g = new THREE.Group();
+  const dark = new THREE.MeshLambertMaterial({ color: 0x2c3036 });
+  for (const dz of [-1.6, 1.6]) {
+    const wheels = new THREE.Mesh(new THREE.BoxGeometry(6.6, 1.3, 1.0), dark);
+    wheels.position.set(0, 0.65, dz); g.add(wheels);
+  }
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.4, 3.4), new THREE.MeshLambertMaterial({ color }));
+  cab.position.set(4.4, 2.2, 0); cab.castShadow = true; g.add(cab);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.2, 3.0), new THREE.MeshLambertMaterial({ color: 0x8fd0e8 }));
+  glass.position.set(5.75, 2.6, 0); g.add(glass);
+  const bedPivot = new THREE.Group(); bedPivot.position.set(-1.4, 1.6, 0); g.add(bedPivot);
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(6.4, 1.4, 3.6), new THREE.MeshLambertMaterial({ color: 0x848a92 }));
+  bed.position.set(-1.0, 0.7, 0); bed.castShadow = true; bedPivot.add(bed);
+  const cargo = new THREE.Mesh(new THREE.BoxGeometry(5.6, 1.2, 3.0), new THREE.MeshLambertMaterial({ color: 0x6e5f47 }));
+  cargo.position.set(-1.0, 1.9, 0); bedPivot.add(cargo);
+  scene.add(g);
+  state.machines++;
+  return { g, bedPivot, cargo };
+}
+/* 单车道环形施工路（车距约束防追尾 / 穿模） */
+const LOOP = { hx: 16, hz: 12.5 };
+const LOOP_LEN = 4 * (LOOP.hx + LOOP.hz);
+const LOOP_PATH = [[LOOP.hx, LOOP.hz], [-LOOP.hx, LOOP.hz], [-LOOP.hx, -LOOP.hz], [LOOP.hx, -LOOP.hz]];
+const vehicles = [];
+{
+  for (const [color, s0] of [[0xd8b840, 0], [0xd85a40, 46]]) {
+    const parts0 = buildTruck(color);
+    vehicles.push({ kind: "truck", ...parts0, s: s0, speed: 5.4, dwell: 0, dumping: false,
+      stops: [{ d: 22, dwell: 1.8, kind: "load" }, { d: 99, dwell: 2.2, kind: "dump" }] });
+  }
+}
+function buildMixer() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(9, 2.6, 3.4), new THREE.MeshLambertMaterial({ color: 0xdde3ea }));
+  body.position.y = 2.2; body.castShadow = true; g.add(body);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.2, 3.2), new THREE.MeshLambertMaterial({ color: 0x3f72c8 }));
+  cab.position.set(4.8, 2.1, 0); g.add(cab);
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.2, 5.4, 10), new THREE.MeshLambertMaterial({ color: 0xe0732a }));
+  drum.rotation.z = Math.PI / 2; drum.rotation.y = 0.16;
+  drum.position.set(-1.4, 3.6, 0); drum.castShadow = true; g.add(drum);
+  for (const dz of [-1.6, 1.6]) {
+    const wheels = new THREE.Mesh(new THREE.BoxGeometry(8.6, 1.3, 1.0), new THREE.MeshLambertMaterial({ color: 0x2c3036 }));
+    wheels.position.set(0, 0.65, dz); g.add(wheels);
+  }
+  scene.add(g);
+  state.machines++;
+  return { g, drum };
+}
+{
+  const m = buildMixer();
+  vehicles.push({ kind: "mixer", ...m, s: 78, speed: 4.6, dwell: 0, stops: null });
+}
+const pathLenCache = new Map();
+function pathSample(path, s) {
+  const segs = path.length;
+  let lens = pathLenCache.get(path);
+  if (!lens) {
+    lens = path.map((p, i) => {
+      const b = path[(i + 1) % segs];
+      return Math.hypot(b[0] - p[0], b[1] - p[1]);
+    });
+    pathLenCache.set(path, lens);
+  }
+  const total = lens.reduce((a, b) => a + b, 0);
+  let d = ((s % total) + total) % total;
+  for (let i = 0; i < segs; i++) {
+    const a = path[i], b = path[(i + 1) % segs];
+    if (d <= lens[i]) {
+      const f = d / lens[i];
+      return { x: a[0] + (b[0] - a[0]) * f, z: a[1] + (b[1] - a[1]) * f, ry: Math.atan2(b[1] - a[1], b[0] - a[0]) };
+    }
+    d -= lens[i];
+  }
+  return { x: path[0][0], z: path[0][1], ry: 0 };
+}
+function buildLoader(x, z) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.0, 2.6), new THREE.MeshLambertMaterial({ color: 0xf2c230 }));
+  body.position.y = 2.0; body.castShadow = true; g.add(body);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.8, 2.2), new THREE.MeshLambertMaterial({ color: 0x8fd0e8 }));
+  cab.position.set(-0.6, 3.2, 0); g.add(cab);
+  const armPivot = new THREE.Group(); armPivot.position.set(1.6, 2.0, 0); g.add(armPivot);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.6, 0.6), new THREE.MeshLambertMaterial({ color: 0x606a76 }));
+  arm.position.set(1.2, 0, 0.9); armPivot.add(arm);
+  const bucket = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.0, 2.6), new THREE.MeshLambertMaterial({ color: 0x54595f }));
+  bucket.position.set(2.6, -0.7, 0.9); armPivot.add(bucket);
+  for (const dz of [-1.2, 1.2]) {
+    const wheels = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.1, 0.8), new THREE.MeshLambertMaterial({ color: 0x2c3036 }));
+    wheels.position.set(0, 0.6, dz); g.add(wheels);
+  }
+  g.position.set(x, 0.8, z);
+  scene.add(g);
+  state.machines++;
+  return { g, armPivot, x0: x, phase: rnd() * 6 };
+}
+const loader = buildLoader(18, -8);
+
+/* ============ 体素工人 ============ */
+const workers = [];
+const SHIRTS = [0xf2b73a, 0xe8734a, 0x4a9ae8, 0x59b06a, 0xe0e4ea];
+function buildWorker(x, z, ry, opts) {
+  const g = new THREE.Group();
+  const shirt = SHIRTS[(rnd() * SHIRTS.length) | 0];
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.5, 0.65), new THREE.MeshLambertMaterial({ color: opts.vest ? 0xf2b73a : shirt }));
+  torso.position.y = 2.2; torso.castShadow = true; g.add(torso);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), new THREE.MeshLambertMaterial({ color: 0xe8c39a }));
+  head.position.y = 3.35; g.add(head);
+  const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.4, 0.95), new THREE.MeshLambertMaterial({ color: opts.helmet || 0xffb020 }));
+  helmet.position.y = 3.9; g.add(helmet);
+  const mkLimb = (w) => new THREE.Mesh(new THREE.BoxGeometry(w, 1.4, w), new THREE.MeshLambertMaterial({ color: 0x3c4653 }));
+  const armL = mkLimb(0.34), armR = mkLimb(0.34), legL = mkLimb(0.42), legR = mkLimb(0.42);
+  armL.position.set(-0.78, 2.3, 0); armR.position.set(0.78, 2.3, 0);
+  legL.position.set(-0.32, 0.7, 0); legR.position.set(0.32, 0.7, 0);
+  for (const a of [armL, armR, legL, legR]) { a.geometry.translate(0, -0.7, 0); a.geometry.translate(0, 0.7, 0); }
+  g.add(armL, armR, legL, legR);
+  g.position.set(x, 0.8, z);
+  scene.add(g);
+  state.workers++;
+  const w = { g, armL, armR, legL, legR, phase: rnd() * 6, role: opts.role, path: opts.path || null,
+    s: rnd() * 10, speed: opts.speed || 2.2, baseRy: ry, carrying: null };
+  if (opts.carrying) {
+    const c = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.6, 0.9), new THREE.MeshLambertMaterial({ color: 0x9a6b3f }));
+    c.position.set(0, 1.7, 1.0); g.add(c); w.carrying = c;
+  }
+  workers.push(w);
+  return w;
+}
+// 绑扎钢筋组（基坑南侧空地）
+for (let i = 0; i < 4; i++) buildWorker(-15 + i * 2.4, 6.0, 0.4, { vest: true, role: "tie" });
+// 搬运组（物料区 → 绕过基坑 → 楼基座的折线）
+const carryPath = [[-19.5, -8.2], [-12, -9.6], [-3.4, -9.6], [-1.4, -4], [-1.4, 6.2], [-2.6, 7.2]];
+for (let i = 0; i < 4; i++)
+  buildWorker(carryPath[0][0], carryPath[0][1], 0.6, { vest: true, role: "carry", path: carryPath, speed: 2.4, carrying: true });
+// 塔吊指挥（黄背心 + 挥手臂）
+buildWorker(1.8, 1.4, -0.4, { vest: true, role: "direct", speed: 0 });
+buildWorker(13.6, 6.8, 0.2, { vest: true, role: "direct", speed: 0 });
+// 工具操作组（加工棚下 + 楼基座旁）
+for (let i = 0; i < 3; i++) buildWorker(6 + i * 2.2, -8.6 + (i % 2) * 1.6, 2.8, { role: "tool" });
+for (let i = 0; i < 3; i++) buildWorker(-4.6 + i * 2.2, 4.0, 0.1, { role: "tool", helmet: 0xf2d24a });
+// 门卫巡逻（大门内侧，避开行车道）
+const guardPath = [[0.5, -15.6], [-5, -15.6], [-5, -15.0], [0.5, -15.0]];
+buildWorker(0, -15.4, Math.PI, { role: "guard", path: guardPath, speed: 1.6, vest: true, helmet: 0x4a9ae8 });
+
+/* ============ 昼夜 / 光照 ============ */
+const hemi = new THREE.HemisphereLight(0xbfd4ee, 0x4a4034, 0.9);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2d8, 2.0);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
+sun.shadow.camera.top = 34; sun.shadow.camera.bottom = -34;
+sun.shadow.camera.far = 160;
+scene.add(sun);
+scene.add(sun.target);
+const ambient = new THREE.AmbientLight(0x404a5e, 0.5);
+scene.add(ambient);
+
+/* 天空穹顶（随昼夜相位变色） */
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false,
+  uniforms: {
+    uTop: { value: new THREE.Color(0x4a7ac8) },
+    uHorizon: { value: new THREE.Color(0xbcd2e8) },
+  },
+  vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform vec3 uTop; uniform vec3 uHorizon; varying vec3 vP;
+    void main(){
+      float h = clamp(normalize(vP).y * 0.5 + 0.5, 0.0, 1.0);
+      gl_FragColor = vec4(mix(uHorizon, uTop, pow(h, 0.8)), 1.0);
+    }`,
+});
+const sky = new THREE.Mesh(new THREE.SphereGeometry(280, 28, 18), skyMat);
+scene.add(sky);
+
+/* 昼夜相位 → 颜色（黎明 / 正午 / 黄昏 / 夜晚） */
+const PHASES = [
+  { t: 0.00, top: 0x384a78, hor: 0xf0b088, sun: 0xffc490, inten: 1.1, amb: 0.42, hemi: 0.7, night: 0.25 },  // 黎明
+  { t: 0.28, top: 0x3f78c8, hor: 0xc8e0f4, sun: 0xfff4dc, inten: 2.3, amb: 0.55, hemi: 1.05, night: 0 },   // 正午
+  { t: 0.55, top: 0x54406e, hor: 0xf0a060, sun: 0xff9a50, inten: 1.4, amb: 0.44, hemi: 0.75, night: 0.35 }, // 黄昏
+  { t: 0.80, top: 0x0a1230, hor: 0x18264a, sun: 0x9fb8e8, inten: 0.34, amb: 0.3, hemi: 0.34, night: 1 },    // 夜晚
+];
+function lerpPhase(p) {
+  const tt = ((p % 1) + 1) % 1;
+  let a = PHASES[3], b = PHASES[0], f = 0;
+  for (let i = 0; i < PHASES.length; i++) {
+    const c = PHASES[i], n = PHASES[(i + 1) % PHASES.length];
+    const cn = n.t > c.t ? n.t : n.t + 1;
+    const ct = tt >= c.t ? tt : tt + 1;
+    if (ct >= c.t && ct <= cn) { a = c; b = n; f = (ct - c.t) / (cn - c.t); break; }
+  }
+  const mix = (x, y) => new THREE.Color(x).lerp(new THREE.Color(y), f);
+  const num = (x, y) => x + (y - x) * f;
+  return { top: mix(a.top, b.top), hor: mix(a.hor, b.hor), sun: mix(a.sun, b.sun),
+    inten: num(a.inten, b.inten), amb: num(a.amb, b.amb), hemi: num(a.hemi, b.hemi), night: num(a.night, b.night) };
+}
+function applyPhase() {
+  const P = lerpPhase(state.phase);
+  skyMat.uniforms.uTop.value.copy(P.top);
+  skyMat.uniforms.uHorizon.value.copy(P.hor);
+  const nightK = state.rain ? 0.85 : 1.0;
+  sun.color.copy(P.sun);
+  sun.intensity = P.inten * 1.15;
+  ambient.intensity = P.amb;
+  hemi.intensity = P.hemi;
+  state.nightLevel = P.night;
+  const ang = state.phase * Math.PI * 2 - Math.PI / 2;
+  sun.position.set(Math.cos(ang) * 110, Math.max(6, Math.sin(ang) * 90 + 24), 42);
+  sun.target.position.set(0, 0, 0);
+  const glow = Math.min(1, P.night * 1.4) * nightK;
+  for (const w of nightLights.windows) w.material.opacity = 0.9 * Math.min(1, P.night * 1.3);
+  for (const s of nightLights.spots) s.intensity = 340 * Math.min(1, P.night * 1.4) * (state.rain ? 1.4 : 1);
+  for (const h of nightLights.halos) h.material.opacity = 0.2 * Math.min(1, P.night * 1.4) * (state.rain ? 1.25 : 1);
+  for (const i of nightLights.indicators) i.material.color.setHex(glow > 0.45 ? 0xff4444 : 0x5a1e1e);
+  scene.fog.color.copy(P.hor).multiplyScalar(0.35);
+}
+
+/* ============ 尘土粒子（自定义 shader） ============ */
+let dustPoints = null, dustMat = null;
+{
+  const N = 700;
+  const pos = new Float32Array(N * 3), seedA = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    pos[i*3] = (rnd() - 0.5) * 52;
+    pos[i*3+1] = 1 + rnd() * 12;
+    pos[i*3+2] = (rnd() - 0.5) * 34;
+    seedA[i] = rnd();
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("aSeed", new THREE.BufferAttribute(seedA, 1));
+  dustMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false,
+    uniforms: { uTime: { value: 0 }, uIntensity: { value: 0.5 } },
+    vertexShader: `
+      uniform float uTime; attribute float aSeed; varying float vA;
+      void main(){
+        vec3 p = position;
+        p.x += sin(uTime * 0.22 + aSeed * 40.0) * 2.2;
+        p.y += sin(uTime * 0.5 + aSeed * 60.0) * 0.8;
+        p.z += cos(uTime * 0.18 + aSeed * 33.0) * 1.8;
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = (24.0 / -mv.z) * (0.5 + aSeed);
+        gl_Position = projectionMatrix * mv;
+        vA = 0.5 + 0.5 * sin(uTime * 0.7 + aSeed * 90.0);
+      }`,
+    fragmentShader: `
+      uniform float uIntensity; varying float vA;
+      void main(){
+        vec2 c = gl_PointCoord - 0.5;
+        float d = length(c);
+        if (d > 0.5) discard;
+        float a = smoothstep(0.5, 0.05, d) * 0.16 * uIntensity * vA;
+        gl_FragColor = vec4(0.82, 0.74, 0.58, a);
+      }`,
+  });
+  dustPoints = new THREE.Points(geo, dustMat);
+  scene.add(dustPoints);
+  setDust(state.dustLevel);
+}
+function setDust(level) {
+  state.dustLevel = level;
+  dustMat.uniforms.uIntensity.value = [0, 0.5, 1.2][level];
+}
+
+/* ============ 暴雨系统 ============ */
+let rainObj = null;
+{
+  const N = 900;
+  const pos = new Float32Array(N * 2 * 3);
+  for (let i = 0; i < N; i++) {
+    const x = (rnd() - 0.5) * 60, y = rnd() * 40, z = (rnd() - 0.5) * 44;
+    pos.set([x, y, z, x - 0.5, y - 2.6, z], i * 6);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.LineBasicMaterial({ color: 0x9fc4e8, transparent: true, opacity: 0.55 });
+  rainObj = new THREE.LineSegments(geo, mat);
+  rainObj.visible = false;
+  scene.add(rainObj);
+}
+function setRain(on) {
+  state.rain = on;
+  rainObj.visible = on;
+  $("btnRain").classList.toggle("on", on);
+  applyPhase();
+}
+addEventListener("keydown", (e) => { if (e.code === "Space") { e.preventDefault(); setRain(!state.rain); } });
+
+/* ============ 桌面控制旋钮（可点击） ============ */
+const knobs = [];
+{
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(13, 2.2, 5.4), new THREE.MeshLambertMaterial({ color: 0x23262e }));
+  panel.position.set(20, 1.1, 16.2); panel.castShadow = true;
+  scene.add(panel);
+  const labels = ["速度", "昼夜", "尘土"];
+  for (let i = 0; i < 3; i++) {
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.7, 14), new THREE.MeshLambertMaterial({ color: 0x4c5560 }));
+    base.position.set(14.8 + i * 5.2, 2.4, 16.2);
+    scene.add(base);
+    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, 1.0, 12), new THREE.MeshLambertMaterial({ color: [0xf2b73a, 0x6fae78, 0xb0895c][i] }));
+    knob.position.set(14.8 + i * 5.2, 3.15, 16.2);
+    knob.castShadow = true;
+    scene.add(knob);
+    const mark = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.3, 0.7), new THREE.MeshBasicMaterial({ color: 0xf5f7fa }));
+    mark.position.set(0, 0.51, 0.3);
+    knob.add(mark);
+    const label = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.1),
+      new THREE.MeshBasicMaterial({ map: signTexture(labels[i], "#1a1d24", "#d8e2f0"), transparent: true }));
+    label.rotation.x = -Math.PI / 2;
+    label.position.set(14.8 + i * 5.2, 0.6, 18.6);
+    scene.add(label);
+    knobs.push({ mesh: knob, index: i });
+  }
+}
+function activateKnob(i) {
+  if (i === 0) cycleSpeed();
+  else if (i === 1) toggleCycle();
+  else cycleDust();
+}
+function cycleSpeed() {
+  state.speedLevel = (state.speedLevel + 1) % 3;
+  state.equipSpeed = [0.5, 1, 1.8][state.speedLevel];
+  $("btnSpeed").textContent = "设备速度：" + ["慢", "标准", "快"][state.speedLevel];
+  knobs[0].mesh.rotation.y = state.speedLevel * (Math.PI * 2 / 3);
+}
+function toggleCycle() {
+  state.cycleOn = !state.cycleOn;
+  $("btnCycle").textContent = "昼夜循环：" + (state.cycleOn ? "开" : "关");
+  $("btnCycle").classList.toggle("on", state.cycleOn);
+  knobs[1].mesh.rotation.y = state.cycleOn ? 0 : Math.PI;
+}
+function cycleDust() {
+  setDust((state.dustLevel + 1) % 3);
+  $("btnDust").textContent = "尘土：" + ["无", "轻", "浓"][state.dustLevel];
+  knobs[2].mesh.rotation.y = state.dustLevel * (Math.PI * 2 / 3);
+}
+$("btnSpeed").addEventListener("click", cycleSpeed);
+$("btnCycle").addEventListener("click", toggleCycle);
+$("btnDust").addEventListener("click", cycleDust);
+$("btnRain").addEventListener("click", () => setRain(!state.rain));
+
+/* ============ 相机：环视 + 待机自动环绕 ============ */
+const canvas = $("scene");
+const cam = { yaw: 0.95, pitch: 0.42, dist: 74, tYaw: 0.95, tPitch: 0.42, tDist: 74, lastTouch: -1e9 };
+function resetView() { cam.tYaw = 0.95; cam.tPitch = 0.42; cam.tDist = 74; cam.lastTouch = performance.now(); }
+$("btnView").addEventListener("click", resetView);
+let dragging = false, lx = 0, ly = 0;
+canvas.addEventListener("pointerdown", (e) => {
+  canvas.setPointerCapture(e.pointerId);
+  const hit = pickKnob(e);
+  if (hit !== -1) { activateKnob(hit); return; }
+  dragging = true; lx = e.clientX; ly = e.clientY;
+  canvas.classList.add("dragging");
+  cam.lastTouch = performance.now();
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (!dragging) return;
+  cam.tYaw -= (e.clientX - lx) * 0.006;
+  cam.tPitch = Math.max(0.06, Math.min(1.15, cam.tPitch + (e.clientY - ly) * 0.004));
+  lx = e.clientX; ly = e.clientY;
+  cam.lastTouch = performance.now();
+});
+const endDrag = () => { dragging = false; canvas.classList.remove("dragging"); cam.lastTouch = performance.now(); };
+canvas.addEventListener("pointerup", endDrag);
+canvas.addEventListener("pointercancel", endDrag);
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  cam.tDist = Math.max(34, Math.min(130, cam.tDist * (e.deltaY > 0 ? 1.09 : 0.92)));
+  cam.lastTouch = performance.now();
+}, { passive: false });
+const ray = new THREE.Raycaster();
+const ndcV = new THREE.Vector2();
+function pickKnob(e) {
+  ndcV.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(ndcV, camera);
+  const hits = ray.intersectObjects(knobs.map(k => k.mesh), false);
+  return hits.length ? knobs.find(k => k.mesh === hits[0].object).index : -1;
+}
+/* 暴露旋钮屏幕坐标（自动化验收用） */
+function knobScreenPos(i) {
+  const p = knobs[i].mesh.getWorldPosition(new THREE.Vector3()).project(camera);
+  return { x: (p.x + 1) / 2 * innerWidth, y: (1 - p.y) / 2 * innerHeight };
+}
+
+/* ============ 车辆 / 机械动画 ============ */
+function stepTraffic(dt) {
+  for (const v of vehicles) {
+    if (v.dwell > 0) {                       // 停靠：装载 / 卸料
+      v.dwell -= dt * state.equipSpeed;
+      if (v.kind === "truck") {
+        v.bedPivot.rotation.z = v.dumping
+          ? Math.min(0.62, v.bedPivot.rotation.z + dt * 1.5)
+          : Math.max(0, v.bedPivot.rotation.z - dt * 1.2);
+        if (v.dwell <= 0 && v.dumping) v.dumping = false;
+      }
+      continue;
+    }
+    const prev = v.s;
+    v.s = (v.s + v.speed * state.equipSpeed * dt) % LOOP_LEN;
+    if (v.stops) {
+      for (const st of v.stops) {
+        if (prev < st.d && v.s >= st.d) {
+          v.s = st.d;
+          v.dwell = st.dwell * 0.6;
+          v.dumping = st.kind === "dump";
+          break;
+        }
+      }
+    }
+    if (v.kind === "truck" && !v.dumping)
+      v.bedPivot.rotation.z = Math.max(0, v.bedPivot.rotation.z - dt * 1.2);
+  }
+  // 车距约束：同一单车道，保持最小间距，杜绝追尾穿模
+  const list = [...vehicles].sort((a, b) => a.s - b.s);
+  for (let i = 1; i < list.length; i++)
+    if (list[i].s - list[i - 1].s < 15) list[i].s = list[i - 1].s + 15;
+  for (const v of vehicles) {
+    const p = pathSample(LOOP_PATH, v.s);
+    v.g.position.set(p.x, 0.8, p.z);
+    v.g.rotation.y = -p.ry;
+    if (v.drum) v.drum.rotation.x += dt * 2.4 * state.equipSpeed;
+  }
+}
+function updateExcavator(x, dt, time) {
+  const t = time * state.equipSpeed + x.phase;
+  const dig = (Math.sin(t * 0.55) + 1) / 2;              // 0 抬起 · 1 下挖
+  x.boomPivot.rotation.z = 0.62 - dig * 0.5;
+  x.armPivot.rotation.z = -0.8 - dig * 0.75;
+  x.bucketPivot.rotation.z = 0.5 + dig * 0.9;
+  x.body.rotation.y = x.body.rotation.y + Math.sin(t * 0.09) * dt * 0.12;
+}
+function updateCrane(c, dt, time) {
+  const t = time * state.equipSpeed + c.phase;
+  const u = (Math.sin(t * 0.14) + 1) / 2;                // 0..1 回转
+  c.slewing.rotation.y = c.baseRot + u * 2.1;
+  const trolleyR = 7 + Math.sin(t * 0.31 + 1) * 3;       // 小车沿臂移动
+  c.trolley.position.set(trolleyR, 0, 0);
+  const hookY = -6 - (Math.sin(t * 0.47 + 1.6) * 0.5 + 0.5) * 11;  // 吊钩升降
+  c.hook.position.y = hookY;
+  c.cable.scale.y = Math.max(0.2, -hookY);
+  c.cable.position.y = hookY / 2;
+  c.load.visible = hookY < -13;                          // 低位时吊着重物
+}
+function updateLoader(l, dt, time) {
+  const t = time * state.equipSpeed * 0.3 + l.phase;
+  const s = (Math.sin(t) + 1) / 2;
+  l.g.position.x = l.x0 - 4 + s * 8;
+  l.g.rotation.y = Math.cos(t) >= 0 ? 0 : Math.PI;
+  l.armPivot.rotation.z = 0.3 - Math.sin(t * 2) * 0.25;
+}
+function updateWorkers(dt, time) {
+  for (const w of workers) {
+    const t = (time * state.equipSpeed + w.phase);
+    if (w.role === "tie") {
+      const k = (Math.sin(t * 2.2) + 1) / 2;
+      w.g.rotation.x = k * 0.5;
+      w.armL.rotation.x = -1.5 - k * 0.5; w.armR.rotation.x = -1.4 - k * 0.6;
+    } else if (w.role === "carry" || w.role === "guard") {
+      w.s += w.speed * state.equipSpeed * dt;
+      const p = pathSample(w.path, w.s);
+      w.g.position.set(p.x, 0.8 + Math.abs(Math.sin(t * 8)) * 0.12, p.z);
+      w.g.rotation.y = -p.ry + Math.PI / 2;
+      w.legL.rotation.x = Math.sin(t * 9) * 0.55;
+      w.legR.rotation.x = -Math.sin(t * 9) * 0.55;
+      w.armL.rotation.x = -Math.sin(t * 9) * 0.4;
+      w.armR.rotation.x = Math.sin(t * 9) * 0.4;
+    } else if (w.role === "direct") {
+      w.armR.rotation.z = -1.4 + Math.sin(t * 2.4) * 0.5;
+      w.armL.rotation.z = 0.2 + Math.sin(t * 2.4 + 1) * 0.2;
+    } else {
+      const k = (Math.sin(t * 3.1) + 1) / 2;
+      w.g.rotation.x = 0.2 + k * 0.3;
+      w.armL.rotation.x = -1.1; w.armR.rotation.x = -0.4 - k * 0.8;
+    }
+  }
+}
+
+/* ============ 主循环 ============ */
+const clock = new THREE.Clock();
+let frames = 0, fpsT = 0;
+const elStats = $("stats");
+function animate() {
+  const dt = Math.min(0.05, clock.getDelta());
+  const time = clock.elapsedTime;
+  requestAnimationFrame(animate);
+  // 昼夜
+  if (state.cycleOn) {
+    state.phase = (state.phase + dt * 0.012 * state.cycleSpeed) % 1;
+    applyPhase();
+  }
+  // 机械
+  stepTraffic(dt);
+  for (const x of excavators) updateExcavator(x, dt, time);
+  for (const c of cranes) updateCrane(c, dt, time);
+  updateLoader(loader, dt, time);
+  updateWorkers(dt, time);
+  // 尘土与雨
+  dustMat.uniforms.uTime.value = time;
+  if (rainObj.visible) {
+    const pos = rainObj.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i += 2) {
+      let y = pos.getY(i) - dt * 34;
+      if (y < 0.5) y = 34 + (i % 17);
+      const x = pos.getX(i);
+      pos.setY(i, y); pos.setY(i + 1, y - 2.6);
+      pos.setX(i + 1, x - 0.5);
+    }
+    pos.needsUpdate = true;
+    state.wetness = Math.min(1, state.wetness + dt * 0.5);
+  } else {
+    state.wetness = Math.max(0, state.wetness - dt * 0.5);
+  }
+  siteGround.material.color.setHex(0xffffff).multiplyScalar(1 - state.wetness * 0.25);
+  // 相机（待机自动环绕）
+  if (performance.now() - cam.lastTouch > 4000 && !dragging) cam.tYaw += dt * 0.05;
+  cam.yaw += (cam.tYaw - cam.yaw) * Math.min(1, dt * 4);
+  cam.pitch += (cam.tPitch - cam.pitch) * Math.min(1, dt * 4);
+  cam.dist += (cam.tDist - cam.dist) * Math.min(1, dt * 4);
+  const cx = Math.cos(cam.yaw) * Math.cos(cam.pitch) * cam.dist;
+  const cz = Math.sin(cam.yaw) * Math.cos(cam.pitch) * cam.dist;
+  const cy = 6 + Math.sin(cam.pitch) * cam.dist * 0.75;
+  camera.position.set(cx, Math.max(4, cy), cz);
+  camera.lookAt(0, 4, 0);
+  renderer.render(scene, camera);
+  frames++; fpsT += dt;
+  if (fpsT >= 0.5) {
+    state.fps = Math.round(frames / fpsT); frames = 0; fpsT = 0;
+    elStats.textContent = `${state.machines} 台机械 · ${state.workers} 名工人 · 昼夜 ${(state.phase * 100).toFixed(0)}% · ${state.fps} FPS`;
+  }
+}
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+applyPhase();
+animate();
+state.ready = true;
+
+/* ============ 自动化只读接口 ============ */
+window.__site = {
+  get state() {
+    return {
+      ready: state.ready, phase: state.phase, cycleOn: state.cycleOn, equipSpeed: state.equipSpeed,
+      dustLevel: state.dustLevel, rain: state.rain, wetness: state.wetness, nightLevel: state.nightLevel,
+      machines: state.machines, workers: state.workers, fences: state.fences, fps: state.fps,
+      cam: { yaw: cam.tYaw, pitch: cam.tPitch, dist: cam.tDist },
+      vehiclePos: vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z })),
+      craneYaw: cranes.map(c => c.slewing.rotation.y),
+      excavatorBoom: excavators.map(x => x.boomPivot.rotation.z),
+      workerPos: workers.map(w => ({ x: w.g.position.x, z: w.g.position.z })),
+      bounds: { w: DESK.w / 2, d: DESK.d / 2 },
+      deskMatWet: state.wetness,
+    };
+  },
+  knobScreenPos: (i) => knobScreenPos(i),
+  activateKnob: (i) => activateKnob(i),
+  setRain: (v) => setRain(!!v),
+  setCycle: (v) => { if (state.cycleOn !== !!v) toggleCycle(); },
+  setPhase: (p) => { state.phase = p; state.cycleOn = false; applyPhase(); },
+  setSpeed: (v) => { state.equipSpeed = v; },
+  resetView,
+};
+}
+</script>
+</body>
+</html>
