@@ -39,7 +39,9 @@
       viewport: ["adaptive", ...Object.keys(sizes)].includes(p.get("viewport"))
         ? p.get("viewport")
         : "adaptive",
-      tab: ["preview", "prompt", "info", "conditions"].includes(p.get("tab"))
+      tab: ["preview", "snapshot", "prompt", "info", "conditions"].includes(
+        p.get("tab"),
+      )
         ? p.get("tab")
         : "preview",
       source: p.get("source") === "raw" ? "raw" : "task",
@@ -66,9 +68,9 @@
         if (state.scope === "raw")
           return (
             anchor &&
-            anchor.raw.trim() &&
+            U.hasRecordedInput(anchor) &&
             anchor.input.completeness !== "unknown" &&
-            r.input.completeness !== "unknown" &&
+            U.hasRecordedInput(r) &&
             r.rawHash === anchor.rawHash
           );
         if (!prompt) return true;
@@ -148,7 +150,7 @@
             .join(" / ");
           return (
             heading +
-            `<button class="model-choice" data-choice="${e(r.id)}" ${slots().some((s) => s !== side && state[s] === r.id) ? "disabled" : ""}><strong>${e(runLabel(r))}</strong><span>${e(r.title)} · ${e(r.date || "日期未记录")}</span><small>${occupied ? "已选 " + occupied + " · " : ""}${seen.has(r.id) ? "已浏览 · " : ""}${r.preview.kind === "none" ? "无预览" : r.preview.embed ? "可预览" : "独立打开"} · ${r.input.completeness === "complete" ? "完整输入" : "输入留存不完整"} · ${e(U.executionModeLabel(U.executionMode(r)))}</small></button>`
+            `<button class="model-choice" data-choice="${e(r.id)}" ${slots().some((s) => s !== side && state[s] === r.id) ? "disabled" : ""}><strong>${e(runLabel(r))}</strong><span>${e(r.title)} · ${e(r.date || "日期未记录")}</span><small>${occupied ? "已选 " + occupied + " · " : ""}${seen.has(r.id) ? "已浏览 · " : ""}${r.preview.kind === "none" ? "无预览" : r.preview.embed ? "可预览" : "独立打开"} · ${e(U.completenessLabel(r.input.completeness))} · ${e(U.executionModeLabel(U.executionMode(r)))}</small></button>`
           );
         })
         .join("") ||
@@ -207,7 +209,32 @@
         `${width} × ${height} · ${Math.round(scale * 100)}%`;
     }
   }
-  function render() {
+  let renderGeneration = 0;
+  async function render() {
+    const generation = ++renderGeneration;
+    try {
+      const selected = slots().map(getRun).filter(Boolean);
+      await U.ensureDetails(data, selected);
+      if (state.tab === "prompt")
+        await U.ensureTexts(data, selected, state.source === "raw");
+      if (generation !== renderGeneration) return;
+      renderLoaded();
+    } catch (error) {
+      if (generation === renderGeneration) {
+        $("relation").textContent = "资料加载失败：" + error.message;
+        let retry = document.getElementById("data-retry");
+        if (!retry) {
+          retry = document.createElement("button");
+          retry.id = "data-retry";
+          retry.textContent = "重试加载资料";
+          retry.onclick = render;
+          $("relation").after(retry);
+        }
+      }
+    }
+  }
+  function renderLoaded() {
+    document.getElementById("data-retry")?.remove();
     const visible = state.tab === "conditions" ? [] : visibleSides();
     document.querySelector(".compare-grid").hidden = state.tab === "conditions";
     $("conditions-view").hidden = state.tab !== "conditions";
@@ -412,7 +439,7 @@
             (unloaded[side] ? "加载此侧" : "卸载此侧") +
             "</button>"
           : "") +
-        (run ? '<a href="' + e(run.document) + '">实验记录</a>' : "") +
+        (run ? '<a href="' + e(U.documentURL(run)) + '">实验记录</a>' : "") +
         (run ? "</div></details>" : "") +
         (run && U.executionMode(run) !== "unknown"
           ? '<span class="execution-mode-chip panel-execution-mode">' +
@@ -463,6 +490,19 @@
           "</pre></div>";
         continue;
       }
+      if (state.tab === "snapshot") {
+        const screenshot = U.screenshotURL(run);
+        content.innerHTML = screenshot
+          ? '<a class="snapshot-preview" href="' +
+            e(screenshot) +
+            '" target="_blank" rel="noopener" aria-label="查看实际截图原图"><img src="' +
+            e(U.screenshotThumbnailURL(run)) +
+            '" alt="' +
+            e(run.title + " · " + runLabel(run) + " 实际截图") +
+            '"><span>已登记实际截图 · 打开原图 ↗</span></a>'
+          : '<div class="frame-placeholder">此实验未登记截图，可查看记录或切换实时预览。</div>';
+        continue;
+      }
       if (state.tab === "info") {
         const info = [
           ["输入关系", U.relation(data, side === "left" ? b : a, run)],
@@ -473,7 +513,12 @@
           ["日期", run.date || "未记录"],
           ["执行模式", U.executionModeLabel(U.executionMode(run))],
           ["自主优化授权原文", run.input.authorization || "未记录"],
-          ["原始输入记录", run.input.completeness + " · " + run.input.notes],
+          [
+            "原始输入记录",
+            U.completenessLabel(run.input.completeness) +
+              " · " +
+              run.input.notes,
+          ],
           ["平台与工具", run.environment.tool || "未记录"],
           ["上下文说明", run.environment.notes],
           [
@@ -586,12 +631,6 @@
         : new Set(valid.map((r) => r.id)).size !== valid.length
           ? "存在重复实验，请更换重复的一侧。"
           : "以 A 为基准查看输入关系。条件相同不代表公平性能评测，未知信息保持未记录。";
-    const completeness = {
-      complete: "完整输入",
-      recorded: "原始输入已记录",
-      partial: "输入留存不完整",
-      unknown: "未记录",
-    };
     const fields = [
       [
         "主题",
@@ -603,6 +642,9 @@
       ["自主优化授权原文", (r) => r.input.authorization || "未记录"],
       ["轮次", (r) => U.roundLabel(r)],
       ["日期", (r) => r.date || "未记录"],
+      ["归档日期", (r) => r.archivedAt || "未记录"],
+      ["截图采集日期", (r) => r.screenshotInfo?.capturedAt || "未记录"],
+      ["来源实验", (r) => r.sourceRunId || "未记录"],
       ["提示词版本", (r) => r.promptId],
       [
         "输入关系（与 A）",
@@ -611,14 +653,8 @@
             ? "基准实验"
             : U.relation(data, getRun("left"), r),
       ],
-      [
-        "原始输入指纹",
-        (r) =>
-          r.raw.trim() && r.input.completeness !== "unknown"
-            ? r.rawHash
-            : "未记录",
-      ],
-      ["输入留存", (r) => completeness[r.input.completeness] || "未记录"],
+      ["原始输入指纹", (r) => (U.hasRecordedInput(r) ? r.rawHash : "未记录")],
+      ["输入留存", (r) => U.completenessLabel(r.input.completeness)],
       ["输入说明", (r) => r.input.notes || "未记录"],
       ["平台与工具", (r) => r.environment.tool || "未记录"],
       ["上下文说明", (r) => r.environment.notes || "未记录"],

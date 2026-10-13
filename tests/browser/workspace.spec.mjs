@@ -1,4 +1,11 @@
 import { test, expect } from "@playwright/test";
+import { loadCatalog } from "../../scripts/lib.mjs";
+const catalog = loadCatalog();
+const vendors = [
+  ...new Set(catalog.models.map((model) => model.provider).filter(Boolean)),
+]
+  .sort((a, b) => a.localeCompare(b, "en"))
+  .concat("未记录 / 多轮混合");
 
 async function prepare(page) {
   // Isolate workspace lifecycle checks from historical demo/CDN behavior.
@@ -21,14 +28,7 @@ test("model picker groups vendors and sorts versions on desktop and mobile", asy
       await page
         .locator(`#run-${side} optgroup`)
         .evaluateAll((groups) => groups.map((g) => g.label)),
-    ).toEqual([
-      "Anthropic",
-      "GitHub Copilot",
-      "MiniMax",
-      "OpenAI",
-      "OpenCode",
-      "未记录 / 多轮混合",
-    ]);
+    ).toEqual(vendors);
     const ids = await page
       .locator(`#run-${side} option[value]:not([value=""])`)
       .evaluateAll((options) => options.map((o) => o.value));
@@ -50,14 +50,9 @@ test("model picker groups vendors and sorts versions on desktop and mobile", asy
   }
   await page.locator("#pick-models").click();
   await page.locator("#scope").selectOption("all");
-  await expect(page.locator(".model-provider")).toHaveText([
-    /Anthropic/,
-    /GitHub Copilot/,
-    /MiniMax/,
-    /OpenAI/,
-    /OpenCode/,
-    /未记录/,
-  ]);
+  await expect(page.locator(".model-provider")).toHaveText(
+    vendors.map((vendor) => new RegExp(vendor)),
+  );
   const inspect = () =>
     page.locator(".model-choice").evaluateAll((buttons) => {
       const d = window.ARCHIVE;

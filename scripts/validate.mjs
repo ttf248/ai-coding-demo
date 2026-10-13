@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import Ajv from "ajv";
+import { isDeepStrictEqual } from "node:util";
+import { siteResourceOutputs } from "./site-assets.mjs";
 import {
   ROOT,
   read,
@@ -81,6 +83,32 @@ for (const model of catalog.models) {
     `Invalid model display metadata: ${model.id}`,
   );
 }
+unique(
+  catalog.tools.map((tool) => tool.id),
+  "tool IDs",
+);
+unique(
+  catalog.tools.flatMap((tool) => tool.aliases),
+  "tool aliases",
+);
+for (const tool of catalog.tools)
+  check(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tool.id) &&
+      !!tool.label &&
+      Array.isArray(tool.aliases) &&
+      tool.aliases.every((alias) => typeof alias === "string" && !!alias),
+    `Invalid tool ${tool.id}`,
+  );
+unique(
+  catalog.batches.map((batch) => batch.batchId),
+  "billing batches",
+);
+const billingSchema = ajv.compile({ ...schema, $ref: "#/$defs/billing" });
+for (const batch of catalog.batches)
+  check(
+    billingSchema({ type: "batch", ...batch }),
+    `Invalid billing batch ${batch.batchId}: ${ajv.errorsText(billingSchema.errors)}`,
+  );
 for (const t of catalog.topics) {
   if (t.testingStatus === "archived")
     check(
@@ -148,6 +176,50 @@ for (const p of catalog.prompts) {
   }
 }
 for (const r of catalog.runs) {
+  if (r.environment.toolId)
+    check(
+      catalog.tools.some((tool) => tool.id === r.environment.toolId),
+      `Unknown tool ${r.id}`,
+    );
+  for (const field of ["archivedAt", "screenshotCapturedAt"])
+    if (r[field])
+      check(
+        !Number.isNaN(Date.parse(r[field])) &&
+          new Date(r[field]).toISOString().slice(0, 10) === r[field],
+        `Invalid ${field}: ${r.id}`,
+      );
+  if (r.sourceRunId) {
+    check(
+      r.sourceRunId !== r.id &&
+        catalog.runs.some((run) => run.id === r.sourceRunId),
+      `Invalid source run ${r.id}`,
+    );
+    let current = r,
+      seen = new Set();
+    while (current?.sourceRunId) {
+      if (seen.has(current.id)) {
+        check(false, `Source run cycle ${r.id}`);
+        break;
+      }
+      seen.add(current.id);
+      current = catalog.runs.find((run) => run.id === current.sourceRunId);
+    }
+  }
+  if (r.billing?.type === "batch") {
+    const batch = catalog.batches.find(
+      (batch) => batch.batchId === r.billing.batchId,
+    );
+    check(!!batch, `Unknown billing batch ${r.id}`);
+    check(
+      isDeepStrictEqual(r.billing, { type: "batch", ...batch }),
+      `Billing batch snapshot differs from dictionary ${r.id}`,
+    );
+  }
+  for (const variant of r.screenshotInfo?.variants || [])
+    check(
+      exists(variant.path),
+      `Missing generated thumbnail ${r.id}: ${variant.path}`,
+    );
   check(
     r.id === `${r.topicId}--${r.runId}` &&
       r.directory === `demos/${r.topicId}/runs/${r.runId}`,
@@ -233,6 +305,10 @@ unique(
 );
 for (const g of catalog.guides) {
   check(
+    g.status === "ready" && ["offline", "required"].includes(g.network),
+    `Invalid guide status/network ${g.slug}`,
+  );
+  check(
     typeof g.title === "string" &&
       !!g.title &&
       typeof g.type === "string" &&
@@ -241,11 +317,24 @@ for (const g of catalog.guides) {
   );
   check(exists(g.document), `Missing guide ${g.document}`);
   check(exists(g.example), `Missing example ${g.example}`);
+  if (exists(g.example))
+    check(
+      !/\$dir|\$\{dir\^\}|cdn\.tailwindcss\.com|unpkg\.com|type="text\/babel"/.test(
+        read(g.example),
+      ),
+      `Guide still contains placeholder/remote runtime ${g.slug}`,
+    );
 }
 for (const [file, content] of generatedFiles(catalog))
   check(
     exists(file) && read(file) === content,
     `Stale generated file ${file}; run npm run generate`,
+  );
+for (const [file, content] of await siteResourceOutputs(catalog))
+  check(
+    exists(file) &&
+      fs.readFileSync(resolveLocal(file)).equals(Buffer.from(content)),
+    `Stale site resource ${file}; run npm run generate`,
   );
 // Check maintained Markdown links, not historical prose/code samples.
 const generated = generatedFiles(catalog);
@@ -269,6 +358,9 @@ for (const file of [
   "index.html",
   "topic.html",
   "compare.html",
+  "404.html",
+  ...catalog.guides.map((guide) => guide.example),
+  ...[...generated.keys()].filter((file) => file.endsWith(".html")),
   ...catalog.runs
     .filter((r) => r.preview.kind === "build")
     .flatMap((r) => r.preview.pages.map((p) => p.href)),
@@ -276,7 +368,8 @@ for (const file of [
   if (!exists(file)) continue;
   for (const match of read(file).matchAll(/(?:src|href)="([^"#]+)"/g)) {
     const href = match[1];
-    if (/^(?:https?:|data:|#)/.test(href)) continue;
+    if (/^(?:https?:|mailto:|data:|#)/.test(href) || href.includes("${"))
+      continue;
     const target = path.posix.normalize(
       path.posix.join(path.posix.dirname(file), href.split(/[?#]/)[0]),
     );

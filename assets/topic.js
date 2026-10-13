@@ -1,4 +1,4 @@
-(function () {
+(async function () {
   "use strict";
   const data = window.ARCHIVE,
     U = window.ArchiveUI,
@@ -11,7 +11,22 @@
       '<h1>未找到这个主题</h1><p>目录已经更新，请返回首页重新选择。</p><a class="button" href="index.html">返回实验目录</a>';
     return;
   }
+  try {
+    await U.ensureDetails(
+      data,
+      data.runs.filter((run) => run.topicId === topic.id),
+    );
+  } catch (error) {
+    root.innerHTML =
+      "<h1>主题资料暂时无法加载</h1><p>" +
+      e(error.message) +
+      '</p><button onclick="location.reload()">重试</button><a href="index.html">返回目录</a>';
+    return;
+  }
   document.title = topic.title + " · AI Coding Demo";
+  document
+    .querySelector('meta[name="description"]')
+    ?.setAttribute("content", topic.description);
   const runs = U.filterRuns(data, {}).filter((r) => r.topicId === topic.id);
   const prompts = data.prompts.filter((p) => p.topicId === topic.id);
   const models = data.models
@@ -149,7 +164,7 @@
               '" target="_blank" rel="noopener">打开预览 ↗</a>'
             : "") +
           '<a href="' +
-          e(r.document) +
+          e(U.documentURL(r)) +
           '">记录</a><button data-compare="' +
           e(r.id) +
           '">加入对比</button></div></div>'
@@ -157,7 +172,23 @@
       })
       .join("");
   }
-  function render() {
+  let renderGeneration = 0;
+  async function render() {
+    const generation = ++renderGeneration;
+    if (view === "prompt") {
+      try {
+        await U.ensureTexts(
+          data,
+          runs.filter((run) => !promptId || run.promptId === promptId),
+          false,
+        );
+      } catch (error) {
+        document.getElementById("topic-results-help").textContent =
+          "任务正文加载失败，请再次点击任务正文重试。";
+        return;
+      }
+    }
+    if (generation !== renderGeneration) return;
     const matched = runs
       .filter(
         (r) =>
@@ -367,7 +398,7 @@
                   '<button data-compare="' +
                   e(r.id) +
                   '" aria-pressed="false">加入对比</button><a href="' +
-                  e(r.document) +
+                  e(U.documentURL(r)) +
                   '">记录</a><button class="row-details-toggle" data-row-details aria-expanded="false" aria-controls="date-' +
                   e(r.id) +
                   " billing-" +
@@ -395,7 +426,7 @@
           " 条记录</summary><p>" +
           e(p.extraction) +
           "</p><pre>" +
-          e(p.text) +
+          e(p.text || "点击任务正文后加载内容。") +
           '</pre><a href="' +
           e(p.directory) +
           '/prompt.md">原始文件 ↗</a> · <a href="compare.html?group=' +
@@ -479,7 +510,8 @@
     sort = p.get("sort") === "recent" ? "recent" : "model";
     render();
   });
-  render();
+  await render();
+  root.dispatchEvent(new Event("archive:topic-ready", { bubbles: true }));
   if (location.hash.startsWith("#run-"))
     document
       .getElementById(decodeURIComponent(location.hash.slice(1)))

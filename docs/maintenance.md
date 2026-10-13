@@ -16,11 +16,30 @@
 - 每次实验的 `prompt.md`：完整原始输入快照；`Readme.md` 保留原始说明、复盘与自动元信息区块。
 - `catalog/models.json`、`categories.json`、`guides.json`：共享字典和技术索引。
 - `assets/generated/catalog.js`：自动生成的浏览器数据，不手改。
+- `catalog/tools.json`：运行工具及历史名称的明确别名。模型厂商由 `models.json` 登记，工具或接入平台不作为模型厂商；旧 `environment.tool` 保留原始名称，新记录可同时填写 `environment.toolId`。
+- `catalog/batches.json`：费用批次字典。新实验可使用 `billing: {"type":"batch","batchId":"已登记批次"}`。既有实验中的完整费用快照继续保留，校验器核对它与字典的一致性。
 - 根 README 的 catalog 区块、主题 README、实验 README 的 archive 区块由脚本维护。区块外的历史记录不会被生成器覆盖。
 
 实验费用写在 `run.json` 的 `billing` 中。`type: "subscription"` 记录订阅方式，未知的货币金额填 `null`；`type: "batch"` 的 `amount` 是批次合计，关联批次的多条 run 可重复引用同一 `batchId`，不得将总额误读或拆算为单案例费用。金额换算时，`sourceAmount`、`sourceUnit` 与 `conversionRate` 保留原始数值及换算比例；`amount` 和 `unit` 记录换算结果。平台没有提供的额度或费用明细保持未知，并在 `note` 说明口径。
 
 所有元数据使用 `schemaVersion: 1`，契约见 [schema](../catalog/schema.json)。实验 ID 为 `{topic}--{run}`；目录用小写 kebab-case，显示名称不受 slug 限制。模型重跑新增 `r02`，不是覆盖 `r01`。未知模型用 `unknown`；日期允许年、月、日精度，缺失为 null。
+
+实验日期 `date`、归档日期 `archivedAt`、截图日期 `screenshotCapturedAt` 分别登记。历史未留存的日期保持 `null`，不得用迁移日期或文件修改时间补造。脚手架只登记实际创建当天的归档日期；有明确来源的重跑或迭代填写 `sourceRunId`，无来源关系填 `null`。截图展示尺寸、指纹和缩略图由原始 PNG 自动读取和生成，不修改证据原图。
+
+## 生成的站点资料
+
+`npm run generate` 会更新并提交以下静态产物：
+
+- `assets/generated/catalog.js`：列表使用的轻量摘要，不包含原始输入和任务正文。
+- `assets/generated/topics/*.json`：按主题读取的详情，批次费用引用共享字典。
+- `assets/generated/inputs/*.json` 与 `tasks/*.json`：按指纹去重的输入和任务正文；仅统一 BOM 与换行，原始 Markdown 不变。查看正文时按需读取，失败可重试。
+- `assets/generated/readers/`：实验、主题、技术说明与维护文档的静态 HTML 阅读页，保留原文下载、目录、代码复制及相对链接。缺失的历史附件显示“文件未留存”，原文路径继续保留。
+- `assets/generated/screenshots/`：480 / 960 像素 WebP 缩略图；文件名含原图指纹，列表使用 `srcset`，放大预览保留原始 PNG。
+- `assets/generated/vendor/`、`guide-demos.css` 和 `guide-react.js`：技术示例的本地运行资源、许可证及预编译脚本。技术示例修改后运行 generate 即可；已归档 demo 不统一升级依赖。
+
+技术索引在 `catalog/guides.json` 登记 `status` 与 `network`。当前示例的脚本、样式无需远程 CDN；Unsplash 与 Skeleton 示例仍需联网加载外部图片，不能标为离线。新增技术示例保持本站导航和 390px 布局，禁止占位 JSX 作为可运行入口。
+
+这些产物与源码一起提交即可静态发布。生成脚本是维护工具，已提交站点无需安装依赖或现场构建。
 
 ## 新增实验
 

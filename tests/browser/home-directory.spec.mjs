@@ -27,7 +27,7 @@ test("homepage covers use registered run screenshots and direct previews", async
     };
   }, topic.id);
   await expect(card.locator(".topic-cover img")).toHaveAttribute(
-    "src",
+    "data-original",
     source.path,
   );
   expect(
@@ -68,7 +68,7 @@ test("homepage covers use registered run screenshots and direct previews", async
   );
   if (filteredScreenshot) {
     await expect(card.locator(".topic-cover img")).toHaveAttribute(
-      "src",
+      "data-original",
       `${filteredScreenshot.directory}/${filteredScreenshot.screenshot}`,
     );
   } else {
@@ -134,14 +134,17 @@ test("active topic grouping shows a screenshot for every active topic", async ({
       `Missing registered screenshot for ${topic.id}`,
     ).toBeTruthy();
     await expect(card.locator(".topic-cover img")).toHaveAttribute(
-      "src",
+      "data-original",
       expected,
     );
-    expect(
-      await card
-        .locator(".topic-cover img")
-        .evaluate((img) => img.complete && img.naturalWidth > 0),
-    ).toBe(true);
+    await card.locator(".topic-cover img").scrollIntoViewIfNeeded();
+    await expect
+      .poll(() =>
+        card
+          .locator(".topic-cover img")
+          .evaluate((img) => img.complete && img.naturalWidth > 0),
+      )
+      .toBe(true);
   }
 });
 
@@ -282,7 +285,7 @@ test("cover preview keeps screenshot, selected version and direct entry aligned"
   await page.goto("./");
   const card = page.locator(".topic-card").first();
   const id = await card.locator("figure").getAttribute("data-screenshot-run");
-  const src = await card.locator("figure img").getAttribute("src");
+  const src = await card.locator("figure img").getAttribute("data-original");
   const href = await card.locator(".preview-link").getAttribute("href");
   await card.locator(".cover-preview").click();
   await expect(page.locator("#preview-dialog")).toBeVisible();
