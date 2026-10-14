@@ -161,7 +161,7 @@ test("active topic grouping shows a screenshot for every active topic", async ({
       topic.testingStatus !== "archived" &&
       data.runs.some((run) => run.topicId === topic.id),
   );
-  await page.goto("./?testing=active&sort=score&group=topics&view=grid");
+  await page.goto("./?testing=active&sort=complexity&group=topics&view=grid");
   while (await page.locator("#load-more").isVisible())
     await page.locator("#load-more").click();
   await expect(page.locator(".topic-card")).toHaveCount(topics.length);
@@ -217,7 +217,7 @@ test("homepage grid and list keep preview controls within a mobile viewport", as
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("./?testing=active&sort=score&group=topics&view=grid");
+  await page.goto("./?testing=active&sort=complexity&group=topics&view=grid");
   for (const view of ["grid", "list"]) {
     await openHomeControls(page);
     await page.locator('[data-view="' + view + '"]').click();
@@ -233,6 +233,7 @@ test("homepage grid and list keep preview controls within a mobile viewport", as
   }
   await page.reload();
   await expect(page.locator("#project-grid")).toHaveClass(/list/);
+  await page.locator('[data-group="runs"]').click();
   await page.locator("#sort").selectOption("title");
   await page.reload();
   await expect(page.locator("#sort")).toHaveValue("title");
@@ -303,7 +304,7 @@ async function openHomeControls(page) {
 test("gallery prioritizes artwork and reveals metadata and navigation on demand", async ({
   page,
 }) => {
-  await page.goto("./?testing=active&sort=score&group=topics&view=grid");
+  await page.goto("./?testing=active&sort=complexity&group=topics&view=grid");
   const first = page.locator(".topic-card").first();
   expect((await first.boundingBox()).y).toBeLessThan(480);
   await expect(page.locator("#provider")).toBeHidden();
@@ -491,6 +492,20 @@ test("complexity is the home default across pagination, views and shared sorting
   expect(await ids()).toEqual(expected.slice(0, 9));
   await page.locator("#load-more").click();
   expect(await ids()).toEqual(expected);
+  await page.goto("./?sort=score&group=topics");
+  await expect(page.locator("#sort")).toHaveValue("complexity");
+  await expect(page.locator("#sort").locator("xpath=..")).toBeHidden();
+  expect(new URL(page.url()).searchParams.get("sort")).toBe("complexity");
+  expect(await ids()).toEqual(expected.slice(0, 9));
+  await page.locator('[data-group="runs"]').click();
+  await expect(page.locator("#sort").locator("xpath=..")).toBeVisible();
+  await page.locator("#sort").selectOption("score");
+  await expect(page.locator("#sort")).toHaveValue("score");
+  await page.locator('[data-group="topics"]').click();
+  await expect(page.locator("#sort")).toHaveValue("complexity");
+  await expect(page.locator("#sort").locator("xpath=..")).toBeHidden();
+  expect(new URL(page.url()).searchParams.get("sort")).toBe("complexity");
+  await page.locator('[data-group="runs"]').click();
   await page.locator("#sort").selectOption("recent");
   await page.reload();
   await expect(page.locator("#sort")).toHaveValue("recent");
