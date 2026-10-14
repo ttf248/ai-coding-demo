@@ -40,7 +40,16 @@
     display: block; margin: 0 auto; max-width: 100%; background: #0b101a;
     border: 1px solid var(--line); border-radius: 8px; touch-action: none; cursor: crosshair;
   }
+  .board-wrap { position: relative; }
+  .inspect {
+    position: absolute; left: 8px; bottom: 8px; z-index: 5; pointer-events: none;
+    background: rgba(10,14,22,.86); border: 1px solid var(--line); border-radius: 6px;
+    padding: 3px 8px; font-size: 11.5px; color: var(--text); opacity: 0; transition: opacity .15s;
+    font-variant-numeric: tabular-nums;
+  }
   .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .hint-inline { align-self: center; font-size: 11.5px; color: var(--muted); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   button, select, input[type="range"] { font: inherit; }
   button {
     background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
@@ -73,6 +82,15 @@
   .help { color: var(--muted); font-size: 12px; }
   .help p { margin: 0 0 6px; }
   .help b { color: var(--text); }
+  .compare-panel { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: #101725; }
+  .compare-title { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .compare-table th, .compare-table td { padding: 5px 6px; text-align: right; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .compare-table th:first-child, .compare-table td:first-child,
+  .compare-table th:nth-child(2), .compare-table td:nth-child(2) { text-align: left; }
+  .compare-table th { color: var(--muted); font-weight: 500; }
+  .compare-table td.best { color: #6ee7a8; font-weight: 600; }
+  .compare-note { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.6; }
   .msg { margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px; display: none; }
   .msg.show { display: block; }
   .msg.err { background: #3a1b22; border: 1px solid #7f2b39; color: #ffc7d1; }
@@ -119,6 +137,7 @@
             <label>拖动</label>
             <button data-tool="start">起点</button>
             <button data-tool="end">终点</button>
+            <span class="hint-inline">按住 Shift 拖动 = 矩形填充</span>
           </div>
         </div>
         <div class="toolbar">
@@ -127,12 +146,32 @@
           <button id="btnStep">单步</button>
           <button id="btnClear">清除搜索</button>
           <button id="btnReset">重置地图</button>
+          <button id="btnCompare">三算法对比</button>
+          <button id="btnSave">保存地图</button>
+          <button id="btnLoad">读取地图</button>
         </div>
         <div class="toolbar">
           <div class="group slider">
             <label for="speed">速度</label>
             <input type="range" id="speed" min="1" max="10" value="6" />
             <span id="speedVal">6</span>
+          </div>
+          <p class="hint-inline" id="speedHint">当前速度：每格约 190 毫秒。</p>
+          <div class="group">
+            <label style="color:var(--muted)">
+              <input type="checkbox" id="heat" /> 访问顺序热力图
+            </label>
+            <label style="color:var(--muted)">
+              <input type="checkbox" id="flow" checked /> 路径流动动画
+            </label>
+          </div>
+          <div class="group">
+            <label>规模</label>
+            <select id="size">
+              <option value="24x16">小 · 24×16</option>
+              <option value="40x28" selected>中 · 40×28</option>
+              <option value="64x44">大 · 64×44</option>
+            </select>
           </div>
           <div class="group">
             <label>预设</label>
@@ -148,7 +187,10 @@
       </div>
 
       <div class="panel board" style="margin-top:14px">
-        <canvas id="cv" width="800" height="560"></canvas>
+        <div class="board-wrap">
+          <canvas id="cv" width="800" height="560"></canvas>
+          <div id="inspect" class="inspect"></div>
+        </div>
         <div class="stats">
           <div class="stat"><b id="sState">空闲</b><i>状态</i></div>
           <div class="stat"><b id="sSteps">0</b><i>路径步数</i></div>
@@ -156,6 +198,9 @@
           <div class="stat"><b id="sVisited">0</b><i>已访问节点</i></div>
           <div class="stat"><b id="sFrontier">0</b><i>当前前沿</i></div>
           <div class="stat"><b id="sTime">0 ms</b><i>搜索耗时</i></div>
+          <div class="stat"><b id="sMix">—</b><i>路径代价构成</i></div>
+          <div class="stat"><b id="sRate">—</b><i>搜索覆盖率</i></div>
+          <div class="stat"><b id="sFrame">—</b><i>单帧渲染耗时</i></div>
         </div>
         <div class="legend">
           <span style="--c:var(--start)">起点</span>
@@ -165,6 +210,14 @@
           <span style="--c:var(--path)">最终路径</span>
           <span style="--c:var(--wall)">障碍</span>
           <span style="--c:var(--weight)">高代价(5)</span>
+        </div>
+        <div id="comparePanel" class="compare-panel" hidden>
+          <p class="compare-title">同一地图上并排运行三种算法后的量化对照</p>
+          <table class="compare-table">
+            <thead><tr><th>算法</th><th>寻路准则</th><th>步数</th><th>总代价</th><th>访问节点</th><th>耗时</th></tr></thead>
+            <tbody id="compareBody"></tbody>
+          </table>
+          <p class="compare-note" id="compareNote"></p>
         </div>
         <div id="msg" class="msg"></div>
       </div>
@@ -186,7 +239,8 @@
           <p>鼠标或手指在地图上<b>按住拖动</b>即可连续绘制；触摸模式同样可用。</p>
           <p>选择“起点 / 终点”后点击格子可移动它们，起点终点不会被障碍覆盖。</p>
           <p>搜索进行中编辑地图会<b>自动停止并清除</b>当前搜索结果，避免状态混用。</p>
-          <p><kbd>空格</kbd> 运行/暂停，<kbd>→</kbd> 单步，<kbd>Esc</kbd> 清除搜索。</p>
+          <p><kbd>空格</kbd> 运行，<kbd>.</kbd> 单步，<kbd>Esc</kbd> 清除搜索，<kbd>C</kbd> 三算法对比，<kbd>Del</kbd> 清空地图，<kbd>R</kbd> 重置。</p>
+          <p><b>键盘编辑</b>：方向键移动光标，<kbd>Shift</kbd>+<kbd>→</kbd> 右移，<kbd>Enter</kbd> 应用当前工具，<kbd>S</kbd>/<kbd>E</kbd> 切换起点 / 终点工具。</p>
         </div>
       </section>
       <section>
@@ -194,6 +248,7 @@
         <div class="help">
           <p>应用“加权走廊”预设后，分别运行 BFS 与 Dijkstra，可直观看到 BFS 可能绕远但步数少、Dijkstra 走代价更低的路线。</p>
           <p>应用“封闭终点”预设后，终点被完全包围，搜索结束会明确提示不可达。</p>
+          <p class="help-inline">窄屏或站内嵌入时会隐藏次要说明，核心控件与统计保持可见；把鼠标移到地图上可查看格子详情。</p>
         </div>
       </section>
     </div>
@@ -204,8 +259,8 @@
 (() => {
   "use strict";
 
-  const COLS = 40;
-  const ROWS = 28;
+  let COLS = 40;
+  let ROWS = 28;
   const COST_NORMAL = 1;
   const COST_WEIGHT = 5;
 
@@ -214,7 +269,7 @@
   const $ = (id) => document.getElementById(id);
 
   // 地图单元：0 空地，1 障碍，2 高代价
-  const grid = new Uint8Array(COLS * ROWS);
+  let grid = new Uint8Array(COLS * ROWS);
   let start = { c: 2, r: Math.floor(ROWS / 2) };
   let end = { c: COLS - 3, r: Math.floor(ROWS / 2) };
 
@@ -232,6 +287,8 @@
       dist: new Float64Array(COLS * ROWS),
       prev: new Int32Array(COLS * ROWS),
       visited: new Uint8Array(COLS * ROWS),
+      order: new Int32Array(COLS * ROWS).fill(-1), // 访问序号，用于热力图
+      orderCount: 0,
       frontier: new Set(),
       path: [],
       steps: 0,
@@ -292,6 +349,47 @@
     }
     return top;
   }
+  /* ---------- 共享求解内核：动画逐步搜索与整图对比共用同一套规则 ---------- */
+  const NEIGHBOURS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+
+  /** 取当前格子的合法四邻（越界或障碍一律排除），四方向移动与任务正文一致 */
+  function neighbours(cur) {
+    const c = cur % COLS, r = (cur / COLS) | 0;
+    const out = [];
+    for (const [dc, dr] of NEIGHBOURS) {
+      const nc = c + dc, nr = r + dr;
+      if (!inBounds(nc, nr) || isBlocked(nc, nr)) continue;
+      out.push(idx(nc, nr));
+    }
+    return out;
+  }
+
+  /** 依据前驱指针还原路径（含起点、不含多余重复） */
+  function reconstruct(prev, endIdx) {
+    const path = [];
+    for (let cur = endIdx; cur !== -1; cur = prev[cur]) path.push(cur);
+    path.reverse();
+    return path;
+  }
+
+  /** 统计路径的步数、总代价与其中高代价格格数 */
+  function pathMetrics(path) {
+    let cost = 0, heavy = 0;
+    for (let k = 1; k < path.length; k++) {
+      const i = path[k];
+      const c = cellCost(i % COLS, (i / COLS) | 0);
+      cost += c;
+      if (c === COST_WEIGHT) heavy++;
+    }
+    return { steps: Math.max(0, path.length - 1), cost, heavy };
+  }
+
+  function countVisited(visited) {
+    let n = 0;
+    for (let i = 0; i < visited.length; i++) if (visited[i]) n++;
+    return n;
+  }
+
   const heuristic = (c, r) => Math.abs(c - end.c) + Math.abs(r - end.r); // 曼哈顿距离
 
   /* ---------- 搜索控制 ---------- */
@@ -320,6 +418,18 @@
 
   function startSearch() {
     if (search.done && search.found) return;
+    if (start.c === end.c && start.r === end.r) {
+      resetSearch(false);
+      search.path = [idx(start.c, start.r)];
+      search.steps = 0;
+      search.cost = 0;
+      search.found = "path";
+      search.done = true;
+      search.elapsed = 0;
+      showMsg("起点与终点重合：路径长度为 0，无需搜索。", "ok");
+      draw();
+      return;
+    }
     if (isBlocked(start.c, start.r) || isBlocked(end.c, end.r)) {
       showMsg("起点或终点被障碍覆盖，请先擦除障碍。", "err");
       return;
@@ -372,12 +482,10 @@
     search.frontier.delete(cur);
     if (search.visited[cur]) return true;
     search.visited[cur] = 1;
+    search.order[cur] = search.orderCount++;
     const c = cur % COLS, r = (cur / COLS) | 0;
     if (c === end.c && r === end.r) { finish("path"); return false; }
-    for (const [dc, dr] of DIRS) {
-      const nc = c + dc, nr = r + dr;
-      if (!inBounds(nc, nr) || isBlocked(nc, nr)) continue;
-      const ni = idx(nc, nr);
+    for (const ni of neighbours(cur)) {
       if (search.visited[ni] || search.frontier.has(ni)) continue;
       search.prev[ni] = cur;              // 记录前驱，路径与步数才能被还原
       search.queue.push(ni);
@@ -392,23 +500,20 @@
     search.frontier.delete(cur);
     if (search.visited[cur]) return true;
     search.visited[cur] = 1;
+    search.order[cur] = search.orderCount++;
     const c = cur % COLS, r = (cur / COLS) | 0;
     if (c === end.c && r === end.r) { finish("path"); return false; }
-    for (const [dc, dr] of DIRS) {
-      const nc = c + dc, nr = r + dr;
-      if (!inBounds(nc, nr) || isBlocked(nc, nr)) continue;
-      const ni = idx(nc, nr);
-      const nd = search.dist[cur] + cellCost(nc, nr); // 进入格子才计代价，起点不计
+    for (const ni of neighbours(cur)) {
+      const nd = search.dist[cur] + cellCost(ni % COLS, (ni / COLS) | 0); // 进入格子才计代价，起点不计
       if (nd < search.dist[ni]) {
         search.dist[ni] = nd;
         search.prev[ni] = cur;
-        heapPush(search.heap, { i: ni, f: nd + (search.mode === "astar" ? heuristic(nc, nr) : 0) });
+        heapPush(search.heap, { i: ni, f: nd + (search.mode === "astar" ? heuristic(ni % COLS, (ni / COLS) | 0) : 0) });
         search.frontier.add(ni);
       }
     }
     return true;
   }
-  const DIRS = [[0, -1], [0, 1], [-1, 0], [1, 0]];
 
   function finish(result) {
     search.done = true;
@@ -419,20 +524,12 @@
     paused = false;
     search.frontier.clear();
     if (result === "path") {
-      const path = [];
-      let cur = idx(end.c, end.r);
-      while (cur !== -1) { path.push(cur); cur = search.prev[cur]; }
-      path.reverse();
-      search.path = path;
-      search.steps = path.length - 1;
-      let cost = 0;
-      for (let i = 1; i < path.length; i++) {
-        const a = path[i - 1] % COLS, b = (path[i - 1] / COLS) | 0;
-        const nc = path[i] % COLS, nr = (path[i] / COLS) | 0;
-        cost += cellCost(nc, nr);
-      }
-      search.cost = cost;
-      const totalSteps = [...search.visited].filter(Boolean).length;
+      search.path = reconstruct(search.prev, idx(end.c, end.r));
+      const metrics = pathMetrics(search.path);
+      search.steps = metrics.steps;
+      search.cost = metrics.cost;
+      const cost = metrics.cost;
+      const totalSteps = countVisited(search.visited);
       showMsg(
         `找到路径：${search.steps} 步，总代价 ${cost}，访问 ${totalSteps} 个节点，耗时 ${search.elapsed} ms。`,
         "ok"
@@ -441,11 +538,7 @@
       search.path = [];
       search.steps = 0;
       search.cost = 0;
-      const totalSteps = [...search.visited].filter(Boolean).length;
-      showMsg(
-        `终点不可达：已访问 ${totalSteps} 个节点后前沿清空，耗时 ${search.elapsed} ms。终点被障碍完全封闭。`,
-        "err"
-      );
+      unreachableMessage(search.elapsed, countVisited(search.visited));
     }
     syncButtons();
     draw();
@@ -459,12 +552,222 @@
     $("sState").textContent = search.found === "path" ? "已完成" : search.found === "unreachable" ? "不可达" : paused ? "已暂停" : running ? "搜索中" : search.started ? "已停止" : "空闲";
   }
 
+  /* ---------- 连通性诊断：不可达时给出可解释的原因 ---------- */
+  function analyseReachability() {
+    const N = COLS * ROWS;
+    const seen = new Uint8Array(N);
+    const si = idx(start.c, start.r);
+    const stack = [si];
+    seen[si] = 1;
+    let count = 0;
+    let openCells = 0;
+    for (let i = 0; i < N; i++) if (!isBlocked(i % COLS, (i / COLS) | 0)) openCells++;
+    while (stack.length) {
+      const cur = stack.pop();
+      count++;
+      const c = cur % COLS, r = (cur / COLS) | 0;
+      for (const ni of neighbours(cur)) {
+        if (seen[ni]) continue;
+        seen[ni] = 1;
+        stack.push(ni);
+      }
+    }
+    const ei = idx(end.c, end.r);
+    const endReachable = seen[ei] === 1;
+    // 终点四邻是否全被封闭
+    let blockedNeighbours = 0;
+    // 四邻中被障碍占据的方向数量：等于 4 减��可通行邻居数
+    blockedNeighbours = 4 - neighbours(ei).length;
+    let reason;
+    if (endReachable) {
+      reason = "终点在起点所在连通区域内，理论上应当可达；若显示不可达，请检查搜索是否被中断。";
+    } else if (blockedNeighbours >= 4) {
+      reason = "终点四个方向的格子全部是障碍：终点被完全封闭，任何算法都无法进入。";
+    } else if (count === 1) {
+      reason = "起点周围没有任何可通行的格子：起点被完全困住，搜索无法扩展。";
+    } else if (count < openCells * 0.5) {
+      reason =
+        "起点所在连通区只有 " +
+        count +
+        " / " +
+        openCells +
+        " 格空地：地图被障碍割裂成多个区域，终点位于另一块区域。";
+    } else {
+      reason = "终点与起点不在同一连通区：需要打通两者之间的障碍才能抵达。";
+    }
+    return { count, openCells, endReachable, blockedNeighbours, reason, seen };
+  }
+
+  function unreachableMessage(elapsed, visitedCount) {
+    const diagInfo = analyseReachability();
+    search.reach = diagInfo;
+    const text =
+      "终点不可达：已访问 " +
+      visitedCount +
+      " 个节点后前沿清空（耗时 " +
+      elapsed +
+      " ms）。\n" +
+      diagInfo.reason +
+      "\n连通区规模 " +
+      diagInfo.count +
+      " / " +
+      diagInfo.openCells +
+      " 格空地。";
+    showMsg(text, "err");
+    announce(text.replace(/\n/g, " "));
+  }
+
+  /* ---------- 三算法同图对比（整图一次性求解，与逐帧动画共用同一套规则） ---------- */
+  function solveWhole(mode) {
+    const N = COLS * ROWS;
+    const dist = new Float64Array(N).fill(Infinity);
+    const prev = new Int32Array(N).fill(-1);
+    const visited = new Uint8Array(N);
+    const t0 = performance.now();
+    if (mode === "bfs") {
+      const queue = [idx(start.c, start.r)];
+      const seen = new Uint8Array(N);
+      const si = idx(start.c, start.r);
+      seen[si] = 1;
+      visited[si] = 1;
+      for (let head = 0; head < queue.length; head++) {
+        const cur = queue[head];
+        const c = cur % COLS, r = (cur / COLS) | 0;
+        if (c === end.c && r === end.r) break;
+        for (const ni of neighbours(cur)) {
+          if (seen[ni]) continue;
+          seen[ni] = 1;
+          visited[ni] = 1;
+          prev[ni] = cur;
+          queue.push(ni);
+        }
+      }
+    } else {
+      const heap = [];
+      const si = idx(start.c, start.r);
+      dist[si] = 0;
+      heapPush(heap, { i: si, f: mode === "astar" ? heuristic(start.c, start.r) : 0 });
+      while (heap.length) {
+        const item = heapPop(heap);
+        const cur = item.i;
+        if (visited[cur]) continue;
+        visited[cur] = 1;
+        const c = cur % COLS, r = (cur / COLS) | 0;
+        if (c === end.c && r === end.r) break;
+        for (const ni of neighbours(cur)) {
+          const nd = dist[cur] + cellCost(ni % COLS, (ni / COLS) | 0);
+          if (nd < dist[ni]) {
+            dist[ni] = nd;
+            prev[ni] = cur;
+            heapPush(heap, { i: ni, f: nd + (mode === "astar" ? heuristic(ni % COLS, (ni / COLS) | 0) : 0) });
+          }
+        }
+      }
+    }
+    const endIdx = idx(end.c, end.r);
+    const reached = visited[endIdx] === 1;
+    const visitedCount = countVisited(visited);
+    if (!reached) return { mode, reached: false, path: [], steps: 0, cost: 0, weighted: 0, visited: visitedCount, ms: performance.now() - t0 };
+    const path = reconstruct(prev, endIdx);
+    const metrics = pathMetrics(path);
+    return {
+      mode, reached: true, path, visitedSet: visited,
+      steps: metrics.steps, cost: metrics.cost, weighted: metrics.heavy,
+      visited: visitedCount, ms: performance.now() - t0,
+    };
+  }
+
+  const COMPARE_COLORS = { bfs: "#6ee7a8", dijkstra: "#f0a92b", astar: "#4dd7ff" };
+  let comparePaths = [];
+
+  function runCompare() {
+    if (isBlocked(start.c, start.r) || isBlocked(end.c, end.r)) {
+      showMsg("起点或终点被障碍覆盖，请先擦除障碍再做对比。", "err");
+      return;
+    }
+    const results = ["bfs", "dijkstra", "astar"].map(solveWhole);
+    comparePaths = results
+      .filter((r) => r.reached)
+      .map((r) => ({ path: r.path, color: COMPARE_COLORS[r.mode], mode: r.mode }));
+    renderCompare(results);
+    const best = results.find((r) => r.mode === "astar" && r.reached);
+    if (best) {
+      // 同步访问集：对比结束后统计与热力图仍然反映 A* 的真实扩展过程
+      search.visited = best.visitedSet;
+      search.order.fill(-1);
+      search.orderCount = 0;
+      for (let i = 0; i < search.visited.length; i++) if (search.visited[i]) search.order[i] = search.orderCount++;
+      search.path = best.path;
+      search.steps = best.steps;
+      search.cost = best.cost;
+      search.found = "path";
+      search.done = true;
+      stopLoop();
+      running = false;
+      draw();
+    }
+    hideMsg();
+  }
+
+  function renderCompare(results) {
+    const body = $("compareBody");
+    const label = { bfs: "BFS", dijkstra: "Dijkstra", astar: "A*" };
+    const rule = { bfs: "按步数", dijkstra: "按地形代价", astar: "代价 + 曼哈顿启发" };
+    const reached = results.filter((r) => r.reached);
+    const bestCost = reached.length ? Math.min(...reached.map((r) => r.cost)) : 0;
+    const bestVisited = reached.length ? Math.min(...reached.map((r) => r.visited)) : 0;
+    body.innerHTML = results
+      .map((r) => {
+        const cells = [
+          '<td><span style="color:' + COMPARE_COLORS[r.mode] + '">' + label[r.mode] + "</span></td>",
+          '<td style="color:var(--muted)">' + rule[r.mode] + "</td>",
+          r.reached ? "<td>" + r.steps + "</td>" : '<td style="color:#ff8fa3">不可达</td>',
+          r.reached ? '<td class="' + (r.cost === bestCost ? "best" : "") + '">' + r.cost + "</td>" : "<td>—</td>",
+          r.reached ? '<td class="' + (r.visited === bestVisited ? "best" : "") + '">' + r.visited + "</td>" : "<td>—</td>",
+          '<td style="color:var(--muted)">' + r.ms.toFixed(1) + " ms</td>",
+        ].join("");
+        return "<tr>" + cells + "</tr>";
+      })
+      .join("");
+    const notes = [];
+    const bfs = results.find((r) => r.mode === "bfs");
+    const dij = results.find((r) => r.mode === "dijkstra");
+    const ast = results.find((r) => r.mode === "astar");
+    if (bfs.reached && dij.reached) {
+      let weightedCells = 0;
+      for (let i = 0; i < grid.length; i++) if (grid[i] === 2) weightedCells++;
+      if (bfs.cost === dij.cost) {
+        notes.push(
+          weightedCells
+            ? "地图上有 " + weightedCells + " 格高代价地形，但最短步路径恰好避开了它们，BFS 与 Dijkstra 结论一致（代价 " + bfs.cost + "）。"
+            : "本图没有高代价地形，BFS 与 Dijkstra 的结论必然一致。",
+        );
+      } else if (bfs.cost < dij.cost) {
+        notes.push("BFS 少走 " + (dij.steps - bfs.steps) + " 步、代价 " + bfs.cost + "；Dijkstra 多花 " + (dij.cost - bfs.cost) + " 点代价换取更短路径。");
+      } else {
+        notes.push("BFS 少走 " + (dij.steps - bfs.steps) + " 步但多花 " + (bfs.cost - dij.cost) + " 点代价；Dijkstra 选择了更省代价的路线。");
+      }
+    }
+    if (dij.reached && ast.reached) {
+      notes.push(
+        "Dijkstra 与 A* 最小代价一致（" + dij.cost + "）；A* 访问 " + ast.visited + " 个节点，Dijkstra 访问 " + dij.visited + " 个。",
+      );
+    }
+    if (!reached.length) {
+      const d = analyseReachability();
+      notes.push("三种算法都无法到达终点。" + d.reason);
+    }
+    $("compareNote").textContent = notes.join(" ");
+    $("comparePanel").hidden = false;
+  }
+
   /* ---------- 渲染 ---------- */
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const avail = cv.clientWidth || cv.width;
     // 画布高度受视口限制，保证统计条与图例留在首屏内；宽度同步收窄以保持格子为正方形
-    const maxH = Math.max(240, window.innerHeight * 0.58);
+    const hostW = cv.parentElement ? cv.parentElement.clientWidth : avail;
+    const maxH = Math.max(220, Math.min(window.innerHeight * 0.58, (hostW || avail) * 0.78));
     const cssW = Math.min(avail, Math.round((maxH * COLS) / ROWS));
     const cssH = Math.round((cssW * ROWS) / COLS);
     cv.style.width = cssW + "px";
@@ -494,6 +797,11 @@
         if (grid[i] === 1) fill = "#3a475d";
         else if (grid[i] === 2) fill = "#4a3f96";
         else if (search.pathSet && search.pathSet.has(i)) fill = "#3ddc97";
+        else if (search.visited[i] && heatOn) {
+          // 热力图：越晚被访问的格子越亮，直观看出扩展顺序
+          const t = search.orderCount > 1 ? search.order[i] / (search.orderCount - 1) : 0;
+          fill = t >= 0 ? `rgb(${Math.round(38 + t * 90)}, ${Math.round(72 + t * 70)}, ${Math.round(126 + t * 60)})` : "#2f4f7a";
+        }
         else if (search.visited[i]) fill = "#2f4f7a";
         else if (search.frontier.has(i)) fill = "#f0a92b";
         else fill = (c + r) % 2 ? "#111725" : "#0e1420";
@@ -502,17 +810,63 @@
       }
     }
 
+    // 对比模式下叠加三条路径（半透明，便于互相比较）
+    for (const cp of comparePaths) {
+      if (cp.path.length < 2) continue;
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = cp.color;
+      ctx.lineWidth = Math.max(1.6, cw * 0.26);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      cp.path.forEach((i, k) => {
+        const x = (i % COLS) * cw + cw / 2, y = (((i / COLS) | 0)) * ch + ch / 2;
+        k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // 路径连线
-    if (search.path.length > 1) {
+    if (search.path.length > 1 && !comparePaths.length) {
       ctx.strokeStyle = "#3ddc97";
       ctx.lineWidth = Math.max(2, cw * 0.35);
       ctx.lineJoin = "round";
+      ctx.lineCap = "round";
       ctx.beginPath();
       search.path.forEach((i, k) => {
         const x = (i % COLS) * cw + cw / 2, y = ((i / COLS) | 0) * ch + ch / 2;
         k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
       });
       ctx.stroke();
+
+      // 流动高亮：沿路径循环推进的一段亮色，指示行进方向
+      if (flowOn && search.path.length > 2) {
+        const seg = Math.max(3, Math.round(search.path.length * 0.18));
+        const head = Math.floor(((performance.now() / 90) % (search.path.length + seg)) - seg);
+        ctx.strokeStyle = "rgba(190,255,225,.95)";
+        ctx.lineWidth = Math.max(2.4, cw * 0.4);
+        ctx.beginPath();
+        for (let k = Math.max(0, head); k <= Math.min(search.path.length - 1, head + seg); k++) {
+          const i = search.path[k];
+          const x = (i % COLS) * cw + cw / 2, y = ((i / COLS) | 0) * ch + ch / 2;
+          k === Math.max(0, head) ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        // 行进方向箭头
+        const tipI = search.path[Math.min(search.path.length - 1, Math.max(0, head + seg))];
+        const prevI = search.path[Math.max(0, Math.min(search.path.length - 1, head + seg) - 1)];
+        const ax = (tipI % COLS) * cw + cw / 2, ay = ((tipI / COLS) | 0) * ch + ch / 2;
+        const bx = (prevI % COLS) * cw + cw / 2, by = ((prevI / COLS) | 0) * ch + ch / 2;
+        const ang = Math.atan2(ay - by, ax - bx);
+        ctx.fillStyle = "rgba(190,255,225,.95)";
+        ctx.beginPath();
+        ctx.moveTo(ax + Math.cos(ang) * cw * 0.5, ay + Math.sin(ang) * ch * 0.5);
+        ctx.lineTo(ax + Math.cos(ang + 2.5) * cw * 0.4, ay + Math.sin(ang + 2.5) * ch * 0.4);
+        ctx.lineTo(ax + Math.cos(ang - 2.5) * cw * 0.4, ay + Math.sin(ang - 2.5) * ch * 0.4);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
 
     const dot = (p, color, scale = 0.8) => {
@@ -538,10 +892,49 @@
     $("sVisited").textContent = [...search.visited].filter(Boolean).length;
     $("sFrontier").textContent = search.frontier.size;
     $("sTime").textContent = search.elapsed + " ms";
+    // 路径代价构成：普通格与高代价格各占多少
+    if (search.path.length > 1) {
+      const m = pathMetrics(search.path);
+      $("sMix").textContent = `${m.heavy} 高 / ${m.steps - m.heavy} 普通`;
+    } else {
+      $("sMix").textContent = "—";
+    }
+    // 搜索覆盖率：访问节点占空地比例
+    let open = 0;
+    for (let i = 0; i < grid.length; i++) if (grid[i] !== 1) open++;
+    const vis = search.orderCount;
+    $("sRate").textContent = vis && open ? ((vis / open) * 100).toFixed(1) + "%" : "—";
     syncButtons();
   }
 
   /* ---------- 交互 ---------- */
+  // 第 8 轮：键盘光标（不依赖鼠标即可编辑地图）
+  let cursor = { c: 2, r: 0 };
+  function moveCursor(dc, dr) {
+    cursor = { c: Math.max(0, Math.min(COLS - 1, cursor.c + dc)), r: Math.max(0, Math.min(ROWS - 1, cursor.r + dr)) };
+    $("inspect").textContent = describeCell(cursor);
+    $("inspect").style.opacity = "1";
+    draw();
+    announce(`光标 ${cursor.c}, ${cursor.r}`);
+  }
+  function applyToolAtCursor() {
+    applyTool(cursor);
+    if (tool === "start") cursor = { c: end.c, r: end.r };
+    if (tool === "end") cursor = { c: start.c, r: start.r };
+    $("inspect").textContent = describeCell(cursor);
+    draw();
+  }
+  let liveRegion = null;
+  function announce(text) {
+    if (!liveRegion) {
+      liveRegion = document.createElement("div");
+      liveRegion.setAttribute("aria-live", "polite");
+      liveRegion.className = "sr-only";
+      document.body.appendChild(liveRegion);
+    }
+    liveRegion.textContent = text;
+  }
+
   function cellFromEvent(ev) {
     const rect = cv.getBoundingClientRect();
     const x = (ev.clientX - rect.left) / rect.width;
@@ -551,8 +944,28 @@
 
   let painting = false;
   let movedEndpoints = false;
+  let hoverCell = null;
 
-  function applyTool(p) {
+  // 第 5 轮：格子悬停检查器（在地图上方显示坐标、代价与搜索状态）
+  const inspect = $("inspect");
+  function describeCell(p) {
+    if (!p) return "";
+    const i = idx(p.c, p.r);
+    const kind = grid[i] === 1 ? "障碍" : grid[i] === 2 ? "高代价地形（5）" : "普通地形（1）";
+    const role = [start, end].some((q) => q.c === p.c && q.r === p.r) ? " · 起点/终点" : "";
+    const visited = search.visited[i] ? ` · 第 ${search.order[i] + 1} 个访问` : "";
+    const path = search.pathSet && search.pathSet.has(i) ? " · 在最终路径上" : "";
+    return `(${p.c}, ${p.r}) ${kind}${role}${visited}${path}`;
+  }
+  cv.addEventListener("pointermove", (ev) => {
+    if (painting || fillRect) return;
+    hoverCell = cellFromEvent(ev);
+    inspect.textContent = describeCell(hoverCell);
+    inspect.style.opacity = hoverCell ? "1" : "0";
+  });
+  cv.addEventListener("pointerleave", () => { hoverCell = null; inspect.style.opacity = "0"; });
+
+  function applyTool(p, silent) {
     if (!inBounds(p.c, p.r)) return;
     const i = idx(p.c, p.r);
     const isStart = p.c === start.c && p.r === start.r;
@@ -578,7 +991,13 @@
     onMapEdited();
   }
 
+  function invalidateCompare() {
+    if (!comparePaths.length && $("comparePanel").hidden) return;
+    comparePaths = [];
+    $("comparePanel").hidden = true;
+  }
   function onMapEdited() {
+    invalidateCompare();
     if (search.started || running) {
       resetSearch(false);
       showMsg("地图已修改，旧搜索结果已清除。", "ok");
@@ -587,36 +1006,59 @@
     }
   }
 
+  let fillRect = null;
+
+  function paintRect(to) {
+    if (!fillRect) return;
+    const x0 = Math.min(fillRect.c, to.c), x1 = Math.max(fillRect.c, to.c);
+    const r0 = Math.min(fillRect.r, to.r), r1 = Math.max(fillRect.r, to.r);
+    for (let r = r0; r <= r1; r++) for (let c = x0; c <= x1; c++) applyTool({ c, r }, true);
+    draw();
+  }
+
   cv.addEventListener("pointerdown", (ev) => {
     ev.preventDefault();
     // 某些环境（合成事件、已释放指针）下捕获会抛异常，不能让它中断后续交互
     try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* 忽略 */ }
+    if (ev.shiftKey && tool !== "start" && tool !== "end") {
+      fillRect = cellFromEvent(ev);
+      paintRect(fillRect);
+      return;
+    }
     painting = true;
     if (tool === "start" || tool === "end") movedEndpoints = false;
     applyTool(cellFromEvent(ev));
     movedEndpoints = true;
   });
   cv.addEventListener("pointermove", (ev) => {
+    if (fillRect) {
+      paintRect(cellFromEvent(ev));
+      return;
+    }
     if (!painting) return;
     applyTool(cellFromEvent(ev));
   });
-  const endPaint = () => { painting = false; };
+  const endPaint = () => { painting = false; fillRect = null; };
   cv.addEventListener("pointerup", endPaint);
   cv.addEventListener("pointercancel", endPaint);
   cv.addEventListener("pointerleave", endPaint);
 
-  document.querySelectorAll("[data-tool]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      tool = btn.dataset.tool;
-      document.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("active", b === btn));
-    });
-  });
+  function setTool(name) {
+    tool = name;
+    document.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("active", b.dataset.tool === name));
+    const btn = document.querySelector('[data-tool="' + name + '"]');
+    announce("当前工具：" + (btn ? btn.textContent : name));
+  }
+  document.querySelectorAll("[data-tool]").forEach((btn) => btn.addEventListener("click", () => setTool(btn.dataset.tool)));
 
-  $("algo").addEventListener("change", (e) => { algo = e.target.value; resetSearch(false); });
+  $("algo").addEventListener("change", (e) => { algo = e.target.value; invalidateCompare(); resetSearch(false); });
+  const speedMs = (v) => Math.max(10, 460 - v * 45);
   $("speed").addEventListener("input", (e) => {
     $("speedVal").textContent = e.target.value;
+    $("speedHint").textContent = `当前速度：每格约 ${speedMs(Number(e.target.value))} 毫秒。`;
     if (running) loop();
   });
+  $("speedHint").textContent = `当前速度：每格约 ${speedMs(6)} 毫秒。`;
   $("btnRun").addEventListener("click", () => {
     if (search.done) startSearch();
     else if (paused) { paused = false; loop(); }
@@ -637,8 +1079,60 @@
       draw();
     }
   });
-  $("btnClear").addEventListener("click", () => { resetSearch(true); hideMsg(); });
+  const MAP_KEY = "pathfinding-lab:map";
+  function serializeMap() {
+    return {
+      v: 1,
+      cols: COLS,
+      rows: ROWS,
+      grid: Array.from(grid),
+      start,
+      end,
+      seed: state,
+    };
+  }
+  function applyMap(data) {
+    if (!data || data.cols !== COLS || data.rows !== ROWS || !Array.isArray(data.grid)) return false;
+    for (let i = 0; i < grid.length; i++) grid[i] = data.grid[i] || 0;
+    start = { c: data.start.c, r: data.start.r };
+    end = { c: data.end.c, r: data.end.r };
+    invalidateCompare();
+    resetSearch(false);
+    draw();
+    return true;
+  }
+
+  $("btnSave").addEventListener("click", () => {
+    try {
+      localStorage.setItem(MAP_KEY, JSON.stringify(serializeMap()));
+      showMsg("当前地图已保存到浏览器本地（不上传任何数据）。", "ok");
+    } catch (e) {
+      showMsg("本地存储不可用（可能是隐私模式）：地图未能保存。", "err");
+    }
+  });
+  $("btnLoad").addEventListener("click", () => {
+    const raw = localStorage.getItem(MAP_KEY);
+    if (!raw) {
+      showMsg("本地还没有保存过地图。先点「保存地图」再读取。", "warn");
+      return;
+    }
+    try {
+      if (applyMap(JSON.parse(raw))) showMsg("已读取本地保存的地图。", "ok");
+      else showMsg("保存的地图与当前网格尺寸不匹配，无法读取。", "err");
+    } catch (e) {
+      showMsg("读取失败：保存的数据已损坏。", "err");
+    }
+  });
+
+  let heatOn = false;
+  let flowOn = true;
+  $("heat").addEventListener("change", (e) => { heatOn = e.target.checked; draw(); });
+  $("flow").addEventListener("change", (e) => { flowOn = e.target.checked; draw(); });
+
+  $("btnCompare").addEventListener("click", runCompare);
+  $("btnClear").addEventListener("click", () => { invalidateCompare(); resetSearch(true); hideMsg(); });
   $("btnReset").addEventListener("click", () => {
+    invalidateCompare();
     grid.fill(0);
     start = { c: 2, r: Math.floor(ROWS / 2) };
     end = { c: COLS - 3, r: Math.floor(ROWS / 2) };
@@ -650,8 +1144,67 @@
   document.addEventListener("keydown", (ev) => {
     if (ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT") return;
     if (ev.code === "Space") { ev.preventDefault(); $("btnRun").click(); }
-    else if (ev.code === "ArrowRight") { ev.preventDefault(); $("btnStep").click(); }
+    else if (ev.key === ".") { ev.preventDefault(); $("btnStep").click(); }
     else if (ev.code === "Escape") { $("btnClear").click(); }
+    else if (ev.code === "Delete" || ev.code === "Backspace") {
+      ev.preventDefault();
+      grid.fill(0);
+      invalidateCompare();
+      resetSearch(false);
+      showMsg("地图已清空，可以从零开始画。", "ok");
+    } else if (ev.key === "1" || ev.key === "2" || ev.key === "3") {
+      const order = ["bfs", "dijkstra", "astar"];
+      $("algo").value = order[Number(ev.key) - 1];
+      algo = order[Number(ev.key) - 1];
+      invalidateCompare();
+      resetSearch(false);
+      showMsg(`已切换到 ${$("algo").selectedOptions[0].textContent}。`, "ok");
+    } else if (ev.key === "c" || ev.key === "C") {
+      runCompare();
+    } else if (ev.key === "r" || ev.key === "R") {
+      $("btnReset").click();
+    } else if (ev.code === "ArrowUp") { ev.preventDefault(); moveCursor(0, -1); }
+    else if (ev.code === "ArrowDown") { ev.preventDefault(); moveCursor(0, 1); }
+    else if (ev.code === "ArrowLeft") { ev.preventDefault(); moveCursor(-1, 0); }
+    else if (ev.code === "ArrowRight" && ev.shiftKey) { ev.preventDefault(); moveCursor(1, 0); }
+    else if (ev.code === "Enter") { ev.preventDefault(); applyToolAtCursor(); announce("已应用当前工具"); }
+    else if (ev.key === "s" || ev.key === "S") { setTool("start"); }
+    else if (ev.key === "e" || ev.key === "E") { setTool("end"); }
+  });
+
+  // 第 5 轮：路径流动动画需要独立于搜索步进的连续重绘
+  function flowLoop() {
+    if (flowOn && search.path.length > 1 && !comparePaths.length) {
+      const t0 = performance.now();
+      draw();
+      const dt = performance.now() - t0;
+      $("sFrame").textContent = dt.toFixed(1) + " ms";
+    }
+    requestAnimationFrame(flowLoop);
+  }
+  flowLoop();
+
+  // 第 6 轮：网格规模可切换，便于观察同一算法在不同规模下的表现
+  function setGridSize(cols, rows, presetName) {
+    COLS = cols;
+    ROWS = rows;
+    grid = new Uint8Array(COLS * ROWS);
+    start = { c: 2, r: Math.floor(ROWS / 2) };
+    end = { c: COLS - 3, r: Math.floor(ROWS / 2) };
+    invalidateCompare();
+    Object.assign(search, freshSearch());
+    running = false;
+    paused = false;
+    stopLoop();
+    applyPreset(presetName || $("preset").value);
+    $("inspect").textContent = "";
+    resize();
+  }
+
+  $("size").addEventListener("change", (e) => {
+    const [c, r] = e.target.value.split("x").map(Number);
+    setGridSize(c, r);
+    showMsg(`已切换到 ${c}×${r} 网格，共 ${c * r} 格；预设地图已按新规模重新生成。`, "ok");
   });
 
   function applyPreset(name) {
@@ -661,32 +1214,49 @@
     if (name === "open") {
       // 空旷草地
     } else if (name === "maze") {
-      for (let r = 3; r < ROWS - 3; r += 4) {
-        const gap = 3 + ((r * 7) % (COLS - 12));
-        for (let c = 3; c < COLS - 3; c++) {
+      // 按网格尺寸自适应：走廊间距与缺口位置都用比例推导
+      const gapStep = Math.max(3, Math.round(ROWS / 7));
+      for (let r = gapStep; r < ROWS - gapStep; r += gapStep) {
+        const gap = 2 + ((r * 7) % (COLS - 5));
+        for (let c = 2; c < COLS - 2; c++) {
           if (c === gap) continue;
           grid[idx(c, r)] = 1;
         }
       }
-      for (let c = 5; c < COLS - 5; c += 8) {
-        for (let r = 4; r < ROWS - 4; r++) grid[idx(c, r)] = 1;
+      const colStep = Math.max(5, Math.round(COLS / 5));
+      for (let c = colStep; c < COLS - colStep; c += colStep) {
+        for (let r = gapStep; r < ROWS - gapStep; r++) grid[idx(c, r)] = 1;
       }
     } else if (name === "weighted") {
-      for (let c = 6; c < COLS - 6; c++) grid[idx(c, 8)] = 2;
-      for (let c = 6; c < COLS - 6; c++) grid[idx(c, 18)] = 2;
-      for (let r = 8; r <= 18; r++) { grid[idx(6, r)] = 2; grid[idx(COLS - 7, r)] = 2; }
-      for (let r = 12; r <= 15; r++) for (let c = 10; c < COLS - 10; c++) grid[idx(c, r)] = 1;
-      end = { c: COLS - 3, r: 4 };
+      const top = Math.max(3, Math.round(ROWS * 0.29));
+      const bottom = Math.max(top + 3, Math.round(ROWS * 0.64));
+      const inner = Math.max(4, Math.round(COLS * 0.16));
+      const margin = Math.max(4, Math.round(COLS * 0.15));
+      for (let c = margin; c < COLS - margin; c++) { grid[idx(c, top)] = 2; grid[idx(c, bottom)] = 2; }
+      for (let r = top; r <= bottom; r++) { grid[idx(margin, r)] = 2; grid[idx(COLS - 1 - margin, r)] = 2; }
+      for (let r = Math.round(ROWS * 0.43); r <= Math.round(ROWS * 0.52); r++) {
+        for (let c = inner; c < COLS - inner; c++) grid[idx(c, r)] = 1;
+      }
+      end = { c: COLS - 3, r: Math.max(2, Math.round(ROWS * 0.14)) };
     } else if (name === "walled") {
       const ec = end.c, er = end.r;
       for (let c = ec - 2; c <= ec + 2; c++) { grid[idx(c, er - 2)] = 1; grid[idx(c, er + 2)] = 1; }
       for (let r = er - 2; r <= er + 2; r++) { grid[idx(ec - 2, r)] = 1; grid[idx(ec + 2, r)] = 1; }
     }
+    invalidateCompare();
     resetSearch(false);
     hideMsg();
     showMsg(`已应用预设：${$("preset").selectedOptions[0].textContent}。`, "ok");
   }
 
+  // 第 7 轮：容器宽度变化时在完整 / 紧凑布局之间切换（嵌入视图会自动进入紧凑模式）
+  const layoutEl = document.querySelector(".layout");
+  if (window.ResizeObserver) {
+    new ResizeObserver((entries) => {
+      for (const e of entries) layoutEl.classList.toggle("compact", e.contentRect.width < 860);
+      resize();
+    }).observe(layoutEl);
+  }
   window.addEventListener("resize", resize);
   resize();
   applyPreset("open");

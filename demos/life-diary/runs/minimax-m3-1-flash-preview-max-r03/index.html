@@ -6,6 +6,9 @@
 <title>仓河 · AI 情绪日记与生活助手 原型</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
+/* Tailwind 走 CDN。若 CDN 不可达，下面这行配置会因为 tailwind 未定义而抛错，
+   这里先兜一个空对象，页面其余脚本仍然正常执行（只是没有 Tailwind 样式）。 */
+window.tailwind = window.tailwind || {};
 tailwind.config = {
   theme: {
     extend: {
@@ -34,6 +37,16 @@ tailwind.config = {
   .homebar { position:absolute; bottom:8px; left:50%; transform:translateX(-50%); width:132px; height:5px; border-radius:99px; background:rgba(0,0,0,.35); z-index:30; }
   .tabbar { backdrop-filter:blur(16px); background:rgba(255,255,255,.9); }
   .no-scrollbar::-webkit-scrollbar { display:none; }
+  /* 第 8 轮：Font Awesome 是 CDN，失败时 <i> 会塌成空元素、版面错位。
+     这里给一个最小的方框占位，让图标缺失也能保持栅格不被撑歪。 */
+  i.fa-solid, i.fa-regular { display: inline-block; min-width: 1em; min-height: 1em; }
+  .fa-fallback i { background: rgba(255,255,255,.14); border-radius: 4px; }
+  .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  /* 第 9 轮：窄屏整体缩放，6 台 375pt 手机在 390px 视口必然溢出 */
+  .track { --scale: 1; }
+  @media (max-width: 720px) { .track { --scale: .78; } }
+  @media (max-width: 520px) { .track { --scale: .62; } }
+  .track > .phone { transform: scale(var(--scale)); transform-origin: top center; margin-bottom: calc(812px * (var(--scale) - 1)); }
   .no-scrollbar { scrollbar-width:none; }
   .bubble-in { animation: bin .4s ease both; } @keyframes bin { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:none } }
   .pulse { animation: pulse 2.4s ease-in-out infinite; } @keyframes pulse { 0%,100%{ box-shadow:0 0 0 0 rgba(139,92,246,.45) } 50%{ box-shadow:0 0 0 12px rgba(139,92,246,0) } }
@@ -62,7 +75,10 @@ tailwind.config = {
           全部页面按 iPhone 375×812 基准输出，可直接交付开发。
         </p>
       </div>
-      <div class="flex gap-2 text-xs">
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <button id="navPrev" class="px-3 py-1.5 rounded-full bg-white/10 border border-white/15 hover:bg-white/20">← 上一屏</button>
+        <span id="navNow" class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 tabular-nums">1 / 6</span>
+        <button id="navNext" class="px-3 py-1.5 rounded-full bg-white/10 border border-white/15 hover:bg-white/20">下一屏 →</button>
         <span class="px-3 py-1.5 rounded-full bg-white/10 border border-white/15">Tailwind CSS</span>
         <span class="px-3 py-1.5 rounded-full bg-white/10 border border-white/15">Font Awesome</span>
         <span class="px-3 py-1.5 rounded-full bg-white/10 border border-white/15">Unsplash</span>
@@ -98,7 +114,8 @@ tailwind.config = {
                 </div>
                 <div class="w-11 h-11 rounded-full bg-white/20 grid place-items-center pulse"><i class="fa-solid fa-microphone"></i></div>
               </div>
-              <button class="mt-4 w-full h-11 rounded-2xl bg-white/95 text-grape-700 text-[14px] font-medium">开始记录</button>
+              <p class="mt-3 text-center text-[11px]" style="color:#9b96b0">今日情绪 <span id="todayScore" class="font-medium text-ink">6.0</span> / 10 · <span id="todayLabel">一般</span></p>
+            <button class="mt-4 w-full h-11 rounded-2xl bg-white/95 text-grape-700 text-[14px] font-medium" data-focus>开始记录</button>
             </div>
 
             <div class="px-5 mt-5">
@@ -107,11 +124,11 @@ tailwind.config = {
                 <span class="text-[11px] text-grape-600">查看全部</span>
               </div>
               <div class="mt-3 grid grid-cols-5 gap-2 text-center">
-                <div><div class="w-full aspect-square rounded-2xl bg-[#fff2d9] grid place-items-center text-[22px]">😄</div><p class="text-[10px] mt-1" style="color:#9b96b0">开心</p></div>
-                <div><div class="w-full aspect-square rounded-2xl bg-[#e7f6f1] grid place-items-center text-[22px]">😌</div><p class="text-[10px] mt-1" style="color:#9b96b0">平静</p></div>
-                <div class="w-full"><div class="aspect-square rounded-2xl bg-grape-100 border-2 border-grape-500 grid place-items-center text-[22px]">😐</div><p class="text-[10px] mt-1 text-grape-600 font-medium">一般</p></div>
-                <div><div class="w-full aspect-square rounded-2xl bg-[#fde8ec] grid place-items-center text-[22px]">😔</div><p class="text-[10px] mt-1" style="color:#9b96b0">低落</p></div>
-                <div><div class="w-full aspect-square rounded-2xl bg-[#f1e8ff] grid place-items-center text-[22px]">😤</div><p class="text-[10px] mt-1" style="color:#9b96b0">烦躁</p></div>
+                <button data-mood="happy" class="rounded-2xl hover:bg-black/5 p-1"><span class="w-full aspect-square rounded-2xl bg-[#fff2d9] grid place-items-center text-[22px] block">😄</span><span class="text-[10px] mt-1 block" style="color:#9b96b0">开心</span></button>
+                <button data-mood="calm" class="rounded-2xl hover:bg-black/5 p-1"><span class="w-full aspect-square rounded-2xl bg-[#e7f6f1] grid place-items-center text-[22px] block">😌</span><span class="text-[10px] mt-1 block" style="color:#9b96b0">平静</span></button>
+                <button data-mood="normal" aria-pressed="true" class="rounded-2xl bg-grape-100 border-2 border-grape-500 p-1"><span class="w-full aspect-square rounded-2xl grid place-items-center text-[22px] block">😐</span><span class="text-[10px] mt-1 block text-grape-600 font-medium">一般</span></button>
+                <button data-mood="low" class="rounded-2xl hover:bg-black/5 p-1"><span class="w-full aspect-square rounded-2xl bg-[#fde8ec] grid place-items-center text-[22px] block">😔</span><span class="text-[10px] mt-1 block" style="color:#9b96b0">低落</span></button>
+                <button data-mood="irritated" class="rounded-2xl hover:bg-black/5 p-1"><span class="w-full aspect-square rounded-2xl bg-[#f1e8ff] grid place-items-center text-[22px] block">😤</span><span class="text-[10px] mt-1 block" style="color:#9b96b0">烦躁</span></button>
               </div>
             </div>
 
@@ -121,8 +138,8 @@ tailwind.config = {
                 <div class="flex gap-3">
                   <div class="w-9 h-9 rounded-full bg-grape-100 grid place-items-center text-grape-600 shrink-0"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
                   <div>
-                    <p class="text-[13px] text-ink leading-6">最近 7 天你的情绪在周三出现明显低谷，内容多与「会议密集」相关。晚间散步的记录里，情绪平均回升 1.8 分。</p>
-                    <p class="text-[11px] mt-2 text-grape-600">试试今晚 8 点出门走 15 分钟 →</p>
+                    <p class="text-[13px] text-ink leading-6" id="insightText">最近 7 天你的情绪在周三出现明显低谷，内容多与「会议密集」相关。晚间散步的记录里，情绪平均回升 1.8 分。</p>
+                    <p class="text-[11px] mt-2 text-grape-600" id="insightAction">试试今晚 8 点出门走 15 分钟 →</p>
                   </div>
                 </div>
               </div>
@@ -141,11 +158,11 @@ tailwind.config = {
               </div>
             </div>
 
-            <div class="mt-auto tabbar border-t border-line grid grid-cols-4 text-[11px] text-center py-3">
-              <div class="text-grape-600"><i class="fa-solid fa-house block text-[15px] mb-0.5"></i>首页</div>
-              <div style="color:#9b96b0"><i class="fa-solid fa-chart-line block text-[15px] mb-0.5"></i>趋势</div>
-              <div style="color:#9b96b0"><i class="fa-regular fa-images block text-[15px] mb-0.5"></i>回忆</div>
-              <div style="color:#9b96b0"><i class="fa-solid fa-user block text-[15px] mb-0.5"></i>我的</div>
+            <div class="mt-auto tabbar border-t border-line grid grid-cols-4 text-[11px] text-center py-1.5" data-tabbar>
+              <button class="py-1.5 rounded-lg text-grape-600" data-tab="0" aria-current="page"><i class="fa-solid fa-house block text-[15px] mb-0.5" aria-hidden="true"></i>首页</button>
+              <button class="py-1.5 rounded-lg hover:bg-black/5" style="color:#9b96b0" data-tab="1"><i class="fa-solid fa-chart-line block text-[15px] mb-0.5" aria-hidden="true"></i>趋势</button>
+              <button class="py-1.5 rounded-lg hover:bg-black/5" style="color:#9b96b0" data-tab="2"><i class="fa-regular fa-images block text-[15px] mb-0.5" aria-hidden="true"></i>回忆</button>
+              <button class="py-1.5 rounded-lg hover:bg-black/5" style="color:#9b96b0" data-tab="3"><i class="fa-solid fa-user block text-[15px] mb-0.5" aria-hidden="true"></i>我的</button>
             </div>
           </div>
           <div class="homebar"></div>
@@ -175,7 +192,7 @@ tailwind.config = {
 
             <div class="px-5 mt-8">
               <div class="rounded-3xl bg-white/14 backdrop-blur p-5 min-h-[210px]">
-                <p class="text-[14px] leading-7">今天加班到八点，回来的地铁上突然觉得…<span class="opacity-70">（正在转写）</span></p>
+                <p class="text-[14px] leading-7" id="transcript">今天加班到八点，回来的地铁上突然觉得…<span class="opacity-70" id="transcriptHint">（正在转写）</span></p>
                 <div class="mt-4 flex items-center gap-3">
                   <div class="w-10 h-10 rounded-full bg-white/25 grid place-items-center"><i class="fa-solid fa-microphone-lines"></i></div>
                   <div class="wave">
@@ -183,7 +200,7 @@ tailwind.config = {
                     <span style="height:50%;animation-delay:.2s"></span><span style="height:90%;animation-delay:.3s"></span>
                     <span style="height:60%;animation-delay:.4s"></span><span style="height:35%;animation-delay:.5s"></span>
                   </div>
-                  <span class="text-[12px] opacity-80 ml-auto tabular-nums">00:23</span>
+                  <span class="text-[12px] opacity-80 ml-auto tabular-nums" id="recTime">00:23</span>
                 </div>
               </div>
             </div>
@@ -208,7 +225,7 @@ tailwind.config = {
                   <p class="text-[12.5px] leading-6">听起来今天消耗很大。要不要先把今天的 3 件小事写下来，剩下的明天再说？</p>
                 </div>
               </div>
-              <button class="mt-4 w-full h-12 rounded-2xl bg-white text-grape-700 font-medium text-[14px]">保存这一篇</button>
+              <button class="mt-4 w-full h-12 rounded-2xl bg-white text-grape-700 font-medium text-[14px]" id="recToggle">停止并保存</button>
             </div>
           </div>
           <div class="homebar"></div>
@@ -328,19 +345,22 @@ tailwind.config = {
                 <line x1="0" y1="30" x2="320" y2="30" stroke="#ece9f2" stroke-width="1"/>
                 <line x1="0" y1="60" x2="320" y2="60" stroke="#ece9f2" stroke-width="1"/>
                 <line x1="0" y1="90" x2="320" y2="90" stroke="#ece9f2" stroke-width="1"/>
-                <path d="M0 78 L16 70 L32 82 L48 60 L64 66 L80 52 L96 58 L112 44 L128 50 L144 38 L160 46 L176 30 L192 42 L208 34 L224 52 L240 46 L256 58 L272 50 L288 62 L304 56 L320 60 L320 120 L0 120 Z" fill="url(#g1)"/>
-                <path d="M0 78 L16 70 L32 82 L48 60 L64 66 L80 52 L96 58 L112 44 L128 50 L144 38 L160 46 L176 30 L192 42 L208 34 L224 52 L240 46 L256 58 L272 50 L288 62 L304 56 L320 60" fill="none" stroke="#8b5cf6" stroke-width="2.4" stroke-linecap="round"/>
-                <path d="M0 82 L48 70 L96 66 L144 56 L192 48 L240 54 L288 60 L320 62" fill="none" stroke="#ffb3a7" stroke-width="2" stroke-dasharray="5 4"/>
-                <circle cx="176" cy="30" r="4" fill="#fff" stroke="#8b5cf6" stroke-width="2.4"/>
+                <path id="moodArea" fill="url(#g1)"></path>
+                <path id="moodLine" fill="none" stroke="#8b5cf6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path id="moodForecast" fill="none" stroke="#ffb3a7" stroke-width="2" stroke-dasharray="5 4"></path>
+                <g id="moodDots"></g>
               </svg>
+              <p class="mt-2 text-[11px] tabular-nums" style="color:#9b96b0">
+                数据来源：<span id="moodSource">内置 30 天样例</span> · 峰值 <span id="moodPeak">—</span> · 均值 <span id="moodAvg">—</span>
+              </p>
               <div class="flex justify-between text-[10px] mt-1" style="color:#9b96b0"><span>9/15</span><span>9/22</span><span>9/29</span><span>10/6</span><span>10/13</span></div>
             </div>
 
             <div class="px-5 mt-4 rounded-3xl bg-white p-4 shadow-lift">
               <p class="text-[13px] font-medium text-ink">情绪构成</p>
               <div class="mt-3 h-3 rounded-full overflow-hidden flex">
-                <span style="width:34%;background:#7dd3c0"></span><span style="width:26%;background:#8b5cf6"></span>
-                <span style="width:18%;background:#ffc46b"></span><span style="width:14%;background:#ffb3a7"></span><span style="width:8%;background:#c3a6ee"></span>
+                <span data-mix style="width:34%;background:#7dd3c0"></span><span data-mix style="width:26%;background:#8b5cf6"></span>
+                <span data-mix style="width:18%;background:#ffc46b"></span><span data-mix style="width:14%;background:#ffb3a7"></span><span data-mix style="width:8%;background:#c3a6ee"></span>
               </div>
               <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[11.5px] text-ink">
                 <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:#7dd3c0"></span>平静 34%</span>
@@ -528,7 +548,14 @@ tailwind.config = {
     </div>
   </main>
 
-  <section class="max-w-[1180px] mx-auto px-6 pb-16">
+  <section class="max-w-[1180px] mx-auto px-6 pb-16" id="explainer">
+    <div class="rounded-2xl bg-white/5 border border-white/10 p-5 mb-5">
+      <h3 class="text-sm font-medium">屏幕状态</h3>
+      <ul class="mt-3 text-[12.5px] leading-5" id="stateList" style="color:#9b96b0"></ul>
+      <p class="mt-3 text-[11.5px] leading-5" style="color:#9b96b0">
+        快捷键：<kbd>←</kbd> / <kbd>→</kbd> 换屏，<kbd>Home</kbd> / <kbd>End</kbd> 跳首尾。地址栏 <code>#p3</code> 可直接定位到第 3 屏。
+      </p>
+    </div>
     <h2 class="text-lg font-medium mb-4">功能规划与页面地图</h2>
     <div class="grid md:grid-cols-4 gap-4">
       <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
@@ -562,6 +589,234 @@ tailwind.config = {
     </p>
   </section>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- 第 8 轮补记：图标字体加 defer。
+       这是一个纯粹装饰性的 CDN 资源，却原来是阻塞式脚本：一旦它变慢或被网络策略拦住，
+       解析会停在它上面，后面所有的内联脚本（含本页的交互逻辑）一条都不会执行——
+       实测过这种情况下页面停在「等待初始化」式的空白状态。
+       加 defer 后它仍然自动加载、图标照常生效，但不再挡住解析。 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+<script>
+/* 第 3~10 轮：把静态画板变成可核对状态的原型。
+   —— 第 3 轮：情绪曲线由数据数组计算生成，不再是手绘 path
+   —— 第 4 轮：情绪构成占比由同一组数据算出，与曲线同源
+   —— 第 5 轮：「此刻心情」可点，首页分数、标签与 AI 洞察随之变化
+   —— 第 6 轮：记录页状态机（录音中 → 转写中 → 已识别），计时由真实经过时间驱动
+   —— 第 7 轮：Tab 栏可切换并带 aria-current
+   —— 第 8 轮：Font Awesome CDN 失败时的占位降级
+   —— 第 9 轮：窄屏整体缩放
+   —— 第 10 轮：屏幕状态摘要与 aria-live 播报 */
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const phones = Array.from(document.querySelectorAll(".track > article.phone"));
+  const labels = phones.map((el, i) => {
+    const cap = el.querySelector(":scope > p");
+    return cap ? cap.textContent.replace(/^[①-⑥]\s*/, "") : "第 " + (i + 1) + " 屏";
+  });
+  const states = phones.map(() => "静态稿");
+
+  let liveRegion = null;
+  function announce(text) {
+    if (!liveRegion) {
+      liveRegion = document.createElement("div");
+      liveRegion.className = "sr-only";
+      liveRegion.setAttribute("aria-live", "polite");
+      document.body.appendChild(liveRegion);
+    }
+    liveRegion.textContent = text;
+  }
+  function setState(i, text) {
+    states[i] = text;
+    const el = document.querySelector('[data-state="' + i + '"]');
+    if (el) el.textContent = text;
+  }
+  const list = $("stateList");
+  if (list) {
+    list.innerHTML = labels.map((l, i) =>
+      '<li class="flex justify-between gap-3 py-1.5 border-b border-white/5"><span>' + (i + 1) + '. ' + l +
+      '</span><span data-state="' + i + '">静态稿</span></li>').join("");
+  }
+
+  /* ---------- 导航 ---------- */
+  let current = 0;
+  function goTo(i, push) {
+    current = Math.max(0, Math.min(phones.length - 1, i));
+    phones[current].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    $("navNow").textContent = (current + 1) + " / " + phones.length;
+    if (push !== false) history.replaceState(null, "", "#p" + (current + 1));
+    announce("第 " + (current + 1) + " 屏：" + labels[current]);
+  }
+  $("navPrev").addEventListener("click", () => goTo(current - 1));
+  $("navNext").addEventListener("click", () => goTo(current + 1));
+
+  /* ---------- 第 3 轮：曲线由数据生成 ---------- */
+  // 30 天样例：0~10 分。用固定种子而不是随机，保证每次打开是同一条曲线。
+  const MOOD = (() => {
+    let seed = 20261014;
+    const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+    const out = [];
+    for (let i = 0; i < 30; i++) out.push(3.4 + rnd() * 6.2);
+    out[16] = 9.1;  // 周三低谷前的高点
+    out[17] = 2.6;  // 周三低谷
+    return out;
+  })();
+  const VW = 320, VH = 120, TOP = 8, BOT = 110;
+  // 右侧留 40px 给预测线，实际曲线只占 0~280
+  const PLOT_W = 280;
+  const yOf = (v) => BOT - (v / 10) * (BOT - TOP);
+  const xOf = (i) => (i / (MOOD.length - 1)) * PLOT_W;
+  const linePath = MOOD.map((v, i) => (i ? "L" : "M") + xOf(i).toFixed(1) + " " + yOf(v).toFixed(1)).join(" ");
+  $("moodLine").setAttribute("d", linePath);
+  $("moodArea").setAttribute("d", linePath + " L" + PLOT_W + " " + VH + " L0 " + VH + " Z");
+
+  // 预测线：对最近 7 天做一次最小二乘拟合再外推 4 天
+  function forecast(series, tail) {
+    const win = series.slice(-7);
+    const n = win.length;
+    const mx = (n - 1) / 2;
+    const my = win.reduce((a, b) => a + b, 0) / n;
+    let num = 0, den = 0;
+    win.forEach((v, i) => { num += (i - mx) * (v - my); den += (i - mx) * (i - mx); });
+    const k = den ? num / den : 0;
+    const b = my - k * mx;
+    return Array.from({ length: tail }, (_, t) => Math.max(0, Math.min(10, b + k * (n - 1 + t))));
+  }
+  const pred = forecast(MOOD, 4);
+  // 预测线接着实际曲线往右延伸到 viewBox 边缘
+  const startX = xOf(MOOD.length - 1);
+  const fx = (t) => startX + (VW - startX) * (t / (pred.length + 1));
+  $("moodForecast").setAttribute("d",
+    "M" + startX.toFixed(1) + " " + yOf(MOOD[MOOD.length - 1]).toFixed(1) +
+    pred.map((v, t) => " L" + fx(t + 1).toFixed(1) + " " + yOf(v).toFixed(1)).join(""));
+  $("moodDots").innerHTML = MOOD.map((v, i) =>
+    '<circle cx="' + xOf(i).toFixed(1) + '" cy="' + yOf(v).toFixed(1) + '" r="2" fill="#8b5cf6"><title>' +
+    ("第 " + (i + 1) + " 天 · " + v.toFixed(1) + " 分") + "</title></circle>").join("") +
+    pred.map((v, t) => '<circle cx="' + fx(t + 1).toFixed(1) + '" cy="' + yOf(v).toFixed(1) +
+      '" r="2" fill="none" stroke="#ffb3a7" stroke-width="1.5"><title>预测 ' + (t + 1) + " 天后 · " + v.toFixed(1) + " 分</title></circle>").join("");
+  $("moodPeak").textContent = Math.max(...MOOD).toFixed(1) + " 分";
+  $("moodAvg").textContent = (MOOD.reduce((a, b) => a + b, 0) / MOOD.length).toFixed(2) + " 分";
+
+  /* ---------- 第 4 轮：情绪构成与曲线同源 ---------- */
+  // 按分数区间统计各情绪的天数占比，而不是写死 34/26/18/14/8
+  // 分桶顺序与色条顺序一致：0 平稳 / 1 积极 / 2 一般 / 3 低落 / 4 高位
+  const MIX_NAME = ["平稳", "积极", "一般", "低落", "高位"];
+  const mix = [0, 0, 0, 0, 0];
+  MOOD.forEach((v) => { mix[v < 4 ? 3 : v < 6 ? 2 : v < 7.5 ? 0 : v < 9 ? 1 : 4]++; });
+  const total = MOOD.length;
+  document.querySelectorAll("[data-mix]").forEach((el, i) => {
+    el.style.width = ((mix[i] / total) * 100).toFixed(2) + "%";
+    el.title = MIX_NAME[i] + " " + mix[i] + " 天";
+  });
+  const mixNote = document.querySelector("[data-mix]").parentElement.nextElementSibling;
+  if (mixNote) mixNote.insertAdjacentHTML("afterbegin",
+    '<p class="text-[11px] mb-2" style="color:#9b96b0">由上方 30 天曲线按分数区间统计得出：' +
+    MIX_NAME.map((name, i) => name + " " + mix[i]).join(" · ") + " 天</p>");
+
+  /* ---------- 第 5 轮：此刻心情驱动首页 ---------- */
+  const MOOD_PRESET = {
+    happy:     { score: 8.6, label: "开心", insight: "今天的记录里，积极词明显增多。保持这个节奏，明天同一时间再看一次曲线会更稳。", action: "把今天的开心来源写下来 →" },
+    calm:      { score: 7.1, label: "平静", insight: "最近 7 天你的情绪中位在 7 分附近，波动比上周小。散步和早睡那两天的记录最平稳。", action: "今晚提前 30 分钟躺下 →" },
+    normal:    { score: 6.0, label: "一般", insight: "最近 7 天你的情绪在周三出现明显低谷，内容多与「会议密集」相关。晚间散步的记录里，情绪平均回升 1.8 分。", action: "试试今晚 8 点出门走 15 分钟 →" },
+    low:       { score: 3.4, label: "低落", insight: "曲线在近 7 天里出现两处明显下探，其中一次紧挨着连续三天的加班记录。低谷通常比它自己以为的更短。", action: "找一个人说说今天最难的那件事 →" },
+    irritated: { score: 4.6, label: "烦躁", insight: "烦躁集中在下午 3 点后的记录，多与临时插入的沟通有关。晚间记录的情绪分平均比下午高 2.1 分。", action: "把下午的临时事项集中到一个清单 →" },
+  };
+  document.querySelectorAll("[data-mood]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-mood]").forEach((b) => {
+        const on = b === btn;
+        b.classList.toggle("bg-grape-100", on);
+        b.classList.toggle("border-2", on);
+        b.classList.toggle("border-grape-500", on);
+        if (on) b.setAttribute("aria-pressed", "true"); else b.removeAttribute("aria-pressed");
+      });
+      const p = MOOD_PRESET[btn.dataset.mood];
+      $("todayScore").textContent = p.score.toFixed(1);
+      $("todayLabel").textContent = p.label;
+      $("insightText").textContent = p.insight;
+      $("insightAction").textContent = p.action;
+      setState(0, "已选择「" + p.label + "」· " + p.score.toFixed(1) + " 分");
+      announce("此刻心情已设为" + p.label + "，" + p.score.toFixed(1) + " 分。");
+    });
+  });
+
+  /* ---------- 第 6 轮：记录页状态机 ---------- */
+  const stage = { phase: "recording", t: 23, hint: "（正在转写）" };
+  const fullText = "今天加班到八点，回来的地铁上突然觉得整条路都空空的。到站以后在便利店门口站了五分钟才想上楼。";
+  const recTime = $("recTime"), transcript = $("transcript"), recToggle = $("recToggle");
+  if (recToggle) {
+    recToggle.addEventListener("click", () => {
+      if (stage.phase === "recording") { stage.phase = "transcribing"; recToggle.textContent = "转写中…"; recToggle.disabled = true; announce("录音已停止，正在转写。"); }
+      else if (stage.phase === "done") { stage.phase = "recording"; stage.t = 0; recTime.textContent = "00:00"; transcript.textContent = fullText.slice(0, 12) + "…"; recToggle.textContent = "停止并保存"; recToggle.disabled = false; announce("已重置为录音中。"); }
+    });
+  }
+  let lastTick = 0;
+  function recLoop(now) {
+    if (stage.phase === "recording" && lastTick) {
+      stage.t += (now - lastTick) / 1000;
+      recTime.textContent = String(Math.floor(stage.t / 60)).padStart(2, "0") + ":" + String(Math.floor(stage.t % 60)).padStart(2, "0");
+      const chars = Math.min(fullText.length, 12 + Math.floor(stage.t) * 2);
+      if (transcript.dataset.typed !== String(chars)) {
+        transcript.dataset.typed = String(chars);
+        transcript.innerHTML = fullText.slice(0, chars) + '<span class="opacity-70">…</span>';
+      }
+    } else if (stage.phase === "transcribing" && lastTick && now - stage.lastTrans > 1800) {
+      stage.lastTrans = now;
+      stage.phase = "done";
+      transcript.textContent = fullText;
+      recToggle.textContent = "重新记录";
+      recToggle.disabled = false;
+      setState(1, "已识别 · 疲惫 0.82 / 焦虑 0.61");
+      announce("转写完成，识别到疲惫 0.82、焦虑 0.61。");
+    }
+    lastTick = now;
+    if (stage.phase === "transcribing" && !stage.lastTrans) stage.lastTrans = now;
+    requestAnimationFrame(recLoop);
+  }
+  requestAnimationFrame(recLoop);
+
+  /* ---------- 第 7 轮：Tab 栏 ---------- */
+  document.querySelectorAll("[data-tabbar]").forEach((bar) => {
+    const idx = phones.indexOf(bar.closest(".phone"));
+    bar.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-tab]");
+      if (!btn) return;
+      bar.querySelectorAll("[data-tab]").forEach((b) => {
+        const on = b === btn;
+        b.classList.toggle("text-grape-600", on);
+        b.style.color = on ? "" : "#9b96b0";
+        if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+      });
+      const name = btn.textContent.trim();
+      setState(idx, "切到「" + name + "」");
+      announce(name + " 标签页");
+    });
+  });
+
+  /* ---------- 第 8 轮：Font Awesome 降级 ---------- */
+  // CDN 失败时 <i class="fa-..."> 没有任何内容，加一个方块占位保持栅格
+  setTimeout(() => {
+    const probe = document.querySelector("i.fa-solid");
+    const loaded = probe && getComputedStyle(probe, "::before").content !== "none" &&
+      getComputedStyle(probe, "::before").content !== "normal" &&
+      getComputedStyle(probe, "::before").content !== '""';
+    if (!loaded) {
+      document.body.classList.add("fa-fallback");
+      document.querySelectorAll("i.fa-solid, i.fa-regular").forEach((el) => { el.style.background = "rgba(139,92,246,.25)"; });
+      announce("图标字体未能加载，已切换为占位方块。");
+    }
+  }, 1500);
+
+  /* ---------- 键盘 ---------- */
+  document.addEventListener("keydown", (ev) => {
+    if (ev.target.tagName === "INPUT" || ev.target.tagName === "TEXTAREA") return;
+    if (ev.key === "ArrowRight") { ev.preventDefault(); goTo(current + 1); }
+    else if (ev.key === "ArrowLeft") { ev.preventDefault(); goTo(current - 1); }
+    else if (ev.key === "Home") { ev.preventDefault(); goTo(0); }
+    else if (ev.key === "End") { ev.preventDefault(); goTo(phones.length - 1); }
+  });
+
+  const m = /^#p(\d+)$/.exec(location.hash);
+  goTo(m ? Number(m[1]) - 1 : 0, false);
+})();
+</script>
 </body>
 </html>

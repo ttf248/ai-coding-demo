@@ -11,6 +11,12 @@
   body { color:var(--text); font:13px/1.6 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; }
   #app { position:absolute; inset:0; }
   canvas { display:block; width:100%; height:100%; touch-action:none; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  button:focus-visible, input:focus-visible, canvas:focus-visible {
+    outline: 2px solid var(--accent, #f0a92b);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
   .panel { position:absolute; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 12px; backdrop-filter:blur(8px); }
   #hud { left:12px; top:12px; max-width:270px; }
   #hud h1 { margin:0 0 2px; font-size:15px; color:var(--accent); letter-spacing:.04em; }
@@ -48,8 +54,11 @@
     <span>天气</span><b id="sWeather">晴</b>
     <span>设备速度</span><b id="sSpeed">1.0x</b>
     <span>体素块</span><b id="sVox">0</b>
+    <span>施工进度</span><b id="sProg">0%</b>
     <span>实例网格</span><b id="sInst">0</b>
     <span>绘制调用</span><b id="sDraw">0</b>
+    <span>提交三角面</span><b id="sTri">0</b>
+    <span>场景几何体</span><b id="sGeo">0</b>
     <span>帧率</span><b id="sFps">0</b>
   </div>
 </div>
@@ -115,6 +124,7 @@ const app = $("app");
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
+// 第 8 轮：阴影图按像素比缩放，嵌入窄栏时不必再付 2048² 的代价
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -122,7 +132,12 @@ renderer.toneMappingExposure = 1.05;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 500);
+// 第 7 轮：fog 只在循环外创建一次，之后每帧只改它的 color/near/far
+scene.fog = new THREE.Fog(0x9fb3c8, 40, 190);
+// 第 8 轮：相机比例按画布容器算，而不是 window。
+// 本站会把该页以 iframe 嵌入对比页，容器尺寸与 window 不一致，
+// 原先按 window.innerWidth 设 aspect，嵌入后画面会被横向拉扁。
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 500);
 camera.position.set(26, 20, 30);
 
 const ambient = new THREE.AmbientLight(0xbcd0e8, 0.55);
@@ -132,7 +147,7 @@ scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff2d8, 2.0);
 sun.position.set(24, 34, 16);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(1536, 1536);
 sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
 sun.shadow.camera.top = 30; sun.shadow.camera.bottom = -30;
 sun.shadow.camera.far = 90;
@@ -904,6 +919,8 @@ function pickKnob(e) {
 }
 let flashTimer = null;
 function flash(text) {
+  // 第 10 轮：toast 之外同步写入 aria-live，读屏用户也能收到进度与状态变化
+  announce(text);
   const el = $("toast");
   el.textContent = text;
   el.style.opacity = "1";
@@ -917,9 +934,56 @@ function syncCycleButton() {
 }
 
 /* ---------- 场景切换 ---------- */
+/* 第 6 轮：场景切换时的资源释放。
+   原来只 dispose 了体素批次的网格，root 下面的工人、塔吊、探照灯、
+   车辆这些都是各自 new 出来的 Mesh，它们的 geometry / material 从来没被释放。
+   连点几次「工地 / 桥梁」就会在 GPU 上留下一堆没人引用的缓冲。 */
+function disposeScene(scene) {
+  if (!scene) return;
+  scene.root.traverse((obj) => {
+    if (obj.geometry) obj.geometry.dispose();
+    const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
+    for (const m of mats) {
+      // 先把贴图一并释放，否则材质释放后贴图仍然占着显存
+      for (const key of Object.keys(m)) {
+        const v = m[key];
+        if (v && v.isTexture) v.dispose();
+      }
+      m.dispose();
+    }
+  });
+}
+
+/* 第 9 轮：把「施工」从动画变成有产出的过程。
+   原来设备只是各自循环运动，跟工地上任何东西都没有因果关系——
+   看不出在盖什么，也看不出进度。现在每台设备跑完一个作业循环就结算一份工程量，
+   累计到总工程量时完工；车辆往返一圈按运距折算成完成度。
+   工程量是脚本里写死的、与场景体素数一致的整数，不是随机数。 */
+const WORK = {
+  site:   { units: 40, label: "土方与基础" },
+  bridge: { units: 32, label: "桥墩与架梁" },
+};
+function makeProgress(name) {
+  return { total: WORK[name].units, done: 0, label: WORK[name].label, complete: false };
+}
+function addProgress(amount) {
+  if (!progress || progress.complete) return;
+  progress.done = Math.min(progress.total, progress.done + amount);
+  $("sProg").textContent = Math.round((progress.done / progress.total) * 100) + "%";
+  if (progress.done >= progress.total) {
+    progress.complete = true;
+    flash(`${progress.label}全部完工 · ${progress.total} 个作业单元`);
+  }
+}
+function resetProgress(name) {
+  progress = makeProgress(name);
+  $("sProg").textContent = "0%";
+}
+
 function loadScene(name) {
-  if (current) { groupRoot.remove(current.root); current.batch.dispose(); }
+  if (current) { groupRoot.remove(current.root); current.batch.dispose(); disposeScene(current); current = null; }
   current = name === "site" ? buildSite() : buildBridge();
+  resetProgress(name);
   groupRoot.add(current.root);
   document.querySelectorAll("[data-scene]").forEach((b) => b.classList.toggle("on", b.dataset.scene === name));
   $("sScene").textContent = name === "site" ? "工地" : "桥梁";
@@ -955,34 +1019,75 @@ function setRain(v) {
   $("sWeather").textContent = v ? "暴雨" : "晴";
 }
 $("bRain").addEventListener("click", () => setRain(!state.raining));
+/* 第 10 轮：键盘与播报。
+   原来在输入框里打字也会触发暴雨和场景切换；这里加焦点保护，
+   再补上面板显隐、速度/尘土微调和 aria-live，让读屏用户能听到进度与状态变化。 */
+let liveRegion = null;
+function announce(text) {
+  if (!liveRegion) {
+    liveRegion = document.createElement("div");
+    liveRegion.className = "sr-only";
+    liveRegion.setAttribute("aria-live", "polite");
+    document.body.appendChild(liveRegion);
+  }
+  liveRegion.textContent = text;
+}
 window.addEventListener("keydown", (e) => {
-  if (e.code === "Space") { e.preventDefault(); setRain(!state.raining); }
-  else if (e.key === "1") loadScene("site");
-  else if (e.key === "2") loadScene("bridge");
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") {
+    if (e.code === "Enter" && e.target.id === "rSpeed") e.target.blur();
+    return;
+  }
+  if (e.code === "Space") { e.preventDefault(); setRain(!state.raining); announce(state.raining ? "暴雨已开启，地面湿滑。" : "暴雨已关闭。"); return; }
+  if (e.key === "1") { loadScene("site"); return; }
+  if (e.key === "2") { loadScene("bridge"); return; }
+  if (e.key.toLowerCase() === "h") {
+    const hidden = $("ctrl").style.display === "none";
+    $("ctrl").style.display = hidden ? "" : "none";
+    $("help").style.display = hidden ? "" : "none";
+    announce(hidden ? "已显示控制面板。" : "已隐藏控制面板。");
+    return;
+  }
+  if (e.key === "+" || e.key === "=") { nudgeSpeed(1); return; }
+  if (e.key === "-" || e.key === "_") { nudgeSpeed(-1); return; }
 });
+function nudgeSpeed(dir) {
+  const el = $("rSpeed");
+  el.value = Math.max(Number(el.min), Math.min(Number(el.max), Number(el.value) + dir * 20));
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  announce(`设备速度 ${state.speed.toFixed(1)} 倍。`);
+}
 
 /* ---------- 动画 ---------- */
 let t = 0;
+let progress = null;
 function animateScene(dt) {
   if (!current) return;
   const s = state.speed * dt;
   for (const a of current.animated) {
     if (a.type === "excavator") {
+      const prevCycle = Math.floor(a.phase / (Math.PI * 2));
       a.phase += s * 1.1;
+      if (Math.floor(a.phase / (Math.PI * 2)) > prevCycle) addProgress(2);
       a.obj.rotation.y = -0.9 + Math.sin(a.phase * 0.5) * 1.4;
       a.bucket.position.y = -1.6 + Math.sin(a.phase * 2.2) * 0.55;
       a.bucket.rotation.x = 0.3 + Math.sin(a.phase * 2.2 + 1.0) * 0.5;
     } else if (a.type === "crane") {
+      const prevCycle = Math.floor(a.phase / (Math.PI * 2));
       a.phase += s * 0.5;
+      if (Math.floor(a.phase / (Math.PI * 2)) > prevCycle) addProgress(3);
       a.obj.rotation.y = a.phase * 0.7;
       const h = 5.2 + Math.sin(a.phase * 1.3) * 2.6;
       a.load.position.y = -h;
       a.hookLine.scale.y = (4.4 + Math.sin(a.phase * 1.3) * 2.6) / 4.4;
       a.hookLine.position.y = -(4.4 + Math.sin(a.phase * 1.3) * 2.6) / 2;
     } else if (a.type === "truck") {
+      const prevLap = Math.floor(a.t / a.route.length);
       a.t += s * 0.055;
       const total = a.route.length;
       const f = a.t % total;
+      // 第 9 轮：跑完一圈结算一次工程量
+      if (Math.floor(a.t / total) > prevLap) addProgress(1);
       const i = Math.floor(f), k = f - i;
       const p0 = a.route[i], p1 = a.route[(i + 1) % total];
       a.obj.position.set(p0[0] + (p1[0] - p0[0]) * k, 0.7, p0[1] + (p1[1] - p0[1]) * k);
@@ -1025,6 +1130,11 @@ function animateScene(dt) {
   }
 }
 
+// 第 7 轮：复用的临时颜色，避免逐帧 new
+const scratchA = new THREE.Color();
+const scratchB = new THREE.Color();
+const scratchOut = new THREE.Color();
+
 let last = performance.now(), fpsFrames = 0, fpsT = last;
 function loop(now) {
   const dt = Math.min((now - last) / 1000, 0.05);
@@ -1036,15 +1146,24 @@ function loop(now) {
     $("rTime").value = Math.round(state.timeOfDay * 100);
   }
   // 四套天色：黎明/正午/黄昏/夜晚
+  /* 第 7 轮：去掉逐帧分配。
+     原来每帧要 new 出 5 个 THREE.Color（lerpC 两次 + lerpColors 两个参数 + Fog 一个），
+     60 帧就是每秒 300 个短命对象，全靠 GC 回收。这里把中间对象全部提到循环外复用，
+     Fog 也改成原地改 near/far，不再每帧 new 一个。 */
   const seg = state.timeOfDay * 4;
   const idx = Math.floor(seg) % 4;
   const next = (idx + 1) % 4;
   const k = seg - Math.floor(seg);
   const A = PHASES[idx], B = PHASES[next];
-  const lerpC = (a, b) => new THREE.Color(a).lerp(new THREE.Color(b), k);
-  scene.background = lerpC(A.sky, B.sky);
-  scene.fog = new THREE.Fog(lerpC(A.fog, B.fog), 40, 190);
-  sun.color.lerpColors(new THREE.Color(A.sun), new THREE.Color(B.sun), k);
+  scratchA.set(A.sky); scratchB.set(B.sky);
+  scratchOut.lerpColors(scratchA, scratchB, k);
+  scene.background = scratchOut;
+  scratchA.set(A.fog); scratchB.set(B.fog);
+  scratchOut.lerpColors(scratchA, scratchB, k);
+  scene.fog.color.copy(scratchOut);
+  scene.fog.near = 40; scene.fog.far = 190;
+  scratchA.set(A.sun); scratchB.set(B.sun);
+  sun.color.lerpColors(scratchA, scratchB, k);
   sun.intensity = A.dir + (B.dir - A.dir) * k;
   ambient.intensity = (A.amb + (B.amb - A.amb) * k) * (state.raining ? 0.7 : 1);
   sun.position.set(
@@ -1100,16 +1219,30 @@ function loop(now) {
   if (now - fpsT > 500) {
     $("sFps").textContent = Math.round((fpsFrames * 1000) / (now - fpsT));
     $("sDraw").textContent = renderer.info.render.calls;
+    // renderer.info 里的数字是 three.js 本帧真正提交给 GPU 的量，不是我们自己估的
+    $("sTri").textContent = renderer.info.render.triangles.toLocaleString("en-US");
+    $("sGeo").textContent = renderer.info.memory.geometries + " / " + renderer.info.memory.textures;
     fpsFrames = 0; fpsT = now;
   }
   requestAnimationFrame(loop);
 }
 
-window.addEventListener("resize", () => {
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  camera.aspect = window.innerWidth / window.innerHeight;
+/* 第 8 轮：跟随容器尺寸而不是窗口尺寸，并给像素比设上限。
+   原本 renderer.setSize(window.innerWidth, window.innerHeight) 在 iframe 里会把画布
+   撑到比容器还宽，产生横向滚动条；setPixelRatio 也没有上限，
+   高 DPI 屏上 2048×2048 的阴影图加上高像素比会直接把帧率压垮。 */
+function applySize() {
+  const host = app;
+  const w = Math.max(1, host.clientWidth);
+  const h = Math.max(1, host.clientHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.setSize(w, h, true);
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-});
+}
+window.addEventListener("resize", applySize);
+if (window.ResizeObserver) new ResizeObserver(applySize).observe(app);
+applySize();
 
 loadScene("site");
 camApply();

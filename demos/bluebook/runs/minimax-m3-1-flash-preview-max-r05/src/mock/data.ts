@@ -71,6 +71,37 @@ export const TABS: Tab[] = [
   { key: "nearby", label: "附近" },
 ];
 
+/* ------------------------------------------------------------------
+ * 第 4 轮：频道过滤规则。
+ * 原先切频道只是弹一句「原型演示：关注频道」，列表内容纹丝不动，
+ * 看不出三个频道到底有什么区别。现在每个频道有写在数据层的纯函数规则：
+ *   recommend  全部内容
+ *   following  作者序号能被 4 整除（模拟「你订阅的作者」）
+ *   nearby     作者序号除以 4 余 1（模拟「同城作者」）
+ * 两条规则互不重叠，且在第一屏就能命中若干条——如果按点赞数筛，
+ * 第一页的点赞上限只有 2700 左右，阈值稍高就会整个频道空白。
+ * 规则是纯函数而不是散在组件里，便于单独测试与替换。
+ * ------------------------------------------------------------------ */
+export function authorIndex(author: string): number {
+  // 刷新后的作者名会带上 "-时间戳" 后缀，先剥掉再取序号
+  const base = author.split("-")[0];
+  const i = AUTHORS.indexOf(base);
+  return i < 0 ? 0 : i;
+}
+
+export function filterByTab(items: Note[], tab: string): Note[] {
+  if (tab === "following") return items.filter((n) => authorIndex(n.author) % 4 === 0);
+  if (tab === "nearby") return items.filter((n) => authorIndex(n.author) % 4 === 1);
+  return items;
+}
+
+export const TAB_EMPTY_TEXT: Record<string, string> = {
+  recommend: "还没有内容",
+  following: "关注频道里还没有内容：当前规则是「作者序号能被 4 整除」，继续下滑加载看看。",
+  nearby: "附近频道里还没有内容：当前规则是「作者序号除以 4 余 1」，继续下滑加载看看。",
+};
+
+
 export function buildPage(page: number): Note[] {
   const start = page * PAGE_SIZE;
   const size = Math.min(PAGE_SIZE, TOTAL - start);

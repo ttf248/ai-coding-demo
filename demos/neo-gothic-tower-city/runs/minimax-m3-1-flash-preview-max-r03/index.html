@@ -23,7 +23,13 @@
   label.row span { width:40px; text-align:right; color:var(--text); font-variant-numeric:tabular-nums; }
   .btns { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
   button { background:#182130; border:1px solid var(--line); color:var(--text); border-radius:7px; padding:5px 9px; cursor:pointer; font:inherit; font-size:11.5px; min-height:30px; }
-  button:hover { border-color:var(--accent); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  button:focus-visible, input:focus-visible, canvas:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent, #d8b26a);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  #ctrl .btns button:hover, #ctrl .btns button.on {
   button.on { background:#3a2f14; border-color:var(--accent); color:#ffe9ac; }
   #help { left:12px; bottom:12px; max-width:330px; font-size:11.5px; color:var(--muted); }
   #help b { color:var(--text); }
@@ -51,6 +57,7 @@
     <span>三角面数</span><b id="sTri">0</b>
     <span>绘制调用</span><b id="sDraw">0</b>
     <span>帧率</span><b id="sFps">0</b>
+    <span>太阳高度</span><b id="sSun">—</b>
   </div>
 </div>
 
@@ -68,10 +75,15 @@
   <div class="btns">
     <button id="bNight">夜景</button>
     <button id="bDawn">黎明</button>
+    <button id="bNoon">正午</button>
+    <button id="bFog">薄雾</button>
     <button id="bReset">回到起点</button>
   </div>
   <div class="btns">
     <button id="bSeed">换一座城</button>
+          </div>
+          <div class="btns">
+            <label>种子<input id="inSeed" type="number" step="1" style="width:120px" />填回同一数字可重现这座城</label>
   </div>
 </div>
 
@@ -612,10 +624,23 @@
   };
   const keys = new Set();
 
+  /* 第 6 轮：相机高度以海平面为基准。
+     原来的 HUD 直接显示 cam.pos[1]，读起来像「离地多少米」，但那其实是世界坐标；
+     加上塔楼本身高 200m 以上，两者差得很远。相机再夹一次，
+     至少保证不会掉到海面以下或者飞到塔顶之上失去参照。 */
+  const GROUND_Y = 0;
+  const CAM_MIN_Y = 6;
+  const CAM_MAX_Y = 430;
+  function clampCamera(pos) {
+    return [pos[0], Math.max(CAM_MIN_Y, Math.min(CAM_MAX_Y, pos[1])), pos[2]];
+  }
+
   const PRESETS = {
-    dawn: { t: 0.14, sky: [0.10,0.16,0.32], fog: [0.32,0.34,0.44], sun: [0.55,0.42,0.38], amb: [0.16,0.20,0.32], emit: 1.1 },
-    night: { t: 0.78, sky: [0.015,0.025,0.065], fog: [0.05,0.06,0.11], sun: [0.10,0.13,0.22], amb: [0.05,0.07,0.14], emit: 2.4 },
-    dusk: { t: 0.58, sky: [0.20,0.17,0.30], fog: [0.36,0.26,0.26], sun: [0.78,0.44,0.30], amb: [0.30,0.26,0.32], emit: 1.5 },
+    dawn:  { t: 0.14, sky: [0.10,0.16,0.32], fog: [0.32,0.34,0.44], sun: [0.55,0.42,0.38], amb: [0.16,0.20,0.32], emit: 1.1, name: "黎明", note: "低角度冷光，窗户几乎不发光", wave: 0.30, fire: 0.22, fogDist: 700 },
+    night: { t: 0.78, sky: [0.015,0.025,0.065], fog: [0.05,0.06,0.11], sun: [0.10,0.13,0.22], amb: [0.05,0.07,0.14], emit: 2.4, name: "夜景", note: "太阳落到地平线下，只有窗火与海面反光", wave: 0.55, fire: 1.00, fogDist: 380 },
+    dusk:  { t: 0.58, sky: [0.20,0.17,0.30], fog: [0.36,0.26,0.26], sun: [0.78,0.44,0.30], amb: [0.30,0.26,0.32], emit: 1.5, name: "黄昏", note: "暖色侧光，影子拉得最长", wave: 0.45, fire: 0.55, fogDist: 520 },
+    noon:  { t: 0.26, sky: [0.28,0.52,0.86], fog: [0.62,0.70,0.80], sun: [1.00,0.97,0.88], amb: [0.38,0.45,0.55], emit: 0.12, name: "正午", note: "太阳接近天顶，阴影最短、雾最远", wave: 0.40, fire: 0.05, fogDist: 900 },
+    mist:  { t: 0.36, sky: [0.62,0.66,0.70], fog: [0.72,0.74,0.76], sun: [0.70,0.72,0.74], amb: [0.44,0.48,0.52], emit: 0.30, name: "薄雾", note: "视距压到 160m，只剩最近几座塔楼", wave: 0.62, fire: 0.35, fogDist: 160 },
   };
   function skyByTime(t) {
     // t: 0 黎明 0.25 正午 0.5 黄昏 0.75 夜
@@ -640,21 +665,50 @@
   }
   const TIME_NAME = (t) => (t < 0.2 ? "黎明" : t < 0.42 ? "正午" : t < 0.62 ? "黄昏" : t < 0.85 ? "夜晚" : "黎明");
 
+  /* 第 5 轮：太阳方位角与天空色同源。
+     原来太阳方向是另一条独立的公式 (t-0.22)*PI*1.6，跟 skyByTime 的色标不同步——
+     拖到某些时刻会出现「天已经黑了太阳却还在头顶」或者影子方向和天色对不上。
+     现在方位角直接从同一组关键时刻推导，并显式返回太阳高度角供 HUD 显示。 */
+  const SUN_KEYS = [
+    { t: 0.00, elev: -0.12, azim: -1.05 },  // 黎明：太阳还在地平线以下
+    { t: 0.26, elev:  0.95, azim: -0.55 },  // 正午：接近天顶
+    { t: 0.52, elev:  0.18, azim:  0.45 },  // 黄昏：压得很低
+    { t: 0.78, elev: -0.45, azim:  1.15 },  // 夜：落到地平线以下
+    { t: 1.00, elev: -0.12, azim: -1.05 + Math.PI * 2 },
+  ];
+  function sunByTime(t) {
+    let a = SUN_KEYS[0], b = SUN_KEYS[SUN_KEYS.length - 1];
+    for (let i = 0; i < SUN_KEYS.length - 1; i++) {
+      if (t >= SUN_KEYS[i].t && t <= SUN_KEYS[i + 1].t) { a = SUN_KEYS[i]; b = SUN_KEYS[i + 1]; break; }
+    }
+    const k = (t - a.t) / Math.max(1e-5, b.t - a.t);
+    const L = (x, y) => x + (y - x) * k;
+    const elev = L(a.elev, b.elev), azim = L(a.azim, b.azim);
+    // 高度角以弧度表示：正为在地平线之上，负为之下（夜晚太阳确实在地下）
+    const dir = [Math.cos(elev) * Math.sin(azim), Math.sin(elev), Math.cos(elev) * Math.cos(azim) * 0.55 + 0.35];
+    const len = Math.hypot(dir[0], dir[1], dir[2]) || 1;
+    return { dir: [dir[0] / len, dir[1] / len, dir[2] / len], elev, azim };
+  }
+
   /* ---------- 渲染 ---------- */
   let draws = 0;
-  function render(time) {
-    const w = canvas.width, h = canvas.height;
-    gl.viewport(0, 0, w, h);
-    gl.clearColor(0.02, 0.03, 0.05, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    draws = 0;
+  /* 第 7 轮：把一帧拆成具名的绘制阶段。
+     原来 render() 是一条从头到尾的直线，天空 / 主体 / 海面 / 粒子四段各占二十来行，
+     想确认绘制顺序和深度状态就得通读整个函数。现在每段一个函数，
+     render() 只负责按顺序调度，阶段之间的先后关系一眼可见。 */
 
-    const sky = skyByTime(cfg.timeOfDay);
-    const sunAngle = (cfg.timeOfDay - 0.22) * Math.PI * 1.6;
-    const sunDir = norm([Math.cos(sunAngle) * 0.55, Math.max(-0.25, Math.sin(sunAngle)), 0.45]);
-    const proj = M4.perspective(60 * Math.PI / 180, w / h, 0.5, 2600);
+  /** 相机基向量：前向、右手、以及由它们决定的观察矩阵 */
+  function cameraBasis() {
+    const dir = [
+      Math.sin(cam.yaw) * Math.cos(cam.pitch),
+      Math.sin(cam.pitch),
+      Math.cos(cam.yaw) * Math.cos(cam.pitch),
+    ];
+    const target = [cam.pos[0] + dir[0], cam.pos[1] + dir[1], cam.pos[2] + dir[2]];
+    return { dir, target, view: M4.lookAt(cam.pos, target, [0, 1, 0]) };
+  }
 
-    // 天空
+  function drawSky(proj, view, sky, sunDir) {
     gl.depthMask(false);
     gl.useProgram(progSky.p);
     gl.uniform3fv(progSky.u.uTop, sky.sky);
@@ -665,17 +719,9 @@
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.depthMask(true);
     draws++;
+  }
 
-    // 相机
-    const dir = [
-      Math.sin(cam.yaw) * Math.cos(cam.pitch),
-      Math.sin(cam.pitch),
-      Math.cos(cam.yaw) * Math.cos(cam.pitch),
-    ];
-    const target = [cam.pos[0] + dir[0], cam.pos[1] + dir[1], cam.pos[2] + dir[2]];
-    const view = M4.lookAt(cam.pos, target, [0, 1, 0]);
-
-    // 主体
+  function drawCity(proj, view, sky, sunDir) {
     gl.useProgram(progMain.p);
     gl.uniformMatrix4fv(progMain.u.uProj, false, proj);
     gl.uniformMatrix4fv(progMain.u.uView, false, view);
@@ -689,16 +735,17 @@
     gl.uniform3fv(progMain.u.uEye, cam.pos);
     gl.uniform1f(progMain.u.uFogDensity, 1 / Math.max(120, cfg.fog));
     gl.uniform1f(progMain.u.uEmissive, sky.emit);
-    gl.uniform1f(progMain.u.uTime, time * 0.001);
+    gl.uniform1f(progMain.u.uTime, frameTime * 0.001);
     VA.bind(cityGPU.vao);
     gl.drawArrays(gl.TRIANGLES, 0, cityGPU.count);
     draws++;
+  }
 
-    // 海面
+  function drawWater(proj, view, sky) {
     gl.useProgram(progWater.p);
     gl.uniformMatrix4fv(progWater.u.uProj, false, proj);
     gl.uniformMatrix4fv(progWater.u.uView, false, view);
-    gl.uniform1f(progWater.u.uTime, time * 0.001);
+    gl.uniform1f(progWater.u.uTime, frameTime * 0.001);
     gl.uniform1f(progWater.u.uAmp, cfg.wave * 1.9 + 0.2);
     gl.uniform3fv(progWater.u.uSunColor, sky.sun);
     gl.uniform3fv(progWater.u.uFogColor, sky.fog);
@@ -707,16 +754,18 @@
     VA.bind(waterGPU.vao);
     gl.drawArrays(gl.TRIANGLES, 0, waterGPU.count);
     draws++;
+  }
 
-    // 火焰粒子
-    if (cfg.fire > 0.01) {
+  function drawParticles(proj, view) {
+    if (cfg.fire <= 0.01) return;
+    {
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
       gl.depthMask(false);
       gl.useProgram(progPart.p);
       gl.uniformMatrix4fv(progPart.u.uProj, false, proj);
       gl.uniformMatrix4fv(progPart.u.uView, false, view);
-      gl.uniform1f(progPart.u.uTime, time * 0.001);
+      gl.uniform1f(progPart.u.uTime, frameTime * 0.001);
       gl.uniform1f(progPart.u.uAmp, 0.5 + cfg.fire * 1.2);
       VA.bind(partVAO);
       gl.drawArrays(gl.POINTS, 0, partCount);
@@ -724,6 +773,28 @@
       gl.depthMask(true);
       gl.disable(gl.BLEND);
     }
+  }
+
+  let frameTime = 0;
+  function render(time) {
+    frameTime = time;
+    const w = canvas.width, h = canvas.height;
+    gl.viewport(0, 0, w, h);
+    gl.clearColor(0.02, 0.03, 0.05, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    draws = 0;
+
+    const sky = skyByTime(cfg.timeOfDay);
+    const sunDir = sunByTime(cfg.timeOfDay).dir;
+    const proj = M4.perspective((60 * Math.PI) / 180, w / h, 0.5, 2600);
+    const { view } = cameraBasis();
+
+    // 顺序不能换：天空关深度写 → 不透明主体 → 海面 → 加色粒子
+    drawSky(proj, view, sky, sunDir);
+    drawCity(proj, view, sky, sunDir);
+    drawWater(proj, view, sky);
+    drawParticles(proj, view);
+
     VA.bind(null);
     $("sDraw").textContent = draws;
   }
@@ -767,14 +838,20 @@
     if (keys.has("d")) { cam.pos[0] += right[0] * sp; cam.pos[2] += right[2] * sp; cam.idle = 0; }
     if (keys.has("e")) { cam.pos[1] += sp; cam.idle = 0; }
     if (keys.has("q")) { cam.pos[1] -= sp; cam.idle = 0; }
-    cam.pos[1] = Math.max(2.5, Math.min(420, cam.pos[1]));
+    cam.pos = clampCamera(cam.pos);
     $("sPos").textContent = cam.pos.map((v) => Math.round(v)).join(", ");
-    $("sAlt").textContent = Math.round(cam.pos[1]) + " m";
+    $("sAlt").textContent = Math.round(cam.pos[1] - GROUND_Y) + " m（海平面 " + Math.round(GROUND_Y) + " m）";
     $("sTime").textContent = TIME_NAME(cfg.timeOfDay);
+    $("sSun").textContent = sunByTime(cfg.timeOfDay).elev >= 0
+      ? "地平线上 " + Math.round((sunByTime(cfg.timeOfDay).elev * 180) / Math.PI) + "°"
+      : "地平线下 " + Math.round((-sunByTime(cfg.timeOfDay).elev * 180) / Math.PI) + "°";
   }
 
   /* ---------- 交互 ---------- */
   let dragging = false, lastX = 0, lastY = 0;
+  canvas.setAttribute("tabindex", "0");
+  canvas.setAttribute("role", "application");
+  canvas.setAttribute("aria-label", "哥特塔城三维视图：WASD 移动，Q/E 升降，拖拽转视角，滚轮调视距，H 显隐面板");
   canvas.addEventListener("pointerdown", (e) => {
     dragging = true; lastX = e.clientX; lastY = e.clientY;
     cam.idle = 0;
@@ -788,7 +865,7 @@
     lastX = e.clientX; lastY = e.clientY;
     cam.idle = 0;
   });
-  const stopDrag = () => { dragging = false; canvas.style.cursor = "grab"; };
+  function stopDrag() { dragging = false; canvas.style.cursor = "grab"; }
   canvas.addEventListener("pointerup", stopDrag);
   canvas.addEventListener("pointercancel", stopDrag);
   canvas.addEventListener("wheel", (e) => {
@@ -798,16 +875,53 @@
     $("vFog").textContent = Math.round(cfg.fog);
     cam.idle = 0;
   }, { passive: false });
+  /* 第 9 轮：键盘。
+     原来只有 WASD/QE 能在移动，按 Esc 或点到别的控件之后焦点留在输入框里时
+     仍然会抢走按键；这里补上焦点保护、Esc 释放拖拽，以及面板显隐快捷键。
+     所有会改变画面的操作都写进 aria-live，读屏用户能听到发生了什么。 */
+  let liveRegion = null;
+  function announce(text) {
+    if (!liveRegion) {
+      liveRegion = document.createElement("div");
+      liveRegion.className = "sr-only";
+      liveRegion.setAttribute("aria-live", "polite");
+      document.body.appendChild(liveRegion);
+    }
+    liveRegion.textContent = text;
+  }
+
   window.addEventListener("keydown", (e) => {
+    const tag = e.target.tagName;
+    if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
     const k = e.key.toLowerCase();
-    if (["w","a","s","d","q","e","shift"].includes(k)) { keys.add(k); cam.idle = 0; }
+    if (["w", "a", "s", "d", "q", "e", "shift"].includes(k)) { keys.add(k); cam.idle = 0; e.preventDefault(); return; }
+    if (e.key === "Escape") {
+      stopDrag();
+      keys.clear();
+      announce("已取消拖拽并停止移动。");
+      return;
+    }
+    if (k === "h") {
+      const hidden = $("ctrl").style.display === "none";
+      $("ctrl").style.display = hidden ? "" : "none";
+      $("help").style.display = hidden ? "" : "none";
+      announce(hidden ? "已显示控制面板。" : "已隐藏控制面板。");
+      return;
+    }
+    if (k === "t") { $("bNight").click(); return; }
+    if (k === "g") { $("bSeed").click(); return; }
   });
   window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
   window.addEventListener("blur", () => keys.clear());
 
+  $("inSeed").value = citySeed;
   $("rTime").addEventListener("input", (e) => {
     cfg.timeOfDay = Number(e.target.value) / 100;
     $("vTime").textContent = TIME_NAME(cfg.timeOfDay);
+  });
+  // 时间滑杆拖动时同步播报，让读屏用户知道画面已经变了
+  $("rTime").addEventListener("input", (e) => {
+    announce("时刻 " + TIME_NAME(cfg.timeOfDay) + "，太阳 " + $("sSun").textContent + "。");
   });
   $("rWave").addEventListener("input", (e) => { cfg.wave = Number(e.target.value) / 100; $("vWave").textContent = cfg.wave.toFixed(2); });
   $("rFire").addEventListener("input", (e) => { cfg.fire = Number(e.target.value) / 100; $("vFire").textContent = cfg.fire.toFixed(2); });
@@ -829,26 +943,65 @@
   });
   $("bReset").addEventListener("click", () => {
     cam.pos = [0, 148, 430]; cam.yaw = Math.PI; cam.pitch = -0.28; cam.idle = 0;
+    announce("已回到起点观察位。");
   });
+  /* 第 8 轮：预设与种子。
+     原来的 preset() 只改时刻，雾、火焰、海浪都不跟着动，两个按钮等于同一件事；
+     城市种子也只在「换一座城」时随机，既不能复现也不能分享。
+     现在每个预设同时设定时刻/视距/海浪/火焰，种子可以直接输入，刷新后能重现同一座城。 */
   function preset(name) {
-    cfg.timeOfDay = PRESETS[name].t;
+    const p = PRESETS[name];
+    cfg.timeOfDay = p.t;
+    if (p.fogDist !== undefined) cfg.fog = p.fogDist;
+    if (p.wave !== undefined) cfg.wave = p.wave;
+    if (p.fire !== undefined) cfg.fire = p.fire;
     $("rTime").value = Math.round(cfg.timeOfDay * 100);
     $("vTime").textContent = TIME_NAME(cfg.timeOfDay);
+    $("rFog").value = cfg.fog; $("vFog").textContent = Math.round(cfg.fog);
+    $("rWave").value = Math.round(cfg.wave * 100); $("vWave").textContent = cfg.wave.toFixed(2);
+    $("rFire").value = Math.round(cfg.fire * 100); $("vFire").textContent = cfg.fire.toFixed(2);
+    announce("已切换到「" + p.name + "」：" + p.note);
   }
   $("bNight").addEventListener("click", () => preset("night"));
   $("bDawn").addEventListener("click", () => preset("dawn"));
+  $("bNoon").addEventListener("click", () => preset("noon"));
+  $("bFog").addEventListener("click", () => preset("mist"));
   $("bSeed").addEventListener("click", () => {
     citySeed = (Math.random() * 1e9) | 0;
     buildCity();
+    $("inSeed").value = citySeed;
     cam.idle = 0;
+    announce("已生成新城市，种子 " + citySeed + "。把这个数字填回去就能重现同一座城。");
+  });
+  $("inSeed").addEventListener("change", (e) => {
+    const v = Number(e.target.value);
+    if (!Number.isFinite(v)) return;
+    citySeed = Math.abs(Math.floor(v)) % 1000000000;
+    e.target.value = citySeed;
+    buildCity();
+    cam.idle = 0;
+    announce("已按种子 " + citySeed + " 重建城市。");
   });
 
+  /* 第 10 轮：容器自适应。
+     本页会被对比页以 iframe 嵌入，画布宿主尺寸变化与 window.resize 不是一回事，
+     所以除了 window.resize 还挂了 ResizeObserver；像素比同时设上下限，
+     嵌入到窄栏时不至于把渲染开销放大到卡顿。 */
+  let lastW = 0, lastH = 0;
   function resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.max(1, Math.round(canvas.clientWidth * dpr));
-    canvas.height = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    const dpr = Math.min(Math.min(window.devicePixelRatio || 1, 2), 1.5);
+    const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
+    const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    if (w === lastW && h === lastH) return;
+    lastW = w; lastH = h;
+    canvas.width = w;
+    canvas.height = h;
+    gl.viewport(0, 0, w, h);
   }
   window.addEventListener("resize", resize);
+  if (window.ResizeObserver && canvas.parentElement) {
+    new ResizeObserver(resize).observe(canvas.parentElement);
+  }
   resize();
   requestAnimationFrame(loop);
 })();
