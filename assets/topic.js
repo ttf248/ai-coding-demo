@@ -72,6 +72,7 @@
       .join("") +
     '</select></label><div class="segments" aria-label="主题内容"><button data-topic-view="list">浏览实验</button><button data-topic-view="matrix">档位覆盖</button><button data-topic-view="prompt">任务正文</button></div></div>' +
     '<section class="topic-context" aria-label="当前任务范围"><h2 id="topic-context-title"></h2><button data-read-task>阅读任务正文 →</button></section>' +
+    '<section class="pricing-context" id="pricing-context" aria-label="供应商与费用口径"><h2>模型厂商、接入供应商与费用</h2><p>实验行分别标出模型厂商与实际接入/计费供应商。订阅展示套餐额度，API 按实际 token 和工具用量计费；批次金额不会拆算成单案例费用。</p><details><summary>公开价格示例（美元，查阅于 2026-10-14）</summary><div class="pricing-examples"><p><strong>OpenAI：</strong>ChatGPT Plus 为 $20/月，Codex 使用包含在计划额度内且受使用限制；GPT-6 Astra 标准 API 为输入 $10、输出 $50 / 百万 token。假设一次任务恰好使用 100 万输入 + 100 万输出 token，API 约 $60，是 Plus 月费的 3 倍。</p><p><strong>Anthropic：</strong>Claude Pro 为 $20/月，Max 5x / 20x 为 $100 / $200 每月；Claude Opus 5.5 标准 API 为输入 $4、输出 $20 / 百万 token。同样假设 100 万输入 + 100 万输出，API 约 $24，是 Pro 月费的 1.2 倍。</p><p>这些是不同产品的公开标价量级示例，不代表本项目任一案例的 token 用量或真实账单。订阅有额度与速率限制，和 API token 账单不是等价服务；第三方价格也由实际平台决定，不能套用统一加价倍数。例如 OpenCode 当前把 Nemotron 3 Ultra Free 列为免费模型。</p><ul><li><a href="https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus" target="_blank" rel="noopener">ChatGPT Plus 月费与 API 单独计费</a> · <a href="https://openai.com/codex/" target="_blank" rel="noopener">OpenAI Codex 计划说明</a> · <a href="https://developers.openai.com/api/docs/models/gpt-6-astra" target="_blank" rel="noopener">GPT-6 Astra API 价格</a></li><li><a href="https://support.anthropic.com/en/articles/11049762-choosing-a-claude-ai-plan" target="_blank" rel="noopener">Claude 计划价格</a> · <a href="https://www.anthropic.com/claude/opus" target="_blank" rel="noopener">Opus 5.5 API 价格</a></li><li><a href="https://opencode.ai/v2/docs/console/models/" target="_blank" rel="noopener">OpenCode 模型及免费档位</a></li></ul></div></details></section>' +
     '<div class="topic-filters" id="topic-filters"><label class="topic-search">搜索实验<input id="topic-search" type="search" placeholder="模型、档位或实验描述" autocomplete="off"></label><label>模型<select id="topic-model"><option value="">全部模型</option>' +
     U.groupedOptions(
       models,
@@ -91,6 +92,7 @@
   function billingSummary(run) {
     const billing = run.billing;
     if (!billing) return "费用未记录";
+    const plan = billing.plan ? `${billing.plan} · ` : "";
     if (billing.type === "batch") {
       const amount =
         billing.amount == null
@@ -104,31 +106,32 @@
           : "";
       return `批次总额：${amount}（${billing.caseCount == null ? "案例数未记录" : billing.caseCount + " 个案例"}${source}）`;
     }
-    if (billing.type === "subscription") return billing.plan || "订阅";
-    if (billing.amount !== null)
-      return `${billing.amount} ${billing.unit || ""}`.trim();
-    return "费用口径未记录";
+    if (billing.type === "subscription")
+      return `${plan}订阅额度（单案例金额未记录）`;
+    if (billing.amount === 0) return `${plan}免费`;
+    if (billing.amount != null) {
+      const amount =
+        billing.unit === "USD"
+          ? `$${Number(billing.amount).toFixed(2)} USD`
+          : `${billing.amount} ${billing.unit || ""}`.trim();
+      return `${plan}单次费用：${amount}`;
+    }
+    return `${plan}费用口径未记录`;
   }
   function billingMarkup(run) {
     const note = run.billing?.note || "";
     const billing = run.billing;
-    const amount =
-      billing?.amount == null
-        ? "未记录"
-        : billing.unit === "USD"
-          ? "$" + Number(billing.amount).toFixed(2)
-          : billing.amount + " " + (billing.unit || "");
-    const short =
-      billing?.type === "batch"
-        ? `批次总额 ${amount} · ${billing.caseCount == null ? "案例数未记录" : billing.caseCount + " 案例"}`
-        : billing?.type === "subscription"
-          ? billing.plan || "订阅"
-          : billingSummary(run);
+    const provider = billing?.provider || "供应商未记录";
     return (
       '<details class="billing-summary"><summary>' +
-      e(short) +
+      e(billingSummary(run)) +
       "</summary><p>" +
       e(billingSummary(run)) +
+      "<br>模型厂商：" +
+      e(U.modelProvider(data, run)) +
+      "；接入/付费供应商：" +
+      e(provider) +
+      "。" +
       (note ? "<br>" + e(note) : "") +
       "</p></details>"
     );
@@ -199,6 +202,9 @@
             [
               U.modelLabel(data, r),
               U.modelProvider(data, r),
+              r.billing?.provider,
+              r.billing?.plan,
+              r.billing?.note,
               r.modelId,
               r.effort,
               U.effortLabel(r.effort),
@@ -228,6 +234,7 @@
     document.getElementById("topic-sort").value = sort;
     document.getElementById("topic-search").value = query;
     document.getElementById("topic-filters").hidden = view === "prompt";
+    document.getElementById("pricing-context").hidden = view === "prompt";
     document.getElementById("topic-sort-field").hidden = view !== "list";
     document.querySelector(".topic-context").hidden = view === "prompt";
     document.getElementById("topic-reset").disabled =
@@ -250,7 +257,7 @@
       view === "matrix"
         ? "空白档位表示未归档实验，不代表能力评价。"
         : view === "list"
-          ? "打开预览查看实现，加入对比查看输入与结果差异。"
+          ? "查看模型厂商、接入供应商和费用口径；打开预览查看实现。"
           : "保留历史任务版本，完整原始输入在各条实验记录中。";
     for (const key of ["matrix", "list", "prompt"]) {
       document.getElementById(
@@ -356,9 +363,9 @@
             items.length +
             ' 条实验</span></div><a href="compare.html?group=' +
             encodeURIComponent(topic.id + "/" + p.id) +
-            '&tab=prompt">比较此版本 →</a></header><p class="topic-table-hint">左右滑动查看日期、费用与操作 →</p><div class="topic-table-scroll" tabindex="0" aria-label="实验记录表，包含费用信息，可横向滚动"><table class="topic-runs-table"><caption class="sr-only">' +
+            '&tab=prompt">比较此版本 →</a></header><p class="topic-table-hint">表格可横向滚动查看供应商、日期、费用与操作 →</p><div class="topic-table-scroll" tabindex="0" aria-label="实验记录表，包含模型、模型厂商、接入供应商与费用，可横向滚动"><table class="topic-runs-table"><caption class="sr-only">' +
             e(p.title) +
-            '的实验记录</caption><thead><tr><th scope="col">模型</th><th scope="col">推理档位</th><th scope="col">轮次</th><th scope="col">日期</th><th scope="col">费用记录</th><th scope="col">操作</th></tr></thead><tbody>' +
+            '的实验记录</caption><thead><tr><th scope="col">模型</th><th scope="col">模型厂商</th><th scope="col">接入/付费供应商</th><th scope="col">推理档位</th><th scope="col">轮次</th><th scope="col">日期</th><th scope="col">费用记录</th><th scope="col">操作</th></tr></thead><tbody>' +
             items
               .map((r) => {
                 const href = U.previewURL(r);
@@ -368,7 +375,11 @@
                   '"><th scope="row" class="topic-run-model">' +
                   e(U.modelLabel(data, r)) +
                   U.executionModeBadge(r) +
-                  '</th><td class="topic-run-effort">' +
+                  '</th><td class="topic-run-model-maker"><span class="mobile-cell-label" aria-hidden="true">模型厂商</span>' +
+                  e(U.modelProvider(data, r)) +
+                  '</td><td class="topic-run-provider"><span class="mobile-cell-label" aria-hidden="true">接入/付费供应商</span>' +
+                  e(r.billing?.provider || "未记录") +
+                  '</td><td class="topic-run-effort">' +
                   e(U.effortLabel(r.effort)) +
                   '</td><td class="topic-run-round">' +
                   e(U.roundLabel(r)) +
@@ -403,7 +414,7 @@
                   e(r.id) +
                   " billing-" +
                   e(r.id) +
-                  '">日期与费用</button></div></td></tr>'
+                  '">日期、供应商与费用明细</button></div></td></tr>'
                 );
               })
               .join("") +

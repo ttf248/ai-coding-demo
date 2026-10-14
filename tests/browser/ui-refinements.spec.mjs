@@ -29,6 +29,7 @@ test("mobile experiment cards show actions without horizontal scrolling and expa
   await page.goto("topic.html?id=fluid-simulation");
   const row = page.locator(".topic-run-row").first();
   await expect(row.locator(".topic-run-date")).toBeHidden();
+  await expect(row.locator(".topic-run-billing")).toBeVisible();
   await expect(row.locator("[data-compare]")).toBeVisible();
   const actions = await row.locator(".topic-row-actions").boundingBox();
   expect(actions.x + actions.width).toBeLessThanOrEqual(390);
@@ -42,6 +43,60 @@ test("mobile experiment cards show actions without horizontal scrolling and expa
   );
   await row.locator("[data-row-details]").click();
   await expect(row.locator(".topic-run-date")).toBeHidden();
+});
+
+test("experiment rows distinguish model makers from billing providers and explain API price scale", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("topic.html?id=fluid-simulation");
+  const row = page.locator(".topic-run-row").first();
+  await expect(page.locator(".topic-runs-table thead th").nth(1)).toHaveText(
+    "模型厂商",
+  );
+  await expect(page.locator(".topic-runs-table thead th").nth(2)).toHaveText(
+    "接入/付费供应商",
+  );
+  await expect(row.locator(".topic-run-model-maker")).toContainText(
+    "Anthropic",
+  );
+  await expect(
+    row.locator(".topic-run-model-maker .mobile-cell-label"),
+  ).toBeVisible();
+  await expect(row.locator(".topic-run-provider")).toBeVisible();
+  await expect(row.locator(".topic-run-provider")).toContainText(
+    "GitHub Copilot",
+  );
+  await expect(
+    row.locator(".topic-run-provider .mobile-cell-label"),
+  ).toBeVisible();
+  await expect(row.locator(".topic-run-billing summary")).not.toContainText(
+    "接入/付费供应商",
+  );
+  const pricing = page.locator("#pricing-context");
+  await expect(pricing).toBeVisible();
+  await pricing.locator("details > summary").click();
+  await expect(pricing.locator(".pricing-examples")).toBeVisible();
+  await expect(pricing.locator(".pricing-examples")).toContainText(
+    "API 约 $60",
+  );
+  await expect(pricing.locator(".pricing-examples")).toContainText(
+    "API 约 $24",
+  );
+  await expect(
+    pricing.locator(
+      'a[href="https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus"]',
+    ),
+  ).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    390,
+  );
+  await page.setViewportSize({ width: 1440, height: 960 });
+  const makerBounds = await row.locator(".topic-run-model-maker").boundingBox();
+  const billingProviderBounds = await row
+    .locator(".topic-run-provider")
+    .boundingBox();
+  expect(billingProviderBounds.x).toBeGreaterThan(makerBounds.x);
 });
 
 test("gallery screenshot errors can be retried without changing the preview source", async ({
