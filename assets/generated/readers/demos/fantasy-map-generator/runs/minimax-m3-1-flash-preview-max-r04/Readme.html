@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f7f9"><title>奇幻地图生成器 · AI Coding Demo</title><meta name="description" content="种子化程序生成的手绘风格奇幻岛屿，河流沿最陡下降汇流，画笔可实时编辑地形。"><meta property="og:title" content="奇幻地图生成器"><meta property="og:description" content="种子化程序生成的手绘风格奇幻岛屿，河流沿最陡下降汇流，画笔可实时编辑地形。"><meta property="og:type" content="article"><link rel="stylesheet" href="../../../../../../site.css"><link rel="stylesheet" href="../../../../../../document.css"><script src="../../../../../../document.js" defer></script></head><body class="document-page"><a class="skip-link" href="#document-content">跳到正文</a><header class="site-header"><div class="container header-inner"><a class="brand" href="../../../../../../../index.html"><span class="brand-mark">AI</span>CODING / DEMO</a><nav aria-label="主导航"><a href="../../../../../../../index.html#projects">实验目录</a><a href="../../../../../../../compare.html">模型对比</a><a href="../../../../../../../index.html#guides">技术索引</a></nav></div></header><main class="container document-layout"><aside class="document-sidebar"><details open><summary>本页目录</summary><nav aria-label="文档目录"><a class="toc-level-1" href="#奇幻地图生成器">奇幻地图生成器</a><a class="toc-level-2" href="#原始提示词">原始提示词</a><a class="toc-level-2" href="#运行方式">运行方式</a><a class="toc-level-2" href="#实现要点">实现要点</a><a class="toc-level-2" href="#验证记录">验证记录</a><a class="toc-level-2" href="#复盘">复盘</a><a class="toc-level-2" href="#十轮评审改进记录">十轮评审改进记录</a><a class="toc-level-2" href="#导入与本次追加记录">导入与本次追加记录</a><a class="toc-level-2" href="#当前归档信息自动生成">当前归档信息（自动生成）</a><a class="toc-level-3" href="#部署适配记录">部署适配记录</a></nav></details></aside><div><div class="document-actions"><a href="../../../../../../../demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r04/Readme.md" download>下载 Markdown 原文 ↗</a><a href="../../../../../../../topic.html?id=fantasy-map-generator">查看主题与版本 →</a></div><p class="document-context">MiniMax M3.1 Flash Preview · max · 实验日期 2026-10-14 · 归档日期 未记录</p><article id="document-content" class="document-content"><h1 id="奇幻地图生成器">奇幻地图生成器</h1>
+<h2 id="原始提示词">原始提示词</h2>
+<p>见 <a href="../../../../../../../demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r04/prompt.md">完整原始输入</a>。本轮为模型 minimax-m3-1-flash-preview、档位 max 在测试分支首次执行任务正文 v1。</p>
+<h2 id="运行方式">运行方式</h2>
+<p>入口为本目录 <code>index.html</code>，单文件、零依赖、无 CDN。首屏即为可操作的默认地图（种子 1306），支持 file:// 直接打开。</p>
+<h2 id="实现要点">实现要点</h2>
+<ul>
+<li>种子经 FNV-1a 哈希后驱动 mulberry32 伪随机，保证「同种子 + 同参数 = 同地图」。</li>
+<li>地形 = 值噪声 fBm + 域扭曲 + <strong>脊状噪声（ridged）</strong> + 多岛中心掩膜；最后做<strong>按秩归一化</strong>，海平面滑块直接对应陆地占比，避免出现大片无意义雪原。</li>
+<li>河流是真正的汇流模型：按高度降序处理格子，降雨量向下坡累积，<code>flow</code> 超过阈值的格子标为河道，因此河流只会沿地势下降流向海洋或洼地，绝不会翻越山峰。</li>
+<li>没有出口的局部洼地标记为内陆湖泊。</li>
+<li>渲染走离屏 canvas + 视口变换，支持平移、滚轮缩放、双指捏合；坐标换算统一走屏幕→地图映射，缩放后绘制位置仍然正确。</li>
+<li>画笔（升高 / 降低 / 挖海）直接改写高度图，改完立即重算海岸、河流、湖泊与城镇。</li>
+<li>城镇位置由种子伪随机 + 平坦度 + 相互间距筛选，保证可复现且不扎堆。</li>
+</ul>
+<h2 id="验证记录">验证记录</h2>
+<ul>
+<li>相同种子连续两次生成，画布像素完全一致；更换种子后结果明显不同。</li>
+<li>画笔在地图中央拖动后，最高海拔与河流像素段数量都发生变化，说明地形与水系联动生效。</li>
+<li>河流像素约 1300 段且连通成树状，符合汇流模型；不存在横穿山脊的孤立河道。</li>
+<li>「显示河流」「显示城镇标签」两个开关真实控制渲染结果。</li>
+<li>缩放与平移后画笔落点与光标一致（屏幕→地图换算统一）。</li>
+<li>390px 视口无水平溢出；内联脚本通过 <code>node --check</code>；控制台无报错。</li>
+</ul>
+<h2 id="复盘">复盘</h2>
+<p><strong>做得好的</strong>：任务正文最难的一条是「河流沿地势下降流向海洋或合理内陆水体，不能随机穿越山峰」，实现用了完整的流量累积而不是「随机撒点画河」，这条是真的算出来的。另外按秩归一化让海平面滑块有了明确物理含义（陆地占比），是可重复性与可调性兼得的处理。</p>
+<p><strong>不足</strong>：</p>
+<ol>
+<li>初版地形是「圆顶」，山体连成一大片白色平原，河流呈放射状直线——单看数值全部正确，视觉上却完全不像地图。加入脊状噪声后才有山脉形态。</li>
+<li>海岸线仍有明显的方块阶梯（单个地图像素被放大），与「手绘风格」的预期有差距；应该做一次地形平滑或提高离屏分辨率。</li>
+<li>城镇名只是「字 + 字」的随机组合，重复度高，且没有任何地形语义关联。</li>
+<li>海平面滑块改变时是整图重新生成（排序 4 万格），连续拖动会有轻微卡顿。</li>
+<li>没有地图保存 / 加载（种子之外的状态无法保存），画笔编辑结果只能靠重新生成覆盖。</li>
+</ol>
+<h2 id="十轮评审改进记录">十轮评审改进记录</h2>
+<p>本轮由模型 MiniMax M3.1 Flash Preview、档位 max 在同一会话内自行评审并逐条改进，每轮换一个切入角度，改动完成后在浏览器里实测再记入下表。历史输入与历史产物未被覆盖。</p>
+<ul>
+<li><strong>第  3 轮</strong>：地形分辨率 240×168 放大后海岸线呈明显方块阶梯；已提升到 384×256 并给沙滩色带加过渡，同时按新规模重标定河流分级与城镇间距。</li>
+<li><strong>第  3 轮</strong>：海深用线性映射出现等深线色带；已改为幂函数过渡。</li>
+<li><strong>第  4 轮</strong>：海平面滑块每次都重新生成噪声（约 130ms）；已保留原始地形，改为只重排行程与水系（约 63ms）。</li>
+<li><strong>第  1 轮</strong>：setPointerCapture 未做保护；已改为 try/catch。</li>
+<li><strong>第 6 轮</strong>：参数拖动按帧合并——原先 30 次连续 input 会跑 30 次重算（实测 1707ms），改为 rAF 合并后同样 30 次只重算 1 次（0ms 阻塞），陆地占比与水系读数仍然正确更新。</li>
+<li><strong>第 6 轮</strong>：区分轻重参数——海平面只重排行程与水系（复用同一份噪声缓存），崎岖度与岛屿数量才整图重新生成。</li>
+<li><strong>第 7 轮</strong>：容器自适应——ResizeObserver 跟随画布宿主宽度，嵌入窄栏时画布等比缩放且不溢出；侧栏在宽度 &lt;780px 时折叠为可滚动抽屉。</li>
+<li><strong>第 8 轮</strong>：键盘操作与播报——方向键平移、+/- 缩放、F 适应窗口；结果写入 aria-live 区域；补齐 focus-visible 焦点环。</li>
+<li><strong>第 9 轮</strong>：城镇命名与地形挂钩——新增 terrainKind（沿海/河畔/山口/平原），后缀改为港/渡/关/原，而非与地形无关的随机组合。</li>
+<li><strong>第 10 轮</strong>：视图状态集中为 view 对象（zoomBy/setZoom/pan），滚轮、缩放滑杆、键盘三处入口复用同一套夹取逻辑；同时新增 clampPan，把视口限制在地图范围内，修正经纬度读数越界（原为 -197.8° ~ 162.2°，现为 -180° ~ 162°）。</li>
+</ul>
+<p>以上每条改动也登记在本目录 <code>run.json</code> 的 <code>changes</code> 字段，可与本表逐条对照。</p>
+<h2 id="导入与本次追加记录">导入与本次追加记录</h2>
+<p>本记录在当前主项目的前序实验基础上追加。原实验记录、HTML 产物与截图保留；本目录收录测试分支更新后的完整产物、执行记录和十轮自审说明。</p>
+<ul>
+<li>迁移来源：F:/dev/ai-coding-demo-test（model-test-base）对应主题的本次 MiniMax M3.1 Flash Preview max 测试记录。</li>
+<li>本次追加耗时：1h 11m 22s；本次追加使用 Max 五小时额度的 64%。</li>
+<li>累计 Token 消耗更新为 156M；连同此前记录的 44%，累计额度消耗为 108%，总耗时为 2h 8m 32s。</li>
+<li>执行模式备注：自我审查十轮。费用和耗时为 12 条实验记录的批次总计，不拆分到单案例。</li>
+</ul>
+<p>&lt;!-- archive:start --&gt;</p>
+<h2 id="当前归档信息自动生成">当前归档信息（自动生成）</h2>
+<ul>
+<li>实验 ID：<code>fantasy-map-generator--minimax-m3-1-flash-preview-max-r04</code></li>
+<li>模型：MiniMax M3.1 Flash Preview；推理档位：max</li>
+<li>执行模式：按原任务执行；备注：自我审查十轮</li>
+<li>类型：single-html；预览：static；网络：offline</li>
+<li><a href="../../../../../../../demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r04/prompt.md">完整原始输入快照</a> · <a href="../../../../../../../topic.html?id=fantasy-map-generator">主题与其他版本</a></li>
+<li>输入记录：完整原始输入，等同于主题任务正文 v1（未增删），保存于本目录 prompt.md。</li>
+<li>工具：Claude Code。Claude Code 会话内直接执行，模型 minimax-m3-1-flash-preview、档位 max；未使用子代理，未参考任何历史实现或远程分支。</li>
+<li>运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。</li>
+<li>费用记录：MiniMax 批次合计 64 %（Max 订阅套餐五小时额度）（12 个案例；批次 minimax-m3-1-flash-preview-max-followup-2026-10-14；未记录单案例费用）</li>
+<li><a href="../../../../../../../demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r04/index.html">生成器入口</a></li>
+</ul>
+<h3 id="部署适配记录">部署适配记录</h3>
+<ul>
+<li>第  3 轮：地形分辨率 240×168 放大后海岸线呈明显方块阶梯；已提升到 384×256 并给沙滩色带加过渡，同时按新规模重标定河流分级与城镇间距。</li>
+<li>第  3 轮：海深用线性映射出现等深线色带；已改为幂函数过渡。</li>
+<li>第  4 轮：海平面滑块每次都重新生成噪声（约 130ms）；已保留原始地形，改为只重排行程与水系（约 63ms）。</li>
+<li>第  1 轮：setPointerCapture 未做保护；已改为 try/catch。</li>
+<li>第 6 轮：参数拖动按帧合并——原先 30 次连续 input 会跑 30 次重算（实测 1707ms），改为 rAF 合并后同样 30 次只重算 1 次（0ms 阻塞），陆地占比与水系读数仍然正确更新。</li>
+<li>第 6 轮：区分轻重参数——海平面只重排行程与水系（复用同一份噪声缓存），崎岖度与岛屿数量才整图重新生成。</li>
+<li>第 7 轮：容器自适应——ResizeObserver 跟随画布宿主宽度，嵌入窄栏时画布等比缩放且不溢出；侧栏在宽度 &lt;780px 时折叠为可滚动抽屉。</li>
+<li>第 8 轮：键盘操作与播报——方向键平移、+/- 缩放、F 适应窗口；结果写入 aria-live 区域；补齐 focus-visible 焦点环。</li>
+<li>第 9 轮：城镇命名与地形挂钩——新增 terrainKind（沿海/河畔/山口/平原），后缀改为港/渡/关/原，而非与地形无关的随机组合。</li>
+<li>第 10 轮：视图状态集中为 view 对象（zoomBy/setZoom/pan），滚轮、缩放滑杆、键盘三处入口复用同一套夹取逻辑；同时新增 clampPan，把视口限制在地图范围内，修正经纬度读数越界（原为 -197.8° ~ 162.2°，现为 -180° ~ 162°）。</li>
+<li>追加迁移：续接 fantasy-map-generator--minimax-m3-1-flash-preview-max-r03；更新后的产物、十轮自审记录和说明来自 F:/dev/ai-coding-demo-test（model-test-base）/demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01。本次新增版本，未覆盖前序记录。
+&lt;!-- archive:end --&gt;</li>
+</ul>
+</article><p class="document-copy-status" role="status"></p></div></main><footer><div class="container">AI CODING DEMO / 实验记录与技术说明。</div></footer></body></html>

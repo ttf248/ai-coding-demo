@@ -314,7 +314,7 @@ export function generatedFiles(catalog) {
           : "执行模式未记录";
     const executionInfo =
       r.input.executionMode && r.input.executionMode !== "unknown"
-        ? `- 执行模式：${executionMode}${r.input.authorization ? `；授权原文：${r.input.authorization}` : ""}\n`
+        ? `- 执行模式：${executionMode}${r.input.executionModeNote ? `；备注：${r.input.executionModeNote}` : ""}${r.input.authorization ? `；授权原文：${r.input.authorization}` : ""}\n`
         : "";
     const billingInfo = r.billing
       ? `- 费用记录：${billingDescription(r.billing)}\n`

@@ -48,6 +48,7 @@
 
 - 实验 ID：`fluid-simulation--minimax-m3-1-flash-preview-max-r03`
 - 模型：MiniMax M3.1 Flash Preview；推理档位：max
+- 执行模式：按原任务执行；备注：自我审查十轮
 - 类型：single-html；预览：static；网络：offline
 - [完整原始输入快照](prompt.md) · [主题与其他版本](../../../../topic.html?id=fluid-simulation)
 - 输入记录：完整原始输入，等同于主题任务正文 v1（未增删），保存于本目录 prompt.md。

@@ -121,7 +121,7 @@
         " " +
         r.title +
         " " +
-        U.executionModeLabel(U.executionMode(r)) +
+        U.executionModeText(r) +
         " " +
         (r.date || "")
       )
@@ -150,7 +150,7 @@
             .join(" / ");
           return (
             heading +
-            `<button class="model-choice" data-choice="${e(r.id)}" ${slots().some((s) => s !== side && state[s] === r.id) ? "disabled" : ""}><strong>${e(runLabel(r))}</strong><span>${e(r.title)} · ${e(r.date || "日期未记录")}</span><small>${occupied ? "已选 " + occupied + " · " : ""}${seen.has(r.id) ? "已浏览 · " : ""}${r.preview.kind === "none" ? "无预览" : r.preview.embed ? "可预览" : "独立打开"} · ${e(U.completenessLabel(r.input.completeness))} · ${e(U.executionModeLabel(U.executionMode(r)))}</small></button>`
+            `<button class="model-choice" data-choice="${e(r.id)}" ${slots().some((s) => s !== side && state[s] === r.id) ? "disabled" : ""}><strong>${e(runLabel(r))}</strong><span>${e(r.title)} · ${e(r.date || "日期未记录")}</span><small>${occupied ? "已选 " + occupied + " · " : ""}${seen.has(r.id) ? "已浏览 · " : ""}${r.preview.kind === "none" ? "无预览" : r.preview.embed ? "可预览" : "独立打开"} · ${e(U.completenessLabel(r.input.completeness))} · ${e(U.executionModeText(r))}</small></button>`
           );
         })
         .join("") ||
@@ -334,9 +334,9 @@
             U.promptFor(data, r)?.hash === U.promptFor(data, other)?.hash
               ? " · 同正文"
               : "") +
-            (U.executionMode(r) === "unknown"
+            (U.executionMode(r) === "unknown" && !r.input.executionModeNote
               ? ""
-              : " · " + e(U.executionModeLabel(U.executionMode(r)))) +
+              : " · " + e(U.executionModeText(r))) +
             "</option>",
         );
       // Keep an untouched iframe in place: moving its DOM node would reload it.
@@ -441,9 +441,10 @@
           : "") +
         (run ? '<a href="' + e(U.documentURL(run)) + '">实验记录</a>' : "") +
         (run ? "</div></details>" : "") +
-        (run && U.executionMode(run) !== "unknown"
+        (run &&
+        (U.executionMode(run) !== "unknown" || run.input.executionModeNote)
           ? '<span class="execution-mode-chip panel-execution-mode">' +
-            e(U.executionModeLabel(U.executionMode(run))) +
+            e(U.executionModeText(run)) +
             "</span>"
           : "") +
         '</div><p class="panel-status">' +
@@ -511,7 +512,7 @@
             U.modelLabel(data, run) + " / " + U.effortLabel(run.effort),
           ],
           ["日期", run.date || "未记录"],
-          ["执行模式", U.executionModeLabel(U.executionMode(run))],
+          ["执行模式", U.executionModeText(run)],
           ["自主优化授权原文", run.input.authorization || "未记录"],
           [
             "原始输入记录",
@@ -574,7 +575,10 @@
       const frame = document.createElement("iframe");
       frame.title = run.title + " · " + side;
       frame.dataset.key = frameKey(side);
-      frame.setAttribute("allow", "fullscreen; autoplay; clipboard-write");
+      frame.setAttribute(
+        "allow",
+        "camera; fullscreen; autoplay; clipboard-write",
+      );
       frame.setAttribute("allowfullscreen", "");
       frame.setAttribute(
         "sandbox",
@@ -638,7 +642,7 @@
       ],
       ["模型", (r) => U.modelLabel(data, r)],
       ["推理档位", (r) => U.effortLabel(r.effort)],
-      ["执行模式", (r) => U.executionModeLabel(U.executionMode(r))],
+      ["执行模式", (r) => U.executionModeText(r)],
       ["自主优化授权原文", (r) => r.input.authorization || "未记录"],
       ["轮次", (r) => U.roundLabel(r)],
       ["日期", (r) => r.date || "未记录"],

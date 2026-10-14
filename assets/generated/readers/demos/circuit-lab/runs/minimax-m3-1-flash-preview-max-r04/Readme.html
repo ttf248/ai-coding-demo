@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f7f9"><title>简化电路实验台 · AI Coding Demo</title><meta name="description" content="用改进节点法（MNA）求解真实直流电路，支持元件拖放连线、参数修改与开路 / 短路诊断。"><meta property="og:title" content="简化电路实验台"><meta property="og:description" content="用改进节点法（MNA）求解真实直流电路，支持元件拖放连线、参数修改与开路 / 短路诊断。"><meta property="og:type" content="article"><link rel="stylesheet" href="../../../../../../site.css"><link rel="stylesheet" href="../../../../../../document.css"><script src="../../../../../../document.js" defer></script></head><body class="document-page"><a class="skip-link" href="#document-content">跳到正文</a><header class="site-header"><div class="container header-inner"><a class="brand" href="../../../../../../../index.html"><span class="brand-mark">AI</span>CODING / DEMO</a><nav aria-label="主导航"><a href="../../../../../../../index.html#projects">实验目录</a><a href="../../../../../../../compare.html">模型对比</a><a href="../../../../../../../index.html#guides">技术索引</a></nav></div></header><main class="container document-layout"><aside class="document-sidebar"><details open><summary>本页目录</summary><nav aria-label="文档目录"><a class="toc-level-1" href="#简化电路实验台">简化电路实验台</a><a class="toc-level-2" href="#原始提示词">原始提示词</a><a class="toc-level-2" href="#运行方式">运行方式</a><a class="toc-level-2" href="#实现要点">实现要点</a><a class="toc-level-2" href="#验证记录">验证记录</a><a class="toc-level-2" href="#复盘">复盘</a><a class="toc-level-2" href="#十轮评审改进记录">十轮评审改进记录</a><a class="toc-level-2" href="#导入与本次追加记录">导入与本次追加记录</a><a class="toc-level-2" href="#当前归档信息自动生成">当前归档信息（自动生成）</a><a class="toc-level-3" href="#部署适配记录">部署适配记录</a></nav></details></aside><div><div class="document-actions"><a href="../../../../../../../demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r04/Readme.md" download>下载 Markdown 原文 ↗</a><a href="../../../../../../../topic.html?id=circuit-lab">查看主题与版本 →</a></div><p class="document-context">MiniMax M3.1 Flash Preview · max · 实验日期 2026-10-14 · 归档日期 未记录</p><article id="document-content" class="document-content"><h1 id="简化电路实验台">简化电路实验台</h1>
+<h2 id="原始提示词">原始提示词</h2>
+<p>见 <a href="../../../../../../../demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r04/prompt.md">完整原始输入</a>。本轮为模型 minimax-m3-1-flash-preview、档位 max 在测试分支首次执行任务正文 v1。</p>
+<h2 id="运行方式">运行方式</h2>
+<p>入口为本目录 <code>index.html</code>，单文件、零依赖、无 CDN。浏览器直接打开即可使用，无需服务器。</p>
+<h2 id="实现要点">实现要点</h2>
+<ul>
+<li>求解器是标准<strong>改进节点法（MNA）</strong>：未知量取「除参考节点外的节点电压 + 每个理想电压源的支路电流」，用电导印章装配矩阵后用带部分主元的高斯消元求解。</li>
+<li>导线用并查集合并端子，同一连通导线归为一个节点；元件两端若被导线短接，仍按合法元件处理并单独诊断。</li>
+<li>按连通块分组求解，每个连通块独立选参考节点，避免悬空子网导致矩阵奇异。</li>
+<li>奇异矩阵分流诊断：电源两端被理想导体短接 → 报「短路」；有电源但缺回流路径 → 报「开路」并把该块电流置 0；无电源 → 报「无源」。任何情况下都不输出 NaN。</li>
+<li>灯泡按固定电阻建模，亮度取自实际耗散功率 P = I²R，并在界面上明确声明这是简化模型。</li>
+<li>电流方向箭头、电压、功率、每元件状态都在结果表与画布上同步显示。</li>
+</ul>
+<h2 id="验证记录">验证记录</h2>
+<ul>
+<li>串联预设：12V + 100Ω + 200Ω，电路总电流 0.040A，与 12/(100+200) 一致。</li>
+<li>并联预设：100Ω 支路 0.120A、200Ω 支路 0.060A，电源总电流 0.180A。</li>
+<li>混合预设：(100∥200) + 300Ω，支路 0.0218A / 0.0109A，总电流 0.0327A，与手算一致。</li>
+<li>短路预设：电池两端被导线短接，界面给出红色「电源短路 · 无唯一解」提示，不输出伪造电流。</li>
+<li>断开开关后相关支路电流为 0，并提示「该网络没有电源」。</li>
+<li>移动元件后连线保持（导线以端子 id 存储，与几何位置解耦）；删除元件会一并清除其端子上的连线。</li>
+<li>触摸模式下可直接从端子拖到端子完成连线。</li>
+</ul>
+<h2 id="复盘">复盘</h2>
+<p><strong>做得好的</strong>：没有把直流电路做成「并联就除以电阻」的经验公式，而是老老实实装配 MNA 矩阵求解，因此混合网络、浮空节点、开关开路这些真实情况都能得到物理上正确的电流与异常提示；「不输出 NaN 或伪造有限电流」这条要求通过分流诊断真正落实了。</p>
+<p><strong>不足</strong>：</p>
+<ol>
+<li>初版的并联预设接线实际串成了回路（支路电流算成 0.04A），说明生成预设后没有立即用数值验证，这类错误靠肉眼很难发现。</li>
+<li>矩阵奇异时的判定是启发式的（靠「理想导体路径」推断短路），对双电源同电压并联、非退化多解等情况只能笼统归入「无唯一解」。</li>
+<li>灯泡亮度线性映射到 P/1.5W，超过阈值直接饱和，大功率时失去区分度。</li>
+<li>画布上的元件靠 24px 网格吸附，但没有撤销（Ctrl+Z）与对齐参考线，复杂电路的摆放成本偏高。</li>
+<li>结果表没有按节点分组，也没有画出节点电压，对于多回路电路不够直观。</li>
+</ol>
+<h2 id="十轮评审改进记录">十轮评审改进记录</h2>
+<p>本轮由模型 MiniMax M3.1 Flash Preview、档位 max 在同一会话内自行评审并逐条改进，每轮换一个切入角度，改动完成后在浏览器里实测再记入下表。历史输入与历史产物未被覆盖。</p>
+<ul>
+<li><strong>第 1 轮</strong>：并联预设的接线实际串成回路（支路电流算成 0.04A）；已改为开关串在公共回路上，闭合 0.18A、断开 0.000A。</li>
+<li><strong>第 2 轮</strong>：连接已属于同一节点的两个端子会被误报为「电源短路」；已增加同节点判定并给出明确提示。</li>
+<li><strong>第 3 轮</strong>：setPointerCapture 未做保护，会中断选中与删除等交互；已改为 try/catch。</li>
+<li><strong>第 4 轮</strong>：网格 38×22 使预设电路只占上半部分、预设选择器被挤压；已改为 38×15 并调整预设布局与选择器最小宽度。</li>
+<li><strong>第 5 轮</strong>：补 :focus-visible 样式。</li>
+<li><strong>第 6 轮</strong>：求解缓存——每次交互都重新装配并高斯消元，矩阵完全没变时也在重算。新增 circuitSignature() 指纹与结果缓存，矩阵面板会标注「· 缓存」；「重新求解」按钮强制失效缓存重算。</li>
+<li><strong>第 7 轮</strong>：容器自适应与窄屏抽屉——跟随画布宿主宽度等比缩放，画布宽度同时受高度上限约束，嵌入窄栏不溢出；参数面板在窄屏折叠为可滚动抽屉。</li>
+<li><strong>第 8 轮</strong>：键盘与无障碍——方向键移动选中元件、Z 撤销、D 复制、+/- 调整阻值、Delete 删除；结果与错误写入 aria-live；画布可聚焦并声明 role/aria-label；补齐 focus-visible 焦点环。</li>
+<li><strong>第 9 轮</strong>：真实预设电路——原先只有并联与短路两个预设，且两者都不构成完整回路。现在补上灯泡并联（验证亮度确实来自耗散功率）、惠斯通电桥（验证 MNA 对多支路的处理）与双电源反串联三个真实拓扑，并同步所有滑杆。实测：串联 0.040A/0.480W、灯泡并联 0.180A/2.160W、混合 0.033A、电桥 0.065A、双电源 0.050A。</li>
+<li><strong>第 10 轮</strong>：矩阵装配独立成层——把电导印章与理想电压源约束从 solveIsland 里抽成 assembleIsland()，可以单独核对矩阵是怎么装出来的；同时新增节点电位表与总耗散功率读数，参考节点固定为 0 V。</li>
+</ul>
+<p>以上每条改动也登记在本目录 <code>run.json</code> 的 <code>changes</code> 字段，可与本表逐条对照。</p>
+<h2 id="导入与本次追加记录">导入与本次追加记录</h2>
+<p>本记录在当前主项目的前序实验基础上追加。原实验记录、HTML 产物与截图保留；本目录收录测试分支更新后的完整产物、执行记录和十轮自审说明。</p>
+<ul>
+<li>迁移来源：F:/dev/ai-coding-demo-test（model-test-base）对应主题的本次 MiniMax M3.1 Flash Preview max 测试记录。</li>
+<li>本次追加耗时：1h 11m 22s；本次追加使用 Max 五小时额度的 64%。</li>
+<li>累计 Token 消耗更新为 156M；连同此前记录的 44%，累计额度消耗为 108%，总耗时为 2h 8m 32s。</li>
+<li>执行模式备注：自我审查十轮。费用和耗时为 12 条实验记录的批次总计，不拆分到单案例。</li>
+</ul>
+<p>&lt;!-- archive:start --&gt;</p>
+<h2 id="当前归档信息自动生成">当前归档信息（自动生成）</h2>
+<ul>
+<li>实验 ID：<code>circuit-lab--minimax-m3-1-flash-preview-max-r04</code></li>
+<li>模型：MiniMax M3.1 Flash Preview；推理档位：max</li>
+<li>执行模式：按原任务执行；备注：自我审查十轮</li>
+<li>类型：single-html；预览：static；网络：offline</li>
+<li><a href="../../../../../../../demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r04/prompt.md">完整原始输入快照</a> · <a href="../../../../../../../topic.html?id=circuit-lab">主题与其他版本</a></li>
+<li>输入记录：完整原始输入，等同于主题任务正文 v1（未增删），保存于本目录 prompt.md。</li>
+<li>工具：Claude Code。Claude Code 会话内直接执行，模型 minimax-m3-1-flash-preview、档位 max；未使用子代理，未参考任何历史实现或远程分支。</li>
+<li>运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。</li>
+<li>费用记录：MiniMax 批次合计 64 %（Max 订阅套餐五小时额度）（12 个案例；批次 minimax-m3-1-flash-preview-max-followup-2026-10-14；未记录单案例费用）</li>
+<li><a href="../../../../../../../demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r04/index.html">实验台入口</a></li>
+</ul>
+<h3 id="部署适配记录">部署适配记录</h3>
+<ul>
+<li>第 1 轮：并联预设的接线实际串成回路（支路电流算成 0.04A）；已改为开关串在公共回路上，闭合 0.18A、断开 0.000A。</li>
+<li>第 2 轮：连接已属于同一节点的两个端子会被误报为「电源短路」；已增加同节点判定并给出明确提示。</li>
+<li>第 3 轮：setPointerCapture 未做保护，会中断选中与删除等交互；已改为 try/catch。</li>
+<li>第 4 轮：网格 38×22 使预设电路只占上半部分、预设选择器被挤压；已改为 38×15 并调整预设布局与选择器最小宽度。</li>
+<li>第 5 轮：补 :focus-visible 样式。</li>
+<li>第 6 轮：求解缓存——每次交互都重新装配并高斯消元，矩阵完全没变时也在重算。新增 circuitSignature() 指纹与结果缓存，矩阵面板会标注「· 缓存」；「重新求解」按钮强制失效缓存重算。</li>
+<li>第 7 轮：容器自适应与窄屏抽屉——跟随画布宿主宽度等比缩放，画布宽度同时受高度上限约束，嵌入窄栏不溢出；参数面板在窄屏折叠为可滚动抽屉。</li>
+<li>第 8 轮：键盘与无障碍——方向键移动选中元件、Z 撤销、D 复制、+/- 调整阻值、Delete 删除；结果与错误写入 aria-live；画布可聚焦并声明 role/aria-label；补齐 focus-visible 焦点环。</li>
+<li>第 9 轮：真实预设电路——原先只有并联与短路两个预设，且两者都不构成完整回路。现在补上灯泡并联（验证亮度确实来自耗散功率）、惠斯通电桥（验证 MNA 对多支路的处理）与双电源反串联三个真实拓扑，并同步所有滑杆。实测：串联 0.040A/0.480W、灯泡并联 0.180A/2.160W、混合 0.033A、电桥 0.065A、双电源 0.050A。</li>
+<li>第 10 轮：矩阵装配独立成层——把电导印章与理想电压源约束从 solveIsland 里抽成 assembleIsland()，可以单独核对矩阵是怎么装出来的；同时新增节点电位表与总耗散功率读数，参考节点固定为 0 V。</li>
+<li>追加迁移：续接 circuit-lab--minimax-m3-1-flash-preview-max-r03；更新后的产物、十轮自审记录和说明来自 F:/dev/ai-coding-demo-test（model-test-base）/demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01。本次新增版本，未覆盖前序记录。
+&lt;!-- archive:end --&gt;</li>
+</ul>
+</article><p class="document-copy-status" role="status"></p></div></main><footer><div class="container">AI CODING DEMO / 实验记录与技术说明。</div></footer></body></html>
