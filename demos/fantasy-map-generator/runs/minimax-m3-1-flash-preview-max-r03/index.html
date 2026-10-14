@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>奇幻地图生成器</title>
+<style>
+  :root {
+    --bg: #14100c;
+    --panel: #1e1813;
+    --panel2: #2a2219;
+    --line: #3b3024;
+    --text: #f0e6d6;
+    --muted: #a8967f;
+    --accent: #d9a441;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; overflow-x: hidden; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 14px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", serif;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 14px 12px 40px; }
+  h1 { margin: 4px 0 2px; font-size: 20px; font-family: Georgia, "Songti SC", serif; }
+  .sub { color: var(--muted); margin: 0 0 12px; font-size: 13px; }
+  .layout { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  @media (min-width: 960px) { .layout { grid-template-columns: minmax(0,1fr) 268px; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  button, input, select { font: inherit; color: var(--text); }
+  button {
+    background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 8px; padding: 8px 11px; cursor: pointer; min-height: 38px;
+  }
+  button:hover { border-color: var(--accent); }
+  button.active { background: #4a3a1c; border-color: var(--accent); font-weight: 600; }
+  button.primary { background: #8a5a1a; border-color: var(--accent); }
+  .slider { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .slider label { width: 74px; color: var(--muted); font-size: 12.5px; }
+  .slider input { flex: 1; min-width: 70px; accent-color: var(--accent); }
+  .slider span { width: 46px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+  canvas { display: block; width: 100%; height: auto; touch-action: none; border-radius: 8px; border: 1px solid #4a3a26; background: #0d2a44; cursor: crosshair; }
+  .legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 4px 10px; margin-top: 10px; font-size: 12px; }
+  .legend div { display: flex; align-items: center; gap: 6px; }
+  .legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid rgba(0,0,0,.35); }
+  .msg { margin-top: 10px; border-radius: 8px; padding: 8px 10px; font-size: 13px; display: none; }
+  .msg.show { display: block; }
+  .msg.ok { background: #1d2a17; border: 1px solid #3d5c2c; color: #cbe8b4; }
+  .msg.err { background: #351a18; border: 1px solid #6d2f2a; color: #f4c3bd; }
+  .help { color: var(--muted); font-size: 12px; }
+  .help p { margin: 0 0 6px; }
+  .help b { color: var(--text); }
+  .stats { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .stats span:last-child { font-variant-numeric: tabular-nums; }
+
+  /* 可访问性：键盘操作时保留清晰的焦点指示 */
+  button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent, #4d9cff);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>奇幻地图生成器</h1>
+  <p class="sub">种子化程序生成的手绘风格奇幻岛屿地图：分形噪声地形、沿地势下降的河流、城镇标注与画笔地形编辑。</p>
+
+  <div class="layout">
+    <div>
+      <div class="panel">
+        <div class="toolbar">
+          <div class="group">
+            <label style="color:var(--muted)">种子</label>
+            <input id="seed" value="1306" style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:110px" />
+            <button id="btnGen" class="primary">生成</button>
+            <button id="btnRandom">随机种子</button>
+          </div>
+          <div class="group">
+            <button data-tool="view" class="active">查看 / 平移</button>
+            <button data-tool="raise">升高地形</button>
+            <button data-tool="lower">降低地形</button>
+            <button data-tool="water">挖海</button>
+          </div>
+          <div class="group">
+            <button id="btnReset">重置参数</button>
+            <button id="btnPng">导出 PNG</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="slider" style="flex:1;min-width:220px">
+            <label for="zoom">缩放</label>
+            <input type="range" id="zoom" min="50" max="400" value="100" />
+            <span id="zoomVal">1.00x</span>
+          </div>
+          <div class="group">
+            <button id="btnFit">适应窗口</button>
+            <label style="color:var(--muted);margin-left:6px">
+              <input type="checkbox" id="showTowns" checked /> 显示城镇标签
+            </label>
+            <label style="color:var(--muted)">
+              <input type="checkbox" id="showRivers" checked /> 显示河流
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:12px">
+        <canvas id="cv" width="900" height="620"></canvas>
+        <div class="legend" id="legend"></div>
+        <div id="msg" class="msg"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2 style="font-size:14px;margin:0 0 10px">生成参数</h2>
+        <div class="slider"><label for="sea">海平面</label><input type="range" id="sea" min="20" max="70" value="42" /><span id="seaVal">0.42</span></div>
+        <div class="slider"><label for="rough">地形粗糙度</label><input type="range" id="rough" min="20" max="100" value="55" /><span id="roughVal">0.55</span></div>
+        <div class="slider"><label for="islands">岛屿密度</label><input type="range" id="islands" min="0" max="100" value="45" /><span id="islVal">0.45</span></div>
+        <div class="slider"><label for="brush">笔刷大小</label><input type="range" id="brush" min="2" max="14" value="6" /><span id="brushVal">6</span></div>
+        <div class="slider"><label for="strength">笔刷强度</label><input type="range" id="strength" min="1" max="10" value="4" /><span id="strVal">0.04</span></div>
+        <div class="slider"><label for="towns">城镇数量</label><input type="range" id="towns" min="0" max="18" value="7" /><span id="townVal">7</span></div>
+      </div>
+
+      <div class="panel" style="margin-top:12px">
+        <h2 style="font-size:14px;margin:0 0 8px">地图统计</h2>
+        <div class="stats"><span>陆地占比</span><span id="kLand">—</span></div>
+        <div class="stats"><span>最高海拔</span><span id="kMax">—</span></div>
+        <div class="stats"><span>水域（含河湖）</span><span id="kWater">—</span></div>
+        <div class="stats"><span>河流像素段</span><span id="kRiver">—</span></div>
+        <div class="stats"><span>城镇数量</span><span id="kTown">—</span></div>
+        <div class="stats"><span>视图缩放</span><span id="kZoom">—</span></div>
+      </div>
+
+      <div class="panel" style="margin-top:12px">
+        <h2 style="font-size:14px;margin:0 0 8px">操作说明</h2>
+        <div class="help">
+          <p><b>相同种子 + 相同参数 = 完全相同的地图</b>，可随时复现。</p>
+          <p><b>平移</b>：查看模式下按住拖动，或按住空格拖动；滚轮 / 双指捏合缩放。</p>
+          <p><b>画笔</b>：选择升高、降低或挖海后在地图上按住拖动，编辑会立即重算海岸线、河流与城镇。</p>
+          <p>河流按降雨汇流沿最陡下降路径流向海洋或低洼湖泊，不会翻越山峰。</p>
+          <p><b>导出 PNG</b> 会按当前视口完整绘制，包含地形、河流与城镇标签。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const MAP_W = 384, MAP_H = 256;
+  const $ = (id) => document.getElementById(id);
+  const cv = $("cv");
+  const ctx = cv.getContext("2d");
+
+  /* ---------- 种子随机 ---------- */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const hashSeed = (s) => {
+    let h = 2166136261 >>> 0;
+    for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  };
+
+  /* ---------- 值噪声 fBm ---------- */
+  function makeNoise(seedNum) {
+    const rand = mulberry32(seedNum);
+    const perm = new Uint8Array(512);
+    const p = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) p[i] = i;
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [p[i], p[j]] = [p[j], p[i]];
+    }
+    for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+    const grad = new Float32Array(256);
+    for (let i = 0; i < 256; i++) grad[i] = rand();
+    const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+    const lerp = (a, b, t) => a + (b - a) * t;
+    function noise(x, y) {
+      const X = Math.floor(x) & 255, Y = Math.floor(y) & 255;
+      const xf = x - Math.floor(x), yf = y - Math.floor(y);
+      const u = fade(xf), v = fade(yf);
+      const aa = grad[perm[perm[X] + Y] & 255];
+      const ab = grad[perm[perm[X] + Y + 1] & 255];
+      const ba = grad[perm[perm[X + 1] + Y] & 255];
+      const bb = grad[perm[perm[X + 1] + Y + 1] & 255];
+      return lerp(lerp(aa, ba, u), lerp(ab, bb, u), v);
+    }
+    return function fbm(x, y, octaves, lacunarity, gain) {
+      let amp = 1, freq = 1, sum = 0, norm = 0;
+      for (let i = 0; i < octaves; i++) {
+        sum += noise(x * freq, y * freq) * amp;
+        norm += amp;
+        amp *= gain; freq *= lacunarity;
+      }
+      return sum / norm;
+    };
+  }
+
+  /* ---------- 状态 ---------- */
+  const state = {
+    seed: "1306",
+    sea: 0.42,
+    rough: 0.55,
+    islands: 0.45,
+    brush: 6,
+    strength: 0.04,
+    townCount: 7,
+    showTowns: true,
+    showRivers: true,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    tool: "view",
+  };
+  let height = new Float32Array(MAP_W * MAP_H);
+  let rawHeight = new Float32Array(MAP_W * MAP_H); // 未做秩归一化的原始地形
+  let river = new Uint8Array(MAP_W * MAP_H);
+  let riverFlow = new Float32Array(MAP_W * MAP_H);
+  let lake = new Uint8Array(MAP_W * MAP_H);
+  let towns = [];
+
+  /* ---------- 生成 ---------- */
+  function generate() {
+    const s = hashSeed(state.seed);
+    const fbm = makeNoise(s);
+    const warp = makeNoise(s ^ 0x9e3779b9);
+    const ridgeNoise = makeNoise(s ^ 0x1f83d9ab);
+    const rand = mulberry32(s ^ 0x5bf03635);
+    const rgh = 0.6 + state.rough * 1.9;
+    const isl = state.islands;
+
+    // 多个岛屿中心，形成群岛而不是单一大陆
+    const nIsl = 2 + Math.floor(rand() * 3);
+    const centers = [];
+    for (let i = 0; i < nIsl; i++) {
+      centers.push({
+        x: 0.20 + rand() * 0.60,
+        y: 0.20 + rand() * 0.60,
+        r: (0.12 + rand() * 0.13) * (0.7 + isl * 0.6),
+        w: (0.55 + rand() * 0.75) * (0.6 + isl * 0.7),
+      });
+    }
+
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const nx = x / MAP_W, ny = y / MAP_H;
+        // 域扭曲，避免噪声的方格感
+        const wx = (warp(nx * 3, ny * 3, 3, 2, 0.5) - 0.5) * 0.55;
+        const wy = (warp(nx * 3 + 5.2, ny * 3 + 1.3, 3, 2, 0.5) - 0.5) * 0.55;
+        const base = fbm((nx + wx) * rgh * 4, (ny + wy) * rgh * 4, 6, 2.05, 0.5);
+        // 脊状噪声：让高地形成山脊而不是圆顶，河流也会随之蜿蜒
+        const rf = 2.1 + rgh * 2.0;
+        const rn = ridgeNoise((nx + wx) * rf, (ny + wy) * rf, 4, 2.1, 0.5);
+        const ridge = Math.pow(1 - Math.abs(rn * 2 - 1), 1.5);
+
+        // 岛屿掩膜：平台型剖面（内部接近恒定，边缘快速下降），避免形成圆顶
+        let mask = 0;
+        for (const c of centers) {
+          const dx = nx - c.x, dy = ny - c.y;
+          const d = Math.sqrt(dx * dx + dy * dy * 1.12) / c.r;
+          if (d < 1) {
+            const prof = Math.pow(Math.max(0, 1 - d * d * d), 0.65);
+            mask = Math.max(mask, c.w * prof);
+          }
+        }
+        // 高程主要由脊状噪声决定，掩膜只决定“这里是不是岛”以及内陆起伏强度
+        let h = 0.42 * base + 0.48 * ridge * (0.35 + 0.65 * Math.min(1, mask)) + 0.14 * mask;
+        // 边缘强制海洋
+        const edge = Math.min(nx, ny, 1 - nx, 1 - ny);
+        if (edge < 0.05) h *= Math.pow(edge / 0.05, 0.8);
+        height[y * MAP_W + x] = Math.max(0, Math.min(1, h));
+      }
+    }
+    rawHeight.set(height);
+    rankNormalize();
+    recompute();
+  }
+
+  // 按秩归一化：海平面滑块直接对应陆地占比，避免高地泛滥，也避免大片雪原
+  function rankNormalize() {
+    const N = MAP_W * MAP_H;
+    // 从原始地形出发，避免每次都重新跑一遍噪声
+    height.set(rawHeight);
+    const sorted = Float32Array.from(height).sort();
+    const landFrac = Math.max(0.04, Math.min(0.92, 0.75 - state.sea));
+    const rankSea = 1 - landFrac;
+    const upperBound = (v) => {
+      let lo = 0, hi = N;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid] <= v) lo = mid + 1; else hi = mid; }
+      return lo;
+    };
+    const sea = state.sea;
+    for (let i = 0; i < N; i++) {
+      const rank = upperBound(height[i]) / N;
+      if (rank <= rankSea) {
+        // 海洋：越低越深
+        const d = rank / Math.max(1e-6, rankSea);
+        height[i] = Math.max(0, sea - 0.16 * (1 - d) - 0.002);
+      } else {
+        // 陆地： highlands 稀少，高程曲线 γ=1.7
+        const e = Math.pow(Math.min(1, (rank - rankSea) / (1 - rankSea)), 2.6);
+        height[i] = sea + 0.004 + e * (0.995 - sea);
+      }
+    }
+  }
+
+  // 河流：降雨 → 沿最陡下降汇流 → 超过阈值为河道，洼地形成湖泊
+  function recompute() {
+    const N = MAP_W * MAP_H;
+    river.fill(0);
+    riverFlow.fill(0);
+    lake.fill(0);
+    const flow = new Float32Array(N);
+    const sea = state.sea;
+    const order = new Int32Array(N);
+    for (let i = 0; i < N; i++) order[i] = i;
+    const h = height;
+    // 按高度降序处理，保证水流总是从高向低
+    const arr = Array.from(order).sort((a, b) => h[b] - h[a]);
+    const next = new Int32Array(N).fill(-1);
+    const DIRS = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
+
+    for (const i of arr) {
+      const x = i % MAP_W, y = (i / MAP_W) | 0;
+      flow[i] += 1 + h[i] * 6; // 降雨随海拔略增
+      if (h[i] <= sea) { flow[i] = 0; next[i] = -2; continue; } // 入海
+      // 找最陡下降邻居（严格更低，避免平局死循环）
+      let best = -1, bestDrop = 0;
+      for (const [dx, dy] of DIRS) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+        const j = ny * MAP_W + nx;
+        const dist = dx && dy ? 1.414 : 1;
+        const drop = (h[i] - h[j]) / dist;
+        if (drop > bestDrop + 1e-6) { bestDrop = drop; best = j; }
+      }
+      if (best === -1) {
+        // 局部洼地：形成内陆水体
+        lake[i] = 1;
+        next[i] = -2;
+        continue;
+      }
+      next[i] = best;
+      flow[best] += flow[i];
+    }
+
+    let riverCells = 0;
+    // 阈值按地图规模标定，避免把整片陆地画成河道网格
+    const threshold = N * 0.0016;
+    for (let i = 0; i < N; i++) {
+      if (h[i] <= sea || lake[i]) continue;
+      if (flow[i] > threshold && next[i] >= 0) {
+        river[i] = 1;
+        riverFlow[i] = flow[i];
+        riverCells++;
+      }
+    }
+
+    // 城镇：高于海平面、坡度平缓、彼此拉开距离
+    const rand = mulberry32(hashSeed(state.seed) ^ 0x1234abcd);
+    towns = [];
+    const tries = state.townCount * 400;
+    for (let t = 0; t < tries && towns.length < state.townCount; t++) {
+      const x = 10 + Math.floor(rand() * (MAP_W - 20));
+      const y = 10 + Math.floor(rand() * (MAP_H - 20));
+      const i = y * MAP_W + x;
+      if (h[i] <= sea + 0.010 || river[i]) continue;
+      let flat = true;
+      for (const [dx, dy] of DIRS) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+        if (Math.abs(h[i] - h[ny * MAP_W + nx]) > 0.012) { flat = false; break; }
+      }
+      if (!flat) continue;
+      if (towns.some((p) => Math.hypot(p.x - x, p.y - y) < 34)) continue;
+      towns.push({ x, y, name: townName(rand) });
+    }
+    $("kRiver").textContent = riverCells;
+    $("kTown").textContent = towns.length;
+    let land = 0, maxH = 0, water = 0;
+    for (let i = 0; i < N; i++) {
+      if (height[i] > sea) land++; else water++;
+      if (height[i] > maxH) maxH = height[i];
+    }
+    $("kLand").textContent = ((land / N) * 100).toFixed(1) + "%";
+    $("kWater").textContent = ((water / N) * 100).toFixed(1) + "%";
+    $("kMax").textContent = ((maxH - sea) * 1000).toFixed(0) + " m";
+    $("kZoom").textContent = state.zoom.toFixed(2) + "x";
+  }
+
+  const NAME_A = ["白", "黑", "青", "赤", "灰", "金", "暮", "晨", "霜", "焰", "风", "石", "云", "月"];
+  const NAME_B = ["港", "岭", "谷", "原", "湾", "堡", "塔", "林", "滩", "关", "溪", "丘"];
+  const townName = (rand) => NAME_A[Math.floor(rand() * NAME_A.length)] + NAME_B[Math.floor(rand() * NAME_B.length)];
+
+  /* ---------- 配色 ---------- */
+  const COLORS = {
+    deep: [18, 44, 78],
+    shallow: [42, 96, 140],
+    coast: [214, 199, 158],
+    grass: [116, 148, 84],
+    forest: [64, 102, 58],
+    rock: [138, 130, 112],
+    snow: [238, 240, 244],
+  };
+  function terrainColor(h, sea) {
+    if (h <= sea) {
+      // 用幂函数做水深过渡，避免出现等深线式色带
+      const t = Math.min(1, Math.pow((sea - h) / 0.14, 0.62));
+      return mix(COLORS.shallow, COLORS.deep, t);
+    }
+    const t = h - sea;
+    if (t < 0.004) return mix(COLORS.coast, [206, 190, 150], t / 0.004);
+    if (t < 0.016) return mix(COLORS.grass, COLORS.coast, 1 - (t - 0.004) / 0.012);
+    if (t < 0.16) return mix(COLORS.grass, [144, 174, 100], t / 0.16);
+    if (t < 0.38) return mix(COLORS.forest, [82, 120, 64], (t - 0.16) / 0.22);
+    if (t < 0.62) return mix(COLORS.rock, [126, 122, 110], (t - 0.38) / 0.24);
+    if (t < 0.80) return mix([178, 180, 182], COLORS.snow, (t - 0.62) / 0.18);
+    return mix(COLORS.snow, [228, 234, 244], Math.min(1, (t - 0.80) / 0.14));
+  }
+  const mix = (a, b, t) => {
+    t = Math.max(0, Math.min(1, t));
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  };
+
+  /* ---------- 离屏地图 ---------- */
+  const off = document.createElement("canvas");
+  off.width = MAP_W; off.height = MAP_H;
+  const offCtx = off.getContext("2d");
+  let mapDirty = true;
+
+  function renderMap() {
+    const img = offCtx.createImageData(MAP_W, MAP_H);
+    const d = img.data;
+    const sea = state.sea;
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const i = y * MAP_W + x;
+        // 山体阴影：使用高度梯度做简单光照
+        const hl = height[y * MAP_W + Math.max(0, x - 1)];
+        const hu = height[Math.max(0, y - 1) * MAP_W + x];
+        let c = terrainColor(height[i] + (((x * 7 + y * 13) % 7) - 3) * 0.0035, sea);
+        const shade = 1 + ((height[i] - hl) * 6 + (height[i] - hu) * 6) * (height[i] > sea ? 1 : 0.3);
+        const f = Math.max(0.55, Math.min(1.35, shade));
+        let r = c[0] * f, g = c[1] * f, b = c[2] * f;
+        if (lake[i]) { r = 42; g = 96; b = 150; }
+        const p = i * 4;
+        d[p] = r; d[p + 1] = g; d[p + 2] = b; d[p + 3] = 255;
+      }
+    }
+    offCtx.putImageData(img, 0, 0);
+
+    // 河流：从源头沿最陡下降路径追踪为连续折线，保证每条河道一路流到海或湖
+    if (state.showRivers) {
+      const D8 = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
+      const nextOf = (i) => {
+        const x = i % MAP_W, y = (i / MAP_W) | 0;
+        let best = -1, bestDrop = 0;
+        for (const [dx, dy] of D8) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+          const j = ny * MAP_W + nx;
+          const dist = dx && dy ? 1.414 : 1;
+          const drop = (height[i] - height[j]) / dist;
+          if (drop > bestDrop + 1e-7) { bestDrop = drop; best = j; }
+        }
+        return best;
+      };
+      const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+      const isSource = (i) => {
+        const x = i % MAP_W, y = (i / MAP_W) | 0;
+        for (const [dx, dy] of DIRS4) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+          const j = ny * MAP_W + nx;
+          if (river[j] && height[j] > height[i]) return false;
+        }
+        return true;
+      };
+      for (const t of [{ min: 0, w: 0.7, c: "rgba(104,164,214,0.95)" }, { min: 320, w: 1.3, c: "rgba(64,138,200,1)" }, { min: 1300, w: 2.1, c: "rgba(38,112,186,1)" }]) {
+        offCtx.strokeStyle = t.c;
+        offCtx.lineWidth = t.w;
+        offCtx.lineCap = "round";
+        offCtx.lineJoin = "round";
+        offCtx.beginPath();
+        for (let y = 0; y < MAP_H; y++) {
+          for (let x = 0; x < MAP_W; x++) {
+            const i = y * MAP_W + x;
+            if (!river[i] || riverFlow[i] < t.min || !isSource(i)) continue;
+            // 从源头一路向下游描粗线；分级靠 riverFlow 的天然递增自然过渡
+            offCtx.moveTo(x + 0.5, y + 0.5);
+            let cur = i, guard = 0;
+            while (guard++ < MAP_W * MAP_H) {
+              const nxt = nextOf(cur);
+              if (nxt === -1) break;
+              const nx = nxt % MAP_W, ny = (nxt / MAP_W) | 0;
+              offCtx.lineTo(nx + 0.5, ny + 0.5);
+              if (!river[nxt] || lake[nxt] || height[nxt] <= state.sea) break;
+              cur = nxt;
+            }
+          }
+        }
+        offCtx.stroke();
+      }
+    }
+    mapDirty = false;
+  }
+
+  /* ---------- 视图 ---------- */
+  function fitView() {
+    const cssW = cv.clientWidth || 900;
+    const cssH = cv.clientHeight || 620;
+    const s = Math.min(cssW / MAP_W, cssH / MAP_H);
+    state.zoom = s / (cssW / MAP_W);
+    state.zoom = Math.max(0.5, Math.min(4, state.zoom));
+    state.panX = (cssW - MAP_W * (cssW / MAP_W * state.zoom)) / 2;
+    state.panY = (cssH - MAP_H * (cssW / MAP_W * state.zoom)) / 2;
+    $("zoom").value = Math.round(state.zoom * 100);
+    $("zoomVal").textContent = state.zoom.toFixed(2) + "x";
+  }
+
+  function draw() {
+    const cssW = cv.clientWidth || 900, cssH = cv.clientHeight || 620;
+    ctx.setTransform(cv.width / cssW, 0, 0, cv.height / cssH, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+    ctx.fillStyle = "#0b1a2b";
+    ctx.fillRect(0, 0, cssW, cssH);
+    if (mapDirty) renderMap();
+    const scale = (cssW / MAP_W) * state.zoom;
+    ctx.save();
+    ctx.translate(state.panX, state.panY);
+    ctx.imageSmoothingEnabled = state.zoom < 2.5;
+    ctx.drawImage(off, 0, 0, MAP_W * scale, MAP_H * scale);
+    ctx.restore();
+
+    // 城镇标签
+    if (state.showTowns) {
+      const fs = Math.max(10, Math.min(15, 11 * state.zoom));
+      ctx.font = `${fs}px Georgia, serif`;
+      ctx.textAlign = "center";
+      for (const t of towns) {
+        const x = state.panX + t.x * scale, y = state.panY + t.y * scale;
+        if (x < -40 || y < -20 || x > cssW + 40 || y > cssH + 20) continue;
+        ctx.beginPath();
+        ctx.arc(x, y, fs * 0.24, 0, Math.PI * 2);
+        ctx.fillStyle = "#fff6e0";
+        ctx.fill();
+        ctx.strokeStyle = "#3a2a18";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "rgba(20,14,8,.85)";
+        ctx.strokeText(t.name, x, y - fs * 0.6);
+        ctx.fillStyle = "#ffeccb";
+        ctx.fillText(t.name, x, y - fs * 0.6);
+      }
+    }
+    // 边框
+    ctx.strokeStyle = "rgba(0,0,0,.5)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(state.panX, state.panY, MAP_W * scale, MAP_H * scale);
+  }
+
+  /* ---------- 图例 ---------- */
+  function buildLegend() {
+    const items = [
+      ["海洋", COLORS.deep], ["浅海", COLORS.shallow], ["海岸", COLORS.coast],
+      ["平原", COLORS.grass], ["森林", COLORS.forest], ["岩石", COLORS.rock],
+      ["雪峰", COLORS.snow], ["湖泊", [42, 96, 150]], ["河流", [70, 140, 200]],
+    ];
+    $("legend").innerHTML = items
+      .map(([n, c]) => `<div><i style="background:rgb(${c.join(",")})"></i>${n}</div>`)
+      .join("");
+  }
+
+  /* ---------- 交互 ---------- */
+  function canvasPoint(ev) {
+    const rect = cv.getBoundingClientRect();
+    const scale = (MAP_W * state.zoom) / rect.width;
+    return { x: (ev.clientX - rect.left) * scale - state.panX, y: (ev.clientY - rect.top) * scale - state.panY };
+  }
+
+  let painting = false, panning = false, last = null, pinch = null;
+
+  function paintAt(p) {
+    const r = state.brush;
+    const d = state.strength;
+    let changed = false;
+    for (let y = Math.floor(p.y - r); y <= p.y + r; y++) {
+      for (let x = Math.floor(p.x - r); x <= p.x + r; x++) {
+        if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) continue;
+        const dist = Math.hypot(x - p.x, y - p.y);
+        if (dist > r) continue;
+        const fall = 1 - dist / r;
+        const i = y * MAP_W + x;
+        if (state.tool === "raise") height[i] = Math.min(1, height[i] + d * fall * 0.5);
+        else if (state.tool === "lower") height[i] = Math.max(0, height[i] - d * fall * 0.5);
+        else if (state.tool === "water") height[i] = Math.max(0, height[i] - d * fall);
+        changed = true;
+      }
+    }
+    if (changed) { mapDirty = true; recompute(); draw(); }
+  }
+
+  cv.addEventListener("pointerdown", (ev) => {
+    ev.preventDefault();
+    // 某些环境（合成事件、已释放指针）下捕获会抛异常，不能让它中断后续交互
+    try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* 忽略 */ }
+    const p = canvasPoint(ev);
+    if (state.tool === "view" || ev.shiftKey) {
+      panning = true;
+      last = { x: ev.clientX, y: ev.clientY };
+      cv.style.cursor = "grabbing";
+    } else {
+      painting = true;
+      paintAt(p);
+    }
+  });
+  cv.addEventListener("pointermove", (ev) => {
+    if (panning && last) {
+      state.panX += ev.clientX - last.x;
+      state.panY += ev.clientY - last.y;
+      last = { x: ev.clientX, y: ev.clientY };
+      draw();
+      return;
+    }
+    if (painting) paintAt(canvasPoint(ev));
+  });
+  const stop = () => {
+    painting = false; panning = false; last = null; cv.style.cursor = "crosshair";
+  };
+  cv.addEventListener("pointerup", stop);
+  cv.addEventListener("pointercancel", stop);
+  cv.addEventListener("pointerleave", stop);
+  cv.addEventListener("wheel", (ev) => {
+    ev.preventDefault();
+    const before = canvasPoint(ev);
+    const factor = ev.deltaY < 0 ? 1.12 : 1 / 1.12;
+    state.zoom = Math.max(0.5, Math.min(4, state.zoom * factor));
+    const after = canvasPoint(ev);
+    state.panX += (after.x - before.x) * state.zoom;
+    state.panY += (after.y - before.y) * state.zoom;
+    $("zoom").value = Math.round(state.zoom * 100);
+    $("zoomVal").textContent = state.zoom.toFixed(2) + "x";
+    $("kZoom").textContent = state.zoom.toFixed(2) + "x";
+    draw();
+  }, { passive: false });
+
+  // 双指捏合缩放
+  const touches = new Map();
+  cv.addEventListener("touchstart", (ev) => {
+    if (ev.touches.length === 2) {
+      const [a, b] = ev.touches;
+      pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), zoom: state.zoom };
+      stop();
+    }
+  }, { passive: true });
+  cv.addEventListener("touchmove", (ev) => {
+    if (pinch && ev.touches.length === 2) {
+      ev.preventDefault();
+      const [a, b] = ev.touches;
+      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      state.zoom = Math.max(0.5, Math.min(4, pinch.zoom * (d / pinch.d)));
+      $("zoom").value = Math.round(state.zoom * 100);
+      $("zoomVal").textContent = state.zoom.toFixed(2) + "x";
+      $("kZoom").textContent = state.zoom.toFixed(2) + "x";
+      draw();
+    }
+  }, { passive: false });
+  cv.addEventListener("touchend", () => { pinch = null; });
+
+  document.querySelectorAll("[data-tool]").forEach((b) =>
+    b.addEventListener("click", () => {
+      state.tool = b.dataset.tool;
+      document.querySelectorAll("[data-tool]").forEach((x) => x.classList.toggle("active", x === b));
+      cv.style.cursor = b.dataset.tool === "view" ? "grab" : "crosshair";
+      showMsg(
+        b.dataset.tool === "view" ? "查看模式：按住拖动平移，滚轮或双指缩放。" : "画笔模式：在地图上按住拖动即可编辑地形，海岸线与河流会立即重算。",
+        "ok"
+      );
+    })
+  );
+
+  function bindRange(id, key, label, format) {
+    const el = $(id);
+    el.addEventListener("input", () => {
+      state[key] = el.value / 100;
+      $(label).textContent = format(state[key]);
+      if (key === "sea") {
+        // 只改变海平面：复用同一份噪声，仅重排行程与水系
+        rankNormalize();
+        recompute();
+        mapDirty = true;
+        draw();
+      } else if (["rough", "islands"].includes(key)) {
+        generate();
+        draw();
+      } else draw();
+    });
+  }
+  bindRange("sea", "sea", "seaVal", (v) => v.toFixed(2));
+  bindRange("rough", "rough", "roughVal", (v) => v.toFixed(2));
+  bindRange("islands", "islands", "islVal", (v) => v.toFixed(2));
+  bindRange("brush", "brush", "brushVal", (v) => String(Math.round(v)));
+  bindRange("strength", "strength", "strVal", (v) => v.toFixed(2));
+  bindRange("towns", "townCount", "townVal", (v) => String(Math.round(v)));
+  $("towns").addEventListener("change", () => { recompute(); draw(); });
+
+  $("zoom").addEventListener("input", (e) => {
+    state.zoom = Number(e.target.value) / 100;
+    $("zoomVal").textContent = state.zoom.toFixed(2) + "x";
+    $("kZoom").textContent = state.zoom.toFixed(2) + "x";
+    draw();
+  });
+  $("btnFit").addEventListener("click", () => { fitView(); draw(); });
+  $("showTowns").addEventListener("change", (e) => { state.showTowns = e.target.checked; draw(); });
+  $("showRivers").addEventListener("change", (e) => { state.showRivers = e.target.checked; mapDirty = true; draw(); });
+
+  $("btnGen").addEventListener("click", () => {
+    const v = $("seed").value.trim();
+    if (!v) { showMsg("种子不能为空。", "err"); return; }
+    state.seed = v;
+    generate();
+    draw();
+    showMsg(`已使用种子「${v}」生成地图，同样的种子与参数会得到完全相同的结果。`, "ok");
+  });
+  $("btnRandom").addEventListener("click", () => {
+    $("seed").value = String(Math.floor(Math.random() * 99999));
+    $("btnGen").click();
+  });
+  $("btnReset").addEventListener("click", () => {
+    state.seed = "1306"; state.sea = 0.42; state.rough = 0.55; state.islands = 0.45;
+    state.brush = 6; state.strength = 0.04; state.townCount = 7; state.zoom = 1;
+    $("seed").value = "1306";
+    $("sea").value = 42; $("rough").value = 55; $("islands").value = 45;
+    $("brush").value = 6; $("strength").value = 4; $("towns").value = 7;
+    $("seaVal").textContent = "0.42"; $("roughVal").textContent = "0.55"; $("islVal").textContent = "0.45";
+    $("brushVal").textContent = "6"; $("strVal").textContent = "0.04"; $("townVal").textContent = "7";
+    generate();
+    fitView();
+    draw();
+    showMsg("已重置为默认参数与默认地图。", "ok");
+  });
+  $("btnPng").addEventListener("click", () => {
+    const out = document.createElement("canvas");
+    const scale = 3;
+    out.width = MAP_W * scale;
+    out.height = MAP_H * scale;
+    const c = out.getContext("2d");
+    c.imageSmoothingEnabled = false;
+    c.drawImage(off, 0, 0, out.width, out.height);
+    if (state.showTowns) {
+      const fs = 13 * scale;
+      c.font = `${fs}px Georgia, serif`;
+      c.textAlign = "center";
+      for (const t of towns) {
+        const x = t.x * scale + scale / 2, y = t.y * scale + scale / 2;
+        c.beginPath();
+        c.arc(x, y, fs * 0.26, 0, Math.PI * 2);
+        c.fillStyle = "#fff6e0"; c.fill();
+        c.strokeStyle = "#3a2a18"; c.lineWidth = 1.5; c.stroke();
+        c.lineWidth = 4;
+        c.strokeStyle = "rgba(20,14,8,.85)";
+        c.strokeText(t.name, x, y - fs * 0.6);
+        c.fillStyle = "#ffeccb";
+        c.fillText(t.name, x, y - fs * 0.6);
+      }
+    }
+    const a = document.createElement("a");
+    a.download = `fantasy-map-${state.seed}.png`;
+    a.href = out.toDataURL("image/png");
+    a.click();
+    showMsg("已导出当前地图 PNG（含地形、河流与城镇标签）。", "ok");
+  });
+
+  function showMsg(text, kind = "ok") {
+    const el = $("msg");
+    el.textContent = text;
+    el.className = "msg show " + kind;
+  }
+
+  window.addEventListener("resize", () => {
+    const cssW = cv.clientWidth || 900;
+    cv.style.height = Math.round(cssW * (MAP_H / MAP_W)) + "px";
+    cv.width = Math.round(cssW * Math.min(window.devicePixelRatio || 1, 2));
+    cv.height = Math.round(cv.clientHeight * Math.min(window.devicePixelRatio || 1, 2));
+    draw();
+  });
+
+  // 初始化
+  const initW = cv.clientWidth || 900;
+  cv.style.height = Math.round(initW * (MAP_H / MAP_W)) + "px";
+  cv.width = Math.round(initW * Math.min(window.devicePixelRatio || 1, 2));
+  cv.height = Math.round(cv.clientHeight * Math.min(window.devicePixelRatio || 1, 2));
+  buildLegend();
+  generate();
+  fitView();
+  draw();
+  showMsg("已生成默认地图。使用相同种子与参数随时可以复现同一张地图。", "ok");
+})();
+</script>
+</body>
+</html>

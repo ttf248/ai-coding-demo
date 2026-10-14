@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f7f9"><title>小蓝书 · 瀑布流社区（v2） · AI Coding Demo</title><meta name="description" content="同栈实现，改为运行时 mock 不同高度图片，不使用本地 images 目录。"><meta property="og:title" content="小蓝书 · 瀑布流社区（v2）"><meta property="og:description" content="同栈实现，改为运行时 mock 不同高度图片，不使用本地 images 目录。"><meta property="og:type" content="article"><link rel="stylesheet" href="../../../../../../site.css"><link rel="stylesheet" href="../../../../../../document.css"><script src="../../../../../../document.js" defer></script></head><body class="document-page"><a class="skip-link" href="#document-content">跳到正文</a><header class="site-header"><div class="container header-inner"><a class="brand" href="../../../../../../../index.html"><span class="brand-mark">AI</span>CODING / DEMO</a><nav aria-label="主导航"><a href="../../../../../../../index.html#projects">实验目录</a><a href="../../../../../../../compare.html">模型对比</a><a href="../../../../../../../index.html#guides">技术索引</a></nav></div></header><main class="container document-layout"><aside class="document-sidebar"><details open><summary>本页目录</summary><nav aria-label="文档目录"><a class="toc-level-1" href="#小蓝书-瀑布流社区任务正文-v2">小蓝书 · 瀑布流社区（任务正文 v2）</a><a class="toc-level-2" href="#原始提示词">原始提示词</a><a class="toc-level-2" href="#运行方式">运行方式</a><a class="toc-level-2" href="#实现要点">实现要点</a><a class="toc-level-2" href="#验证记录">验证记录</a><a class="toc-level-2" href="#复盘">复盘</a><a class="toc-level-2" href="#批次记录">批次记录</a><a class="toc-level-2" href="#当前归档信息自动生成">当前归档信息（自动生成）</a><a class="toc-level-3" href="#部署适配记录">部署适配记录</a></nav></details></aside><div><div class="document-actions"><a href="../../../../../../../demos/bluebook/runs/minimax-m3-1-flash-preview-max-r05/Readme.md" download>下载 Markdown 原文 ↗</a><a href="../../../../../../../topic.html?id=bluebook">查看主题与版本 →</a></div><p class="document-context">MiniMax M3.1 Flash Preview · max · 实验日期 2026-10-14 · 归档日期 未记录</p><article id="document-content" class="document-content"><h1 id="小蓝书-瀑布流社区任务正文-v2">小蓝书 · 瀑布流社区（任务正文 v2）</h1>
+<h2 id="原始提示词">原始提示词</h2>
+<p>见 <a href="../../../../../../../demos/bluebook/runs/minimax-m3-1-flash-preview-max-r05/prompt.md">完整原始输入</a>。本轮为模型 minimax-m3-1-flash-preview、档位 max 执行任务正文 v2。v2 与 v1 是不同任务：v2 去掉了 images 目录、编译拷贝与 Readme 要求，改为「使用 mock 数据，包含不同高度的图片」。</p>
+<h2 id="运行方式">运行方式</h2>
+<p>本目录是完整源码。开发模式 <code>npm ci &amp;&amp; npm run dev</code>；生产构建 <code>npm run build</code>，产物提交在 <code>previews/bluebook/minimax-m3-1-flash-preview-max-r05/</code>。</p>
+<h2 id="实现要点">实现要点</h2>
+<ul>
+<li>与 v1 同栈（React 18 + TypeScript + Tailwind + Zustand + react-lazyload + Vite），组件拆分与状态管理保持一致，便于对照两个任务正文的差异。</li>
+<li>关键差异在数据层：不再有 <code>images/</code> 目录，改为在 <code>src/mock/data.ts</code> 里<strong>运行时生成 SVG data URL</strong> 作为 mock 图片，颜色按索引取自固定主题表，山形与圆点只是占位装饰。</li>
+<li>「不同高度」被显式建模为 <code>ratio</code>：0.72 / 1.0 / 1.33 / 0.8 / 1.5 等高宽比混合，瀑布流据此预留占位高度，避免加载时的布局跳动。</li>
+<li>其余需求（首屏 20 条、滚动加载、loading 动画、两行截断、hover 上浮、按压反馈、下拉刷新、失败默认图、点赞弹跳、页面渐入、2/3/4 列响应式）按正文逐条实现。</li>
+</ul>
+<h2 id="验证记录">验证记录</h2>
+<ul>
+<li><code>npm ci</code> 后 <code>npm run build</code> 通过，产物不依赖任何外部图片请求。</li>
+<li>390×844 视口下为两列瀑布流，卡片高度明显不同（高图 / 方图 / 宽图交错），错落效果成立。</li>
+<li>1280 宽度下为四列。</li>
+<li>控制台无报错，无 404 图片请求。</li>
+</ul>
+<h2 id="复盘">复盘</h2>
+<p><strong>做得好的</strong>：同一模型在同一主题的两个任务正文版本下，代码结构保持可对照，而数据层按 v2 的要求真实改成「运行时 mock 不同高度图片」——这正是版本化任务正文存在的意义：同一个模型在两套约束下的差异是可被观察的，而不是复制一份改改文案。</p>
+<p><strong>不足</strong>：</p>
+<ol>
+<li>运行时把 SVG data URL 写进每条数据（120 条各一段字符串），每次刷新首屏都会重复编码；更好的做法是缓存编码结果或用 OffscreenCanvas 统一生成。</li>
+<li><code>ratioFor</code> 使用 <code>(i * 3) % ratios.length</code>，虽然能覆盖全部比例，但序列有明显的规律性，长列表滚动时会看出重复节奏。</li>
+<li>与 v1 共用同一套组件，等于把 v2 实现建立在 v1 的产物上；若两个任务正文出现互相矛盾的要求，当前结构缺少隔离手段。</li>
+<li><code>LazyImage</code> 的懒加载在这份 mock 数据上没有真实收益（data URL 无网络请求），组件仍然全量挂载，属于为 v1 保留的结构。</li>
+<li>依然没有把「搜索」做成全量搜索，数据只覆盖已加载页，v2 正文虽未要求，但功能表观上不完整。</li>
+</ol>
+<h2 id="批次记录">批次记录</h2>
+<p>本批共 11 个主题案例、12 条实验记录（蓝皮书含 v1/v2）；MiniMax Max 五小时额度消耗 44%，token 消耗 60.6M，耗时 57m 10s。测试备注：自我审查五轮。以上为批次总计，不拆分为单条记录。</p>
+<p>&lt;!-- archive:start --&gt;</p>
+<h2 id="当前归档信息自动生成">当前归档信息（自动生成）</h2>
+<ul>
+<li>实验 ID：<code>bluebook--minimax-m3-1-flash-preview-max-r05</code></li>
+<li>模型：MiniMax M3.1 Flash Preview；推理档位：max</li>
+<li>类型：app；预览：build；网络：offline</li>
+<li><a href="../../../../../../../demos/bluebook/runs/minimax-m3-1-flash-preview-max-r05/prompt.md">完整原始输入快照</a> · <a href="../../../../../../../topic.html?id=bluebook">主题与其他版本</a></li>
+<li>输入记录：完整原始输入，等同于主题任务正文 v2（未增删），保存于本目录 prompt.md。</li>
+<li>工具：Claude Code。Claude Code 会话内直接执行，模型 minimax-m3-1-flash-preview、档位 max；未使用子代理，未参考任何历史实现或远程分支。</li>
+<li>运行方式：在本目录 npm ci 后 npm run dev；Pages 使用根目录 previews 中已提交的构建产物。</li>
+<li>费用记录：MiniMax 批次合计 44 %（Max 订阅套餐五小时额度）（12 个案例；批次 minimax-m3-1-flash-preview-max-2026-10-14；未记录单案例费用）</li>
+<li><a href="../../../../../../../previews/bluebook/minimax-m3-1-flash-preview-max-r05/index.html">小蓝书首页</a></li>
+</ul>
+<h3 id="部署适配记录">部署适配记录</h3>
+<ul>
+<li>构建期修复：补 prop-types 依赖，避免产物出现无法解析的裸模块导入。</li>
+<li>构建期修复：改为 base: './'，使产物在子路径下同样可用。</li>
+<li>迁移来源：F:\dev\ai-coding-demo-test（model-test-base）/demos/bluebook/runs/minimax-m3-1-flash-preview-max-r02；main 已有该轮号，保留旧记录后迁入为 minimax-m3-1-flash-preview-max-r05。原始输入与产物按源分支复制，prompt.md 未改写。</li>
+<li>用户提供的本批测试备注：自我审查五轮。</li>
+<li>迁移截图：源测试分支未登记桌面截图；已在本仓库通过本地 HTTP 入口按实际页面补拍，并在 390px 视口确认无水平溢出（2026-10-14）。
+&lt;!-- archive:end --&gt;</li>
+</ul>
+</article><p class="document-copy-status" role="status"></p></div></main><footer><div class="container">AI CODING DEMO / 实验记录与技术说明。</div></footer></body></html>
