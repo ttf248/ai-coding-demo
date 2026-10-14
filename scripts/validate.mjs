@@ -243,6 +243,49 @@ for (const r of catalog.runs) {
       exists(`${r.directory}/${r.screenshot}`),
       `Missing run screenshot ${r.id}`,
     );
+  const score = r.score || {};
+  if (r.screenshot) {
+    check(
+      score.status === "rated",
+      `Run with screenshot must have a rating: ${r.id}`,
+    );
+    if (score.status === "rated" && score.dimensions) {
+      const total = Object.values(score.dimensions).reduce(
+        (sum, points) => sum + points,
+        0,
+      );
+      check(
+        total === score.total,
+        `Score total differs from dimensions ${r.id}`,
+      );
+      check(
+        score.screenshotHash === r.screenshotInfo?.hash,
+        `Screenshot changed; reassess score ${r.id}`,
+      );
+    }
+  } else {
+    check(
+      score.status === "unavailable" ||
+        (score.status === "pending" &&
+          r.status === "draft" &&
+          r.preview.kind === "none"),
+      `Run without screenshot must be unavailable or an unfinished draft: ${r.id}`,
+    );
+    if (score.status === "unavailable")
+      check(
+        typeof score.evidence === "string" &&
+          score.evidence.trim().length >= 12,
+        `Explain why score is unavailable ${r.id}`,
+      );
+  }
+  if (score.assessedAt) {
+    const d = new Date(`${score.assessedAt}T00:00:00Z`);
+    check(
+      !Number.isNaN(d.valueOf()) &&
+        d.toISOString().slice(0, 10) === score.assessedAt,
+      `Invalid score assessment date ${r.id}`,
+    );
+  }
   if (r.date) {
     const [year, month = 1, day = 1] = r.date.split("-").map(Number);
     const d = new Date(Date.UTC(year, month - 1, day));

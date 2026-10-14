@@ -15,11 +15,7 @@ test("homepage covers use registered run screenshots and direct previews", async
   const source = await page.evaluate((topicId) => {
     const run = window.ARCHIVE.runs
       .filter((item) => item.topicId === topicId && item.screenshot)
-      .sort(
-        (a, b) =>
-          (b.date || "").localeCompare(a.date || "") ||
-          window.ArchiveUI.compareModelRuns(window.ARCHIVE, a, b),
-      )[0];
+      .sort(window.ArchiveUI.compareRunScores)[0];
     return {
       path: `${run.directory}/${run.screenshot}`,
       modelId: run.modelId,
@@ -38,7 +34,7 @@ test("homepage covers use registered run screenshots and direct previews", async
   await expect(card.locator(".topic-cover figcaption")).toContainText(
     source.label,
   );
-  await expect(card.locator(".latest-run")).toContainText("最新实验");
+  await expect(card.locator(".latest-run")).toContainText("最高评分");
   const previewHref = await card.locator(".preview-link").getAttribute("href");
   expect(previewHref).toBeTruthy();
   const response = await page.request.get(previewHref);
@@ -59,11 +55,7 @@ test("homepage covers use registered run screenshots and direct previews", async
             run.modelId === modelId &&
             run.screenshot,
         )
-        .sort(
-          (a, b) =>
-            (b.date || "").localeCompare(a.date || "") ||
-            window.ArchiveUI.compareModelRuns(window.ARCHIVE, a, b),
-        )[0],
+        .sort(window.ArchiveUI.compareRunScores)[0],
     { topicId: topic.id, modelId: otherModel.id },
   );
   if (filteredScreenshot) {
@@ -78,6 +70,64 @@ test("homepage covers use registered run screenshots and direct previews", async
   await page.locator("nav a[href='#guides']").click();
   await expect(page.locator("#guides")).toHaveAttribute("open", "");
   await expect(page.locator("#guide-search")).toBeVisible();
+});
+
+test("homepage sorts by task complexity and shows each topic's highest-rated record", async ({
+  page,
+}) => {
+  const activeTopics = data.topics.filter(
+    (topic) =>
+      topic.testingStatus !== "archived" &&
+      data.runs.some((run) => run.topicId === topic.id),
+  );
+  const latestDate = (topicId) =>
+    data.runs
+      .filter((run) => run.topicId === topicId)
+      .reduce((date, run) => ((run.date || "") > date ? run.date : date), "");
+  const firstTopic = [...activeTopics]
+    .sort(
+      (a, b) =>
+        (b.complexity?.level || 0) - (a.complexity?.level || 0) ||
+        latestDate(b.id).localeCompare(latestDate(a.id)) ||
+        a.id.localeCompare(b.id),
+    )[0];
+  const top = data.runs
+    .filter(
+      (run) => run.topicId === firstTopic.id && run.score.status === "rated",
+    )
+    .sort(
+      (a, b) =>
+        b.score.total - a.score.total ||
+        (b.date || "").localeCompare(a.date || "") ||
+        a.id.localeCompare(b.id, "en"),
+    )[0];
+  await page.goto("./");
+  const first = page.locator(".topic-card").first();
+  await expect(page.locator("#sort")).toHaveValue("complexity");
+  await expect(
+    first.locator(`h3 a[href="topic.html?id=${firstTopic.id}"]`),
+  ).toHaveCount(1);
+  await expect(first.locator(".topic-cover")).toHaveAttribute(
+    "data-screenshot-run",
+    top.id,
+  );
+  await expect(first.locator(".score-chip").first()).toHaveText(
+    `评分 ${top.score.total}`,
+  );
+  await expect(first.locator(".topic-cover img")).toHaveAttribute(
+    "data-original",
+    `${top.directory}/${top.screenshot}`,
+  );
+  const href =
+    top.preview.kind === "external"
+      ? top.preview.externalUrl
+      : top.preview.pages?.find((page) => page.id === top.preview.defaultPage)
+          ?.href || null;
+  if (href) {
+    await expect(first.locator(".preview-link")).toHaveAttribute("href", href);
+  } else {
+    await expect(first.locator(".preview-link")).toHaveCount(0);
+  }
 });
 
 test("recent update cards keep text within their bounds on desktop and mobile", async ({
@@ -111,7 +161,7 @@ test("active topic grouping shows a screenshot for every active topic", async ({
       topic.testingStatus !== "archived" &&
       data.runs.some((run) => run.topicId === topic.id),
   );
-  await page.goto("./?testing=active&sort=latest&group=topics&view=grid");
+  await page.goto("./?testing=active&sort=score&group=topics&view=grid");
   while (await page.locator("#load-more").isVisible())
     await page.locator("#load-more").click();
   await expect(page.locator(".topic-card")).toHaveCount(topics.length);
@@ -122,11 +172,7 @@ test("active topic grouping shows a screenshot for every active topic", async ({
     const expected = await page.evaluate((topicId) => {
       const run = window.ARCHIVE.runs
         .filter((item) => item.topicId === topicId && item.screenshot)
-        .sort(
-          (a, b) =>
-            (b.date || "").localeCompare(a.date || "") ||
-            window.ArchiveUI.compareModelRuns(window.ARCHIVE, a, b),
-        )[0];
+        .sort(window.ArchiveUI.compareRunScores)[0];
       return run ? `${run.directory}/${run.screenshot}` : null;
     }, topic.id);
     expect(
@@ -155,7 +201,7 @@ test("run grouping shows registered screenshots on their own experiment cards", 
     const topic = data.topics.find((item) => item.id === run.topicId);
     return topic?.testingStatus !== "archived" && run.screenshot;
   });
-  await page.goto("./?testing=active&sort=latest&group=runs&view=grid");
+  await page.goto("./?testing=active&sort=score&group=runs&view=grid");
   while (await page.locator("#load-more").isVisible())
     await page.locator("#load-more").click();
   await expect(page.locator(".run-card-screenshot")).toHaveCount(
@@ -171,7 +217,7 @@ test("homepage grid and list keep preview controls within a mobile viewport", as
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("./?testing=active&sort=latest&group=topics&view=grid");
+  await page.goto("./?testing=active&sort=score&group=topics&view=grid");
   for (const view of ["grid", "list"]) {
     await openHomeControls(page);
     await page.locator('[data-view="' + view + '"]').click();
@@ -257,7 +303,7 @@ async function openHomeControls(page) {
 test("gallery prioritizes artwork and reveals metadata and navigation on demand", async ({
   page,
 }) => {
-  await page.goto("./?testing=active&sort=latest&group=topics&view=grid");
+  await page.goto("./?testing=active&sort=score&group=topics&view=grid");
   const first = page.locator(".topic-card").first();
   expect((await first.boundingBox()).y).toBeLessThan(480);
   await expect(page.locator("#provider")).toBeHidden();
@@ -429,9 +475,8 @@ test("complexity is the home default across pagination, views and shared sorting
   await page.goto("./");
   await expect(page.locator("#sort")).toHaveValue("complexity");
   const expected = await page.evaluate(() => {
-    const d = window.ARCHIVE,
-      U = window.ArchiveUI;
-    const runs = U.filterRuns(d, { testing: "active", sort: "complexity" });
+    const d = window.ARCHIVE, U = window.ArchiveUI;
+    const runs = U.filterRuns(d, { testing: "active" });
     return d.topics
       .filter((t) => !U.isTopicArchived(t))
       .sort((a, b) => U.compareTopics(a, b, runs, "complexity"))
@@ -465,7 +510,7 @@ test("complexity is the home default across pagination, views and shared sorting
   ).toBe(true);
 });
 
-test("legacy latest links use complexity and card badges stay grouped", async ({
+test("legacy latest links return to complexity sorting and card badges stay grouped", async ({
   page,
 }) => {
   await page.goto(
@@ -477,10 +522,18 @@ test("legacy latest links use complexity and card badges stay grouped", async ({
     .evaluateAll((links) =>
       links.slice(0, 2).map((a) => new URL(a.href).searchParams.get("id")),
     );
-  expect(firstIds.sort()).toEqual([
-    "fluid-simulation",
-    "voxel-construction-site",
-  ]);
+  const topTopics = await page.evaluate(() => {
+    const d = window.ARCHIVE,
+      U = window.ArchiveUI,
+      runs = U.filterRuns(d, { testing: "active" });
+    return d.topics
+      .filter((topic) => !U.isTopicArchived(topic))
+      .sort((a, b) => U.compareTopics(a, b, runs, "complexity"))
+      .slice(0, 2)
+      .map((topic) => topic.id)
+      .sort();
+  });
+  expect(firstIds.sort()).toEqual(topTopics);
   expect(new URL(page.url()).searchParams.get("sort")).toBe("complexity");
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 960 });

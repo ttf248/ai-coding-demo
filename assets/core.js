@@ -37,9 +37,7 @@
       : '<span class="' +
         escape(className) +
         '" title="' +
-        escape(
-          run.input.authorization || executionModeText(run),
-        ) +
+        escape(run.input.authorization || executionModeText(run)) +
         '">' +
         escape(executionModeText(run)) +
         "</span>";
@@ -234,6 +232,56 @@
   function compareComplexity(a, b) {
     return (b?.complexity?.level || 0) - (a?.complexity?.level || 0);
   }
+  const scoreValue = (run) =>
+    Number.isInteger(run?.score)
+      ? run.score
+      : run?.score?.status === "rated" && Number.isInteger(run.score.total)
+        ? run.score.total
+        : null;
+  function scoreBadge(run) {
+    const total = scoreValue(run);
+    if (total !== null)
+      return (
+        '<span class="score-chip" title="截图评分 ' +
+        total +
+        "/100 · 规则 v" +
+        (run.score?.rubricVersion || 1) +
+        '">评分 ' +
+        total +
+        "</span>"
+      );
+    if (run?.score?.status === "unavailable")
+      return (
+        '<span class="score-chip score-unavailable" title="' +
+        escape(
+          run.score.evidence ||
+            "没有真实运行截图，因此未评分并排除在排序之外。",
+        ) +
+        '">无截图评分</span>'
+      );
+    if (!run?.score || run.score.status === "unavailable")
+      return (
+        '<span class="score-chip score-unavailable" title="' +
+        escape(
+          run.score?.evidence ||
+            "没有真实运行截图，因此未评分并排除在排序之外。",
+        ) +
+        '">无截图评分</span>'
+      );
+    return '<span class="score-chip score-pending">待评分</span>';
+  }
+  function compareRunScores(a, b) {
+    return (
+      (scoreValue(b) ?? -1) - (scoreValue(a) ?? -1) ||
+      (b.date || "").localeCompare(a.date || "") ||
+      a.id.localeCompare(b.id, "en")
+    );
+  }
+  function bestScoredRun(runs) {
+    return [...runs]
+      .filter((run) => scoreValue(run) !== null)
+      .sort(compareRunScores)[0];
+  }
   function complexityBadge(topic) {
     if (!topic?.complexity) return "";
     return (
@@ -253,7 +301,12 @@
       runs
         .filter((r) => r.topicId === topic.id)
         .reduce((date, r) => ((r.date || "") > date ? r.date : date), "");
+    const topScore = (topic) =>
+      runs
+        .filter((r) => r.topicId === topic.id)
+        .reduce((score, r) => Math.max(score, scoreValue(r) ?? -1), -1);
     return (
+      (sort === "score" ? topScore(b) - topScore(a) : 0) ||
       (sort === "complexity" ? compareComplexity(a, b) : 0) ||
       latest(b).localeCompare(latest(a)) ||
       a.id.localeCompare(b.id)
@@ -297,14 +350,16 @@
       .sort((a, b) =>
         state.sort === "title"
           ? a.title.localeCompare(b.title, "zh-CN") || a.id.localeCompare(b.id)
-          : (state.sort === "complexity"
-              ? compareComplexity(
-                  data.topics.find((t) => t.id === a.topicId),
-                  data.topics.find((t) => t.id === b.topicId),
-                )
-              : 0) ||
-            (b.date || "").localeCompare(a.date || "") ||
-            a.id.localeCompare(b.id),
+          : state.sort === "score"
+            ? compareRunScores(a, b)
+            : (state.sort === "complexity"
+                ? compareComplexity(
+                    data.topics.find((t) => t.id === a.topicId),
+                    data.topics.find((t) => t.id === b.topicId),
+                  )
+                : 0) ||
+              (b.date || "").localeCompare(a.date || "") ||
+              a.id.localeCompare(b.id),
       );
   }
   function diff(a, b) {
@@ -453,7 +508,7 @@
             escape(params.toString()) +
             '">开始对比 ↗</a>'
           : '<span role="status">再选一个实验开始对比</span>') +
-        "</div></div><div class=\"selection-items\">" +
+        '</div></div><div class="selection-items">' +
         selected
           .map((id, i) => {
             const run = data.runs.find((r) => r.id === id);
@@ -609,6 +664,10 @@
     promptFor,
     relation,
     compareComplexity,
+    scoreValue,
+    scoreBadge,
+    compareRunScores,
+    bestScoredRun,
     compareTopics,
     complexityBadge,
     filterRuns,

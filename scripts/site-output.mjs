@@ -45,12 +45,14 @@ export function browserOutputs(catalog) {
   const outputs = new Map();
   const json = (file, data) => outputs.set(file, JSON.stringify(data) + "\n");
   const runs = catalog.runs.map((run) => {
-    const { raw, changes, billing, environment, input, ...summary } = run;
+    const { raw, changes, billing, environment, input, score, ...summary } =
+      run;
     const detailsHref = `assets/generated/topics/${run.topicId}.json`;
     const rawHref = `assets/generated/inputs/${run.rawHash}.json`;
     json(rawHref, raw);
     return {
       ...summary,
+      ...(score.status === "rated" ? { score: score.total } : {}),
       reader: readerPath(run.document),
       hasRaw: !!raw.trim(),
       rawHref,
@@ -116,6 +118,7 @@ export function documentOutputs(catalog, generated) {
       ...catalog.topics.map((topic) => `${topic.directory}/Readme.md`),
       ...catalog.guides.map((guide) => guide.document),
       "docs/maintenance.md",
+      "docs/case-scoring.md",
       "docs/archive-workspace.md",
       "docs/vercel-root-directories.md",
     ]),

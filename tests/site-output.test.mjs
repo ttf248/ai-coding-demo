@@ -33,6 +33,10 @@ test("summary omits large bodies and deduplicated inputs preserve normalized tex
     assert.equal(run.billing, undefined);
     const original = catalog.runs.find((item) => item.id === run.id),
       raw = JSON.parse(outputs.get(run.rawHref));
+    assert.equal(
+      run.score,
+      original.score.status === "rated" ? original.score.total : undefined,
+    );
     assert.equal(raw, original.raw);
     assert.equal(hash(raw), original.rawHash);
   }
@@ -81,8 +85,7 @@ test("input relationships and completeness work before lazy body loading", () =>
 test("archive summaries retain execution mode notes for visible badges", () => {
   const audited = catalog.runs.filter(
     (run) =>
-      run.billing?.batchId ===
-      "minimax-m3-1-flash-preview-max-2026-10-14",
+      run.billing?.batchId === "minimax-m3-1-flash-preview-max-2026-10-14",
   );
   assert.equal(audited.length, 12);
   for (const original of audited) {
@@ -92,14 +95,8 @@ test("archive summaries retain execution mode notes for visible badges", () => {
       summarized.input.executionModeNote,
       original.input.executionModeNote,
     );
-    assert.match(
-      ui.ArchiveUI.executionModeBadge(summarized),
-      /自我审查十轮/,
-    );
-    assert.match(
-      ui.ArchiveUI.runCard(summary, summarized),
-      /自我审查十轮/,
-    );
+    assert.match(ui.ArchiveUI.executionModeBadge(summarized), /自我审查十轮/);
+    assert.match(ui.ArchiveUI.runCard(summary, summarized), /自我审查十轮/);
   }
 });
 test("topic details reference canonical billing batches and retain tool provenance", () => {
