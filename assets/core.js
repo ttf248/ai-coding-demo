@@ -26,17 +26,22 @@
       unknown: "执行模式未记录",
     })[mode] || "执行模式未记录";
   const executionMode = (run) => run?.input?.executionMode || "unknown";
+  const executionModeText = (run) => {
+    const label = executionModeLabel(executionMode(run));
+    const note = run?.input?.executionModeNote?.trim();
+    return note || label;
+  };
   const executionModeBadge = (run, className = "execution-mode-chip") =>
-    executionMode(run) === "unknown"
+    executionMode(run) === "unknown" && !run?.input?.executionModeNote
       ? ""
       : '<span class="' +
         escape(className) +
         '" title="' +
         escape(
-          run.input.authorization || executionModeLabel(executionMode(run)),
+          run.input.authorization || executionModeText(run),
         ) +
         '">' +
-        escape(executionModeLabel(executionMode(run))) +
+        escape(executionModeText(run)) +
         "</span>";
   const isTopicArchived = (topic) => topic?.testingStatus === "archived";
   function compareModels(x, y) {
@@ -217,9 +222,9 @@
       if (modeA !== modeB && (modeA !== "unknown" || modeB !== "unknown"))
         return (
           "任务正文一致 · 执行模式不同（A：" +
-          executionModeLabel(modeA) +
+          executionModeText(a) +
           "；B：" +
-          executionModeLabel(modeB) +
+          executionModeText(b) +
           "）"
         );
       return "任务正文一致 · 原始输入不同";
@@ -592,6 +597,7 @@
     modelProvider,
     executionMode,
     executionModeLabel,
+    executionModeText,
     executionModeBadge,
     isTopicArchived,
     compareModelRuns,

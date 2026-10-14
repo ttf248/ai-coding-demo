@@ -211,7 +211,7 @@
     const mode =
       U.executionModeBadge(run) ||
       '<span class="model-record-mode">' +
-        e(U.executionModeLabel(U.executionMode(run))) +
+        e(U.executionModeText(run)) +
         "</span>";
     return (
       '<tr class="model-run-record" id="run-' +
@@ -321,7 +321,7 @@
                     " · " +
                     (preview.date || "日期未记录") +
                     " · " +
-                    U.executionModeLabel(U.executionMode(preview)),
+                    U.executionModeText(preview),
                 ) +
                 '">' +
                 (preview.date ? "最近可用预览 ↗" : "可用预览 ↗") +
@@ -364,7 +364,7 @@
                       " · " +
                       toolLabel(condition.latest) +
                       " · " +
-                      U.executionModeLabel(U.executionMode(condition.latest)),
+                      U.executionModeText(condition.latest),
                   ) +
                   '">' +
                   recent
@@ -495,7 +495,7 @@
               r.effort,
               U.effortLabel(r.effort),
               toolLabel(r),
-              U.executionModeLabel(U.executionMode(r)),
+              U.executionModeText(r),
               r.date,
               r.promptId,
               r.description,
@@ -726,7 +726,7 @@
                       e(U.completenessLabel(r.input?.completeness)) +
                       "</span><small>" +
                       (U.executionModeBadge(r) ||
-                        e(U.executionModeLabel(U.executionMode(r)))) +
+                        e(U.executionModeText(r))) +
                       '</small></td><td class="topic-run-actions"><div class="topic-row-actions">' +
                       (U.screenshotURL(r)
                         ? '<a href="' +

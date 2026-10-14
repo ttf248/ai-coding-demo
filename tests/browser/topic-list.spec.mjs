@@ -14,6 +14,13 @@ test("topic opens the complete compact list with recorded batch durations", asyn
   );
   await expect(page.locator(".topic-run-row")).toHaveCount(runs.length);
   await expect(page.locator(".topic-run-row").first()).toBeVisible();
+  const auditedRun = runs.find(
+    (run) => run.input.executionModeNote === "自我审查十轮",
+  );
+  expect(auditedRun).toBeTruthy();
+  await expect(
+    page.locator(`#run-${auditedRun.id} .topic-run-input .execution-mode-chip`),
+  ).toHaveText("自我审查十轮");
   await expect(page.locator(".topic-runs-table thead th")).toHaveText([
     "模型 / 厂商",
     "接入供应商 / 工具",
@@ -41,7 +48,7 @@ test("topic opens the complete compact list with recorded batch durations", asyn
       run.billing.duration.text,
     );
     await expect(row.locator(".topic-run-duration small")).toHaveText(
-      "批次耗时 · 11 案例",
+      `批次耗时 · ${run.billing.caseCount} 案例`,
     );
     await expect(row.locator(".topic-run-tool")).not.toBeEmpty();
     await expect(row.locator(".topic-run-input > span")).toHaveText(
@@ -72,7 +79,7 @@ test("topic opens the complete compact list with recorded batch durations", asyn
     "2h 50m 7s",
   );
   await expect(page.locator(".model-record-duration small")).toHaveText(
-    "批次耗时 · 11 案例",
+    `批次耗时 · ${runs.find((run) => run.modelId === "qwen3-8-max").billing.caseCount} 案例`,
   );
   await page.goBack();
   await expect(page.locator("#topic-list")).toBeVisible();
