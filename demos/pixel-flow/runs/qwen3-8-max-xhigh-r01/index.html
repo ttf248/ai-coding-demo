@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Pixel Flow · 图片粒子化与手势还原</title>
+<style>
+  html, body { margin: 0; min-height: 100%; background: #07080f; color: #e8ecf6;
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+  #wrap { max-width: 1180px; margin: 0 auto; padding: 18px 16px 40px; }
+  header { text-align: center; padding: 10px 0 14px; }
+  header h1 { margin: 0; font-size: clamp(20px, 4vw, 28px); letter-spacing: .04em; }
+  header p { margin: 6px auto 0; max-width: 720px; font-size: 12.5px; color: #93a0bd; line-height: 1.7; }
+  #stage { position: relative; border: 1px solid #223052; border-radius: 16px; overflow: hidden; background: #05060c; }
+  #gl { display: block; width: 100%; height: min(62vh, 640px); touch-action: none; }
+  #camBox { position: absolute; right: 12px; bottom: 12px; width: 168px; border-radius: 12px; overflow: hidden;
+    border: 1px solid rgba(140,170,255,.35); background: #000; box-shadow: 0 10px 30px rgba(0,0,0,.6); }
+  #camBox video { width: 100%; display: block; transform: scaleX(-1); }
+  #camBox canvas { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+  #camBox.off { display: none; }
+  #status { position: absolute; left: 12px; top: 12px; max-width: min(70%, 460px); padding: 8px 12px; border-radius: 10px;
+    background: rgba(10,14,28,.72); border: 1px solid rgba(140,170,255,.3); backdrop-filter: blur(8px);
+    font-size: 12px; line-height: 1.6; color: #cdd8f2; }
+  #gesture { position: absolute; right: 12px; top: 12px; padding: 8px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+    background: rgba(10,14,28,.72); border: 1px solid rgba(140,170,255,.3); backdrop-filter: blur(8px); }
+  #gesture.on { background: rgba(24,120,80,.85); border-color: #7ef0b6; color: #eafff3; }
+  #bar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-top: 14px;
+    background: #0d1222; border: 1px solid #223052; border-radius: 14px; padding: 12px; }
+  .group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .label { font-size: 12px; color: #8fa0c0; }
+  button, select, input[type="file"]::file-selector-button {
+    background: #182238; color: #e8ecf6; border: 1px solid #2c3c60; border-radius: 9px;
+    padding: 8px 13px; font-size: 12.5px; cursor: pointer; font-family: inherit; min-height: 38px; }
+  button:hover { border-color: #6ea8ff; }
+  button.primary { background: linear-gradient(180deg,#2f7fe0,#1f5db0); border-color: #8ec2ff; font-weight: 600; }
+  input[type="range"] { width: 120px; accent-color: #6ea8ff; }
+  .val { font-size: 12px; color: #8ec2ff; min-width: 44px; }
+  #help { margin-top: 14px; background: #0d1222; border: 1px solid #223052; border-radius: 14px; padding: 12px 16px;
+    font-size: 12.5px; color: #93a0bd; line-height: 1.8; }
+  #help strong { color: #dbe6ff; }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(5,6,12,.8);
+    font-size: 13px; color: #bcd0f7; z-index: 5; }
+  #loading.hidden { display: none; }
+  @media (max-width: 520px) { #camBox { width: 116px; } input[type="range"] { width: 92px; } }
+</style>
+<script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.min.js" onerror="window.__mpFailed=true"></script>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <h1>Pixel Flow · 图片粒子化与手势还原</h1>
+    <p>上传（或使用内置示例）图片 → Canvas 提取像素 → 每个采样点成为 Three.js 粒子，初始为飘散粒子流；
+      摄像头 + MediaPipe Hands 实时追踪手部：张开手掌激活「还原力场」，粒子向原图位置汇聚；握拳暂停还原。无摄像头环境自动降级为鼠标力场模式。</p>
+  </header>
+
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <div id="status">初始化…</div>
+    <div id="gesture">手势：—</div>
+    <div id="camBox" class="off">
+      <video id="video" playsinline muted></video>
+      <canvas id="camOverlay"></canvas>
+    </div>
+    <div id="loading">正在加载 Three.js / MediaPipe（CDN）…</div>
+  </div>
+
+  <div id="bar">
+    <div class="group">
+      <span class="label">图片</span>
+      <input type="file" id="file" accept="image/*">
+      <button id="btnDemo" class="primary">内置示例图</button>
+    </div>
+    <div class="group">
+      <span class="label">采样密度</span>
+      <select id="density">
+        <option value="4">细 (4px)</option>
+        <option value="5" selected>中 (5px)</option>
+        <option value="7">粗 (7px)</option>
+      </select>
+    </div>
+    <div class="group">
+      <span class="label">还原力度</span>
+      <input type="range" id="force" min="0.02" max="0.2" step="0.01" value="0.08">
+      <span class="val" id="forceVal"></span>
+    </div>
+    <div class="group">
+      <button id="btnScatter">重新飘散</button>
+      <button id="btnMouse">鼠标力场：开</button>
+    </div>
+  </div>
+
+  <div id="help">
+    <strong>手势说明：</strong>张开手掌 = 激活还原力场（粒子加速回位）；握拳 = 暂停还原（粒子继续飘散）；手的位置 = 力场中心（力场内粒子额外加速）。
+    <strong>降级模式：</strong>摄像头不可用、MediaPipe 加载失败或处于 iframe 等无摄像头授权环境时，自动切换为鼠标 / 触摸力场（按住画布 = 激活还原）。
+    <strong>技术栈：</strong>Vanilla JS + Three.js（粒子渲染）+ MediaPipe Hands（手部关键点）+ Canvas API（像素提取）；力场为弹簧-阻尼物理，非固定动画。
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+
+const statusEl = document.getElementById("status");
+const gestureEl = document.getElementById("gesture");
+const loadingEl = document.getElementById("loading");
+const camBox = document.getElementById("camBox");
+const video = document.getElementById("video");
+const overlay = document.getElementById("camOverlay");
+const octx = overlay.getContext("2d");
+const setStatus = (t) => { statusEl.textContent = t; };
+
+// ---------- Three 场景 ----------
+const canvas = document.getElementById("gl");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(1.75, devicePixelRatio || 1));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05060c);
+const camera = new THREE.PerspectiveCamera(50, 2, 0.1, 100);
+camera.position.set(0, 0, 46);
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== w || canvas.height !== h) {
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+}
+addEventListener("resize", resize);
+
+// ---------- 粒子系统 ----------
+const MAXP = 40000;
+const geo = new THREE.BufferGeometry();
+const pos = new Float32Array(MAXP * 3);
+const col = new Float32Array(MAXP * 3);
+const target = new Float32Array(MAXP * 3);
+const vel = new Float32Array(MAXP * 3);
+const seedArr = new Float32Array(MAXP);
+geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+const pmat = new THREE.PointsMaterial({ size: 0.26, vertexColors: true, sizeAttenuation: true, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending });
+const points = new THREE.Points(geo, pmat);
+points.frustumCulled = false;
+scene.add(points);
+let count = 0;
+let lastImg = null;
+
+const state = {
+  attract: false,          // 还原力场是否激活
+  mouseForce: true,        // 鼠标/触摸力场开关
+  pointer: { x: 0, y: 0, down: false, inside: false },
+  hand: { present: false, x: 0, y: 0, open: false },
+  force: 0.08,
+  mode: "init",            // camera | mouse | pending
+  converged: 0,
+};
+window.__pf = state;
+
+function scatter() {
+  for (let i = 0; i < count; i++) {
+    const i3 = i * 3;
+    const r = 26 + Math.random() * 22;
+    const th = Math.random() * Math.PI * 2;
+    const ph = Math.acos(2 * Math.random() - 1);
+    pos[i3] = r * Math.sin(ph) * Math.cos(th);
+    pos[i3 + 1] = r * Math.sin(ph) * Math.sin(th) * 0.6;
+    pos[i3 + 2] = (Math.random() - 0.5) * 18;
+    vel[i3] = vel[i3 + 1] = vel[i3 + 2] = 0;
+    seedArr[i] = Math.random();
+  }
+  geo.attributes.position.needsUpdate = true;
+}
+
+function buildFromImage(img, step) {
+  lastImg = img;
+  const W = Math.min(480, img.width || 320);
+  const H = Math.max(24, Math.round((img.height / img.width) * W));
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const cx = cv.getContext("2d", { willReadFrequently: true });
+  cx.drawImage(img, 0, 0, W, H);
+  const data = cx.getImageData(0, 0, W, H).data;
+  const aspect = H / W;
+  const worldW = 34, worldH = worldW * aspect;
+  let n = 0;
+  for (let y = 0; y < H; y += step) {
+    for (let x = 0; x < W; x += step) {
+      const i4 = (y * W + x) * 4;
+      const a = data[i4 + 3];
+      if (a < 40) continue;
+      if (n >= MAXP) break;
+      const i3 = n * 3;
+      target[i3] = (x / W - 0.5) * worldW;
+      target[i3 + 1] = (0.5 - y / H) * worldH;
+      target[i3 + 2] = 0;
+      col[i3] = data[i4] / 255;
+      col[i3 + 1] = data[i4 + 1] / 255;
+      col[i3 + 2] = data[i4 + 2] / 255;
+      n++;
+    }
+  }
+  count = n;
+  state.count = n;
+  geo.setDrawRange(0, count);
+  geo.attributes.color.needsUpdate = true;
+  scatter();
+  state.converged = 0;
+  setStatus(`已粒子化 ${count.toLocaleString()} 个采样点（步长 ${step}px）。${state.mode === "camera" ? "张开手掌开始还原。" : "按住画布或开启鼠标力场开始还原。"}`);
+}
+
+function demoImage() {
+  const cv = document.createElement("canvas");
+  cv.width = 480; cv.height = 320;
+  const c = cv.getContext("2d");
+  const g = c.createLinearGradient(0, 0, 480, 320);
+  g.addColorStop(0, "#123a6d"); g.addColorStop(0.5, "#0e7490"); g.addColorStop(1, "#f59e0b");
+  c.fillStyle = g; c.fillRect(0, 0, 480, 320);
+  c.fillStyle = "#ffe9a8";
+  c.beginPath(); c.arc(360, 90, 46, 0, Math.PI * 2); c.fill();
+  c.fillStyle = "#0b2447";
+  for (let i = 0; i < 7; i++) {
+    const x = i * 70 - 20, h = 90 + ((i * 53) % 90);
+    c.beginPath(); c.moveTo(x, 320); c.lineTo(x + 45, 320 - h); c.lineTo(x + 90, 320); c.closePath(); c.fill();
+  }
+  c.fillStyle = "rgba(255,255,255,0.85)";
+  c.font = "bold 54px system-ui"; c.textAlign = "center";
+  c.fillText("PIXEL FLOW", 240, 210);
+  const img = new Image();
+  img.onload = () => buildFromImage(img, Number(density.value));
+  img.src = cv.toDataURL();
+}
+
+// ---------- 物理 ----------
+function simulate(dt, t) {
+  const attract = state.attract;
+  const f = state.force;
+  // 力场中心（手或指针），世界坐标近似 z=0 平面
+  let fx = 0, fy = 0, hasZone = false, zoneR = 9;
+  if (state.mode === "camera" && state.hand.present) {
+    fx = state.hand.x; fy = state.hand.y; hasZone = true;
+  } else if (state.mouseForce && state.pointer.inside) {
+    fx = state.pointer.x; fy = state.pointer.y; hasZone = true;
+  }
+  let conv = 0;
+  for (let i = 0; i < count; i++) {
+    const i3 = i * 3;
+    const sd = seedArr[i];
+    // 飘散流场（未还原时的卷曲漂移）
+    let ax = Math.sin(t * 0.6 + pos[i3 + 1] * 0.12 + sd * 6.28) * 1.4;
+    let ay = Math.cos(t * 0.5 + pos[i3] * 0.1 + sd * 4.1) * 1.1;
+    let az = Math.sin(t * 0.4 + sd * 9.0) * 0.7;
+    if (attract) {
+      const dx = target[i3] - pos[i3], dy = target[i3 + 1] - pos[i3 + 1], dz = target[i3 + 2] - pos[i3 + 2];
+      let k = f;
+      if (hasZone) {
+        const zx = pos[i3] - fx, zy = pos[i3 + 1] - fy;
+        if (zx * zx + zy * zy < zoneR * zoneR) k = f * 3.2; // 力场内加速
+      }
+      ax += dx * k * 22; ay += dy * k * 22; az += dz * k * 22;
+      // 弹簧阻尼
+      vel[i3] *= 0.86; vel[i3 + 1] *= 0.86; vel[i3 + 2] *= 0.86;
+      if (Math.abs(dx) + Math.abs(dy) < 0.5) conv++;
+    } else {
+      vel[i3] *= 0.965; vel[i3 + 1] *= 0.965; vel[i3 + 2] *= 0.965;
+    }
+    vel[i3] += ax * dt; vel[i3 + 1] += ay * dt; vel[i3 + 2] += az * dt;
+    pos[i3] += vel[i3] * dt; pos[i3 + 1] += vel[i3 + 1] * dt; pos[i3 + 2] += vel[i3 + 2] * dt;
+  }
+  state.converged = count ? conv / count : 0;
+  geo.attributes.position.needsUpdate = true;
+}
+
+// ---------- 指针力场 ----------
+function pointerWorld(e) {
+  const r = canvas.getBoundingClientRect();
+  const nx = ((e.clientX - r.left) / r.width) * 2 - 1;
+  const ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
+  const halfH = Math.tan((camera.fov * Math.PI) / 360) * camera.position.z;
+  const halfW = halfH * camera.aspect;
+  return { x: nx * halfW, y: ny * halfH };
+}
+canvas.addEventListener("pointerdown", (e) => {
+  state.pointer.down = true; state.pointer.inside = true;
+  const w = pointerWorld(e); state.pointer.x = w.x; state.pointer.y = w.y;
+  if (state.mode !== "camera") state.attract = true;
+  canvas.setPointerCapture(e.pointerId);
+  syncGesture();
+});
+canvas.addEventListener("pointermove", (e) => {
+  state.pointer.inside = true;
+  const w = pointerWorld(e); state.pointer.x = w.x; state.pointer.y = w.y;
+});
+canvas.addEventListener("pointerup", () => {
+  state.pointer.down = false;
+  if (state.mode !== "camera") state.attract = false;
+  syncGesture();
+});
+canvas.addEventListener("pointerleave", () => { state.pointer.inside = false; });
+
+// ---------- 控件 ----------
+const density = document.getElementById("density");
+const force = document.getElementById("force");
+document.getElementById("forceVal").textContent = Number(force.value).toFixed(2);
+force.addEventListener("input", () => {
+  state.force = Number(force.value);
+  document.getElementById("forceVal").textContent = state.force.toFixed(2);
+});
+document.getElementById("btnScatter").onclick = () => { scatter(); setStatus("粒子已重新飘散。"); };
+const btnMouse = document.getElementById("btnMouse");
+btnMouse.onclick = () => {
+  state.mouseForce = !state.mouseForce;
+  btnMouse.textContent = `鼠标力场：${state.mouseForce ? "开" : "关"}`;
+  btnMouse.setAttribute("aria-pressed", String(state.mouseForce));
+};
+document.getElementById("btnDemo").onclick = () => demoImage();
+document.getElementById("file").addEventListener("change", (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  const img = new Image();
+  img.onload = () => { buildFromImage(img, Number(density.value)); URL.revokeObjectURL(url); };
+  img.onerror = () => { setStatus("图片解码失败，请更换文件。"); URL.revokeObjectURL(url); };
+  img.src = url;
+});
+density.addEventListener("change", () => { if (lastImg) buildFromImage(lastImg, Number(density.value)); else demoImage(); });
+
+function syncGesture() {
+  if (state.mode === "camera") {
+    gestureEl.textContent = state.hand.present ? (state.hand.open ? "手势：张开手掌 · 还原中" : "手势：握拳 · 飘散中") : "手势：未检测到手";
+  } else {
+    gestureEl.textContent = state.attract ? "鼠标力场：还原中" : "鼠标力场：待命";
+  }
+  gestureEl.classList.toggle("on", state.attract);
+}
+
+// ---------- MediaPipe 摄像头 ----------
+async function initCamera() {
+  if (window.__mpFailed || typeof window.Hands !== "function") {
+    return "MediaPipe Hands 加载失败，已降级为鼠标力场模式。";
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 320, height: 240 } });
+  } catch (e) {
+    return "摄像头不可用或未授权（" + (e && e.name ? e.name : "error") + "），已降级为鼠标力场模式。";
+  }
+  video.srcObject = stream;
+  await video.play().catch(() => {});
+  camBox.classList.remove("off");
+  overlay.width = 168; overlay.height = 126;
+  const hands = new window.Hands({
+    locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`,
+  });
+  hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+  hands.onResults((res) => {
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    if (res.multiHandLandmarks && res.multiHandLandmarks.length) {
+      const lm = res.multiHandLandmarks[0];
+      const palm = lm[9];
+      const wrist = lm[0];
+      const tips = [4, 8, 12, 16, 20];
+      const palmSize = Math.hypot(palm.x - wrist.x, palm.y - wrist.y) || 1e-6;
+      let open = 0;
+      for (const ti of tips) open += Math.hypot(lm[ti].x - wrist.x, lm[ti].y - wrist.y);
+      open = open / 5 / palmSize;
+      state.hand.present = true;
+      state.hand.open = open > 1.55;
+      // 镜像 x（视频已镜像显示）→ 世界坐标
+      const halfH = Math.tan((camera.fov * Math.PI) / 360) * camera.position.z;
+      const halfW = halfH * camera.aspect;
+      state.hand.x = (0.5 - palm.x) * 2 * halfW * 0.82;
+      state.hand.y = (0.5 - palm.y) * 2 * halfH * 0.82;
+      state.attract = state.hand.open;
+      // 骨架叠画
+      octx.strokeStyle = "rgba(126,240,182,0.9)";
+      octx.lineWidth = 2;
+      octx.beginPath();
+      for (const [a, b] of [[0, 5], [5, 9], [9, 13], [13, 17], [0, 17], [5, 8], [9, 12], [13, 16], [17, 20]]) {
+        octx.moveTo(lm[a].x * overlay.width, lm[a].y * overlay.height);
+        octx.lineTo(lm[b].x * overlay.width, lm[b].y * overlay.height);
+      }
+      octx.stroke();
+    } else {
+      state.hand.present = false;
+      state.attract = false;
+    }
+    syncGesture();
+  });
+  const loop = async () => {
+    if (video.readyState >= 2) await hands.send({ image: video }).catch(() => {});
+    requestAnimationFrame(loop);
+  };
+  loop();
+  state.mode = "camera";
+  return null;
+}
+
+// ---------- 启动 ----------
+(async () => {
+  resize();
+  demoImage();
+  const err = await initCamera();
+  if (err) {
+    state.mode = "mouse";
+    setStatus(err + " 按住画布即激活还原力场。");
+  } else {
+    setStatus("摄像头已启动：张开手掌激活还原力场，握拳暂停。");
+  }
+  syncGesture();
+  loadingEl.classList.add("hidden");
+  const clock = new THREE.Clock();
+  let frames = 0, total = 0;
+  window.__frames = 0;
+  const tick = () => {
+    resize();
+    const dt = Math.min(0.05, clock.getDelta());
+    simulate(dt, clock.elapsedTime);
+    renderer.render(scene, camera);
+    total++; window.__frames = total; frames++;
+    requestAnimationFrame(tick);
+  };
+  tick();
+})();
+</script>
+</body>
+</html>

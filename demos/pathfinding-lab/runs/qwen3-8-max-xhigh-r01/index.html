@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>寻路算法实验室</title>
+<style>
+  :root {
+    --bg: #0b1220;
+    --panel: #121c31;
+    --panel-2: #0e1626;
+    --line: #24304d;
+    --text: #e6edf9;
+    --muted: #93a4c3;
+    --accent: #38bdf8;
+    --start: #10b981;
+    --goal: #f43f5e;
+    --wall: #55647f;
+    --weight: #8b5cf6;
+    --path: #fbbf24;
+    --danger: #fb7185;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -100px, #16233f 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  header { padding: 22px 16px 6px; text-align: center; }
+  header h1 { margin: 0; font-size: clamp(20px, 4.5vw, 30px); letter-spacing: 0.02em; }
+  header p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+  main { max-width: 1040px; margin: 0 auto; padding: 12px 16px 40px; display: flex; flex-direction: column; gap: 12px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+  .group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .group > .label { color: var(--muted); font-size: 12px; margin-right: 2px; white-space: nowrap; }
+  button, select {
+    appearance: none;
+    background: #1b2a4a;
+    color: var(--text);
+    border: 1px solid #2e4166;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    min-height: 38px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover, select:hover { border-color: var(--accent); }
+  button:active { transform: translateY(1px); }
+  button[aria-pressed="true"], button[aria-checked="true"] {
+    background: linear-gradient(180deg, #1d4ed8, #1e40af);
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.35);
+  }
+  button.primary { background: linear-gradient(180deg, #0ea5e9, #0369a1); border-color: #7dd3fc; font-weight: 600; }
+  button.warn { background: #3b2a1a; border-color: #92613a; }
+  select { padding-right: 26px; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 15px) 16px, calc(100% - 10px) 16px; background-size: 5px 5px; background-repeat: no-repeat; }
+  input[type="range"] { width: 130px; accent-color: var(--accent); }
+  .speedval { color: var(--accent); font-size: 12px; min-width: 72px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; padding: 10px 12px; }
+  .stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .stat .k { color: var(--muted); font-size: 11px; }
+  .stat .v { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .v.ok { color: #4ade80; }
+  .stat .v.err { color: var(--danger); }
+  .stat .v.run { color: var(--accent); }
+  .stat .v.pause { color: #facc15; }
+  .algo-note { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+  .canvas-wrap { margin: 0; padding: 10px; display: flex; justify-content: center; }
+  canvas {
+    width: 100%;
+    max-width: 990px;
+    height: auto;
+    display: block;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    touch-action: none;
+    cursor: crosshair;
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; color: var(--muted); }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15); flex: none; }
+  .help h2 { margin: 0 0 8px; font-size: 15px; }
+  .help ul { margin: 0; padding-left: 20px; color: var(--muted); font-size: 13px; }
+  .help li { margin: 4px 0; }
+  .help strong { color: var(--text); }
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%) translateY(80px);
+    background: #1f2b47;
+    border: 1px solid #3b4d78;
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    max-width: min(92vw, 480px);
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    z-index: 50;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  #toast.error { border-color: #9f3348; background: #3a1622; }
+  @media (max-width: 480px) {
+    main { padding: 10px 10px 32px; }
+    .toolbar { gap: 8px 10px; }
+    button, select { flex: 0 1 auto; }
+    input[type="range"] { width: 100px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>寻路算法实验室</h1>
+  <p>BFS · Dijkstra · A*（四方向移动，A* 使用曼哈顿距离启发）· 支持墙壁、高代价地形与逐步动画</p>
+</header>
+<main>
+  <section class="panel toolbar" aria-label="工具栏">
+    <div class="group" id="algoGroup" role="radiogroup" aria-label="算法选择">
+      <span class="label">算法</span>
+      <button type="button" role="radio" data-algo="bfs" aria-checked="false">BFS</button>
+      <button type="button" role="radio" data-algo="dijkstra" aria-checked="true">Dijkstra</button>
+      <button type="button" role="radio" data-algo="astar" aria-checked="false">A*</button>
+    </div>
+    <div class="group">
+      <label class="label" for="preset">预设地图</label>
+      <select id="preset">
+        <option value="blank" selected>空白地图</option>
+        <option value="maze">迷宫（种子 42）</option>
+        <option value="swamp">加权沼泽</option>
+        <option value="sealed">封闭终点（不可达演示）</option>
+        <option value="scatter">随机障碍（种子 7）</option>
+      </select>
+    </div>
+    <div class="group" id="brushGroup" role="radiogroup" aria-label="画笔选择">
+      <span class="label">画笔</span>
+      <button type="button" role="radio" data-brush="wall" aria-checked="true">墙壁</button>
+      <button type="button" role="radio" data-brush="weight" aria-checked="false">高代价 ×5</button>
+      <button type="button" role="radio" data-brush="eraser" aria-checked="false">橡皮</button>
+    </div>
+    <div class="group">
+      <button type="button" id="btnRun" class="primary">▶ 运行</button>
+      <button type="button" id="btnPause">⏸ 暂停</button>
+      <button type="button" id="btnStep">⏭ 单步</button>
+      <button type="button" id="btnClear" class="warn">清除搜索</button>
+      <button type="button" id="btnReset" class="warn">重置地图</button>
+    </div>
+    <div class="group">
+      <label class="label" for="speed">速度</label>
+      <input type="range" id="speed" min="0" max="9" step="1" value="4">
+      <span class="speedval" id="speedVal"></span>
+    </div>
+  </section>
+
+  <section class="panel stats" aria-label="搜索状态">
+    <div class="stat"><div class="k">状态</div><div class="v" id="stStatus">就绪</div></div>
+    <div class="stat"><div class="k">已访问节点</div><div class="v" id="stVisited">0</div></div>
+    <div class="stat"><div class="k">当前前沿</div><div class="v" id="stFrontier">0</div></div>
+    <div class="stat"><div class="k">路径步数</div><div class="v" id="stSteps">—</div></div>
+    <div class="stat"><div class="k">路径总代价</div><div class="v" id="stCost">—</div></div>
+    <div class="stat algo-note" id="algoNote"></div>
+  </section>
+
+  <figure class="panel canvas-wrap">
+    <canvas id="grid" width="1320" height="760" aria-label="寻路网格，33 列 19 行"></canvas>
+  </figure>
+
+  <section class="panel legend" aria-label="图例">
+    <span class="item"><span class="swatch" style="background:#10b981"></span>起点</span>
+    <span class="item"><span class="swatch" style="background:#f43f5e"></span>终点</span>
+    <span class="item"><span class="swatch" style="background:#55647f"></span>墙壁（不可通行）</span>
+    <span class="item"><span class="swatch" style="background:#8b5cf6"></span>高代价地形（进入代价 5）</span>
+    <span class="item"><span class="swatch" style="background:#22d3ee"></span>搜索前沿（待扩展）</span>
+    <span class="item"><span class="swatch" style="background:linear-gradient(90deg,#93c5fd,#1d4ed8)"></span>已访问（颜色越深越早）</span>
+    <span class="item"><span class="swatch" style="background:#fbbf24"></span>最终路径</span>
+  </section>
+
+  <section class="panel help">
+    <h2>操作说明</h2>
+    <ul>
+      <li><strong>编辑地图：</strong>选择画笔后在网格上点击或拖动即可绘制 / 擦除墙壁与高代价地形；直接拖动绿色「起」或红色「终」方块可以移动起点与终点。起点与终点不能被障碍覆盖。</li>
+      <li><strong>运行搜索：</strong>「▶ 运行」开始或继续搜索；「⏸ 暂停」随时暂停；「⏭ 单步」逐节点扩展（搜索未开始时会自动新建一次搜索）；「清除搜索」只清除访问痕迹，保留地图；「重置地图」清空全部障碍并恢复默认起终点。</li>
+      <li><strong>速度：</strong>滑块调节每帧扩展的节点数（1～512 步/帧）。</li>
+      <li><strong>代价规则：</strong>四方向移动；起点代价不计入，进入普通格代价为 1，进入高代价格为 5，墙壁不可进入。路径总代价 = 路径上除起点外所有格的进入代价之和。</li>
+      <li><strong>算法差异：</strong>BFS 按步数搜索（保证步数最少，不计地形代价）；Dijkstra 按地形代价搜索（保证总代价最小）；A* 按「已付出代价 + 曼哈顿距离」搜索，在四方向、代价 ≥ 1 的网格上同样得到最小代价。</li>
+      <li><strong>编辑即清除：</strong>搜索进行中或结束后编辑地图（含移动起终点），会自动停止并清除旧搜索，防止新旧状态混用。</li>
+      <li><strong>建议实验：</strong>在「加权沼泽」预设上分别运行 Dijkstra 与 A*，两者总代价一致且都低于 BFS 直穿沼泽的代价；BFS 的步数则最少。在「封闭终点」预设上运行任意算法，会明确提示不可达。</li>
+      <li>桌面端使用鼠标，移动端直接用手指触摸绘制与拖动，均可使用。</li>
+    </ul>
+  </section>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+(() => {
+  "use strict";
+  const COLS = 33, ROWS = 19, CELL = 40;
+  const EMPTY = 0, WALL = 1, WEIGHT = 2;
+  const WEIGHT_COST = 5;
+  const canvas = document.getElementById("grid");
+  const ctx = canvas.getContext("2d");
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- 状态 ----------
+  const DEF_START = { c: 1, r: 9 };
+  const DEF_GOAL = { c: COLS - 2, r: 9 };
+  let cells = new Uint8Array(COLS * ROWS);
+  let start = { ...DEF_START };
+  let goal = { ...DEF_GOAL };
+  let algo = "dijkstra";
+  let brush = "wall";
+  let speed = 4;
+
+  // 搜索运行时状态
+  let gen = null;            // 当前搜索生成器
+  let running = false;       // 是否连续运行中
+  let finished = false;      // 当前搜索是否已结束
+  let unreachable = false;
+  let visited = new Int32Array(COLS * ROWS).fill(-1); // 扩展顺序
+  let inOpen = new Uint8Array(COLS * ROWS);
+  let openCount = 0;
+  let visitedCount = 0;
+  let orderCounter = 0;
+  let pathIdx = null;        // 最终路径（格索引数组）
+  let pathSteps = null;
+  let pathCost = null;
+  let dirty = true;
+
+  const idx = (c, r) => r * COLS + c;
+  const inside = (c, r) => c >= 0 && c < COLS && r >= 0 && r < ROWS;
+  const entryCost = (i) => (cells[i] === WEIGHT ? WEIGHT_COST : 1);
+
+  // ---------- 提示条 ----------
+  const toastEl = $("toast");
+  let toastTimer = 0;
+  function toast(msg, isError) {
+    toastEl.textContent = msg;
+    toastEl.className = "show" + (isError ? " error" : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.className = ""; }, 2400);
+  }
+
+  // ---------- 二叉堆 ----------
+  class Heap {
+    constructor() { this.pri = []; this.tie = []; this.val = []; }
+    get size() { return this.val.length; }
+    push(p, t, v) {
+      const pri = this.pri, tie = this.tie, val = this.val;
+      pri.push(p); tie.push(t); val.push(v);
+      let i = val.length - 1;
+      while (i > 0) {
+        const parent = (i - 1) >> 1;
+        if (this._less(i, parent)) { this._swap(i, parent); i = parent; } else break;
+      }
+    }
+    pop() {
+      const val = this.val;
+      if (!val.length) return null;
+      const top = val[0];
+      const lastP = this.pri.pop(), lastT = this.tie.pop(), lastV = val.pop();
+      if (val.length) {
+        this.pri[0] = lastP; this.tie[0] = lastT; val[0] = lastV;
+        let i = 0;
+        for (;;) {
+          const l = i * 2 + 1, r = l + 1;
+          let m = i;
+          if (l < val.length && this._less(l, m)) m = l;
+          if (r < val.length && this._less(r, m)) m = r;
+          if (m === i) break;
+          this._swap(i, m); i = m;
+        }
+      }
+      return top;
+    }
+    _less(a, b) {
+      if (this.pri[a] !== this.pri[b]) return this.pri[a] < this.pri[b];
+      return this.tie[a] < this.tie[b];
+    }
+    _swap(a, b) {
+      for (const arr of [this.pri, this.tie, this.val]) {
+        const t = arr[a]; arr[a] = arr[b]; arr[b] = t;
+      }
+    }
+  }
+
+  // ---------- 算法（生成器：每 yield 一次 = 扩展一个节点） ----------
+  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+  function markVisited(i) {
+    visited[i] = orderCounter++;
+    visitedCount++;
+    inOpen[i] = 0;
+    openCount--;
+  }
+  function markOpen(i) {
+    if (!inOpen[i]) { inOpen[i] = 1; openCount++; }
+  }
+
+  function* bfsSearch() {
+    const si = idx(start.c, start.r), gi = idx(goal.c, goal.r);
+    const parent = new Int32Array(COLS * ROWS).fill(-1);
+    const queue = [si];
+    let head = 0;
+    markOpen(si);
+    parent[si] = -2;
+    while (head < queue.length) {
+      const cur = queue[head++];
+      if (cur === gi) return { reached: true, path: tracePath(parent, gi, si), metric: "steps" };
+      markVisited(cur);
+      yield;
+      const cc = cur % COLS, cr = (cur / COLS) | 0;
+      for (const [dc, dr] of DIRS) {
+        const nc = cc + dc, nr = cr + dr;
+        if (!inside(nc, nr)) continue;
+        const nb = idx(nc, nr);
+        if (cells[nb] === WALL || visited[nb] >= 0 || inOpen[nb]) continue;
+        parent[nb] = cur;
+        markOpen(nb);
+        queue.push(nb);
+      }
+    }
+    return { reached: false, metric: "steps" };
+  }
+
+  function* bestFirstSearch(useHeuristic) {
+    const si = idx(start.c, start.r), gi = idx(goal.c, goal.r);
+    const parent = new Int32Array(COLS * ROWS).fill(-1);
+    const g = new Float64Array(COLS * ROWS).fill(Infinity);
+    const heap = new Heap();
+    let tie = 0;
+    g[si] = 0;
+    parent[si] = -2;
+    heap.push(useHeuristic ? manhattan(si) : 0, tie++, si);
+    markOpen(si);
+    while (heap.size) {
+      const cur = heap.pop();
+      if (visited[cur] >= 0) continue; // 陈旧堆项
+      if (cur === gi) return { reached: true, path: tracePath(parent, gi, si), metric: "cost" };
+      markVisited(cur);
+      yield;
+      const cc = cur % COLS, cr = (cur / COLS) | 0;
+      for (const [dc, dr] of DIRS) {
+        const nc = cc + dc, nr = cr + dr;
+        if (!inside(nc, nr)) continue;
+        const nb = idx(nc, nr);
+        if (cells[nb] === WALL || visited[nb] >= 0) continue;
+        const nd = g[cur] + entryCost(nb);
+        if (nd < g[nb]) {
+          g[nb] = nd;
+          parent[nb] = cur;
+          heap.push(nd + (useHeuristic ? manhattan(nb) : 0), tie++, nb);
+          markOpen(nb);
+        }
+      }
+    }
+    return { reached: false, metric: "cost" };
+  }
+
+  function manhattan(i) {
+    const c = i % COLS, r = (i / COLS) | 0;
+    return Math.abs(c - goal.c) + Math.abs(r - goal.r);
+  }
+
+  function tracePath(parent, gi, si) {
+    const path = [];
+    let cur = gi;
+    while (cur !== -2 && cur !== -1) { path.push(cur); cur = parent[cur]; }
+    if (path[path.length - 1] !== si) return null;
+    path.reverse();
+    return path;
+  }
+
+  function makeGenerator() {
+    if (algo === "bfs") return bfsSearch();
+    if (algo === "astar") return bestFirstSearch(true);
+    return bestFirstSearch(false);
+  }
+
+  // ---------- 搜索控制 ----------
+  function resetOverlay() {
+    visited.fill(-1);
+    inOpen.fill(0);
+    openCount = 0;
+    visitedCount = 0;
+    orderCounter = 0;
+    pathIdx = null;
+    pathSteps = null;
+    pathCost = null;
+    finished = false;
+    unreachable = false;
+    dirty = true;
+  }
+
+  function cancelSearch(notifyMsg) {
+    const had = gen !== null || finished;
+    gen = null;
+    running = false;
+    resetOverlay();
+    setStatus("就绪", "");
+    updateStats();
+    if (had && notifyMsg) toast(notifyMsg);
+  }
+
+  function ensureSearch() {
+    if (!gen) {
+      resetOverlay();
+      gen = makeGenerator();
+      finished = false;
+    }
+  }
+
+  function stepOnce() {
+    ensureSearch();
+    if (finished) return false;
+    const r = gen.next();
+    if (r.done) {
+      finishSearch(r.value);
+      return false;
+    }
+    dirty = true;
+    updateStats();
+    return true;
+  }
+
+  function finishSearch(result) {
+    running = false;
+    finished = true;
+    if (result.reached && result.path) {
+      pathIdx = result.path;
+      pathSteps = result.path.length - 1;
+      let cost = 0;
+      for (let k = 1; k < result.path.length; k++) cost += entryCost(result.path[k]);
+      pathCost = cost;
+      const metricName = algo === "bfs" ? "步数最少" : "代价最小";
+      setStatus("已找到路径", "ok");
+      toast(`搜索完成：${metricName}的路径，共 ${pathSteps} 步，总代价 ${pathCost}。`);
+    } else {
+      unreachable = true;
+      setStatus("终点不可达", "err");
+      toast("终点不可达：已探索起点可达的全部区域，被墙壁完全封闭。", true);
+    }
+    dirty = true;
+    updateStats();
+  }
+
+  function runSearch() {
+    if (finished) { // 已结束的搜索重新运行 = 全新搜索
+      gen = null;
+      resetOverlay();
+    }
+    ensureSearch();
+    running = true;
+    setStatus("搜索中…", "run");
+    updateStats();
+  }
+
+  function pauseSearch() {
+    if (running) {
+      running = false;
+      setStatus("已暂停", "pause");
+      updateStats();
+    }
+  }
+
+  function stepButton() {
+    if (finished) { toast("本次搜索已结束，请先「清除搜索」再单步。", true); return; }
+    running = false;
+    const advanced = stepOnce();
+    if (!finished) setStatus(advanced || visitedCount > 0 ? "已暂停" : "就绪", advanced ? "pause" : "");
+    updateStats();
+  }
+
+  // ---------- 渲染 ----------
+  const COLORS = {
+    bg: "#0e1626",
+    grid: "rgba(148,163,184,0.09)",
+    wall: "#55647f",
+    wallEdge: "#3a4761",
+    weight: "#8b5cf6",
+    start: "#10b981",
+    goal: "#f43f5e",
+    frontier: "#22d3ee",
+    path: "#fbbf24",
+  };
+
+  function visitedColor(order) {
+    const t = orderCounter > 1 ? order / (orderCounter - 1) : 0;
+    const h = 212 + 18 * t;
+    const l = 68 - 26 * t;
+    return `hsl(${h.toFixed(1)},82%,${l.toFixed(1)}%)`;
+  }
+
+  function draw() {
+    dirty = false;
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const i = idx(c, r);
+        const x = c * CELL, y = r * CELL;
+        const v = cells[i];
+        if (v === WALL) {
+          ctx.fillStyle = COLORS.wall;
+          ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+          ctx.fillStyle = COLORS.wallEdge;
+          ctx.fillRect(x + 1, y + CELL - 7, CELL - 2, 6);
+        } else if (v === WEIGHT) {
+          ctx.fillStyle = "#241a3f";
+          ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+          ctx.strokeStyle = COLORS.weight;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          for (let k = -CELL; k < CELL; k += 10) {
+            ctx.moveTo(x + 2 + k, y + CELL - 2);
+            ctx.lineTo(x + 2 + k + CELL - 4, y + 2);
+          }
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(x + 1, y + 1, CELL - 2, CELL - 2);
+          ctx.clip();
+          ctx.stroke();
+          ctx.restore();
+        }
+        if (visited[i] >= 0) {
+          ctx.fillStyle = visitedColor(visited[i]);
+          ctx.globalAlpha = 0.82;
+          ctx.fillRect(x + 2, y + 2, CELL - 4, CELL - 4);
+          ctx.globalAlpha = 1;
+        } else if (inOpen[i]) {
+          ctx.fillStyle = COLORS.frontier;
+          ctx.globalAlpha = 0.55;
+          ctx.fillRect(x + 2, y + 2, CELL - 4, CELL - 4);
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    // 网格线
+    ctx.strokeStyle = COLORS.grid;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let c = 0; c <= COLS; c++) { ctx.moveTo(c * CELL + 0.5, 0); ctx.lineTo(c * CELL + 0.5, ROWS * CELL); }
+    for (let r = 0; r <= ROWS; r++) { ctx.moveTo(0, r * CELL + 0.5); ctx.lineTo(COLS * CELL, r * CELL + 0.5); }
+    ctx.stroke();
+
+    // 最终路径
+    if (pathIdx && pathIdx.length > 1) {
+      ctx.save();
+      ctx.strokeStyle = COLORS.path;
+      ctx.lineWidth = 10;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.shadowColor = "rgba(251,191,36,0.6)";
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      pathIdx.forEach((i, k) => {
+        const x = (i % COLS) * CELL + CELL / 2, y = ((i / COLS) | 0) * CELL + CELL / 2;
+        if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    drawEndpoint(start, COLORS.start, "起");
+    drawEndpoint(goal, unreachable && finished ? "#e11d48" : COLORS.goal, "终");
+
+    // 不可达时给终点加警示圈
+    if (unreachable && finished) {
+      ctx.strokeStyle = "#fecdd3";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath();
+      ctx.arc(goal.c * CELL + CELL / 2, goal.r * CELL + CELL / 2, CELL * 0.62, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  function drawEndpoint(p, color, ch) {
+    const x = p.c * CELL, y = p.r * CELL;
+    ctx.fillStyle = color;
+    const pad = 3, rr = 9;
+    const w = CELL - pad * 2, h = CELL - pad * 2;
+    ctx.beginPath();
+    ctx.roundRect(x + pad, y + pad, w, h, rr);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `700 ${Math.round(CELL * 0.5)}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(ch, x + CELL / 2, y + CELL / 2 + 1);
+  }
+
+  // ---------- 状态与统计 ----------
+  function setStatus(text, cls) {
+    const el = $("stStatus");
+    el.textContent = text;
+    el.className = "v" + (cls ? " " + cls : "");
+  }
+  function updateStats() {
+    $("stVisited").textContent = String(visitedCount);
+    $("stFrontier").textContent = String(openCount);
+    $("stSteps").textContent = pathSteps === null ? "—" : String(pathSteps);
+    $("stCost").textContent = pathCost === null ? "—" : String(pathCost);
+  }
+  const ALGO_NOTES = {
+    bfs: "BFS：广度优先，按步数搜索；找到的是步数最少路径，总代价仅供参考（可能穿过高代价地形）。",
+    dijkstra: "Dijkstra：按地形代价搜索；起点代价不计入，普通格进入代价 1，高代价格 5，找到总代价最小的路径。",
+    astar: "A*：按「已付出代价 + 曼哈顿距离」搜索；启发不多估，结果与 Dijkstra 同为最小代价，通常扩展更少节点。",
+  };
+  function updateAlgoNote() { $("algoNote").textContent = ALGO_NOTES[algo]; }
+
+  // ---------- 地图编辑 ----------
+  function setCell(c, r, v) {
+    if (!inside(c, r)) return false;
+    if ((c === start.c && r === start.r) || (c === goal.c && r === goal.r)) {
+      if (v !== EMPTY) { toast("起点和终点不能被障碍覆盖。", true); return false; }
+    }
+    const i = idx(c, r);
+    if (cells[i] === v) return false;
+    cells[i] = v;
+    cancelSearch("地图已编辑：已停止并清除旧搜索。");
+    dirty = true;
+    return true;
+  }
+
+  let pointer = null; // {mode:'paint'|'drag-start'|'drag-goal', strokeErase, moved, notified}
+
+  function cellFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width * COLS;
+    const y = (e.clientY - rect.top) / rect.height * ROWS;
+    return { c: Math.floor(x), r: Math.floor(y) };
+  }
+
+  function validEndpointCell(c, r, other) {
+    return inside(c, r) && cells[idx(c, r)] === EMPTY && !(c === other.c && r === other.r);
+  }
+
+  function applyBrush(c, r) {
+    if (!inside(c, r)) return;
+    const i = idx(c, r);
+    if ((c === start.c && r === start.r) || (c === goal.c && r === goal.r)) {
+      toast("起点和终点不能被障碍覆盖。", true);
+      return;
+    }
+    if (brush === "eraser") {
+      if (cells[i] !== EMPTY) setCell(c, r, EMPTY);
+      return;
+    }
+    if (brush === "wall") {
+      const target = pointer && pointer.strokeErase ? EMPTY : WALL;
+      setCell(c, r, target);
+      return;
+    }
+    // weight 画笔：空白 → 高代价；已是高代价 → 擦除（切换）
+    if (cells[i] === WEIGHT) setCell(c, r, EMPTY);
+    else if (cells[i] === EMPTY) setCell(c, r, WEIGHT);
+  }
+
+  canvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const { c, r } = cellFromEvent(e);
+    if (!inside(c, r)) return;
+    canvas.setPointerCapture(e.pointerId);
+    if (c === start.c && r === start.r) {
+      pointer = { mode: "drag-start", notified: false };
+    } else if (c === goal.c && r === goal.r) {
+      pointer = { mode: "drag-goal", notified: false };
+    } else {
+      pointer = { mode: "paint", strokeErase: brush === "wall" && cells[idx(c, r)] === WALL };
+      applyBrush(c, r);
+    }
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (!pointer) return;
+    e.preventDefault();
+    const { c, r } = cellFromEvent(e);
+    if (pointer.mode === "paint") {
+      applyBrush(c, r);
+      return;
+    }
+    // 拖动起点 / 终点
+    const moving = pointer.mode === "drag-start" ? start : goal;
+    const other = pointer.mode === "drag-start" ? goal : start;
+    if (c === moving.c && r === moving.r) return;
+    if (validEndpointCell(c, r, other)) {
+      if (gen !== null || finished) {
+        cancelSearch(null);
+        if (!pointer.notified) { toast("已移动端点：旧搜索已清除。"); pointer.notified = true; }
+      }
+      moving.c = c; moving.r = r;
+      dirty = true;
+    }
+  });
+
+  function endPointer(e) {
+    if (pointer && pointer.mode === "paint") { /* stroke end */ }
+    pointer = null;
+    if (e && e.pointerId !== undefined && canvas.hasPointerCapture(e.pointerId)) {
+      canvas.releasePointerCapture(e.pointerId);
+    }
+  }
+  canvas.addEventListener("pointerup", endPointer);
+  canvas.addEventListener("pointercancel", endPointer);
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  // ---------- 预设地图（全部可重复：固定种子 / 固定公式） ----------
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // DFS 回溯完美迷宫：所有奇数坐标房间互相连通，固定种子可重复
+  function carveMaze(rnd) {
+    cells.fill(WALL);
+    const stack = [[1, 1]];
+    cells[idx(1, 1)] = EMPTY;
+    const dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]];
+    while (stack.length) {
+      const [c, r] = stack[stack.length - 1];
+      const options = [];
+      for (const [dc, dr] of dirs) {
+        const nc = c + dc, nr = r + dr;
+        if (nc >= 1 && nc <= COLS - 2 && nr >= 1 && nr <= ROWS - 2 && cells[idx(nc, nr)] === WALL) {
+          options.push([nc, nr, c + dc / 2, r + dr / 2]);
+        }
+      }
+      if (!options.length) { stack.pop(); continue; }
+      const [nc, nr, mc, mr] = options[Math.floor(rnd() * options.length)];
+      cells[idx(mc, mr)] = EMPTY;
+      cells[idx(nc, nr)] = EMPTY;
+      stack.push([nc, nr]);
+    }
+  }
+
+  // BFS 连通性检查（用于随机预设保底）
+  function goalReachable() {
+    const si = idx(start.c, start.r), gi = idx(goal.c, goal.r);
+    const seen = new Uint8Array(COLS * ROWS);
+    const queue = [si];
+    seen[si] = 1;
+    for (let head = 0; head < queue.length; head++) {
+      const cur = queue[head];
+      if (cur === gi) return true;
+      const cc = cur % COLS, cr = (cur / COLS) | 0;
+      for (const [dc, dr] of DIRS) {
+        const nc = cc + dc, nr = cr + dr;
+        if (!inside(nc, nr)) continue;
+        const nb = idx(nc, nr);
+        if (cells[nb] === WALL || seen[nb]) continue;
+        seen[nb] = 1;
+        queue.push(nb);
+      }
+    }
+    return false;
+  }
+
+  const PRESETS = {
+    blank() { cells.fill(EMPTY); },
+    maze() { carveMaze(mulberry32(42)); },
+    swamp() {
+      cells.fill(EMPTY);
+      // 中部沼泽带：进入代价 5，每 6 列留一条免费走廊
+      for (let r = 6; r <= 12; r++) {
+        for (let c = 3; c <= COLS - 4; c++) {
+          if ((c - 3) % 6 === 2) continue; // 走廊
+          cells[idx(c, r)] = WEIGHT;
+        }
+      }
+      // 上下各两段矮墙，制造绕行权衡
+      for (let c = 6; c <= 12; c++) cells[idx(c, 3)] = WALL;
+      for (let c = 20; c <= 26; c++) cells[idx(c, 3)] = WALL;
+      for (let c = 10; c <= 16; c++) cells[idx(c, ROWS - 4)] = WALL;
+      for (let c = 22; c <= 28; c++) cells[idx(c, ROWS - 4)] = WALL;
+    },
+    sealed() {
+      cells.fill(EMPTY);
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const c = goal.c + dc, r = goal.r + dr;
+          if (inside(c, r)) cells[idx(c, r)] = WALL;
+        }
+      }
+      for (let c = 10; c <= 22; c += 4) {
+        for (let r = 2; r <= 8; r++) cells[idx(c, r)] = WALL;
+      }
+    },
+    scatter() {
+      // 从种子 7 起递增，直到默认起终点连通；过程完全确定、可重复
+      for (let seed = 7; ; seed++) {
+        const rnd = mulberry32(seed);
+        cells.fill(EMPTY);
+        for (let i = 0; i < cells.length; i++) if (rnd() < 0.27) cells[i] = WALL;
+        cells[idx(DEF_START.c, DEF_START.r)] = EMPTY;
+        cells[idx(DEF_GOAL.c, DEF_GOAL.r)] = EMPTY;
+        const s = start, g = goal;
+        start = { ...DEF_START };
+        goal = { ...DEF_GOAL };
+        const reachable = goalReachable() || seed >= 60;
+        start = s; goal = g;
+        if (reachable) {
+          start = { ...DEF_START };
+          goal = { ...DEF_GOAL };
+          return;
+        }
+      }
+    },
+  };
+
+  function applyPreset(name, announce) {
+    PRESETS[name]();
+    // 起终点恢复默认位置并始终保持为空位
+    start = { ...DEF_START };
+    goal = { ...DEF_GOAL };
+    cells[idx(start.c, start.r)] = EMPTY;
+    cells[idx(goal.c, goal.r)] = EMPTY;
+    gen = null;
+    running = false;
+    resetOverlay();
+    setStatus("就绪", "");
+    updateStats();
+    dirty = true;
+    if (announce) toast(`已载入预设：${$("preset").selectedOptions[0].textContent}`);
+  }
+
+  // ---------- 控件绑定 ----------
+  $("algoGroup").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-algo]");
+    if (!btn) return;
+    algo = btn.dataset.algo;
+    for (const b of $("algoGroup").querySelectorAll("button")) {
+      b.setAttribute("aria-checked", String(b === btn));
+    }
+    cancelSearch("已切换算法：旧搜索已清除。");
+    updateAlgoNote();
+  });
+
+  $("brushGroup").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-brush]");
+    if (!btn) return;
+    brush = btn.dataset.brush;
+    for (const b of $("brushGroup").querySelectorAll("button")) {
+      b.setAttribute("aria-pressed", String(b === btn));
+    }
+  });
+
+  $("preset").addEventListener("change", () => applyPreset($("preset").value, true));
+  $("btnRun").addEventListener("click", runSearch);
+  $("btnPause").addEventListener("click", pauseSearch);
+  $("btnStep").addEventListener("click", stepButton);
+  $("btnClear").addEventListener("click", () => {
+    if (gen === null && !finished && visitedCount === 0) { toast("当前没有需要清除的搜索。"); return; }
+    cancelSearch(null);
+    toast("已清除搜索状态，地图保持不变。");
+  });
+  $("btnReset").addEventListener("click", () => {
+    $("preset").value = "blank";
+    applyPreset("blank", false);
+    toast("地图已重置为空白，起点与终点恢复默认位置。");
+  });
+
+  const speedVal = $("speedVal");
+  function updateSpeedLabel() {
+    const rate = Math.pow(2, speed);
+    speedVal.textContent = `${rate} 步/帧`;
+  }
+  $("speed").addEventListener("input", (e) => {
+    speed = Number(e.target.value);
+    updateSpeedLabel();
+  });
+
+  // ---------- 主循环 ----------
+  function frame() {
+    if (running && !finished) {
+      const rate = Math.pow(2, speed);
+      for (let k = 0; k < rate && !finished; k++) {
+        const r = gen.next();
+        if (r.done) { finishSearch(r.value); break; }
+      }
+      dirty = true;
+      updateStats();
+    }
+    if (dirty) draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- 初始化 ----------
+  if (!ctx.roundRect) {
+    // 极旧浏览器兜底
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+      this.rect(x, y, w, h);
+    };
+  }
+  applyPreset("blank", false);
+  updateAlgoNote();
+  updateSpeedLabel();
+  updateStats();
+  draw();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
