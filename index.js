@@ -22,9 +22,12 @@
     )
       ? params.get("sort")
       : "complexity",
-    group: params.get("group") || "topics",
+    group: ["topics", "runs"].includes(params.get("group"))
+      ? params.get("group")
+      : "topics",
     view: params.get("view") || "grid",
   };
+  if (state.group === "topics") state.sort = "complexity";
   let visible = 9;
   let restoredScroll = 0;
   try {
@@ -201,6 +204,7 @@
       });
   }
   function render(reset = false) {
+    if (state.group === "topics") state.sort = "complexity";
     if (reset) visible = 9;
     const matched = U.filterRuns(data, state);
     previewScopes.clear();
@@ -418,6 +422,7 @@
       .forEach((b) =>
         b.setAttribute("aria-pressed", String(b.dataset.group === state.group)),
       );
+    $("sort").closest("label").hidden = state.group !== "runs";
     document
       .querySelectorAll("[data-view]")
       .forEach((b) =>
@@ -571,6 +576,7 @@
   document.querySelectorAll("[data-group]").forEach((b) =>
     b.addEventListener("click", () => {
       state.group = b.dataset.group;
+      if (state.group === "topics") state.sort = "complexity";
       render(true);
     }),
   );
