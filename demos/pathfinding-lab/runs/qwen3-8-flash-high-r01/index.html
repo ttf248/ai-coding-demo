@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>寻路算法实验室</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #1e293b;
+        --line: #334155;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #38bdf8;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--bg); color: var(--text);
+        font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; }
+      body { overflow-x: hidden; }
+      .wrap { max-width: 860px; margin: 0 auto; padding: 12px; }
+      h1 { font-size: 18px; margin: 4px 0 2px; }
+      .sub { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+      .panel { background: var(--panel); border: 1px solid var(--line);
+        border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+      .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+        margin-bottom: 8px; }
+      .row:last-child { margin-bottom: 0; }
+      .label { font-size: 12px; color: var(--muted); min-width: 56px; }
+      button, select { background: #0b1220; color: var(--text);
+        border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px;
+        font-size: 13px; touch-action: manipulation; cursor: pointer; }
+      button.on { border-color: var(--accent); color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
+      input[type="range"] { accent-color: var(--accent); }
+      #gridBox { width: 100%; }
+      canvas { display: block; width: 100%; border-radius: 8px;
+        background: #0b1220; border: 1px solid var(--line); touch-action: none; }
+      .stats { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px;
+        color: var(--muted); }
+      .stats b { color: var(--text); font-variant-numeric: tabular-nums; }
+      #msg { font-size: 12.5px; min-height: 18px; }
+      #msg.err { color: #fca5a5; }
+      #msg.ok { color: #86efac; }
+      .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 12px;
+        color: var(--muted); }
+      .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+        margin-right: 4px; vertical-align: -1px; }
+      .help { font-size: 12px; color: var(--muted); line-height: 1.7; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>网格寻路算法实验室</h1>
+      <div class="sub">
+        BFS / Dijkstra / A*（曼哈顿启发）· 四方向移动 · 普通格进入代价 1，高代价格 5，起点不计入代价
+      </div>
+
+      <div class="panel">
+        <div class="row">
+          <span class="label">算法</span>
+          <select id="algo" aria-label="选择算法">
+            <option value="bfs">BFS（按步数扩展）</option>
+            <option value="dijkstra" selected>Dijkstra（按代价）</option>
+            <option value="astar">A*（按代价 + 启发）</option>
+          </select>
+          <span class="label">预设</span>
+          <select id="preset" aria-label="选择预设地图">
+            <option value="open">预设一：无障碍</option>
+            <option value="maze" selected>预设二：障碍墙</option>
+            <option value="swamp">预设三：高代价泥沼</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="label">画笔</span>
+          <button data-mode="wall" class="mode on">绘制障碍</button>
+          <button data-mode="erase" class="mode">擦除障碍</button>
+          <button data-mode="weight" class="mode">高代价地形</button>
+          <button data-mode="start" class="mode">放起点</button>
+          <button data-mode="end" class="mode">放终点</button>
+        </div>
+        <div class="row">
+          <button id="runBtn">▶ 运行</button>
+          <button id="pauseBtn" disabled>⏸ 暂停</button>
+          <button id="stepBtn">单步</button>
+          <button id="clearBtn">清除搜索</button>
+          <button id="resetBtn">重置地图</button>
+        </div>
+        <div class="row">
+          <span class="label">速度</span>
+          <input id="speed" type="range" min="2" max="300" value="60"
+            style="flex:1;min-width:120px" aria-label="每步间隔" />
+          <span id="speedVal" class="label" style="min-width:auto">60 事件/秒</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div id="gridBox"><canvas id="cv"></canvas></div>
+        <div class="row" style="margin-top:8px">
+          <div class="stats">
+            <span>状态：<b id="stateTxt">就绪</b></span>
+            <span>前沿：<b id="frontierTxt">0</b></span>
+            <span>已访问：<b id="visitedTxt">0</b></span>
+            <span>路径步数：<b id="stepsTxt">-</b></span>
+            <span>总代价：<b id="costTxt">-</b></span>
+          </div>
+        </div>
+        <div id="msg" class="row"></div>
+      </div>
+
+      <div class="panel legend">
+        <span><i class="sw" style="background:#13203b"></i>普通格</span>
+        <span><i class="sw" style="background:#7c4a12"></i>高代价(5)</span>
+        <span><i class="sw" style="background:#475569"></i>障碍</span>
+        <span><i class="sw" style="background:#22c55e"></i>起点</span>
+        <span><i class="sw" style="background:#ef4444"></i>终点</span>
+        <span><i class="sw" style="background:#38bdf8"></i>搜索前沿</span>
+        <span><i class="sw" style="background:#6366f1"></i>已访问</span>
+        <span><i class="sw" style="background:#facc15"></i>最终路径</span>
+      </div>
+
+      <div class="panel help">
+        操作说明：选择画笔后，在网格上<b>按住拖动</b>即可绘制（手机直接用手指）。
+        “放起点 / 放终点”模式下点击一格即可移动端点；起终点不会被障碍覆盖。
+        <b>搜索期间编辑地图会立即停止并清除旧搜索</b>，防止状态混用。
+        “运行”按速度逐事件展示搜索过程；“暂停”冻结过程；“单步”推进一个事件。
+        BFS 以步数最少为目标（只按扩展层数计），Dijkstra 与 A* 以地形代价最小为目标；
+        最小代价路线有多条时展示先找到的其中一条。
+      </div>
+    </div>
+
+    <script>
+      "use strict";
+      const COLS = 21, ROWS = 15;
+      const EMPTY = 0, WALL = 1, WEIGHT = 2;
+      const cv = document.getElementById("cv");
+      const ctx = cv.getContext("2d");
+      const NEI = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+      const key = (r, c) => r * COLS + c;
+      const inb = (r, c) => r >= 0 && r < ROWS && c >= 0 && c < COLS;
+      const enterCost = (r, c) => (state.cells[r][c] === WEIGHT ? 5 : 1);
+
+      const state = {
+        cells: [],
+        start: { r: 7, c: 2 },
+        end: { r: 7, c: 18 },
+        mode: "wall",
+        algo: "dijkstra",
+        speed: 60,
+      };
+
+      /* ---------- 预设地图（可重复） ---------- */
+      function makePreset(name) {
+        const g = Array.from({ length: ROWS }, () => Array(COLS).fill(EMPTY));
+        const set = (r, c, v) => { if (inb(r, c)) g[r][c] = v; };
+        const box = (r0, c0, r1, c1, v) => {
+          for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) set(r, c, v);
+        };
+        state.start = { r: 7, c: 2 };
+        state.end = { r: 7, c: 18 };
+        if (name === "maze") {
+          for (let r = 2; r <= 12; r++) if (r !== 7) set(r, 8, WALL);
+          for (let r = 2; r <= 12; r++) if (r !== 9) set(r, 13, WALL);
+          box(4, 5, 4, 6, WALL);
+          box(10, 4, 10, 5, WALL);
+        }
+        if (name === "swamp") {
+          box(0, 7, ROWS - 1, 11, WEIGHT);
+          box(2, 7, 5, 8, WALL);
+          box(9, 10, 12, 11, WALL);
+        }
+        set(state.start.r, state.start.c, EMPTY);
+        set(state.end.r, state.end.c, EMPTY);
+        return g;
+      }
+
+      /* ---------- 真实搜索：生成事件流 ----------
+         事件: {t:'f',r,c} 入前沿  {t:'v',r,c} 扩展(访问) */
+      function searchAll() {
+        const S = { ...state.start }, E = { ...state.end };
+        const events = [];
+        const parent = new Map();
+        const gScore = new Map();
+        const closed = new Set();
+        let found = false;
+
+        const neigh = (r, c) => {
+          const out = [];
+          for (const [dr, dc] of NEI) {
+            const nr = r + dr, nc = c + dc;
+            if (inb(nr, nc) && state.cells[nr][nc] !== WALL) out.push([nr, nc]);
+          }
+          return out;
+        };
+
+        if (state.algo === "bfs") {
+          const q = [[S.r, S.c]];
+          closed.add(key(S.r, S.c));
+          while (q.length) {
+            const [r, c] = q.shift();
+            events.push({ t: "v", r, c });
+            if (r === E.r && c === E.c) { found = true; break; }
+            for (const [nr, nc] of neigh(r, c)) {
+              const k = key(nr, nc);
+              if (closed.has(k)) continue;
+              closed.add(k);
+              parent.set(k, [r, c]);
+              events.push({ t: "f", r: nr, c: nc });
+              q.push([nr, nc]);
+            }
+          }
+        } else {
+          const heur =
+            state.algo === "astar"
+              ? (r, c) => Math.abs(r - E.r) + Math.abs(c - E.c)
+              : () => 0;
+          const open = [{ r: S.r, c: S.c, g: 0, f: heur(S.r, S.c) }];
+          gScore.set(key(S.r, S.c), 0);
+          events.push({ t: "f", r: S.r, c: S.c });
+          while (open.length) {
+            let bi = 0;
+            for (let i = 1; i < open.length; i++) {
+              if (open[i].f < open[bi].f ||
+                (open[i].f === open[bi].f && open[i].g > open[bi].g)) bi = i;
+            }
+            const cur = open.splice(bi, 1)[0];
+            if (closed.has(key(cur.r, cur.c))) continue;
+            closed.add(key(cur.r, cur.c));
+            events.push({ t: "v", r: cur.r, c: cur.c });
+            if (cur.r === E.r && cur.c === E.c) { found = true; break; }
+            for (const [nr, nc] of neigh(cur.r, cur.c)) {
+              const k = key(nr, nc);
+              if (closed.has(k)) continue;
+              const ng = cur.g + enterCost(nr, nc);
+              if (ng < (gScore.has(k) ? gScore.get(k) : Infinity)) {
+                gScore.set(k, ng);
+                parent.set(k, [cur.r, cur.c]);
+                open.push({ r: nr, c: nc, g: ng, f: ng + heur(nr, nc) });
+                events.push({ t: "f", r: nr, c: nc });
+              }
+            }
+          }
+        }
+
+        let path = [], steps = null, totalCost = null;
+        if (found) {
+          let cur = [E.r, E.c];
+          while (cur) { path.unshift(cur); cur = parent.get(key(cur[0], cur[1])); }
+          if (state.algo === "bfs") {
+            steps = path.length - 1;
+            totalCost = 0;
+            for (let i = 1; i < path.length; i++) totalCost += enterCost(path[i][0], path[i][1]);
+          } else {
+            steps = path.length - 1;
+            totalCost = gScore.get(key(E.r, E.c));
+          }
+        }
+        return { found, events, path, steps, totalCost };
+      }
+
+      /* ---------- 播放控制 ---------- */
+      const els = {
+        state: document.getElementById("stateTxt"),
+        frontier: document.getElementById("frontierTxt"),
+        visited: document.getElementById("visitedTxt"),
+        steps: document.getElementById("stepsTxt"),
+        cost: document.getElementById("costTxt"),
+        msg: document.getElementById("msg"),
+        run: document.getElementById("runBtn"),
+        pause: document.getElementById("pauseBtn"),
+        step: document.getElementById("stepBtn"),
+      };
+
+      let view = null;
+      /* view: { res, idx, frontier:Set, visited:Set, path:Set, timer, phase } */
+
+      function newView() {
+        const res = searchAll();
+        view = {
+          res, idx: 0,
+          frontier: new Set(), visited: new Set(), path: new Set(),
+          timer: null, phase: "ready",
+        };
+        if (!res.found) setMsg("", "");
+        return view;
+      }
+
+      function applyEvent(ev) {
+        const k = key(ev.r, ev.c);
+        if (ev.t === "f") {
+          if (!view.visited.has(k)) view.frontier.add(k);
+        } else {
+          view.frontier.delete(k);
+          view.visited.add(k);
+        }
+      }
+
+      function tick() {
+        const { events } = view.res;
+        if (view.idx >= events.length) { finishReveal(); return; }
+        applyEvent(events[view.idx]);
+        view.idx += 1;
+        syncStats();
+        draw();
+        if (view.idx >= events.length) finishReveal();
+      }
+
+      function finishReveal() {
+        stopTimer();
+        const { res } = view;
+        view.path.clear();
+        view.frontier.clear();
+        if (res.found) {
+          res.path.forEach(([r, c]) => {
+            view.path.add(key(r, c));
+            view.visited.add(key(r, c));
+          });
+          view.phase = "done";
+          setMsg(
+            `已找到路径：${res.steps} 步，总代价 ${res.totalCost}`,
+            "ok");
+        } else {
+          view.phase = "unreachable";
+          setMsg("终点不可达：搜索已耗尽所有可达格子", "err");
+        }
+        els.run.classList.remove("on");
+        els.pause.disabled = true;
+        syncStats();
+        draw();
+      }
+
+      function stopTimer() {
+        if (view && view.timer) { clearInterval(view.timer); view.timer = null; }
+      }
+
+      function play() {
+        if (!view) newView();
+        if (view.phase === "done" || view.phase === "unreachable") return;
+        if (view.timer) return;
+        view.phase = "running";
+        view.timer = setInterval(tick, Math.max(1, 1000 / state.speed));
+        els.run.classList.add("on");
+        els.pause.disabled = false;
+        syncStats();
+      }
+
+      function pause() {
+        stopTimer();
+        if (view && view.phase === "running") view.phase = "paused";
+        els.run.classList.remove("on");
+        els.pause.disabled = true;
+        syncStats();
+      }
+
+      function stepOnce() {
+        if (!view) newView();
+        pause();
+        if (view.phase === "done" || view.phase === "unreachable") return;
+        if (view.phase === "ready") view.phase = "paused";
+        tick();
+      }
+
+      function clearSearch() {
+        stopTimer();
+        view = null;
+        setMsg("", "");
+        syncStats();
+        draw();
+      }
+
+      /** 搜索期间编辑地图：停止并清除旧搜索 */
+      function onMapEdited() {
+        if (view) clearSearch();
+        draw();
+      }
+
+      function setMsg(text, cls) {
+        els.msg.textContent = text || "";
+        els.msg.className = "row" + (cls ? " " + cls : "");
+      }
+
+      function syncStats() {
+        els.visited.textContent = view ? view.visited.size : 0;
+        els.frontier.textContent = view ? view.frontier.size : 0;
+        const done = view && (view.phase === "done");
+        els.steps.textContent = done ? view.res.steps : "-";
+        els.cost.textContent = done ? view.res.totalCost : "-";
+        els.state.textContent = view ? {
+          ready: "就绪", running: "搜索中", paused: "已暂停",
+          done: "完成", unreachable: "不可达",
+        }[view.phase] : "就绪";
+      }
+
+      /* ---------- 绘制 ---------- */
+      let cellPx = 24;
+      function resize() {
+        const box = document.getElementById("gridBox");
+        const w = Math.max(200, box.clientWidth - 2);
+        cellPx = Math.floor(w / COLS);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        cv.width = cellPx * COLS * dpr;
+        cv.height = cellPx * ROWS * dpr;
+        cv.style.width = cellPx * COLS + "px";
+        cv.style.height = cellPx * ROWS + "px";
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        draw();
+      }
+
+      function draw() {
+        const W = cellPx * COLS, H = cellPx * ROWS;
+        ctx.clearRect(0, 0, W, H);
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            const x = c * cellPx, y = r * cellPx, k = key(r, c);
+            let col = "#13203b";
+            if (state.cells[r][c] === WALL) col = "#475569";
+            else if (state.cells[r][c] === WEIGHT) col = "#7c4a12";
+            if (view) {
+              if (view.path.has(k)) col = "#facc15";
+              else if (view.visited.has(k)) col = "#6366f1";
+              else if (view.frontier.has(k)) col = "#38bdf8";
+            }
+            ctx.fillStyle = col;
+            ctx.fillRect(x + 1, y + 1, cellPx - 2, cellPx - 2);
+          }
+        }
+        const marker = (pt, color, label) => {
+          const x = pt.c * cellPx, y = pt.r * cellPx;
+          ctx.fillStyle = color;
+          ctx.fillRect(x + 2, y + 2, cellPx - 4, cellPx - 4);
+          ctx.fillStyle = "#0b1220";
+          ctx.font = `bold ${Math.max(10, Math.floor(cellPx * 0.5))}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(label, x + cellPx / 2, y + cellPx / 2 + 1);
+        };
+        marker(state.start, "#22c55e", "起");
+        marker(state.end, "#ef4444", "终");
+      }
+
+      /* ---------- 指针编辑（鼠标 + 触摸） ---------- */
+      function cellFromEvent(ev) {
+        const rect = cv.getBoundingClientRect();
+        const t = ev.touches && ev.touches.length ? ev.touches[0] : ev;
+        const x = t.clientX - rect.left, y = t.clientY - rect.top;
+        const c = Math.floor(x / (rect.width / COLS));
+        const r = Math.floor(y / (rect.height / ROWS));
+        return inb(r, c) ? { r, c } : null;
+      }
+
+      function applyPaint(r, c) {
+        const isStart = r === state.start.r && c === state.start.c;
+        const isEnd = r === state.end.r && c === state.end.c;
+        if (state.mode === "wall" || state.mode === "erase" || state.mode === "weight") {
+          if (isStart || isEnd) {
+            setMsg("起终点不可被障碍或地形覆盖", "err");
+            return false;
+          }
+          state.cells[r][c] =
+            state.mode === "wall" ? WALL : state.mode === "weight" ? WEIGHT : EMPTY;
+          onMapEdited();
+          return true;
+        }
+        if (state.mode === "start") {
+          if (isEnd) { setMsg("起点不能与终点重合", "err"); return false; }
+          state.cells[r][c] = EMPTY;
+          state.start = { r, c };
+          onMapEdited();
+          return true;
+        }
+        if (state.mode === "end") {
+          if (isStart) { setMsg("终点不能与起点重合", "err"); return false; }
+          state.cells[r][c] = EMPTY;
+          state.end = { r, c };
+          onMapEdited();
+          return true;
+        }
+        return false;
+      }
+
+      let painting = false, lastKey = -1;
+      function onDown(ev) {
+        ev.preventDefault();
+        const p = cellFromEvent(ev);
+        if (!p) return;
+        painting = true;
+        lastKey = key(p.r, p.c);
+        applyPaint(p.r, p.c);
+      }
+      function onMove(ev) {
+        if (!painting) return;
+        ev.preventDefault();
+        const p = cellFromEvent(ev);
+        if (!p) return;
+        if (state.mode === "start" || state.mode === "end") return;
+        const k = key(p.r, p.c);
+        if (k === lastKey) return;
+        lastKey = k;
+        applyPaint(p.r, p.c);
+      }
+      function onUp() { painting = false; }
+
+      cv.addEventListener("mousedown", onDown);
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      cv.addEventListener("touchstart", onDown, { passive: false });
+      cv.addEventListener("touchmove", onMove, { passive: false });
+      window.addEventListener("touchend", onUp);
+
+      /* ---------- 控件 ---------- */
+      document.querySelectorAll(".mode").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.mode = btn.dataset.mode;
+          document.querySelectorAll(".mode").forEach((b) =>
+            b.classList.toggle("on", b === btn));
+        });
+      });
+      document.getElementById("algo").addEventListener("change", (e) => {
+        state.algo = e.target.value;
+        clearSearch();
+      });
+      document.getElementById("preset").addEventListener("change", (e) => {
+        state.cells = makePreset(e.target.value);
+        clearSearch();
+      });
+      document.getElementById("speed").addEventListener("input", (e) => {
+        state.speed = +e.target.value;
+        document.getElementById("speedVal").textContent =
+          state.speed + " 事件/秒";
+        if (view && view.timer) {
+          clearInterval(view.timer);
+          view.timer = setInterval(tick, Math.max(1, 1000 / state.speed));
+        }
+      });
+      els.run.addEventListener("click", play);
+      els.pause.addEventListener("click", pause);
+      els.step.addEventListener("click", stepOnce);
+      document.getElementById("clearBtn").addEventListener("click", clearSearch);
+      document.getElementById("resetBtn").addEventListener("click", () => {
+        state.cells = makePreset(document.getElementById("preset").value);
+        clearSearch();
+        draw();
+      });
+      window.addEventListener("resize", resize);
+
+      state.cells = makePreset(document.getElementById("preset").value);
+      resize();
+      syncStats();
+    </script>
+  </body>
+</html>

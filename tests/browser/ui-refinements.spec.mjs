@@ -50,7 +50,10 @@ test("experiment rows distinguish model makers from billing providers and explai
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("topic.html?id=fluid-simulation&view=list");
-  const row = page.locator(".topic-run-row").first();
+  const row = page
+    .locator(".topic-run-row")
+    .filter({ hasText: "Claude Haiku 5.5" })
+    .first();
   await expect(page.locator(".topic-runs-table thead th").nth(1)).toHaveText(
     "模型厂商",
   );

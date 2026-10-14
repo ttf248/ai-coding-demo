@@ -31,8 +31,8 @@
 ## 项目统计
 
 - 实验主题：12
-- 实验记录：271
-- 可预览记录：259
+- 实验记录：282
+- 可预览记录：270
 - 技术主题：14
 
 ## 实验目录
@@ -72,6 +72,7 @@
 | [小蓝书瀑布流 · minimax-m3 / max](demos/bluebook/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/bluebook/runs/minimax-m3-max-r01/prompt.md) | [打开](previews/bluebook/minimax-m3-max-r01/index.html) |
 | [小蓝书瀑布流 v2 · minimax-m3 / max](demos/bluebook/runs/minimax-m3-max-r02/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v2](demos/bluebook/runs/minimax-m3-max-r02/prompt.md) | [打开](previews/bluebook/minimax-m3-max-r02/index.html) |
 | [小蓝书瀑布流社区](demos/bluebook/runs/muse-spark-1-3-free-xhigh-r01/Readme.md) | Muse Spark 1.3 Free / xhigh | 2026-10-13 | [v2](demos/bluebook/runs/muse-spark-1-3-free-xhigh-r01/prompt.md) | [打开](previews/bluebook/muse-spark-1-3-free-xhigh-r01/index.html) |
+| [小蓝书瀑布流社区原型](demos/bluebook/runs/qwen3-8-flash-high-r01/Readme.md) | Qwen 3.8 Flash / high | 2026-10-14 | [v2](demos/bluebook/runs/qwen3-8-flash-high-r01/prompt.md) | [打开](previews/bluebook/qwen3-8-flash-high-r01/index.html) |
 
 ### 简化电路实验台
 
@@ -100,6 +101,7 @@
 | [简化电路实验台](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-06 | [v1](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 | [简化电路实验台](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r02/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r02/prompt.md) | [打开](demos/circuit-lab/runs/minimax-m3-1-flash-preview-max-r02/index.html) |
 | [简化电路实验台](demos/circuit-lab/runs/muse-spark-1-3-free-xhigh-r01/Readme.md) | Muse Spark 1.3 Free / xhigh | 2026-10-13 | [v1](demos/circuit-lab/runs/muse-spark-1-3-free-xhigh-r01/prompt.md) | [打开](demos/circuit-lab/runs/muse-spark-1-3-free-xhigh-r01/index.html) |
+| [简化电路实验台](demos/circuit-lab/runs/qwen3-8-flash-high-r01/Readme.md) | Qwen 3.8 Flash / high | 2026-10-14 | [v1](demos/circuit-lab/runs/qwen3-8-flash-high-r01/prompt.md) | [打开](demos/circuit-lab/runs/qwen3-8-flash-high-r01/index.html) |
 
 ### 奇幻地图生成器
 
@@ -128,6 +130,7 @@
 | [奇幻地图生成器](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-06 | [v1](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 | [奇幻地图生成器](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r02/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r02/prompt.md) | [打开](demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r02/index.html) |
 | [奇幻地图生成器](demos/fantasy-map-generator/runs/muse-spark-1-3-free-xhigh-r01/Readme.md) | Muse Spark 1.3 Free / xhigh | 2026-10-13 | [v1](demos/fantasy-map-generator/runs/muse-spark-1-3-free-xhigh-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/muse-spark-1-3-free-xhigh-r01/index.html) |
+| [奇幻岛屿地图生成器](demos/fantasy-map-generator/runs/qwen3-8-flash-high-r01/Readme.md) | Qwen 3.8 Flash / high | 2026-10-14 | [v1](demos/fantasy-map-generator/runs/qwen3-8-flash-high-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/qwen3-8-flash-high-r01/index.html) |
 
 ### 彩色流体实验台
 
@@ -156,6 +159,7 @@
 | [彩色流体实验台](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-06 | [v1](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 | [彩色流体实验台](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r02/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r02/prompt.md) | [打开](demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r02/index.html) |
 | [彩色流体实验台](demos/fluid-simulation/runs/muse-spark-1-3-free-xhigh-r01/Readme.md) | Muse Spark 1.3 Free / xhigh | 2026-10-13 | [v1](demos/fluid-simulation/runs/muse-spark-1-3-free-xhigh-r01/prompt.md) | [打开](demos/fluid-simulation/runs/muse-spark-1-3-free-xhigh-r01/index.html) |
+| [彩色流体实验台](demos/fluid-simulation/runs/qwen3-8-flash-high-r01/Readme.md) | Qwen 3.8 Flash / high | 2026-10-14 | [v1](demos/fluid-simulation/runs/qwen3-8-flash-high-r01/prompt.md) | [打开](demos/fluid-simulation/runs/qwen3-8-flash-high-r01/index.html) |
 
 ### 生活情绪日记
 
@@ -186,6 +190,7 @@
 | [AI 情绪日记 App 原型](demos/life-diary/runs/minimax-m3-1-flash-preview-max-r02/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/life-diary/runs/minimax-m3-1-flash-preview-max-r02/prompt.md) | [打开](demos/life-diary/runs/minimax-m3-1-flash-preview-max-r02/index.html) |
 | [藏盒 · AI 情绪日记与生活助手](demos/life-diary/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/life-diary/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/life-diary/runs/minimax-m3-max-r01/index.html) |
 | [生活情绪日记原型](demos/life-diary/runs/muse-spark-1-3-free-xhigh-r01/Readme.md) | Muse Spark 1.3 Free / xhigh | 2026-10-13 | [v1](demos/life-diary/runs/muse-spark-1-3-free-xhigh-r01/prompt.md) | [打开](demos/life-diary/runs/muse-spark-1-3-free-xhigh-r01/index.html) |
+| [AI 情绪日记原型图](demos/life-diary/runs/qwen3-8-flash-high-r01/Readme.md) | Qwen 3.8 Flash / high | 2026-10-14 | [v1](demos/life-diary/runs/qwen3-8-flash-high-r01/prompt.md) | [打开](demos/life-diary/runs/qwen3-8-flash-high-r01/index.html) |
 | [生活情绪日记](demos/life-diary/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](demos/life-diary/runs/unknown-unknown-r01/prompt.md) | [打开](demos/life-diary/runs/unknown-unknown-r01/index.html) |
 
 ### 冥想 iOS App
@@ -217,6 +222,7 @@
 | [冥想 App 完整原型](demos/meditation/runs/minimax-m3-1-flash-preview-max-r02/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/meditation/runs/minimax-m3-1-flash-preview-max-r02/prompt.md) | [打开](demos/meditation/runs/minimax-m3-1-flash-preview-max-r02/index.html) |
 | [静境 · 冥想 iOS App 原型](demos/meditation/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/meditation/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/meditation/runs/minimax-m3-max-r01/index.html) |
 | [冥想 iOS App 原型](demos/meditation/runs/muse-spark-1-3-free-xhigh-r01/Readme.md) | Muse Spark 1.3 Free / xhigh | 2026-10-13 | [v1](demos/meditation/runs/muse-spark-1-3-free-xhigh-r01/prompt.md) | [打开](demos/meditation/runs/muse-spark-1-3-free-xhigh-r01/index.html) |
+| [冥想 iOS App 原型图](demos/meditation/runs/qwen3-8-flash-high-r01/Readme.md) | Qwen 3.8 Flash / high | 2026-10-14 | [v1](demos/meditation/runs/qwen3-8-flash-high-r01/prompt.md) | [打开](demos/meditation/runs/qwen3-8-flash-high-r01/index.html) |
 | [冥想 iOS App](demos/meditation/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](demos/meditation/runs/unknown-unknown-r01/prompt.md) | [打开](demos/meditation/runs/unknown-unknown-r01/index.html) |
 | [静屿 · 冥想 iOS App 原型 · Codex 续作](demos/meditation/runs/unknown-unknown-r02/Readme.md) | 未记录 / 多轮混合 / unknown | 2026-10-10 | [v1](demos/meditation/runs/unknown-unknown-r02/prompt.md) | [打开](demos/meditation/runs/unknown-unknown-r02/index.html) |
 
@@ -251,6 +257,7 @@
 | [新哥特式塔楼城市漫游](demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r02/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r02/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r02/index.html) |
 | [新哥特式塔楼城市 · 漫游](demos/neo-gothic-tower-city/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/neo-gothic-tower-city/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/minimax-m3-max-r01/index.html) |
 | [新哥特式塔楼城市](demos/neo-gothic-tower-city/runs/muse-spark-1-3-free-xhigh-r01/Readme.md) | Muse Spark 1.3 Free / xhigh | 2026-10-13 | [v1](demos/neo-gothic-tower-city/runs/muse-spark-1-3-free-xhigh-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/muse-spark-1-3-free-xhigh-r01/index.html) |
+| [新哥特式塔楼城市漫游](demos/neo-gothic-tower-city/runs/qwen3-8-flash-high-r01/Readme.md) | Qwen 3.8 Flash / high | 2026-10-14 | [v1](demos/neo-gothic-tower-city/runs/qwen3-8-flash-high-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/qwen3-8-flash-high-r01/index.html) |
 
 ### 寻路算法实验室
 
@@ -279,6 +286,7 @@
 | [寻路算法实验室](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-06 | [v1](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01/index.html) |
 | [寻路算法实验室](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r02/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r02/prompt.md) | [打开](demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r02/index.html) |
 | [寻路算法实验室](demos/pathfinding-lab/runs/muse-spark-1-3-free-xhigh-r01/Readme.md) | Muse Spark 1.3 Free / xhigh | 2026-10-13 | [v1](demos/pathfinding-lab/runs/muse-spark-1-3-free-xhigh-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/muse-spark-1-3-free-xhigh-r01/index.html) |
+| [寻路算法实验室](demos/pathfinding-lab/runs/qwen3-8-flash-high-r01/Readme.md) | Qwen 3.8 Flash / high | 2026-10-14 | [v1](demos/pathfinding-lab/runs/qwen3-8-flash-high-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/qwen3-8-flash-high-r01/index.html) |
 
 ### Pixel Flow
 
@@ -309,6 +317,7 @@
 | [图片粒子化与手势还原](demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r02/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r02/prompt.md) | [打开](demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r02/index.html) |
 | [Pixel Flow · 图片粒子化与手势还原](demos/pixel-flow/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/pixel-flow/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/minimax-m3-max-r01/index.html) |
 | [图片粒子化与手势还原](demos/pixel-flow/runs/muse-spark-1-3-free-xhigh-r01/Readme.md) | Muse Spark 1.3 Free / xhigh | 2026-10-13 | [v1](demos/pixel-flow/runs/muse-spark-1-3-free-xhigh-r01/prompt.md) | [打开](demos/pixel-flow/runs/muse-spark-1-3-free-xhigh-r01/index.html) |
+| [图片粒子化手势还原应用](demos/pixel-flow/runs/qwen3-8-flash-high-r01/Readme.md) | Qwen 3.8 Flash / high | 2026-10-14 | [v1](demos/pixel-flow/runs/qwen3-8-flash-high-r01/prompt.md) | [打开](demos/pixel-flow/runs/qwen3-8-flash-high-r01/index.html) |
 | [Pixel Flow](demos/pixel-flow/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-12 | [v1](demos/pixel-flow/runs/unknown-unknown-r01/prompt.md) | 无静态预览 |
 
 ### 自选股实战
@@ -359,6 +368,7 @@
 | [体素微缩建筑工地沙盘](demos/voxel-construction-site/runs/minimax-m3-1-flash-preview-max-r02/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/voxel-construction-site/runs/minimax-m3-1-flash-preview-max-r02/prompt.md) | [打开](demos/voxel-construction-site/runs/minimax-m3-1-flash-preview-max-r02/index.html) |
 | [体素微缩建筑工地 · 沙盘](demos/voxel-construction-site/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/voxel-construction-site/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/minimax-m3-max-r01/index.html) |
 | [体素微缩建筑工地](demos/voxel-construction-site/runs/muse-spark-1-3-free-xhigh-r01/Readme.md) | Muse Spark 1.3 Free / xhigh | 2026-10-13 | [v1](demos/voxel-construction-site/runs/muse-spark-1-3-free-xhigh-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/muse-spark-1-3-free-xhigh-r01/index.html) |
+| [体素微缩建筑工地沙盘](demos/voxel-construction-site/runs/qwen3-8-flash-high-r01/Readme.md) | Qwen 3.8 Flash / high | 2026-10-14 | [v1](demos/voxel-construction-site/runs/qwen3-8-flash-high-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/qwen3-8-flash-high-r01/index.html) |
 
 ### YouTube UI 模块
 
@@ -389,6 +399,7 @@
 | [视频社区 App UI/UX 参考图](demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r02/Readme.md) | MiniMax M3.1 Flash Preview / max | 2026-10-13 | [v1](demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r02/prompt.md) | [打开](demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r02/index.html) |
 | [YouTube · UI 模块设计参考](demos/youtube-ui/runs/minimax-m3-max-r01/Readme.md) | MiniMax M3 / max | 2026-09-29 | [v1](demos/youtube-ui/runs/minimax-m3-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/minimax-m3-max-r01/index.html) |
 | [YouTube UI 模块原型](demos/youtube-ui/runs/muse-spark-1-3-free-xhigh-r01/Readme.md) | Muse Spark 1.3 Free / xhigh | 2026-10-13 | [v1](demos/youtube-ui/runs/muse-spark-1-3-free-xhigh-r01/prompt.md) | [打开](demos/youtube-ui/runs/muse-spark-1-3-free-xhigh-r01/index.html) |
+| [YouTube 首页模块原型图](demos/youtube-ui/runs/qwen3-8-flash-high-r01/Readme.md) | Qwen 3.8 Flash / high | 2026-10-14 | [v1](demos/youtube-ui/runs/qwen3-8-flash-high-r01/prompt.md) | [打开](demos/youtube-ui/runs/qwen3-8-flash-high-r01/index.html) |
 | [YouTube UI 模块](demos/youtube-ui/runs/unknown-unknown-r01/Readme.md) | 未记录 / 多轮混合 / unknown | 2025-05 | [v1](demos/youtube-ui/runs/unknown-unknown-r01/prompt.md) | [打开](demos/youtube-ui/runs/unknown-unknown-r01/youtube-app-creator.html) |
 | [星流视频 · YouTube UI Codex 续作原型](demos/youtube-ui/runs/unknown-unknown-r02/Readme.md) | 未记录 / 多轮混合 / unknown | 2026-10-10 | [v1](demos/youtube-ui/runs/unknown-unknown-r02/prompt.md) | [打开](demos/youtube-ui/runs/unknown-unknown-r02/index.html) |
 
