@@ -432,6 +432,7 @@
     }
     function render() {
       tray.hidden = !selected.length;
+      tray.dataset.count = String(selected.length);
       document.body.classList.toggle("has-selection", !!selected.length);
       const params = new URLSearchParams();
       selected.forEach((id, i) =>
@@ -439,9 +440,15 @@
       );
       if (selected.length > 2) params.set("layout", "quad");
       tray.innerHTML =
-        '<div class="selection-items"><strong>对比栏 · ' +
+        '<div class="selection-content"><div class="selection-header"><strong>对比栏 · ' +
         selected.length +
-        "/4</strong>" +
+        '/4</strong><div class="actions"><button data-clear>清空</button>' +
+        (selected.length >= 2
+          ? '<a class="button primary" href="compare.html?' +
+            escape(params.toString()) +
+            '">开始对比 ↗</a>'
+          : '<span role="status">再选一个实验开始对比</span>') +
+        "</div></div><div class=\"selection-items\">" +
         selected
           .map((id, i) => {
             const run = data.runs.find((r) => r.id === id);
@@ -465,13 +472,7 @@
             );
           })
           .join("") +
-        '</div><div class="actions"><button data-clear>清空</button>' +
-        (selected.length >= 2
-          ? '<a class="button primary" href="compare.html?' +
-            escape(params.toString()) +
-            '">开始对比 ↗</a>'
-          : '<span role="status">再选一个实验开始对比</span>') +
-        "</div>";
+        "</div></div>";
       document.querySelectorAll("[data-compare]").forEach((b) => {
         const on = selected.includes(b.dataset.compare);
         b.setAttribute("aria-pressed", String(on));
