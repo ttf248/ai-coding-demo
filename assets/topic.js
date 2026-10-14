@@ -41,7 +41,7 @@
     : "";
   let view = ["models", "matrix", "list", "prompt"].includes(params.get("view"))
     ? params.get("view")
-    : "models";
+    : "list";
   let modelId = models.some((m) => m.id === params.get("model"))
     ? params.get("model")
     : "";
@@ -99,7 +99,7 @@
           "</option>",
       )
       .join("") +
-    '</select></label><div class="segments" aria-label="主题内容"><button data-topic-view="models">按模型</button><button data-topic-view="list">全部记录</button><button data-topic-view="matrix">档位覆盖</button></div></div>' +
+    '</select></label><div class="segments" aria-label="主题内容"><button data-topic-view="list">全部记录</button><button data-topic-view="models">按模型</button><button data-topic-view="matrix">档位覆盖</button></div></div>' +
     '<section class="topic-context" aria-label="当前任务范围"><h2 id="topic-context-title"></h2><button data-read-task>阅读任务正文 →</button></section>' +
     '<details class="pricing-context" id="pricing-context" aria-label="供应商与费用口径"><summary>费用口径 <span>厂商、接入供应商与计费说明</span></summary><h2>模型厂商、接入供应商与费用</h2><p>实验行分别标出模型厂商与实际接入/计费供应商。订阅展示套餐额度，API 按实际 token 和工具用量计费；批次金额不会拆算成单案例费用。</p><details><summary>公开价格示例（美元，查阅于 2026-10-14）</summary><div class="pricing-examples"><p><strong>OpenAI：</strong>ChatGPT Plus 为 $20/月，Codex 使用包含在计划额度内且受使用限制；GPT-6 Astra 标准 API 为输入 $10、输出 $50 / 百万 token。假设一次任务恰好使用 100 万输入 + 100 万输出 token，API 约 $60，是 Plus 月费的 3 倍。</p><p><strong>Anthropic：</strong>Claude Pro 为 $20/月，Max 5x / 20x 为 $100 / $200 每月；Claude Opus 5.5 标准 API 为输入 $4、输出 $20 / 百万 token。同样假设 100 万输入 + 100 万输出，API 约 $24，是 Pro 月费的 1.2 倍。</p><p>这些是不同产品的公开标价量级示例，不代表本项目任一案例的 token 用量或真实账单。订阅有额度与速率限制，和 API token 账单不是等价服务；第三方价格也由实际平台决定，不能套用统一加价倍数。例如 OpenCode 当前把 Nemotron 3 Ultra Free 列为免费模型。</p><ul><li><a href="https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus" target="_blank" rel="noopener">ChatGPT Plus 月费与 API 单独计费</a> · <a href="https://openai.com/codex/" target="_blank" rel="noopener">OpenAI Codex 计划说明</a> · <a href="https://developers.openai.com/api/docs/models/gpt-6-astra" target="_blank" rel="noopener">GPT-6 Astra API 价格</a></li><li><a href="https://support.anthropic.com/en/articles/11049762-choosing-a-claude-ai-plan" target="_blank" rel="noopener">Claude 计划价格</a> · <a href="https://www.anthropic.com/claude/opus" target="_blank" rel="noopener">Opus 5.5 API 价格</a></li><li><a href="https://opencode.ai/v2/docs/console/models/" target="_blank" rel="noopener">OpenCode 模型及免费档位</a></li></ul></div></details></details>' +
     '<div class="topic-filters" id="topic-filters"><label class="topic-search">搜索实验<input id="topic-search" type="search" placeholder="模型、档位或实验描述" autocomplete="off"></label><label>模型<select id="topic-model"><option value="">全部模型</option>' +
@@ -117,6 +117,7 @@
       .join("") +
     '</select></label><label id="topic-sort-field">排序<select id="topic-sort"><option value="model">模型 / 档位从高到低</option><option value="recent">日期从新到旧</option></select></label></div></details><button id="topic-reset">清除筛选</button></div>' +
     '<div class="topic-results-heading"><p id="topic-count" role="status"></p><p id="topic-results-help"></p></div><section id="topic-matrix" aria-label="模型与档位实验矩阵" hidden></section><section id="topic-models" aria-label="按模型浏览实验"></section><section id="topic-list" hidden><div class="topic-run-groups"></div></section><section id="topic-prompts" class="prompt-library" hidden><h2>任务与版本</h2><div></div></section>';
+  root.append(document.getElementById("pricing-context"));
   const refreshSelection = U.setupSelection(data);
   function billingSummary(run) {
     const billing = run.billing;
@@ -156,6 +157,8 @@
       e(compactBilling(run)) +
       "</summary><p>" +
       e(billingSummary(run)) +
+      "<br>" +
+      e(R.durationSummary(run)) +
       "<br>模型厂商：" +
       e(U.modelProvider(data, run)) +
       "；接入/付费供应商：" +
@@ -183,32 +186,67 @@
   function toolLabel(run) {
     return R.toolLabel(data, run);
   }
+  function durationMarkup(run) {
+    const duration = run.billing?.duration;
+    if (!duration) return '<span class="missing-record">耗时未记录</span>';
+    const batch = run.billing.type === "batch";
+    return (
+      '<strong title="' +
+      e(R.durationSummary(run)) +
+      '">' +
+      e(duration.text) +
+      "</strong><small>" +
+      (batch
+        ? "批次耗时 · " +
+          (run.billing.caseCount == null
+            ? "案例数未记录"
+            : run.billing.caseCount + " 案例")
+        : "单次耗时") +
+      "</small>"
+    );
+  }
   const visibleConditionRecords = 3;
   function modelRecord(run, latest, historical = false) {
     const href = U.previewURL(run);
-    const fee = [run.billing?.plan, compactBilling(run)]
-      .filter(Boolean)
-      .join(" · ");
     const mode =
       U.executionModeBadge(run) ||
       '<span class="model-record-mode">' +
         e(U.executionModeLabel(U.executionMode(run))) +
         "</span>";
     return (
-      '<article class="model-run-record" id="run-' +
+      '<tr class="model-run-record" id="run-' +
       e(run.id) +
       '">' +
-      '<div class="model-record-identity"><strong class="model-record-effort">' +
+      '<th scope="row" class="model-record-identity"><strong class="model-record-effort">' +
       e(U.effortLabel(run.effort)) +
-      "</strong><span>" +
+      '</strong><small class="model-record-round">' +
       e(U.roundLabel(run)) +
-      "</span><time>" +
+      '</small></th><td class="model-record-date"><time>' +
       e(run.date || "日期未记录") +
-      '</time><span class="model-record-fee" title="' +
-      e(billingSummary(run)) +
+      '</time></td><td class="model-record-facts"><span class="model-record-provider">' +
+      e(run.billing?.provider || "供应商未记录") +
+      '</span><small class="model-record-tool">' +
+      e(toolLabel(run)) +
+      '</small></td><td class="model-record-fee" title="' +
+      e([billingSummary(run), run.billing?.note].filter(Boolean).join("；")) +
       '">' +
-      e(fee) +
-      "</span></div>" +
+      e(compactBilling(run)) +
+      (run.billing?.plan ? "<small>" + e(run.billing.plan) + "</small>" : "") +
+      '</td><td class="model-record-duration">' +
+      durationMarkup(run) +
+      '</td><td class="model-record-input"><span class="model-input-state" title="' +
+      e(run.input?.notes || "") +
+      '">' +
+      e(U.completenessLabel(run.input?.completeness)) +
+      "</span><small>" +
+      mode +
+      "</small>" +
+      (historical
+        ? '<small class="model-record-relation">与本组最近记录：' +
+          e(U.relation(data, latest, run)) +
+          "</small>"
+        : "") +
+      '</td><td class="model-record-operation">' +
       '<div class="model-record-actions">' +
       (href
         ? '<a class="model-preview" href="' +
@@ -227,35 +265,12 @@
       '" aria-pressed="false">加入对比</button>' +
       '<a class="model-record-reader" href="' +
       e(U.documentURL(run)) +
-      '">完整明细 →</a></div>' +
-      '<div class="model-record-facts"><span><span class="model-fact-label">工具</span>' +
-      e(toolLabel(run)) +
-      "</span>" +
-      mode +
-      '<span><span class="model-fact-label">接入/付费供应商</span>' +
-      e(run.billing?.provider || "未记录") +
-      "</span>" +
-      '<span class="model-input-state" title="' +
-      e(run.input?.notes || "") +
-      '">' +
-      e(U.completenessLabel(run.input?.completeness)) +
-      "</span>" +
-      (run.billing?.sourceAmount != null
-        ? "<span>原始消耗 " +
-          e(run.billing.sourceAmount + " " + run.billing.sourceUnit) +
-          "</span>"
-        : "") +
-      (historical
-        ? '<span class="model-record-relation">与本组最近记录：' +
-          e(U.relation(data, latest, run)) +
-          "</span>"
-        : "") +
-      "</div></article>"
+      '">完整明细 →</a></div></td></tr>'
     );
   }
   function modelsMarkup(groups) {
     return (
-      '<div class="model-overview-toolbar"><span>展开模型，直接查看记录与关键明细。</span><button data-expand-models>' +
+      '<div class="model-overview-toolbar"><span>按模型分组，记录按列对齐；更早轮次可展开查看。</span><button data-expand-models>' +
       (groups.every((group) => openGroups.has(group.key))
         ? "收起全部"
         : "展开全部") +
@@ -265,11 +280,6 @@
           const latest = group.latest,
             preview = group.latestPreview;
           const bodyId = "model-records-" + index;
-          const providers = [
-            ...new Set(
-              group.runs.map((run) => run.billing?.provider || "未记录"),
-            ),
-          ];
           return (
             '<section class="topic-model-group" data-model-group="' +
             e(group.modelId) +
@@ -291,8 +301,6 @@
               : "") +
             '</span><span class="model-group-meta">' +
             e(U.modelProvider(data, latest)) +
-            " · 接入：" +
-            e(providers.join(" / ")) +
             " · " +
             e(latest.date ? "最近 " + latest.date : "日期未记录") +
             '</span><span class="model-efforts">' +
@@ -326,7 +334,14 @@
             bodyId +
             '"' +
             (openGroups.has(group.key) ? "" : " hidden") +
-            ">" +
+            '><p class="model-table-hint">左右滑动查看费用、耗时与操作 →</p><div class="model-table-scroll" tabindex="0" aria-label="模型实验记录，可横向滚动"><table class="model-records-table"><caption class="sr-only">' +
+            e(
+              U.modelLabel(data, latest) +
+                " · " +
+                group.promptId +
+                " 的实验记录",
+            ) +
+            '</caption><thead><tr><th scope="col">档位 / 轮次</th><th scope="col">日期</th><th scope="col">接入供应商 / 工具</th><th scope="col">费用记录</th><th scope="col">执行耗时</th><th scope="col">输入 / 执行模式</th><th scope="col">操作</th></tr></thead>' +
             group.conditions
               .map((condition, ci) => {
                 const recent = condition.runs.slice(0, visibleConditionRecords);
@@ -341,9 +356,9 @@
                       '&tab=snapshot">比较最近两条 →</a>'
                     : "";
                 return (
-                  '<div class="model-condition" data-condition="' +
+                  '<tbody class="model-condition" data-condition="' +
                   e(condition.key) +
-                  '" role="group" aria-label="' +
+                  '" aria-label="' +
                   e(
                     U.effortLabel(condition.latest.effort) +
                       " · " +
@@ -358,7 +373,7 @@
                     )
                     .join("") +
                   (older.length || comparison
-                    ? '<div class="model-history-controls">' +
+                    ? '<tr class="model-history-controls"><td colspan="7">' +
                       (older.length
                         ? '<button data-history-toggle="' +
                           e(condition.key) +
@@ -375,10 +390,11 @@
                           " 条</button>"
                         : "") +
                       comparison +
-                      "</div>"
+                      "</td></tr>"
                     : "") +
+                  "</tbody>" +
                   (older.length
-                    ? '<div class="model-history" id="' +
+                    ? '<tbody class="model-history" id="' +
                       historyId +
                       '"' +
                       (openHistory.has(condition.key) ? "" : " hidden") +
@@ -386,13 +402,12 @@
                       older
                         .map((run) => modelRecord(run, condition.latest, true))
                         .join("") +
-                      "</div>"
-                    : "") +
-                  "</div>"
+                      "</tbody>"
+                    : "")
                 );
               })
               .join("") +
-            "</div></section>"
+            "</table></div></div></section>"
           );
         })
         .join("")
@@ -422,6 +437,8 @@
           (r.preview.kind === "none" ? "无预览" : "可预览") +
           " " +
           U.executionModeBadge(r) +
+          '</small><small class="matrix-duration">' +
+          e(R.durationSummary(r)) +
           "</small>" +
           billingMarkup(r) +
           '<div class="card-actions">' +
@@ -549,7 +566,7 @@
       view === "matrix"
         ? "空白档位表示未归档实验，不代表能力评价。"
         : view === "list"
-          ? "查看模型厂商、接入供应商和费用口径；打开预览查看实现。"
+          ? "费用与耗时标明单次或批次口径；批次数据不拆算为单案例。"
           : view === "models"
             ? "保留工具与执行模式差异；完整说明从明细入口查看。"
             : "保留历史任务版本，完整原始输入在各条实验记录中。";
@@ -667,9 +684,9 @@
                 items.length +
                 ' 条实验</span></div><a href="compare.html?group=' +
                 encodeURIComponent(topic.id + "/" + p.id) +
-                '&tab=prompt">比较此版本 →</a></header><p class="topic-table-hint">表格可横向滚动查看供应商、日期、费用与操作 →</p><div class="topic-table-scroll" tabindex="0" aria-label="实验记录表，包含模型、模型厂商、接入供应商与费用，可横向滚动"><table class="topic-runs-table"><caption class="sr-only">' +
+                '&tab=prompt">比较此版本 →</a></header><div class="topic-table-scroll" tabindex="0" aria-label="实验记录表，包含模型、工具、档位、日期、费用与耗时"><table class="topic-runs-table"><caption class="sr-only">' +
                 e(p.title) +
-                '的实验记录</caption><thead><tr><th scope="col">模型</th><th scope="col">模型厂商</th><th scope="col">接入/付费供应商</th><th scope="col">推理档位</th><th scope="col">轮次</th><th scope="col">日期</th><th scope="col">费用记录</th><th scope="col">操作</th></tr></thead><tbody>' +
+                '的实验记录</caption><thead><tr><th scope="col">模型 / 厂商</th><th scope="col">接入供应商 / 工具</th><th scope="col">档位 / 轮次</th><th scope="col">日期</th><th scope="col">费用记录</th><th scope="col">执行耗时</th><th scope="col">输入 / 执行模式</th><th scope="col">操作</th></tr></thead><tbody>' +
                 items
                   .map((r) => {
                     const href = U.previewURL(r);
@@ -678,16 +695,17 @@
                       e(r.id) +
                       '"><th scope="row" class="topic-run-model">' +
                       e(U.modelLabel(data, r)) +
-                      U.executionModeBadge(r) +
-                      '</th><td class="topic-run-model-maker"><span class="mobile-cell-label" aria-hidden="true">模型厂商</span>' +
+                      '<small class="topic-run-model-maker">' +
                       e(U.modelProvider(data, r)) +
-                      '</td><td class="topic-run-provider"><span class="mobile-cell-label" aria-hidden="true">接入/付费供应商</span>' +
+                      '</small></th><td class="topic-run-provider"><span class="mobile-cell-label" aria-hidden="true">接入/付费供应商</span><span>' +
                       e(r.billing?.provider || "未记录") +
-                      '</td><td class="topic-run-effort">' +
+                      '</span><small class="topic-run-tool">' +
+                      e(toolLabel(r)) +
+                      '</small></td><td class="topic-run-condition"><span class="topic-run-effort">' +
                       e(U.effortLabel(r.effort)) +
-                      '</td><td class="topic-run-round">' +
+                      '</span><small class="topic-run-round">' +
                       e(U.roundLabel(r)) +
-                      '</td><td class="topic-run-date" id="date-' +
+                      '</small></td><td class="topic-run-date" id="date-' +
                       e(r.id) +
                       '"><time>' +
                       e(r.date || "日期未记录") +
@@ -695,7 +713,21 @@
                       e(r.id) +
                       '">' +
                       billingMarkup(r) +
-                      '</td><td class="topic-run-actions"><div class="topic-row-actions">' +
+                      (r.billing?.plan
+                        ? '<small class="topic-run-plan">' +
+                          e(r.billing.plan) +
+                          "</small>"
+                        : "") +
+                      '</td><td class="topic-run-duration">' +
+                      durationMarkup(r) +
+                      '</td><td class="topic-run-input"><span title="' +
+                      e(r.input?.notes || "") +
+                      '">' +
+                      e(U.completenessLabel(r.input?.completeness)) +
+                      "</span><small>" +
+                      (U.executionModeBadge(r) ||
+                        e(U.executionModeLabel(U.executionMode(r)))) +
+                      '</small></td><td class="topic-run-actions"><div class="topic-row-actions">' +
                       (U.screenshotURL(r)
                         ? '<a href="' +
                           e(U.screenshotURL(r)) +
@@ -714,11 +746,7 @@
                       e(r.id) +
                       '" aria-pressed="false">加入对比</button><a href="' +
                       e(U.documentURL(r)) +
-                      '">记录</a><button class="row-details-toggle" data-row-details aria-expanded="false" aria-controls="date-' +
-                      e(r.id) +
-                      " billing-" +
-                      e(r.id) +
-                      '">日期、供应商与费用明细</button></div></td></tr>'
+                      '">记录</a></div></td></tr>'
                     );
                   })
                   .join("") +
@@ -858,14 +886,6 @@
       render();
       return;
     }
-    const details = event.target.closest("[data-row-details]");
-    if (details) {
-      const expanded = details.getAttribute("aria-expanded") !== "true";
-      details.setAttribute("aria-expanded", String(expanded));
-      details.closest("tr").classList.toggle("details-expanded", expanded);
-      details.textContent = expanded ? "收起详情" : "日期、供应商与费用明细";
-      return;
-    }
     if (event.target.closest("#topic-reset, [data-reset-filters]")) {
       modelId = effort = query = "";
       promptId = "";
@@ -889,7 +909,7 @@
       : "";
     view = ["models", "matrix", "list", "prompt"].includes(p.get("view"))
       ? p.get("view")
-      : "models";
+      : "list";
     modelId = models.some((m) => m.id === p.get("model")) ? p.get("model") : "";
     effort = efforts.includes(p.get("effort")) ? p.get("effort") : "";
     query = p.get("q") || "";

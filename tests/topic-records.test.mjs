@@ -9,6 +9,36 @@ vm.runInNewContext(read("assets/core.js"), context);
 vm.runInNewContext(read("assets/topic-records.js"), context);
 const R = context.ArchiveTopicRecords;
 
+test("duration display preserves recorded scope, approximate text and unknown values", () => {
+  assert.equal(R.durationSummary({}), "耗时未记录");
+  assert.equal(R.durationSummary({ billing: { type: "batch" } }), "耗时未记录");
+  assert.equal(
+    R.durationSummary({
+      billing: { type: "run", duration: { seconds: 0, text: "0s" } },
+    }),
+    "单次耗时 0s",
+  );
+  for (const batch of data.batches.filter((batch) => batch.duration)) {
+    const related = data.runs.filter(
+      (run) => run.billing?.batchId === batch.batchId,
+    );
+    assert.ok(related.length > 0);
+    for (const run of related) {
+      assert.deepEqual(run.billing.duration, batch.duration);
+      assert.equal(R.durationSummary(run), "批次耗时 " + batch.duration.text);
+    }
+  }
+  const approximate = data.batches.find(
+    (batch) => batch.duration?.seconds === null,
+  );
+  assert.ok(approximate.duration.text.includes("精确时长未记录"));
+  const historical = data.runs.find(
+    (run) => run.billing?.batchId === approximate.batchId,
+  );
+  const source = JSON.parse(read(historical.directory + "/run.json"));
+  assert.equal(source.billing.duration, undefined);
+});
+
 test("topic model groups preserve every record and separate task versions", () => {
   for (const topic of data.topics) {
     const runs = data.runs.filter((run) => run.topicId === topic.id);

@@ -83,5 +83,17 @@
           ),
       );
   }
-  global.ArchiveTopicRecords = { group, modelKey, conditionKey, toolLabel };
+  function durationSummary(run) {
+    const billing = run.billing;
+    if (!billing?.duration) return "耗时未记录";
+    const scope = billing.type === "batch" ? "批次耗时" : "单次耗时";
+    return scope + " " + billing.duration.text;
+  }
+  global.ArchiveTopicRecords = {
+    group,
+    modelKey,
+    conditionKey,
+    toolLabel,
+    durationSummary,
+  };
 })(typeof window !== "undefined" ? window : globalThis);

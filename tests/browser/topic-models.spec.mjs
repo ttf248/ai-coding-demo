@@ -46,12 +46,12 @@ async function mockHistory(page) {
 const modelGroup = (page, model) =>
   page.locator(`[data-model-group="${model}"]`);
 
-test("topic defaults to a complete model overview with collapsed history", async ({
+test("explicit model view retains the complete overview and collapsed history", async ({
   page,
 }) => {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("topic.html?id=voxel-construction-site");
+  await page.goto("topic.html?id=voxel-construction-site&view=models");
   await expect(page.locator('[data-topic-view="models"]')).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -98,7 +98,7 @@ test("topic defaults to a complete model overview with collapsed history", async
 test("model filters expand matching records and restore explicit collapse and sorting", async ({
   page,
 }) => {
-  await page.goto("topic.html?id=voxel-construction-site");
+  await page.goto("topic.html?id=voxel-construction-site&view=models");
   await page.locator("#topic-model").selectOption("gpt-6-1-sol");
   const group = modelGroup(page, "gpt-6-1-sol");
   await expect(group.locator(".model-group-records")).toBeVisible();
@@ -109,7 +109,7 @@ test("model filters expand matching records and restore explicit collapse and so
     "medium",
   ]);
   await expect(
-    group.locator(".model-record-facts").filter({ hasText: "自主设计授权" }),
+    group.locator(".model-record-input").filter({ hasText: "自主设计授权" }),
   ).toHaveCount(1);
   await group.locator("[data-model-toggle]").click();
   await page.reload();
@@ -140,7 +140,7 @@ test("historical anchors reveal the target and remain compatible with the full l
 }) => {
   await mockHistory(page);
   const anchor = `#run-${foldedRun.id}`;
-  await page.goto(`topic.html?id=voxel-construction-site${anchor}`);
+  await page.goto(`topic.html?id=voxel-construction-site&view=models${anchor}`);
   await expect(page.locator(anchor)).toBeVisible();
   await expect(
     modelGroup(page, "gpt-6-astra").locator("[data-model-toggle]"),
@@ -158,7 +158,9 @@ test("historical anchors reveal the target and remain compatible with the full l
   await expect(page.locator(anchor)).toBeVisible();
   await page.locator("#topic-model").selectOption("minimax-m3-1-flash-preview");
   expect(new URL(page.url()).hash).toBe("");
-  await page.goto("topic.html?id=voxel-construction-site#run-%E0%A4%A");
+  await page.goto(
+    "topic.html?id=voxel-construction-site&view=models#run-%E0%A4%A",
+  );
   await expect(page.locator(".topic-model-group")).toHaveCount(
     new Set(voxel.map((run) => run.modelId)).size,
   );
@@ -168,7 +170,9 @@ test("history comparison opens the exact pair without executing previews", async
   page,
 }) => {
   await mockHistory(page);
-  await page.goto("topic.html?id=voxel-construction-site&model=gpt-6-astra");
+  await page.goto(
+    "topic.html?id=voxel-construction-site&view=models&model=gpt-6-astra",
+  );
   const link = modelGroup(page, "gpt-6-astra").locator(
     ".model-history-controls a",
   );
@@ -198,7 +202,7 @@ test("multiple task versions remain separate and task reading returns to the ove
   page,
 }) => {
   const blue = data.runs.filter((run) => run.topicId === "bluebook");
-  await page.goto("topic.html?id=bluebook");
+  await page.goto("topic.html?id=bluebook&view=models");
   await expect(page.locator("#topic-prompt")).toBeVisible();
   await expect(page.locator(".topic-model-group")).toHaveCount(
     new Set(blue.map((run) => `${run.promptId}/${run.modelId}`)).size,
@@ -222,7 +226,7 @@ test("mobile model overview shows its first preview on the first screen and adva
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("topic.html?id=voxel-construction-site");
+  await page.goto("topic.html?id=voxel-construction-site&view=models");
   await expect(page.locator("#topic-effort")).toBeHidden();
   const bounds = await page
     .locator(".model-quick-preview")
@@ -239,9 +243,8 @@ test("mobile model overview shows its first preview on the first screen and adva
   await expect(page.locator("#topic-effort")).toHaveValue("max");
   const row = page.locator(".model-run-record").first();
   await expect(row.locator(".model-record-facts")).toBeVisible();
-  await expect(row.locator(".model-record-facts")).toContainText(
-    "接入/付费供应商",
-  );
+  await expect(row.locator(".model-record-provider")).not.toBeEmpty();
+  await expect(row.locator(".model-record-tool")).not.toBeEmpty();
   await row.locator("[data-compare]").click();
   await expect(page.locator("#compare-tray")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
@@ -256,14 +259,16 @@ test("mobile model overview shows its first preview on the first screen and adva
 test("expanded model shows compact facts and direct detail links without nested disclosures", async ({
   page,
 }) => {
-  await page.goto("topic.html?id=voxel-construction-site&model=gpt-6-1-sol");
+  await page.goto(
+    "topic.html?id=voxel-construction-site&view=models&model=gpt-6-1-sol",
+  );
   const group = modelGroup(page, "gpt-6-1-sol");
   await expect(group.locator(".model-run-record")).toHaveCount(3);
   await expect(group.locator(".model-group-records details")).toHaveCount(0);
   await expect(group.locator(".model-record-facts").first()).toContainText(
     "OpenAI",
   );
-  await expect(group.locator(".model-record-facts").first()).toContainText(
+  await expect(group.locator(".model-record-input").first()).toContainText(
     "输入留存不完整",
   );
   await expect(group.locator(".model-record-fee").first()).toContainText(
@@ -271,9 +276,26 @@ test("expanded model shows compact facts and direct detail links without nested 
   );
   expect((await group.boundingBox()).height).toBeLessThan(330);
   const row = group.locator(".model-run-record").first();
-  const identity = await row.locator(".model-record-identity").boundingBox();
-  const actions = await row.locator(".model-record-actions").boundingBox();
-  expect(actions.x - (identity.x + identity.width)).toBeLessThanOrEqual(20);
+  await expect(row).toHaveRole("row");
+  await expect(row.locator("th, td")).toHaveCount(7);
+  await expect(group.locator(".model-records-table thead th")).toHaveText([
+    "档位 / 轮次",
+    "日期",
+    "接入供应商 / 工具",
+    "费用记录",
+    "执行耗时",
+    "输入 / 执行模式",
+    "操作",
+  ]);
+  const positions = await group
+    .locator(".model-run-record")
+    .evaluateAll((rows) =>
+      rows.map((row) =>
+        Array.from(row.cells, (cell) => cell.getBoundingClientRect().x),
+      ),
+    );
+  expect(positions[1]).toEqual(positions[0]);
+  expect(positions[2]).toEqual(positions[0]);
   await row.locator(".model-record-reader").click();
   await expect(page).toHaveURL(
     /assets\/generated\/readers\/demos\/voxel-construction-site\/runs\/gpt-6-1-sol-max-r01\/Readme\.html/,
@@ -298,7 +320,9 @@ test("short rerun histories are immediately visible when the model opens", async
         ";",
     }),
   );
-  await page.goto("topic.html?id=voxel-construction-site&model=gpt-6-astra");
+  await page.goto(
+    "topic.html?id=voxel-construction-site&view=models&model=gpt-6-astra",
+  );
   const group = modelGroup(page, "gpt-6-astra");
   await expect(page.locator(`#run-${historyRun.id}`)).toBeVisible();
   await expect(page.locator(`#run-${historySource.id}`)).toBeVisible();
