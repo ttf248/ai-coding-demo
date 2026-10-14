@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>奇幻地图生成器</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; overflow-x: hidden; }
+.header { text-align: center; padding: 20px; background: #16213e; border-bottom: 1px solid #0f3460; }
+.header h1 { font-size: 1.5rem; color: #4ecdc4; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; padding: 15px; justify-content: center; background: #16213e; align-items: center; }
+.controls input, .controls button { padding: 8px 16px; border: 1px solid #0f3460; border-radius: 6px; background: #1a1a2e; color: #e0e0e0; font-size: 0.9rem; }
+.controls button { cursor: pointer; }
+.controls button:hover { background: #0f3460; }
+.controls label { font-size: 0.9rem; color: #888; }
+.canvas-container { position: relative; width: 100%; height: 500px; background: #0a0a1a; border: 2px solid #0f3460; margin: 15px; border-radius: 8px; overflow: hidden; }
+#mapCanvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+.info { padding: 15px; background: #16213e; margin: 0 15px 15px; border-radius: 8px; border: 1px solid #0f3460; }
+.legend { display: flex; flex-wrap: wrap; gap: 15px; padding: 10px 15px; font-size: 0.85rem; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-color { width: 20px; height: 12px; border-radius: 2px; }
+@media (max-width: 768px) { .canvas-container { height: 350px; } }
+</style>
+</head>
+<body>
+<div class="header"><h1>手绘风格奇幻岛屿地图生成器</h1></div>
+<div class="controls">
+  <label>种子: <input type="text" id="seedInput" value="fantasy" style="width:120px"></label>
+  <label>海平面: <input type="range" id="seaLevel" min="0" max="100" value="35" style="width:100px"></label>
+  <label>粗糙度: <input type="range" id="roughness" min="1" max="10" value="5" style="width:100px"></label>
+  <button onclick="generateMap()">生成地图</button>
+  <button onclick="setBrush('raise')">升高地形</button>
+  <button onclick="setBrush('lower')">降低地形</button>
+  <button onclick="toggleLabels()">城镇标签</button>
+  <button onclick="exportPNG()">导出PNG</button>
+  <button onclick="resetMap()">重置</button>
+</div>
+<div class="legend">
+  <div class="legend-item"><div class="legend-color" style="background:#1a5276"></div>海洋</div>
+  <div class="legend-item"><div class="legend-color" style="background:#f9e79f"></div>海岸</div>
+  <div class="legend-item"><div class="legend-color" style="background:#52be80"></div>平原</div>
+  <div class="legend-item"><div class="legend-color" style="background:#1e8449"></div>森林</div>
+  <div class="legend-item"><div class="legend-color" style="background:#7f8c8d"></div>山脉</div>
+</div>
+<div class="canvas-container"><canvas id="mapCanvas"></canvas></div>
+<div class="info">操作说明：拖动鼠标绘制地形，点击生成地图重新生成，导出PNG保存当前地图。</div>
+
+<script>
+const canvas = document.getElementById('mapCanvas');
+const ctx = canvas.getContext('2d');
+let mapData = [];
+let mapSize = 128;
+let showLabels = true;
+let brushType = 'raise';
+let isDrawing = false;
+let towns = [];
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = rect.height * devicePixelRatio;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Seeded random
+function seededRandom(seed) {
+  let x = 0;
+  for (let i = 0; i < seed.length; i++) x = ((x << 5) - x + seed.charCodeAt(i)) | 0;
+  return function() {
+    x = (x * 1103515245 + 12345) & 0x7fffffff;
+    return x / 0x7fffffff;
+  };
+}
+
+// Simple noise
+function noise(x, y, seed) {
+  const rng = seededRandom(seed + '_' + Math.floor(x) + '_' + Math.floor(y));
+  return rng();
+}
+
+function smoothNoise(x, y, seed, scale) {
+  const sx = x / scale, sy = y / scale;
+  const x0 = Math.floor(sx), y0 = Math.floor(sy);
+  const fx = sx - x0, fy = sy - y0;
+  const n00 = noise(x0, y0, seed), n10 = noise(x0+1, y0, seed);
+  const n01 = noise(x0, y0+1, seed), n11 = noise(x0+1, y0+1, seed);
+  const nx0 = n00 * (1-fx) + n10 * fx, nx1 = n01 * (1-fx) + n11 * fx;
+  return nx0 * (1-fy) + nx1 * fy;
+}
+
+function fbm(x, y, seed, octaves) {
+  let val = 0, amp = 1, freq = 1, max = 0;
+  for (let i = 0; i < octaves; i++) {
+    val += smoothNoise(x * freq, y * freq, seed + i, 16) * amp;
+    max += amp; amp *= 0.5; freq *= 2;
+  }
+  return val / max;
+}
+
+function generateMap() {
+  const seed = document.getElementById('seedInput').value || 'fantasy';
+  const seaLevel = parseInt(document.getElementById('seaLevel').value) / 100;
+  const roughness = parseInt(document.getElementById('roughness').value);
+  mapData = [];
+  towns = [];
+  
+  for (let y = 0; y < mapSize; y++) {
+    mapData[y] = [];
+    for (let x = 0; x < mapSize; x++) {
+      let h = fbm(x, y, seed, 4 + roughness);
+      // Island falloff
+      const dx = (x - mapSize/2) / (mapSize/2);
+      const dy = (y - mapSize/2) / (mapSize/2);
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      h = h * (1 - dist * 0.5);
+      mapData[y][x] = h;
+    }
+  }
+  
+  // Generate towns on suitable land
+  const rng = seededRandom(seed + '_towns');
+  for (let i = 0; i < 8; i++) {
+    const tx = Math.floor(rng() * mapSize);
+    const ty = Math.floor(rng() * mapSize);
+    if (mapData[ty] && mapData[ty][tx] > seaLevel + 0.1 && mapData[ty][tx] < 0.7) {
+      towns.push({ x: tx, y: ty, name: '城镇' + (i+1) });
+    }
+  }
+  
+  drawMap();
+}
+
+function getTerrainColor(h, seaLevel) {
+  if (h < seaLevel) return '#1a5276';
+  if (h < seaLevel + 0.05) return '#f9e79f';
+  if (h < 0.5) return '#52be80';
+  if (h < 0.7) return '#1e8449';
+  return '#7f8c8d';
+}
+
+function drawMap() {
+  const w = canvas.width / devicePixelRatio;
+  const h = canvas.height / devicePixelRatio;
+  ctx.clearRect(0, 0, w, h);
+  const seaLevel = parseInt(document.getElementById('seaLevel').value) / 100;
+  const cellW = w / mapSize, cellH = h / mapSize;
+  
+  for (let y = 0; y < mapSize; y++) {
+    for (let x = 0; x < mapSize; x++) {
+      ctx.fillStyle = getTerrainColor(mapData[y][x], seaLevel);
+      ctx.fillRect(x * cellW, y * cellH, cellW + 1, cellH + 1);
+    }
+  }
+  
+  // Draw towns
+  if (showLabels) {
+    ctx.fillStyle = '#fff';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    for (const town of towns) {
+      ctx.beginPath();
+      ctx.arc(town.x * cellW + cellW/2, town.y * cellH + cellH/2, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillText(town.name, town.x * cellW + cellW/2, town.y * cellH - 5);
+    }
+  }
+}
+
+function setBrush(type) { brushType = type; }
+function toggleLabels() { showLabels = !showLabels; drawMap(); }
+
+function exportPNG() {
+  const link = document.createElement('a');
+  link.download = 'fantasy_map.png';
+  link.href = canvas.toDataURL();
+  link.click();
+}
+
+function resetMap() {
+  document.getElementById('seedInput').value = 'fantasy';
+  document.getElementById('seaLevel').value = 35;
+  document.getElementById('roughness').value = 5;
+  generateMap();
+}
+
+// Drawing
+function getMousePos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+}
+
+canvas.addEventListener('mousedown', e => { isDrawing = true; applyBrush(getMousePos(e)); });
+canvas.addEventListener('mousemove', e => { if (isDrawing) applyBrush(getMousePos(e)); });
+canvas.addEventListener('mouseup', () => isDrawing = false);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); isDrawing = true; applyBrush(getMousePos(e)); }, { passive: false });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); if (isDrawing) applyBrush(getMousePos(e)); }, { passive: false });
+canvas.addEventListener('touchend', () => isDrawing = false);
+
+function applyBrush(pos) {
+  const w = canvas.width / devicePixelRatio;
+  const h = canvas.height / devicePixelRatio;
+  const mapX = Math.floor((pos.x / w) * mapSize);
+  const mapY = Math.floor((pos.y / h) * mapSize);
+  const radius = 3;
+  
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      const x = mapX + dx, y = mapY + dy;
+      if (x >= 0 && x < mapSize && y >= 0 && y < mapSize) {
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist <= radius) {
+          const factor = brushType === 'raise' ? 0.02 : -0.02;
+          mapData[y][x] = Math.max(0, Math.min(1, mapData[y][x] + factor));
+        }
+      }
+    }
+  }
+  drawMap();
+}
+
+// Initial generation
+generateMap();
+</script>
+</body>
+</html>

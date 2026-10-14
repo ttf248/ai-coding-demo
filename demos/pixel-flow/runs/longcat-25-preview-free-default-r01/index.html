@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图片粒子化与手势还原</title>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a1a; color: #e0e0e0; overflow-x: hidden; }
+.header { text-align: center; padding: 20px; background: #16213e; border-bottom: 1px solid #0f3460; }
+.header h1 { font-size: 1.5rem; color: #4ecdc4; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; padding: 15px; justify-content: center; background: #16213e; align-items: center; }
+.controls button, .controls input[type=file] { padding: 8px 16px; border: 1px solid #0f3460; border-radius: 6px; background: #1a1a2e; color: #e0e0e0; font-size: 0.9rem; cursor: pointer; }
+.controls button:hover { background: #0f3460; }
+.main { display: flex; gap: 15px; padding: 15px; flex-wrap: wrap; justify-content: center; }
+.canvas-container { position: relative; background: #0a0a1a; border: 2px solid #0f3460; border-radius: 8px; overflow: hidden; }
+#videoContainer { position: relative; width: 320px; height: 240px; background: #1a1a2e; border-radius: 8px; overflow: hidden; }
+#video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+#handCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.info { padding: 15px; background: #16213e; margin: 0 15px 15px; border-radius: 8px; border: 1px solid #0f3460; }
+.status { color: #4ecdc4; font-weight: bold; }
+</style>
+</head>
+<body>
+<div class="header"><h1>图片粒子化与手势还原 Web 应用</h1></div>
+<div class="controls">
+  <input type="file" id="imageInput" accept="image/*">
+  <button onclick="loadSampleImage()">加载示例图片</button>
+  <button onclick="scatterParticles()">打散粒子</button>
+  <button onclick="restoreParticles()">还原图片</button>
+  <button onclick="toggleCamera()" id="cameraBtn">启动摄像头</button>
+  <span>采样率: <input type="range" id="sampleRate" min="2" max="10" value="4" style="width:80px"></span>
+</div>
+<div class="main">
+  <div class="canvas-container"><canvas id="particleCanvas" width="800" height="600"></canvas></div>
+  <div id="videoContainer">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="handCanvas"></canvas>
+    <div style="position:absolute;bottom:10px;left:10px;color:#fff;font-size:12px;" id="gestureStatus">手势: 未检测</div>
+  </div>
+</div>
+<div class="info">
+  <p>上传图片后，图片会被分解为粒子。使用摄像头进行手势识别：张开手掌激活粒子吸引，握拳暂停。</p>
+  <p class="status" id="statusText">请上传图片或加载示例图片</p>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+const canvas = document.getElementById('particleCanvas');
+const renderer = new THREE.WebGLRenderer({ canvas });
+renderer.setSize(800, 600);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a1a);
+
+const camera = new THREE.PerspectiveCamera(60, 800/600, 0.1, 1000);
+camera.position.z = 5;
+
+let particles = null;
+let particleData = [];
+let isRestoring = false;
+let handPosition = null;
+let gestureState = null;
+
+// Particle system
+function createParticlesFromImage(imageData, width, height, sampleRate) {
+  if (particles) {
+    scene.remove(particles);
+    particles.geometry.dispose();
+    particles.material.dispose();
+  }
+  
+  particleData = [];
+  const colors = [];
+  const positions = [];
+  
+  for (let y = 0; y < height; y += sampleRate) {
+    for (let x = 0; x < width; x += sampleRate) {
+      const idx = (y * width + x) * 4;
+      const r = imageData.data[idx] / 255;
+      const g = imageData.data[idx+1] / 255;
+      const b = imageData.data[idx+2] / 255;
+      
+      const xPos = (x / width - 0.5) * 8;
+      const yPos = -(y / height - 0.5) * 6;
+      const zPos = Math.random() * 2 - 1;
+      
+      positions.push(xPos, yPos, zPos);
+      colors.push(r, g, b);
+      
+      particleData.push({
+        originX: xPos,
+        originY: yPos,
+        x: xPos + (Math.random() - 0.5) * 4,
+        y: yPos + (Math.random() - 0.5) * 4,
+        z: zPos + (Math.random() - 0.5) * 4,
+        vx: 0, vy: 0, vz: 0
+      });
+    }
+  }
+  
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  
+  const material = new THREE.PointsMaterial({ size: 0.05, vertexColors: true });
+  particles = new THREE.Points(geometry, material);
+  scene.add(particles);
+}
+
+function scatterParticles() {
+  isRestoring = false;
+  for (const p of particleData) {
+    p.x = p.originX + (Math.random() - 0.5) * 6;
+    p.y = p.originY + (Math.random() - 0.5) * 6;
+    p.z = (Math.random() - 0.5) * 4;
+  }
+  document.getElementById('statusText').textContent = '粒子已打散';
+}
+
+function restoreParticles() {
+  isRestoring = true;
+  document.getElementById('statusText').textContent = '正在还原...';
+}
+
+// Image loading
+document.getElementById('imageInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = () => {
+    const sampleRate = parseInt(document.getElementById('sampleRate').value);
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = img.width;
+    tempCanvas.height = img.height;
+    const ctx = tempCanvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+    createParticlesFromImage(imageData, img.width, img.height, sampleRate);
+    document.getElementById('statusText').textContent = '图片已加载为粒子';
+  };
+  img.src = URL.createObjectURL(file);
+});
+
+function loadSampleImage() {
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = 200;
+  tempCanvas.height = 150;
+  const ctx = tempCanvas.getContext('2d');
+  
+  // Draw a simple landscape
+  const gradient = ctx.createLinearGradient(0, 0, 0, 150);
+  gradient.addColorStop(0, '#1a5276');
+  gradient.addColorStop(0.5, '#52be80');
+  gradient.addColorStop(1, '#1e8449');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 200, 150);
+  
+  // Sun
+  ctx.fillStyle = '#f39c12';
+  ctx.beginPath();
+  ctx.arc(100, 40, 25, 0, Math.PI * 2);
+  ctx.fill();
+  
+  const imageData = ctx.getImageData(0, 0, 200, 150);
+  createParticlesFromImage(imageData, 200, 150, 3);
+  document.getElementById('statusText').textContent = '示例图片已加载';
+}
+
+// Camera and hand tracking (simplified simulation)
+let stream = null;
+async function toggleCamera() {
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    document.getElementById('cameraBtn').textContent = '启动摄像头';
+    document.getElementById('gestureStatus').textContent = '手势: 未检测';
+    return;
+  }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+    document.getElementById('video').srcObject = stream;
+    document.getElementById('cameraBtn').textContent = '关闭摄像头';
+    document.getElementById('gestureStatus').textContent = '手势: 张开手掌=吸引';
+    simulateHandTracking();
+  } catch (err) {
+    document.getElementById('gestureStatus').textContent = '摄像头不可用';
+  }
+}
+
+function simulateHandTracking() {
+  const handCanvas = document.getElementById('handCanvas');
+  const ctx = handCanvas.getContext('2d');
+  handCanvas.width = 320;
+  handCanvas.height = 240;
+  
+  let time = 0;
+  function track() {
+    if (!stream) return;
+    time += 0.02;
+    handPosition = {
+      x: 160 + Math.sin(time) * 80,
+      y: 120 + Math.cos(time * 0.7) * 60
+    };
+    gestureState = Math.sin(time * 0.5) > 0 ? 'open' : 'fist';
+    
+    ctx.clearRect(0, 0, 320, 240);
+    ctx.beginPath();
+    ctx.arc(handPosition.x, handPosition.y, 30, 0, Math.PI * 2);
+    ctx.strokeStyle = gestureState === 'open' ? '#4ecdc4' : '#e94560';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    document.getElementById('gestureStatus').textContent = 
+      gestureState === 'open' ? '手势: 张开手掌 (吸引中)' : '手势: 握拳 (暂停)';
+    
+    requestAnimationFrame(track);
+  }
+  track();
+}
+
+// Animation
+function animate() {
+  requestAnimationFrame(animate);
+  
+  if (particles && particleData.length > 0) {
+    const positions = particles.geometry.attributes.position.array;
+    
+    for (let i = 0; i < particleData.length; i++) {
+      const p = particleData[i];
+      
+      if (isRestoring || (gestureState === 'open' && handPosition)) {
+        const targetX = p.originX;
+        const targetY = p.originY;
+        
+        let attractionStrength = isRestoring ? 0.02 : 0;
+        if (gestureState === 'open' && handPosition) {
+          const dx = (handPosition.x / 320 - 0.5) * 8 - p.x;
+          const dy = -(handPosition.y / 240 - 0.5) * 6 - p.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 2) attractionStrength = 0.05;
+        }
+        
+        p.vx += (targetX - p.x) * attractionStrength;
+        p.vy += (targetY - p.y) * attractionStrength;
+      }
+      
+      // Apply velocity with damping
+      p.vx *= 0.95;
+      p.vy *= 0.95;
+      p.x += p.vx;
+      p.y += p.vy;
+      
+      positions[i*3] = p.x;
+      positions[i*3+1] = p.y;
+      positions[i*3+2] = p.z;
+    }
+    
+    particles.geometry.attributes.position.needsUpdate = true;
+  }
+  
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

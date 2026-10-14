@@ -486,7 +486,7 @@ test("legacy latest links use complexity and card badges stay grouped", async ({
     await page.setViewportSize({ width, height: 960 });
     for (const group of ["topics", "runs"]) {
       await page.locator('[data-group="' + group + '"]').click();
-      await page.locator("#q").fill("体素");
+      await page.locator("#q").fill("自主设计版");
       if (group === "runs") {
         expect(
           await page.locator(".card-badges .execution-mode-chip").count(),
