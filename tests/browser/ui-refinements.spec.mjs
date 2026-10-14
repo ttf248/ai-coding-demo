@@ -28,21 +28,23 @@ test("mobile experiment cards show actions without horizontal scrolling and expa
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("topic.html?id=fluid-simulation&view=list");
   const row = page.locator(".topic-run-row").first();
-  await expect(row.locator(".topic-run-date")).toBeHidden();
+  await expect(row.locator(".topic-run-date")).toBeVisible();
+  await expect(row.locator(".topic-run-provider")).toBeVisible();
+  await expect(row.locator(".topic-run-tool")).toBeVisible();
+  await expect(row.locator(".topic-run-duration")).toBeVisible();
   await expect(row.locator(".topic-run-billing")).toBeVisible();
   await expect(row.locator("[data-compare]")).toBeVisible();
   const actions = await row.locator(".topic-row-actions").boundingBox();
   expect(actions.x + actions.width).toBeLessThanOrEqual(390);
-  await row.locator("[data-row-details]").click();
-  await expect(row.locator(".topic-run-date")).toBeVisible();
   await row.locator(".billing-summary summary").click();
   await expect(row.locator(".billing-summary p")).toContainText("批次总额");
   await row.locator("[data-compare]").click();
   await expect(page.locator("#compare-tray")).toContainText(
     "再选一个实验开始对比",
   );
-  await row.locator("[data-row-details]").click();
-  await expect(row.locator(".topic-run-date")).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    390,
+  );
 });
 
 test("experiment rows distinguish model makers from billing providers and explain API price scale", async ({
@@ -54,19 +56,15 @@ test("experiment rows distinguish model makers from billing providers and explai
     .locator(".topic-run-row")
     .filter({ hasText: "Claude Haiku 5.5" })
     .first();
+  await expect(page.locator(".topic-runs-table thead th").nth(0)).toHaveText(
+    "模型 / 厂商",
+  );
   await expect(page.locator(".topic-runs-table thead th").nth(1)).toHaveText(
-    "模型厂商",
+    "接入供应商 / 工具",
   );
-  await expect(page.locator(".topic-runs-table thead th").nth(2)).toHaveText(
-    "接入/付费供应商",
-  );
-  await row.locator("[data-row-details]").click();
   await expect(row.locator(".topic-run-model-maker")).toContainText(
     "Anthropic",
   );
-  await expect(
-    row.locator(".topic-run-model-maker .mobile-cell-label"),
-  ).toBeVisible();
   await expect(row.locator(".topic-run-provider")).toBeVisible();
   await expect(row.locator(".topic-run-provider")).toContainText(
     "GitHub Copilot",

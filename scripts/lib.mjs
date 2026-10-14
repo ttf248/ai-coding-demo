@@ -150,13 +150,20 @@ export function loadCatalog() {
     for (const runId of folders(`${base}/runs`)) {
       const directory = `${base}/runs/${runId}`;
       const run = readJSON(`${directory}/run.json`);
-      const billing =
+      let billing =
         run.billing?.type === "batch" && Object.keys(run.billing).length === 2
           ? {
               ...run.billing,
               ...batches.find((batch) => batch.batchId === run.billing.batchId),
             }
           : run.billing;
+      // Enrich legacy billing snapshots without rewriting the archived run.json.
+      const batchDuration = batches.find(
+        (batch) =>
+          billing?.type === "batch" && batch.batchId === billing.batchId,
+      )?.duration;
+      if (batchDuration && billing.duration === undefined)
+        billing = { ...billing, duration: batchDuration };
       const raw = normalize(read(`${directory}/${run.input.file}`));
       const prefix =
         run.preview.kind === "build"

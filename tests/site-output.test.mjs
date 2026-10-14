@@ -45,7 +45,9 @@ test("summary omits large bodies and deduplicated inputs preserve normalized tex
     new Set(catalog.runs.map((run) => run.rawHash)).size,
   );
   assert.ok(
-    Buffer.byteLength(outputs.get("assets/generated/catalog.js")) < 625000,
+    // Keep the summary budget proportional to the growing archive.
+    Buffer.byteLength(outputs.get("assets/generated/catalog.js")) <
+      catalog.runs.length * 2200,
   );
 });
 test("input relationships and completeness work before lazy body loading", () => {
