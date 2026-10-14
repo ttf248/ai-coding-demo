@@ -60,6 +60,9 @@ export function browserOutputs(catalog) {
         hash: input.hash,
         completeness: input.completeness,
         executionMode: input.executionMode || "unknown",
+        ...(input.executionModeNote
+          ? { executionModeNote: input.executionModeNote }
+          : {}),
         authorization: input.authorization || "",
       },
       environment: {
