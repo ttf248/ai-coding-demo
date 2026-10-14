@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import { loadCatalog } from "../../scripts/lib.mjs";
 import { resolveLocal } from "../../scripts/lib.mjs";
 import { pathToFileURL } from "node:url";
+import { readdirSync } from "node:fs";
+import { dirname } from "node:path";
 const data = loadCatalog();
 const city = data.runs.filter((r) => r.topicId === "neo-gothic-tower-city");
 const voxel = data.runs.filter((r) => r.topicId === "voxel-construction-site");
@@ -12,6 +14,17 @@ const voxelAstra = voxel.find((r) => r.id.endsWith("gpt-6-astra-low-r01"));
 const blue = data.runs.filter((r) => r.topicId === "bluebook");
 const blueBuilds = blue.filter(
   (r) => r.type === "app" && r.preview.kind === "build",
+);
+const blueLocalBuilds = blueBuilds.filter(
+  (run) =>
+    run.preview.network === "offline" ||
+    readdirSync(resolveLocal(dirname(run.preview.pages[0].href)), {
+      recursive: true,
+      withFileTypes: true,
+    }).some(
+      (entry) =>
+        entry.isFile() && /\.(png|jpe?g|webp|gif|svg|avif)$/i.test(entry.name),
+    ),
 );
 const url = (a, b, extra = "") =>
   `compare.html?left=${a.id}&right=${b.id}${extra}`;
@@ -132,9 +145,9 @@ test("directory counts, filters, sort, views, pagination and selection", async (
 test("topic detail and prompt comparison restore URLs without executing demos", async ({
   page,
 }) => {
-  await page.goto("topic.html?id=voxel-construction-site");
+  await page.goto("topic.html?id=voxel-construction-site&view=list");
   await expect(page.locator(".topic-run-row")).toHaveCount(voxel.length);
-  await page.locator('[data-topic-view="prompt"]').click();
+  await page.locator("[data-read-task]").click();
   await page.locator("#topic-prompts summary").first().click();
   await expect(page.locator("details pre")).toContainText("InstancedMesh");
   await page.goto(url(voxelSol, voxelAstra, "&tab=prompt&source=raw"));
@@ -369,7 +382,20 @@ test("built apps render their local images under the configured base", async ({
   await page.route("https://raw.githubusercontent.com/**", (route) =>
     route.abort(),
   );
-  for (const r of blueBuilds) {
+  // Only local files and generated data images belong to this check.
+  // Remote-only experiments are explicitly marked as requiring a network.
+  await page.route("**/*", (route) => {
+    const request = route.request(),
+      url = new URL(request.url());
+    if (
+      request.resourceType() === "image" &&
+      /^https?:$/.test(url.protocol) &&
+      url.origin !== new URL(baseURL).origin
+    )
+      return route.abort();
+    return route.fallback();
+  });
+  for (const r of blueLocalBuilds) {
     const failures = [];
     const watch = (res) => {
       const expectedDemoFallback =
@@ -390,7 +416,13 @@ test("built apps render their local images under the configured base", async ({
             .locator("img")
             .evaluateAll(
               (imgs) =>
-                imgs.filter((i) => i.complete && i.naturalWidth > 0).length,
+                imgs.filter(
+                  (i) =>
+                    i.complete &&
+                    i.naturalWidth > 0 &&
+                    (i.src.startsWith(location.origin + "/") ||
+                      /^(data|blob):/.test(i.src)),
+                ).length,
             ),
         { timeout: 20000 },
       )

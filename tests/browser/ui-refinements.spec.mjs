@@ -26,7 +26,7 @@ test("mobile experiment cards show actions without horizontal scrolling and expa
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("topic.html?id=fluid-simulation");
+  await page.goto("topic.html?id=fluid-simulation&view=list");
   const row = page.locator(".topic-run-row").first();
   await expect(row.locator(".topic-run-date")).toBeHidden();
   await expect(row.locator(".topic-run-billing")).toBeVisible();
@@ -49,7 +49,7 @@ test("experiment rows distinguish model makers from billing providers and explai
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("topic.html?id=fluid-simulation");
+  await page.goto("topic.html?id=fluid-simulation&view=list");
   const row = page.locator(".topic-run-row").first();
   await expect(page.locator(".topic-runs-table thead th").nth(1)).toHaveText(
     "模型厂商",
@@ -57,6 +57,7 @@ test("experiment rows distinguish model makers from billing providers and explai
   await expect(page.locator(".topic-runs-table thead th").nth(2)).toHaveText(
     "接入/付费供应商",
   );
+  await row.locator("[data-row-details]").click();
   await expect(row.locator(".topic-run-model-maker")).toContainText(
     "Anthropic",
   );
@@ -75,6 +76,7 @@ test("experiment rows distinguish model makers from billing providers and explai
   );
   const pricing = page.locator("#pricing-context");
   await expect(pricing).toBeVisible();
+  await pricing.locator(":scope > summary").click();
   await pricing.locator("details > summary").click();
   await expect(pricing.locator(".pricing-examples")).toBeVisible();
   await expect(pricing.locator(".pricing-examples")).toContainText(

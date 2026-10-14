@@ -53,6 +53,7 @@ test("archived topics are separately browsable and historical experiments remain
   await expect(page.locator(".topic-testing-history")).toContainText(
     "This topic no longer needs reruns",
   );
+  await page.locator('[data-topic-view="list"]').click();
   await expect(page.locator(".topic-run-row")).toHaveCount(
     data.runs.filter((r) => r.topicId === "bluebook").length,
   );
@@ -96,7 +97,7 @@ test("local archive and restore forms persist status and retain history after re
     );
     return route.fulfill({ json: fixture.topics[index] });
   });
-  await page.goto("topic.html?id=bluebook");
+  await page.goto("topic.html?id=bluebook&view=list");
   await page.locator("#topic-testing-action").click();
   await expect(page.locator("#topic-testing-dialog")).toBeVisible();
   await page.locator('#topic-testing-dialog [type="submit"]').click();

@@ -12,7 +12,7 @@ const priorVoxelRun = voxel.find(
 test("topic effort order matches comparison selectors and date sorting remains explicit", async ({
   page,
 }) => {
-  await page.goto("topic.html?id=bluebook&prompt=v2");
+  await page.goto("topic.html?id=bluebook&prompt=v2&view=list");
   await expect(page.locator("#topic-sort")).toHaveValue("model");
   const solRows = page.locator(".topic-run-row").filter({
     has: page.locator(".topic-run-model", { hasText: /^GPT-6\.1 Sol/ }),
@@ -55,7 +55,7 @@ test("topic effort order matches comparison selectors and date sorting remains e
 test("topic browsing groups versions, filters experiments and restores state", async ({
   page,
 }) => {
-  await page.goto("topic.html?id=bluebook");
+  await page.goto("topic.html?id=bluebook&view=list");
   await expect(page.locator('[data-topic-view="list"]')).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -147,7 +147,7 @@ test("design-enhanced authorization is visible on home, topic and comparison pag
   await expect(homeBadge).toHaveText("自主设计授权");
   await expect(homeBadge).toBeVisible();
 
-  await page.goto("topic.html?id=voxel-construction-site");
+  await page.goto("topic.html?id=voxel-construction-site&view=list");
   const row = page.locator(`#run-${designRun.id}`);
   await expect(row.locator(".execution-mode-chip")).toHaveText("自主设计授权");
   await expect(row.locator(".execution-mode-chip")).toBeVisible();
@@ -353,7 +353,7 @@ test("topic matrix filters versions, exposes repeat runs and switches to a mobil
   await page.reload();
   await expect(page.locator("#topic-prompt")).toHaveValue("v2");
   await expect(page.locator(".selection-item")).toHaveCount(1);
-  await page.locator('[data-topic-view="prompt"]').click();
+  await page.locator("[data-read-task]").click();
   await expect(page.locator("#topic-prompts details")).toHaveCount(1);
   await page.locator("#topic-prompts summary").click();
   await expect(page.locator("#topic-prompts pre")).toContainText("瀑布流");
