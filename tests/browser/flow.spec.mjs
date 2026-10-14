@@ -140,8 +140,10 @@ test("design-enhanced authorization is visible on home, topic and comparison pag
   expect(designRun).toBeDefined();
   expect(priorVoxelRun).toBeDefined();
 
-  await page.goto("./?group=runs&testing=all&q=%E4%BD%93%E7%B4%A0");
-  const homeBadge = page.locator(".run-card .execution-mode-chip");
+  await page.goto(
+    "./?group=runs&testing=all&q=%E8%87%AA%E4%B8%BB%E8%AE%BE%E8%AE%A1%E7%89%88",
+  );
+  const homeBadge = page.locator(".run-card .execution-mode-chip").first();
   await expect(homeBadge).toHaveText("自主设计授权");
   await expect(homeBadge).toBeVisible();
 

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>简化电路实验台</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; overflow-x: hidden; }
+.header { text-align: center; padding: 20px; background: #16213e; border-bottom: 1px solid #0f3460; }
+.header h1 { font-size: 1.5rem; color: #e94560; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; padding: 15px; justify-content: center; background: #16213e; }
+.controls button, .controls select { padding: 8px 16px; border: 1px solid #0f3460; border-radius: 6px; background: #1a1a2e; color: #e0e0e0; cursor: pointer; font-size: 0.9rem; }
+.controls button:hover { background: #0f3460; }
+.controls button.active { background: #e94560; border-color: #e94560; }
+.canvas-container { position: relative; width: 100%; height: 500px; background: #0a0a1a; border: 2px solid #0f3460; margin: 15px; border-radius: 8px; overflow: hidden; }
+#circuitCanvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.info-panel { padding: 15px; background: #16213e; margin: 0 15px 15px; border-radius: 8px; border: 1px solid #0f3460; }
+.info-panel h3 { color: #e94560; margin-bottom: 10px; }
+.info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.info-item { background: #1a1a2e; padding: 10px; border-radius: 6px; }
+.info-item .label { font-size: 0.8rem; color: #888; }
+.info-item .value { font-size: 1.1rem; color: #4ecdc4; font-weight: bold; }
+.error-msg { color: #ff6b6b; padding: 10px; text-align: center; font-weight: bold; }
+.legend { display: flex; flex-wrap: wrap; gap: 15px; padding: 10px 15px; font-size: 0.85rem; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-color { width: 20px; height: 12px; border-radius: 2px; }
+@media (max-width: 768px) { .canvas-container { height: 350px; } .controls { padding: 10px; } }
+</style>
+</head>
+<body>
+<div class="header"><h1>简化直流电路实验台</h1></div>
+<div class="controls">
+  <button onclick="setMode('select')" id="btnSelect" class="active">选择/移动</button>
+  <button onclick="setMode('battery')" id="btnBattery">放置电池</button>
+  <button onclick="setMode('resistor')" id="btnResistor">放置电阻</button>
+  <button onclick="setMode('bulb')" id="btnBulb">放置灯泡</button>
+  <button onclick="setMode('switch')" id="btnSwitch">放置开关</button>
+  <button onclick="setMode('wire')" id="btnWire">连线</button>
+  <button onclick="setMode('delete')" id="btnDelete">删除</button>
+  <button onclick="loadPreset('series')">串联预设</button>
+  <button onclick="loadPreset('parallel')">并联预设</button>
+  <button onclick="resetAll()">重置</button>
+  <button onclick="solveCircuit()">求解电路</button>
+</div>
+<div class="legend">
+  <div class="legend-item"><div class="legend-color" style="background:#4ecdc4"></div>电池</div>
+  <div class="legend-item"><div class="legend-color" style="background:#ffe66d"></div>电阻</div>
+  <div class="legend-item"><div class="legend-color" style="background:#ff6b6b"></div>灯泡</div>
+  <div class="legend-item"><div class="legend-color" style="background:#95e1d3"></div>开关(闭合)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#aaa"></div>开关(断开)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#0f3460;border:1px solid #4ecdc4"></div>导线</div>
+</div>
+<div class="canvas-container"><canvas id="circuitCanvas"></canvas></div>
+<div class="info-panel" id="infoPanel"><h3>电路信息</h3><p style="color:#888">点击"求解电路"查看结果</p></div>
+
+<script>
+const canvas = document.getElementById('circuitCanvas');
+const ctx = canvas.getContext('2d');
+let elements = [];
+let wires = [];
+let mode = 'select';
+let dragging = null;
+let dragOffset = { x: 0, y: 0 };
+let wireStart = null;
+let nextId = 1;
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = rect.height * devicePixelRatio;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('btn' + m.charAt(0).toUpperCase() + m.slice(1));
+  if (btn) btn.classList.add('active');
+}
+
+function getMousePos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+}
+
+function findElement(pos) {
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i];
+    if (Math.abs(pos.x - el.x) < 30 && Math.abs(pos.y - el.y) < 20) return el;
+  }
+  return null;
+}
+
+function findTerminal(pos) {
+  for (const el of elements) {
+    for (const term of el.terminals) {
+      if (Math.abs(pos.x - term.x) < 12 && Math.abs(pos.y - term.y) < 12) return { element: el, terminal: term };
+    }
+  }
+  return null;
+}
+
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('touchstart', handleStart, { passive: false });
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('touchmove', handleMove, { passive: false });
+canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('touchend', handleEnd);
+
+function handleStart(e) {
+  e.preventDefault();
+  const pos = getMousePos(e);
+  if (mode === 'wire') {
+    const term = findTerminal(pos);
+    if (term) wireStart = term;
+  } else if (mode === 'delete') {
+    const el = findElement(pos);
+    if (el) { elements = elements.filter(e => e !== el); wires = wires.filter(w => w.from.element !== el && w.to.element !== el); }
+  } else if (['battery','resistor','bulb','switch'].includes(mode)) {
+    createElement(mode, pos.x, pos.y);
+  } else {
+    const el = findElement(pos);
+    if (el) { dragging = el; dragOffset = { x: pos.x - el.x, y: pos.y - el.y }; }
+  }
+}
+
+function handleMove(e) {
+  e.preventDefault();
+  if (!dragging) return;
+  const pos = getMousePos(e);
+  dragging.x = pos.x - dragOffset.x;
+  dragging.y = pos.y - dragOffset.y;
+  updateTerminals();
+}
+
+function handleEnd(e) {
+  if (mode === 'wire' && wireStart) {
+    const pos = getMousePos(e);
+    const end = findTerminal(pos);
+    if (end && end.element !== wireStart.element) {
+      wires.push({ from: wireStart, to: end });
+    }
+    wireStart = null;
+  }
+  dragging = null;
+  draw();
+}
+
+function createElement(type, x, y) {
+  const el = { id: nextId++, type, x, y, value: 12, terminals: [] };
+  if (type === 'battery') el.value = 12;
+  if (type === 'resistor') el.value = 100;
+  if (type === 'bulb') el.value = 50;
+  updateTerminals(el);
+  elements.push(el);
+  draw();
+}
+
+function updateTerminals(el) {
+  const targets = el ? [el] : elements;
+  for (const e of targets) {
+    e.terminals = [
+      { id: e.id + '_p', x: e.x - 30, y: e.y, label: '+' },
+      { id: e.id + '_n', x: e.x + 30, y: e.y, label: '-' }
+    ];
+  }
+}
+
+function draw() {
+  const w = canvas.width / devicePixelRatio;
+  const h = canvas.height / devicePixelRatio;
+  ctx.clearRect(0, 0, w, h);
+  
+  // Draw grid
+  ctx.strokeStyle = '#1a1a3e';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+  // Draw wires
+  for (const wire of wires) {
+    ctx.beginPath();
+    ctx.moveTo(wire.from.terminal.x, wire.from.terminal.y);
+    ctx.lineTo(wire.to.terminal.x, wire.to.terminal.y);
+    ctx.strokeStyle = '#4ecdc4';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  // Draw wire in progress
+  if (wireStart) {
+    ctx.beginPath();
+    ctx.moveTo(wireStart.terminal.x, wireStart.terminal.y);
+    ctx.lineTo(mouseX, mouseY);
+    ctx.strokeStyle = '#4ecdc488';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Draw elements
+  for (const el of elements) {
+    ctx.save();
+    ctx.translate(el.x, el.y);
+    
+    if (el.type === 'battery') {
+      ctx.fillStyle = '#4ecdc4';
+      ctx.fillRect(-25, -12, 50, 24);
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(-8, -20, 16, 8);
+      ctx.fillRect(-8, 12, 16, 8);
+      ctx.fillStyle = '#fff';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('+', -15, 4);
+      ctx.fillText('-', 15, 4);
+      ctx.fillText(el.value + 'V', 0, 4);
+    } else if (el.type === 'resistor') {
+      ctx.fillStyle = '#ffe66d';
+      ctx.fillRect(-20, -8, 40, 16);
+      ctx.fillStyle = '#1a1a2e';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(el.value + 'Ω', 0, 4);
+    } else if (el.type === 'bulb') {
+      ctx.beginPath();
+      ctx.arc(0, 0, 15, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff6b6b';
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('💡', 0, 4);
+    } else if (el.type === 'switch') {
+      ctx.fillStyle = el.closed ? '#95e1d3' : '#666';
+      ctx.fillRect(-18, -6, 36, 12);
+      if (el.closed) {
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(-14, -2, 28, 4);
+      } else {
+        ctx.strokeStyle = '#ff6b6b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-10, -8);
+        ctx.lineTo(10, 8);
+        ctx.stroke();
+      }
+    }
+    
+    // Draw terminals
+    for (const term of el.terminals) {
+      ctx.beginPath();
+      ctx.arc(term.x - el.x, term.y - el.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#e94560';
+      ctx.fill();
+    }
+    
+    ctx.restore();
+  }
+}
+
+let mouseX = 0, mouseY = 0;
+canvas.addEventListener('mousemove', e => { const pos = getMousePos(e); mouseX = pos.x; mouseY = pos.y; });
+canvas.addEventListener('touchmove', e => { const pos = getMousePos(e); mouseX = pos.x; mouseY = pos.y; });
+
+function solveCircuit() {
+  const batteries = elements.filter(e => e.type === 'battery');
+  const resistors = elements.filter(e => e.type === 'resistor' || e.type === 'bulb');
+  const switches = elements.filter(e => e.type === 'switch');
+  
+  if (batteries.length === 0) { showError('请至少放置一个电池'); return; }
+  
+  const openSwitch = switches.find(s => !s.closed);
+  if (openSwitch) { showError('电路中有断开开关，电流为零'); return; }
+  
+  if (resistors.length === 0) { showError('请至少放置一个电阻或灯泡'); return; }
+  
+  // Simple series calculation
+  const totalVoltage = batteries.reduce((sum, b) => sum + b.value, 0);
+  const totalResistance = resistors.reduce((sum, r) => sum + r.value, 0);
+  
+  if (totalResistance === 0) { showError('电源短路！电阻为零'); return; }
+  
+  const current = totalVoltage / totalResistance;
+  const results = resistors.map(r => ({
+    resistance: r.value,
+    voltage: current * r.value,
+    current: current,
+    power: current * current * r.value
+  }));
+  
+  const panel = document.getElementById('infoPanel');
+  panel.innerHTML = '<h3>电路求解结果</h3><div class="info-grid">' +
+    '<div class="info-item"><div class="label">总电压</div><div class="value">' + totalVoltage.toFixed(2) + ' V</div></div>' +
+    '<div class="info-item"><div class="label">总电阻</div><div class="value">' + totalResistance.toFixed(2) + ' Ω</div></div>' +
+    '<div class="info-item"><div class="label">总电流</div><div class="value">' + current.toFixed(4) + ' A</div></div>' +
+    results.map((r, i) =>
+      '<div class="info-item"><div class="label">元件' + (i+1) + ' (' + r.resistance + 'Ω)</div><div class="value">V=' + r.voltage.toFixed(2) + 'V, I=' + r.current.toFixed(4) + 'A, P=' + r.power.toFixed(4) + 'W</div></div>'
+    ).join('') +
+    '</div>';
+}
+
+function showError(msg) {
+  document.getElementById('infoPanel').innerHTML = '<h3>电路信息</h3><div class="error-msg">' + msg + '</div>';
+}
+
+function loadPreset(type) {
+  elements = []; wires = []; nextId = 1;
+  if (type === 'series') {
+    createElement('battery', 150, 250);
+    createElement('resistor', 350, 250);
+    createElement('resistor', 550, 250);
+    wires.push({ from: { element: elements[0], terminal: elements[0].terminals[1] }, to: { element: elements[1], terminal: elements[1].terminals[0] } });
+    wires.push({ from: { element: elements[1], terminal: elements[1].terminals[1] }, to: { element: elements[2], terminal: elements[2].terminals[0] } });
+    wires.push({ from: { element: elements[2], terminal: elements[2].terminals[1] }, to: { element: elements[0], terminal: elements[0].terminals[0] } });
+  } else if (type === 'parallel') {
+    createElement('battery', 100, 250);
+    createElement('resistor', 400, 150);
+    createElement('resistor', 400, 350);
+    wires.push({ from: { element: elements[0], terminal: elements[0].terminals[1] }, to: { element: elements[1], terminal: elements[1].terminals[0] } });
+    wires.push({ from: { element: elements[0], terminal: elements[0].terminals[1] }, to: { element: elements[2], terminal: elements[2].terminals[0] } });
+    wires.push({ from: { element: elements[1], terminal: elements[1].terminals[1] }, to: { element: elements[0], terminal: elements[0].terminals[0] } });
+    wires.push({ from: { element: elements[2], terminal: elements[2].terminals[1] }, to: { element: elements[0], terminal: elements[0].terminals[0] } });
+  }
+  updateTerminals();
+  draw();
+}
+
+function resetAll() {
+  elements = []; wires = []; nextId = 1;
+  document.getElementById('infoPanel').innerHTML = '<h3>电路信息</h3><p style="color:#888">点击"求解电路"查看结果</p>';
+  draw();
+}
+
+// Click on switch to toggle
+canvas.addEventListener('click', e => {
+  const pos = getMousePos(e);
+  const el = findElement(pos);
+  if (el && el.type === 'switch') {
+    el.closed = !el.closed;
+    draw();
+  }
+});
+
+// Draw loop
+function loop() { draw(); requestAnimationFrame(loop); }
+loop();
+</script>
+</body>
+</html>

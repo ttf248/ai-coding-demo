@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>彩色流体实验台</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a1a; color: #e0e0e0; min-height: 100vh; overflow-x: hidden; }
+.header { text-align: center; padding: 20px; background: #16213e; border-bottom: 1px solid #0f3460; }
+.header h1 { font-size: 1.5rem; color: #4ecdc4; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; padding: 15px; justify-content: center; background: #16213e; align-items: center; }
+.controls button, .controls select, .controls input { padding: 8px 16px; border: 1px solid #0f3460; border-radius: 6px; background: #1a1a2e; color: #e0e0e0; font-size: 0.9rem; }
+.controls button { cursor: pointer; }
+.controls button:hover { background: #0f3460; }
+.controls label { font-size: 0.9rem; color: #888; }
+.canvas-container { position: relative; width: 100%; height: 500px; background: #0a0a1a; border: 2px solid #0f3460; margin: 15px; border-radius: 8px; overflow: hidden; }
+#fluidCanvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.info { padding: 15px; background: #16213e; margin: 0 15px 15px; border-radius: 8px; border: 1px solid #0f3460; }
+@media (max-width: 768px) { .canvas-container { height: 350px; } }
+</style>
+</head>
+<body>
+<div class="header"><h1>彩色流体实验台 (WebGL)</h1></div>
+<div class="controls">
+  <label>颜色: <input type="color" id="dyeColor" value="#ff6b6b"></label>
+  <label>注入力度: <input type="range" id="force" min="1" max="10" value="5" style="width:80px"></label>
+  <label>消散: <input type="range" id="dissipation" min="0" max="100" value="20" style="width:80px"></label>
+  <label>迭代次数: <input type="range" id="iterations" min="10" max="80" value="30" style="width:80px"></label>
+  <label>分辨率: <select id="resolution"><option value="64">64x64</option><option value="128" selected>128x128</option><option value="256">256x256</option></select></label>
+  <button onclick="togglePause()" id="pauseBtn">暂停</button>
+  <button onclick="clearFluid()">清空</button>
+  <button onclick="resetParams()">重置参数</button>
+  <button onclick="screenshot()">截图</button>
+</div>
+<div class="canvas-container"><canvas id="fluidCanvas"></canvas></div>
+<div class="info">操作说明：鼠标或手指拖动注入颜色和动量。使用控制面板调整参数。</div>
+
+<script>
+const canvas = document.getElementById('fluidCanvas');
+const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+
+if (!gl) {
+  document.querySelector('.info').innerHTML = '<p style="color:#ff6b6b">您的浏览器不支持 WebGL，无法运行流体模拟。</p>';
+  throw new Error('WebGL not supported');
+}
+
+let paused = false;
+let dyeColor = [1, 0.42, 0.42];
+let forceStrength = 5;
+let dissipation = 0.2;
+let iterations = 30;
+let simResolution = 128;
+
+// Vertex shader
+const vsSource = `
+attribute vec2 a_position;
+varying vec2 v_uv;
+void main() {
+  v_uv = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}`;
+
+// Fragment shaders for different passes
+const fsAdvection = `
+precision mediump float;
+varying vec2 v_uv;
+uniform sampler2D u_velocity;
+uniform sampler2D u_source;
+uniform vec2 u_texelSize;
+uniform float u_dissipation;
+void main() {
+  vec2 vel = texture2D(u_velocity, v_uv).xy;
+  vec2 coord = v_uv - vel * u_texelSize;
+  vec4 result = texture2D(u_source, coord);
+  gl_FragColor = result * u_dissipation;
+}`;
+
+const fsSplat = `
+precision mediump float;
+varying vec2 v_uv;
+uniform sampler2D u_target;
+uniform vec2 u_point;
+uniform vec3 u_color;
+uniform float u_radius;
+void main() {
+  vec2 p = v_uv - u_point;
+  p.x *= 1.0;
+  float dist = length(p);
+  float strength = exp(-dist * dist / u_radius);
+  vec4 base = texture2D(u_target, v_uv);
+  gl_FragColor = vec4(base.rgb + u_color * strength, 1.0);
+}`;
+
+const fsDisplay = `
+precision mediump float;
+varying vec2 v_uv;
+uniform sampler2D u_texture;
+void main() {
+  vec4 color = texture2D(u_texture, v_uv);
+  gl_FragColor = vec4(color.rgb, 1.0);
+}`;
+
+function createShader(type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(shader));
+    gl.deleteShader(shader);
+    return null;
+  }
+  return shader;
+}
+
+function createProgram(vs, fs) {
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(prog));
+    return null;
+  }
+  return prog;
+}
+
+const vs = createShader(gl.VERTEX_SHADER, vsSource);
+const fsAdv = createShader(gl.FRAGMENT_SHADER, fsAdvection);
+const fsSpl = createShader(gl.FRAGMENT_SHADER, fsSplat);
+const fsDisp = createShader(gl.FRAGMENT_SHADER, fsDisplay);
+
+const progAdvection = createProgram(vs, fsAdv);
+const progSplat = createProgram(vs, fsSpl);
+const progDisplay = createProgram(vs, fsDisp);
+
+// Geometry
+const quad = new Float32Array([-1,-1, 1,-1, -1,1, 1,1]);
+const quadBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+
+function createFBO(w, h) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return { tex, fbo, w, h };
+}
+
+let velocity, dye;
+function initFBOs() {
+  if (velocity) { gl.deleteTexture(velocity.tex); gl.deleteFramebuffer(velocity.fbo); }
+  if (dye) { gl.deleteTexture(dye.tex); gl.deleteFramebuffer(dye.fbo); }
+  velocity = createFBO(simResolution, simResolution);
+  dye = createFBO(simResolution, simResolution);
+}
+initFBOs();
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = rect.height * devicePixelRatio;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function blit(target) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target ? target.fbo : null);
+  gl.viewport(0, 0, target ? target.w : canvas.width, target ? target.h : canvas.height);
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+  const loc = gl.getAttribLocation(progDisplay, 'a_position');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function step() {
+  gl.useProgram(progAdvection);
+  const texelLoc = gl.getUniformLocation(progAdvection, 'u_texelSize');
+  gl.uniform2f(texelLoc, 1/simResolution, 1/simResolution);
+  
+  // Advect velocity
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, velocity.tex);
+  gl.uniform1i(gl.getUniformLocation(progAdvection, 'u_velocity'), 0);
+  gl.uniform1i(gl.getUniformLocation(progAdvection, 'u_source'), 0);
+  gl.uniform1f(gl.getUniformLocation(progAdvection, 'u_dissipation'), 0.995);
+  blit(velocity);
+  
+  // Advect dye
+  gl.bindTexture(gl.TEXTURE_2D, dye.tex);
+  gl.uniform1f(gl.getUniformLocation(progAdvection, 'u_dissipation'), 1.0 - dissipation * 0.01);
+  blit(dye);
+}
+
+function render() {
+  gl.useProgram(progDisplay);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, dye.tex);
+  gl.uniform1i(gl.getUniformLocation(progDisplay, 'u_texture'), 0);
+  blit(null);
+}
+
+// Mouse/touch interaction
+let lastPos = null;
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  return {
+    x: (touch.clientX - rect.left) / rect.width,
+    y: 1.0 - (touch.clientY - rect.top) / rect.height
+  };
+}
+
+function splat(pos, dx, dy) {
+  gl.useProgram(progSplat);
+  gl.uniform2f(gl.getUniformLocation(progSplat, 'u_point'), pos.x, pos.y);
+  gl.uniform3f(gl.getUniformLocation(progSplat, 'u_color'), dyeColor[0]*dx*0.1, dyeColor[1]*dy*0.1, dyeColor[2]*dy*0.1);
+  gl.uniform1f(gl.getUniformLocation(progSplat, 'u_radius'), 0.0005);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, velocity.tex);
+  gl.uniform1i(gl.getUniformLocation(progSplat, 'u_target'), 0);
+  blit(velocity);
+  
+  gl.bindTexture(gl.TEXTURE_2D, dye.tex);
+  gl.uniform3f(gl.getUniformLocation(progSplat, 'u_color'), dyeColor[0]*0.05, dyeColor[1]*0.05, dyeColor[2]*0.05);
+  blit(dye);
+}
+
+canvas.addEventListener('mousedown', e => { lastPos = getPos(e); });
+canvas.addEventListener('mousemove', e => {
+  if (!lastPos) return;
+  const pos = getPos(e);
+  const dx = (pos.x - lastPos.x) * forceStrength;
+  const dy = (pos.y - lastPos.y) * forceStrength;
+  splat(pos, dx, dy);
+  lastPos = pos;
+});
+canvas.addEventListener('mouseup', () => lastPos = null);
+canvas.addEventListener('mouseleave', () => lastPos = null);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); lastPos = getPos(e); }, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!lastPos) return;
+  const pos = getPos(e);
+  const dx = (pos.x - lastPos.x) * forceStrength;
+  const dy = (pos.y - lastPos.y) * forceStrength;
+  splat(pos, dx, dy);
+  lastPos = pos;
+}, { passive: false });
+canvas.addEventListener('touchend', () => lastPos = null);
+
+// Controls
+document.getElementById('dyeColor').addEventListener('input', e => {
+  const hex = e.target.value;
+  dyeColor = [parseInt(hex.slice(1,3),16)/255, parseInt(hex.slice(3,5),16)/255, parseInt(hex.slice(5,7),16)/255];
+});
+document.getElementById('force').addEventListener('input', e => forceStrength = parseInt(e.target.value));
+document.getElementById('dissipation').addEventListener('input', e => dissipation = parseInt(e.target.value));
+document.getElementById('iterations').addEventListener('input', e => iterations = parseInt(e.target.value));
+document.getElementById('resolution').addEventListener('change', e => {
+  simResolution = parseInt(e.target.value);
+  initFBOs();
+});
+
+function togglePause() {
+  paused = !paused;
+  document.getElementById('pauseBtn').textContent = paused ? '继续' : '暂停';
+}
+function clearFluid() {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, velocity.fbo);
+  gl.clearColor(0, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dye.fbo);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+}
+function resetParams() {
+  document.getElementById('force').value = 5;
+  document.getElementById('dissipation').value = 20;
+  document.getElementById('iterations').value = 30;
+  forceStrength = 5; dissipation = 20; iterations = 30;
+}
+function screenshot() {
+  const link = document.createElement('a');
+  link.download = 'fluid_simulation.png';
+  link.href = canvas.toDataURL();
+  link.click();
+}
+
+// Animation loop
+function loop() {
+  if (!paused) {
+    for (let i = 0; i < iterations; i++) step();
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

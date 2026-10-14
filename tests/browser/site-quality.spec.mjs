@@ -172,7 +172,9 @@ test("homepage loads thumbnails and separates vendors from tools", async ({
     /Anthropic · \d+/,
   );
   await page.locator('[data-recent="archive"]').click();
-  await expect(page.locator("#recent-list")).toContainText("归档日期尚未留存");
+  await expect(page.locator("#recent-list")).toContainText(
+    "LongCat 2.5 Preview Free",
+  );
 });
 
 test("returning from a topic restores loaded cards and scroll", async ({

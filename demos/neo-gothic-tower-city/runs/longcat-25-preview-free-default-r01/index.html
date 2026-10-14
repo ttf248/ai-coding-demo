@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新哥特式塔楼城市 - 3D漫游</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; background: #0a0a1a; font-family: 'Segoe UI', system-ui, sans-serif; }
+canvas { display: block; }
+#info { position: absolute; top: 20px; left: 20px; color: #fff; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 10px; font-size: 14px; max-width: 300px; z-index: 10; }
+#info h1 { font-size: 18px; margin-bottom: 8px; color: #e94560; }
+#info p { color: #aaa; font-size: 12px; line-height: 1.6; }
+#loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-size: 24px; z-index: 20; }
+</style>
+</head>
+<body>
+<div id="loading">加载中...</div>
+<div id="info">
+  <h1>新哥特式塔楼城市</h1>
+  <p>鼠标拖拽环视 | 滚轮缩放 | 自动漫游中...</p>
+</div>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a1a);
+scene.fog = new THREE.Fog(0x0a0a1a, 50, 200);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 30, 60);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
+scene.add(ambientLight);
+
+const moonLight = new THREE.DirectionalLight(0x8888ff, 0.8);
+moonLight.position.set(50, 100, 50);
+moonLight.castShadow = true;
+scene.add(moonLight);
+
+const torchLights = [];
+for (let i = 0; i < 20; i++) {
+  const light = new THREE.PointLight(0xff6600, 2, 30);
+  light.position.set((Math.random()-0.5)*80, 5+Math.random()*20, (Math.random()-0.5)*80);
+  scene.add(light);
+  torchLights.push(light);
+}
+
+// Ground
+const groundGeo = new THREE.PlaneGeometry(200, 200);
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.9 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Gothic tower function
+function createGothicTower(x, z, height, radius) {
+  const group = new THREE.Group();
+  
+  // Main body
+  const bodyGeo = new THREE.CylinderGeometry(radius * 0.7, radius, height, 8);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2a2a4e, roughness: 0.7 });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = height / 2;
+  body.castShadow = true;
+  group.add(body);
+  
+  // Spire
+  const spireGeo = new THREE.ConeGeometry(radius * 0.8, height * 0.4, 8);
+  const spireMat = new THREE.MeshStandardMaterial({ color: 0x1a1a3e, roughness: 0.5 });
+  const spire = new THREE.Mesh(spireGeo, spireMat);
+  spire.position.y = height + height * 0.2;
+  spire.castShadow = true;
+  group.add(spire);
+  
+  // Windows (emissive)
+  const windowGeo = new THREE.PlaneGeometry(radius * 0.3, radius * 0.5);
+  const windowMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xffcc00, emissiveIntensity: 0.5 });
+  for (let i = 0; i < 4; i++) {
+    const win = new THREE.Mesh(windowGeo, windowMat);
+    const angle = (i / 4) * Math.PI * 2;
+    win.position.set(Math.cos(angle) * radius * 0.71, height * 0.6, Math.sin(angle) * radius * 0.71);
+    win.lookAt(win.position.clone().multiplyScalar(2));
+    group.add(win);
+  }
+  
+  // Flying buttresses
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const buttressGeo = new THREE.BoxGeometry(radius * 0.3, height * 0.7, radius * 0.2);
+    const buttress = new THREE.Mesh(buttressGeo, bodyMat);
+    buttress.position.set(Math.cos(angle) * radius * 1.2, height * 0.35, Math.sin(angle) * radius * 1.2);
+    buttress.rotation.y = -angle;
+    buttress.castShadow = true;
+    group.add(buttress);
+  }
+  
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+// Create city
+const towers = [];
+for (let i = 0; i < 30; i++) {
+  const x = (Math.random() - 0.5) * 150;
+  const z = (Math.random() - 0.5) * 150;
+  const height = 15 + Math.random() * 35;
+  const radius = 2 + Math.random() * 3;
+  towers.push(createGothicTower(x, z, height, radius));
+}
+
+// Central cathedral
+const cathedral = createGothicTower(0, 0, 60, 8);
+
+// Water
+const waterGeo = new THREE.PlaneGeometry(300, 300);
+const waterMat = new THREE.MeshStandardMaterial({ color: 0x0a2a4a, transparent: true, opacity: 0.8, roughness: 0.1, metalness: 0.5 });
+const water = new THREE.Mesh(waterGeo, waterMat);
+water.rotation.x = -Math.PI / 2;
+water.position.y = -0.5;
+scene.add(water);
+
+// Particles (fire/embers)
+const particleCount = 500;
+const particleGeo = new THREE.BufferGeometry();
+const positions = new Float32Array(particleCount * 3);
+for (let i = 0; i < particleCount; i++) {
+  positions[i*3] = (Math.random() - 0.5) * 200;
+  positions[i*3+1] = Math.random() * 50;
+  positions[i*3+2] = (Math.random() - 0.5) * 200;
+}
+particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+const particleMat = new THREE.PointsMaterial({ color: 0xff6600, size: 0.5, transparent: true, opacity: 0.6 });
+const particles = new THREE.Points(particleGeo, particleMat);
+scene.add(particles);
+
+// Camera control
+let mouseX = 0, mouseY = 0;
+let targetRotationX = 0, targetRotationY = 0;
+let autoRotate = true;
+
+document.addEventListener('mousedown', () => autoRotate = false);
+document.addEventListener('mousemove', e => {
+  if (!autoRotate) {
+    targetRotationY = (e.clientX / window.innerWidth - 0.5) * Math.PI * 2;
+    targetRotationX = (e.clientY / window.innerHeight - 0.5) * Math.PI;
+  }
+});
+document.addEventListener('wheel', e => {
+  camera.position.z = Math.max(20, Math.min(150, camera.position.z + e.deltaY * 0.05));
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Hide loading
+document.getElementById('loading').style.display = 'none';
+
+// Animation
+let time = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  time += 0.01;
+  
+  if (autoRotate) {
+    camera.position.x = Math.sin(time * 0.2) * 80;
+    camera.position.z = Math.cos(time * 0.2) * 80;
+    camera.position.y = 30 + Math.sin(time * 0.5) * 10;
+    camera.lookAt(0, 20, 0);
+  } else {
+    camera.rotation.x += (targetRotationX - camera.rotation.x) * 0.05;
+    camera.rotation.y += (targetRotationY - camera.rotation.y) * 0.05;
+  }
+  
+  // Animate torch lights
+  for (let i = 0; i < torchLights.length; i++) {
+    torchLights[i].intensity = 1.5 + Math.sin(time * 3 + i) * 0.5;
+  }
+  
+  // Animate particles
+  const pos = particles.geometry.attributes.position.array;
+  for (let i = 0; i < particleCount; i++) {
+    pos[i*3+1] += 0.1;
+    if (pos[i*3+1] > 50) pos[i*3+1] = 0;
+  }
+  particles.geometry.attributes.position.needsUpdate = true;
+  
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

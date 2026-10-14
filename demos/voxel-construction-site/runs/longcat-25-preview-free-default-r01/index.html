@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>体素微缩建筑工地沙盘</title>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; background: #0a0a1a; font-family: 'Segoe UI', system-ui, sans-serif; }
+canvas { display: block; }
+#ui { position: absolute; top: 20px; left: 20px; color: #fff; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 10px; z-index: 10; }
+#ui h1 { font-size: 16px; margin-bottom: 10px; color: #4ecdc4; }
+#ui label { display: block; margin: 8px 0; font-size: 13px; }
+#ui input[type=range] { width: 150px; }
+#loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-size: 24px; z-index: 20; }
+</style>
+</head>
+<body>
+<div id="loading">加载中...</div>
+<div id="ui">
+  <h1>体素建筑工地沙盘</h1>
+  <label>设备速度: <input type="range" id="speed" min="0" max="100" value="50"></label>
+  <label>昼夜循环: <input type="checkbox" id="dayNight" checked></label>
+  <label>尘土强度: <input type="range" id="dust" min="0" max="100" value="30"></label>
+  <p style="font-size:11px;color:#888;margin-top:10px;">鼠标拖拽环视 | 滚轮缩放 | 空格键暴雨</p>
+</div>
+<script type="module">
+import * as THREE from 'three';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.Fog(0x87ceeb, 50, 200);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(40, 35, 40);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+sunLight.position.set(50, 80, 30);
+sunLight.castShadow = true;
+scene.add(sunLight);
+
+// Ground (dark wood table)
+const tableGeo = new THREE.BoxGeometry(100, 2, 100);
+const tableMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.8 });
+const table = new THREE.Mesh(tableGeo, tableMat);
+table.position.y = -1;
+table.receiveShadow = true;
+scene.add(table);
+
+// Voxel helper
+function createVoxel(x, y, z, color, size = 1) {
+  const geo = new THREE.BoxGeometry(size, size, size);
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
+
+// Construction site elements
+const dynamicObjects = [];
+
+// Building foundation
+for (let x = -10; x <= 10; x += 2) {
+  for (let z = -10; z <= 10; z += 2) {
+    createVoxel(x, 1, z, 0x808080, 2);
+  }
+}
+
+// Scaffolding
+for (let y = 2; y <= 15; y += 3) {
+  for (let x = -12; x <= 12; x += 4) {
+    createVoxel(x, y, -12, 0xffa500, 0.5);
+    createVoxel(x, y, 12, 0xffa500, 0.5);
+  }
+  for (let z = -12; z <= 12; z += 4) {
+    createVoxel(-12, y, z, 0xffa500, 0.5);
+    createVoxel(12, y, z, 0xffa500, 0.5);
+  }
+}
+
+// Tower crane
+function createCrane(x, z) {
+  const group = new THREE.Group();
+  // Base
+  const base = new THREE.Mesh(new THREE.BoxGeometry(4, 1, 4), new THREE.MeshStandardMaterial({ color: 0xffcc00 }));
+  base.position.y = 0.5;
+  group.add(base);
+  // Tower
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(1, 20, 1), new THREE.MeshStandardMaterial({ color: 0xffcc00 }));
+  tower.position.y = 10;
+  group.add(tower);
+  // Arm
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(20, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffcc00 }));
+  arm.position.set(8, 19, 0);
+  group.add(arm);
+  // Hook
+  const hook = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), new THREE.MeshStandardMaterial({ color: 0x666666 }));
+  hook.position.set(15, 17, 0);
+  group.add(hook);
+  
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return { group, arm, hook, angle: 0 };
+}
+
+const crane1 = createCrane(-20, -20);
+const crane2 = createCrane(20, -20);
+dynamicObjects.push(crane1, crane2);
+
+// Excavators
+function createExcavator(x, z) {
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 2), new THREE.MeshStandardMaterial({ color: 0xff8c00 }));
+  body.position.y = 1.5;
+  group.add(body);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(1, 4, 1), new THREE.MeshStandardMaterial({ color: 0xff8c00 }));
+  arm.position.set(0, 3, 0);
+  arm.rotation.z = 0.5;
+  group.add(arm);
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return { group, arm, baseX: x, time: Math.random() * 100 };
+}
+
+const excavators = [];
+for (let i = 0; i < 3; i++) {
+  excavators.push(createExcavator(-15 + i * 15, -25));
+}
+dynamicObjects.push(...excavators);
+
+// Trucks
+function createTruck() {
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 2), new THREE.MeshStandardMaterial({ color: 0xcc0000 }));
+  body.position.y = 1.5;
+  group.add(body);
+  const cargo = new THREE.Mesh(new THREE.BoxGeometry(3, 1.5, 1.8), new THREE.MeshStandardMaterial({ color: 0x999999 }));
+  cargo.position.set(-0.5, 3, 0);
+  group.add(cargo);
+  scene.add(group);
+  return { group, progress: 0 };
+}
+
+const trucks = [createTruck(), createTruck()];
+dynamicObjects.push(...trucks);
+
+// Workers (static voxel figures)
+function createWorker(x, z, color) {
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.5), new THREE.MeshStandardMaterial({ color }));
+  body.position.y = 0.6;
+  group.add(body);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({ color: 0xffdbac }));
+  head.position.y = 1.5;
+  group.add(head);
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+for (let i = 0; i < 20; i++) {
+  createWorker((Math.random()-0.5)*40, (Math.random()-0.5)*40, [0x0066cc, 0x00cc66, 0xcc6600][i%3]);
+}
+
+// Materials piles
+for (let i = 0; i < 10; i++) {
+  createVoxel(25 + Math.random()*5, 0.5, 15 + Math.random()*5, 0x8B4513, 1);
+  createVoxel(-25 + Math.random()*5, 0.5, 15 + Math.random()*5, 0x696969, 1);
+}
+
+// Dust particles
+const dustCount = 200;
+const dustGeo = new THREE.BufferGeometry();
+const dustPositions = new Float32Array(dustCount * 3);
+for (let i = 0; i < dustCount; i++) {
+  dustPositions[i*3] = (Math.random() - 0.5) * 80;
+  dustPositions[i*3+1] = Math.random() * 30;
+  dustPositions[i*3+2] = (Math.random() - 0.5) * 80;
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+const dustMat = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 0.3, transparent: true, opacity: 0.4 });
+const dust = new THREE.Points(dustGeo, dustMat);
+scene.add(dust);
+
+// Rain particles
+const rainCount = 500;
+const rainGeo = new THREE.BufferGeometry();
+const rainPositions = new Float32Array(rainCount * 3);
+for (let i = 0; i < rainCount; i++) {
+  rainPositions[i*3] = (Math.random() - 0.5) * 100;
+  rainPositions[i*3+1] = Math.random() * 50;
+  rainPositions[i*3+2] = (Math.random() - 0.5) * 100;
+}
+rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+const rainMat = new THREE.PointsMaterial({ color: 0x6699ff, size: 0.2, transparent: true, opacity: 0 });
+const rain = new THREE.Points(rainGeo, rainMat);
+scene.add(rain);
+
+// Camera control
+let isDragging = false;
+let prevMouse = { x: 0, y: 0 };
+let cameraAngle = Math.PI / 4;
+let cameraHeight = 35;
+let cameraDistance = 55;
+
+document.addEventListener('mousedown', e => { isDragging = true; prevMouse = { x: e.clientX, y: e.clientY }; });
+document.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - prevMouse.x;
+  const dy = e.clientY - prevMouse.y;
+  cameraAngle -= dx * 0.01;
+  cameraHeight = Math.max(10, Math.min(60, cameraHeight + dy * 0.2));
+  prevMouse = { x: e.clientX, y: e.clientY };
+});
+document.addEventListener('mouseup', () => isDragging = false);
+document.addEventListener('wheel', e => {
+  cameraDistance = Math.max(20, Math.min(100, cameraDistance + e.deltaY * 0.05));
+});
+
+let isRaining = false;
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); isRaining = !isRaining; }
+});
+
+// UI controls
+let deviceSpeed = 0.5;
+let dayNightCycle = true;
+document.getElementById('speed').addEventListener('input', e => deviceSpeed = e.target.value / 100);
+document.getElementById('dayNight').addEventListener('change', e => dayNightCycle = e.target.checked);
+document.getElementById('dust').addEventListener('input', e => dustMat.opacity = e.target.value / 200);
+
+document.getElementById('loading').style.display = 'none';
+
+// Animation
+let time = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  time += 0.016 * (deviceSpeed * 2);
+  
+  // Camera
+  camera.position.x = Math.sin(cameraAngle) * cameraDistance;
+  camera.position.z = Math.cos(cameraAngle) * cameraDistance;
+  camera.position.y = cameraHeight;
+  camera.lookAt(0, 5, 0);
+  
+  // Cranes
+  crane1.angle += 0.005 * deviceSpeed;
+  crane1.group.rotation.y = crane1.angle;
+  crane2.angle -= 0.003 * deviceSpeed;
+  crane2.group.rotation.y = crane2.angle;
+  
+  // Excavators
+  for (const ex of excavators) {
+    ex.arm.rotation.z = 0.5 + Math.sin(time + ex.time) * 0.3;
+  }
+  
+  // Trucks
+  for (const truck of trucks) {
+    truck.progress += 0.002 * deviceSpeed;
+    if (truck.progress > 1) truck.progress = 0;
+    truck.group.position.x = -30 + truck.progress * 60;
+    truck.group.position.z = -20 + Math.sin(truck.progress * Math.PI) * 5;
+  }
+  
+  // Dust
+  const dp = dust.geometry.attributes.position.array;
+  for (let i = 0; i < dustCount; i++) {
+    dp[i*3+1] += 0.02;
+    dp[i*3] += Math.sin(time + i) * 0.01;
+    if (dp[i*3+1] > 30) dp[i*3+1] = 0;
+  }
+  dust.geometry.attributes.position.needsUpdate = true;
+  
+  // Rain
+  rainMat.opacity = isRaining ? 0.6 : 0;
+  if (isRaining) {
+    const rp = rain.geometry.attributes.position.array;
+    for (let i = 0; i < rainCount; i++) {
+      rp[i*3+1] -= 1;
+      if (rp[i*3+1] < 0) rp[i*3+1] = 50;
+    }
+    rain.geometry.attributes.position.needsUpdate = true;
+  }
+  
+  // Day/night cycle
+  if (dayNightCycle) {
+    const dayProgress = (Math.sin(time * 0.1) + 1) / 2;
+    const skyColor = new THREE.Color().lerpColors(new THREE.Color(0x0a0a2e), new THREE.Color(0x87ceeb), dayProgress);
+    scene.background = skyColor;
+    scene.fog.color = skyColor;
+    sunLight.intensity = dayProgress;
+  }
+  
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
