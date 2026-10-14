@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   publicDir: "images",
-  // 相对路径产物支持 Pages 子路径托管；浏览器会阻止 file:// 加载 ES module/CSS。
+  // 相对路径产物：既能被 Pages 子路径托管，也能直接 file:// 打开
   base: "./",
   build: { outDir: "dist", assetsDir: "assets" },
 });

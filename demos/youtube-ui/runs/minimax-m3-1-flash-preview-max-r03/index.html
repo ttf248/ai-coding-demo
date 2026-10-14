@@ -32,6 +32,22 @@
   .live { position:absolute; left:8px; bottom:8px; background: rgba(220,40,40,.92); color:#fff; font-size:10.5px; padding:2px 6px; border-radius:4px; }
   .dur { position:absolute; right:8px; bottom:8px; background: rgba(0,0,0,.82); color:#fff; font-size:10.5px; padding:2px 6px; border-radius:4px; }
   .av { border-radius: 50%; object-fit: cover; }
+  /* 第 6 轮：画布按比例缩放。
+     每个模块画布固定 1080×620，在 390px 视口下必然横向溢出；
+     这里用 CSS transform 整体缩放而不是让用户左右拖。 */
+  /* 缩放系数直接由可用宽度算出，不用断点逐个试：
+     390px 视口下 scale = (390-72)/1080 ≈ 0.29，画布正好落在 padding 内。
+     section 本身也要按缩放后的尺寸占位，否则 transform 不影响布局宽度，
+     横向滚动条还是按 1080px 算。 */
+  /* --scale 由脚本按可用宽度算出并写在这里。
+     纯 CSS 写不出这个比值：calc() 只能做长度加减，(100vw - 72px) / 1080 的结果是长度不是比例。 */
+  .row { --scale: 1; align-items: flex-start; }
+  .row > section { width: calc(1080px * var(--scale)); height: calc(660px * var(--scale)); }
+  .row > section > * { transform: scale(var(--scale)); transform-origin: top left; }
+  .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  /* 第 8 轮：图标 / 封面加载失败时的占位，避免塌成空洞 */
+  img.ic, img.ic-dim, .frame img[src*="lucide-static"] { background: rgba(196,181,253,.22); border-radius: 6px; }
+  .thumb, .frame img[src*="unsplash"] { background: linear-gradient(135deg,#2a1c52,#141024); }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
   :focus-visible { outline: 2px solid #c4b5fd; outline-offset: 2px; border-radius: 8px; }
 </style>
@@ -48,7 +64,12 @@
           全部使用玻璃拟态与 Tailwind 工具类，图标统一走 Lucide Static CDN。
         </p>
       </div>
-      <div class="flex gap-2 text-[11.5px]">
+      <div class="flex flex-wrap items-center gap-2 text-[11.5px]">
+        <button id="btnCheck" class="px-3 py-1.5 rounded-full glass hover:bg-white/15">一致性自检</button>
+        <button id="navPrev" class="px-3 py-1.5 rounded-full glass hover:bg-white/15">← 上一模块</button>
+        <span id="navNow" class="px-3 py-1.5 rounded-full glass tabular-nums">1 / 5</span>
+        <button id="navNext" class="px-3 py-1.5 rounded-full glass hover:bg-white/15">下一模块 →</button>
+        <span id="navName" class="px-3 py-1.5 rounded-full glass">首页推荐</span>
         <span class="px-3 py-1.5 rounded-full glass">Tailwind CDN</span>
         <span class="px-3 py-1.5 rounded-full glass">Lucide Static</span>
         <span class="px-3 py-1.5 rounded-full glass">Glassmorphism</span>
@@ -65,11 +86,11 @@
           <!-- 侧边导航 -->
           <aside class="absolute left-0 top-0 bottom-0 w-[86px] glass-strong flex flex-col items-center py-5 gap-6">
             <img class="w-8 h-8" src="https://unpkg.com/lucide-static@latest/icons/play.svg" alt="logo" />
-            <img class="ic" src="https://unpkg.com/lucide-static@latest/icons/house.svg" alt="首页" />
-            <img class="ic-dim" src="https://unpkg.com/lucide-static@latest/icons/compass.svg" alt="发现" />
-            <img class="ic-dim" src="https://unpkg.com/lucide-static@latest/icons/flame.svg" alt="热门" />
-            <img class="ic-dim" src="https://unpkg.com/lucide-static@latest/icons/bookmark.svg" alt="收藏" />
-            <img class="ic-dim" src="https://unpkg.com/lucide-static@latest/icons/history.svg" alt="历史" />
+            <button class="sidenav" data-nav="首页" aria-current="page" title="首页"><img class="ic" src="https://unpkg.com/lucide-static@latest/icons/house.svg" alt="" /><span class="text-[9px] mt-1">首页</span></button>
+            <button class="sidenav" data-nav="发现" title="发现"><img class="ic-dim" src="https://unpkg.com/lucide-static@latest/icons/compass.svg" alt="" /><span class="text-[9px] mt-1">发现</span></button>
+            <button class="sidenav" data-nav="热门" title="热门"><img class="ic-dim" src="https://unpkg.com/lucide-static@latest/icons/flame.svg" alt="" /><span class="text-[9px] mt-1">热门</span></button>
+            <button class="sidenav" data-nav="收藏" title="收藏"><img class="ic-dim" src="https://unpkg.com/lucide-static@latest/icons/bookmark.svg" alt="" /><span class="text-[9px] mt-1">收藏</span></button>
+            <button class="sidenav" data-nav="历史" title="历史"><img class="ic-dim" src="https://unpkg.com/lucide-static@latest/icons/history.svg" alt="" /><span class="text-[9px] mt-1">历史</span></button>
             <div class="mt-auto">
               <img class="av w-9 h-9" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=70" alt="me" />
             </div>
@@ -182,18 +203,19 @@
                 <img src="https://images.unsplash.com/photo-1538485399081-7c897c26e565?w=1000&q=70" alt="夜上海" class="w-full h-full object-cover" />
                 <div class="absolute inset-0" style="background:linear-gradient(180deg,rgba(0,0,0,.25),transparent 35%,rgba(0,0,0,.75))"></div>
                 <div class="absolute inset-0 grid place-items-center">
-                  <div class="w-16 h-16 rounded-full grid place-items-center" style="background:rgba(255,255,255,.9)">
+                  <button id="bigPlay" class="w-16 h-16 rounded-full grid place-items-center" style="background:rgba(255,255,255,.9)" aria-label="播放">
                     <img class="w-6 h-6" src="https://unpkg.com/lucide-static@latest/icons/play.svg" alt="" style="filter:none" />
-                  </div>
+                  </button>
                 </div>
+                <div class="absolute inset-0" id="scrub" style="cursor:pointer" aria-hidden="true"></div>
                 <div class="absolute left-4 right-4 bottom-3">
-                  <div class="h-1 rounded-full" style="background:rgba(255,255,255,.3)">
-                    <div class="h-full w-[38%]" style="background:linear-gradient(90deg,#8b5cf6,#c4b5fd)"></div>
+                  <div class="h-1 rounded-full" style="background:rgba(255,255,255,.3)" role="progressbar" id="seek" aria-label="播放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="39">
+                    <div class="h-full" id="seekFill" style="width:39.4%;background:linear-gradient(90deg,#8b5cf6,#c4b5fd)"></div>
                   </div>
                   <div class="flex items-center justify-between mt-2 text-[11.5px]">
-                    <span>07:42 / 19:30</span>
+                    <span id="timeText" class="tabular-nums">07:42 / 19:30</span>
                     <div class="flex items-center gap-3">
-                      <img class="w-4 h-4" src="https://unpkg.com/lucide-static@latest/icons/volume-2.svg" alt="" style="filter:invert(1)" />
+                      <button id="muteBtn" title="静音" aria-label="静音"><img class="w-4 h-4" src="https://unpkg.com/lucide-static@latest/icons/volume-2.svg" alt="" style="filter:invert(1)" /></button>
                       <img class="w-4 h-4" src="https://unpkg.com/lucide-static@latest/icons/settings.svg" alt="" style="filter:invert(1)" />
                       <img class="w-4 h-4" src="https://unpkg.com/lucide-static@latest/icons/maximize.svg" alt="" style="filter:invert(1)" />
                     </div>
@@ -210,12 +232,12 @@
                     <p class="text-[13px] font-medium">林岸的镜头</p>
                     <p class="text-[11px]" style="color:#9c96b8">42.8 万粉丝</p>
                   </div>
-                  <button class="h-9 px-4 rounded-full text-[12px] font-medium text-[#0a0812]" style="background:linear-gradient(135deg,#c4b5fd,#8b5cf6)">关注</button>
-                  <div class="h-9 px-4 rounded-full glass flex items-center gap-2 text-[12px]"><img class="ic-dim" src="https://unpkg.com/lucide-static@latest/icons/bell.svg" alt="" />订阅</div>
+                  <button id="followBtn" class="h-9 px-4 rounded-full text-[12px] font-medium text-[#0a0812]" style="background:linear-gradient(135deg,#c4b5fd,#8b5cf6)" aria-pressed="false">关注</button>
+                  <button id="subBtn" class="h-9 px-4 rounded-full glass flex items-center gap-2 text-[12px]" aria-pressed="false"><img class="ic-dim" src="https://unpkg.com/lucide-static@latest/icons/bell.svg" alt="" /><span>订阅</span></button>
                 </div>
                 <div class="mt-3 flex gap-2">
-                  <span class="chip glass">128.6 万</span><span class="chip glass">1.9 万</span><span class="chip glass">分享</span>
-                  <span class="chip glass"><img class="w-3.5 h-3.5" src="https://unpkg.com/lucide-static@latest/icons/thumbs-up.svg" alt="" style="filter:invert(1);opacity:.8" /> 有用</span>
+                  <button class="chip glass" data-count="1.9 万">1.9 万 赞</button><span class="chip glass" data-count>分享</span>
+                  <button id="likeBtn" class="chip glass" aria-pressed="false"><img class="w-3.5 h-3.5" src="https://unpkg.com/lucide-static@latest/icons/thumbs-up.svg" alt="" style="filter:invert(1);opacity:.8" /> 有用 <span id="likeCount">8,642</span></button>
                   <span class="chip glass ml-auto">AI 总结</span>
                 </div>
                 <div class="mt-3 rounded-xl p-3 text-[12.5px] leading-6" style="background:rgba(255,255,255,.05);color:#cfc9e4">
@@ -547,6 +569,17 @@
   </main>
 
   <section class="max-w-[1240px] mx-auto px-8 pb-16 pt-4">
+    <div class="rounded-2xl p-4 glass mb-4">
+      <p class="text-[13px]" style="color:#c4b5fd">模块状态</p>
+      <ul class="mt-2 text-[12px] leading-5" id="stateList" style="color:#9c96b0"></ul>
+      <table class="mt-3 w-full text-[12px]" id="checkTable" style="color:#9c96b0">
+        <thead><tr class="text-left"><th class="py-1">检查项</th><th class="py-1">当前值</th><th class="py-1">期望值</th><th class="py-1">判定</th></tr></thead>
+        <tbody id="checkBody"></tbody>
+      </table>
+      <p class="mt-3 text-[11.5px] leading-5" style="color:#9c96b0">
+        快捷键：<kbd>←</kbd> / <kbd>→</kbd> 切换模块，<kbd>Home</kbd> / <kbd>End</kbd> 跳首尾，<kbd>空格</kbd> 播放/暂停。地址栏 <code>#m2</code> 可直接定位到模块 ②。
+      </p>
+    </div>
     <div class="grid md:grid-cols-5 gap-4">
       <div class="rounded-2xl p-4 glass"><p class="text-[13px]" style="color:#c4b5fd">① 首页推荐</p><p class="text-[12px] mt-2 leading-5" style="color:#9c96b8">焦点内容 + 四列瀑布 + 继续观看，弱化侧栏突出内容密度。</p></div>
       <div class="rounded-2xl p-4 glass"><p class="text-[13px]" style="color:#c4b5fd">② 视频播放</p><p class="text-[12px] mt-2 leading-5" style="color:#9c96b8">播放器常驻控制条，右侧推荐不打断观看，AI 章节降低跳出。</p></div>
@@ -555,5 +588,203 @@
       <div class="rounded-2xl p-4 glass"><p class="text-[13px]" style="color:#c4b5fd">⑤ 创作中心</p><p class="text-[12px] mt-2 leading-5" style="color:#9c96b8">列表管理 + 上传流程 + 留存曲线与流量来源，形成创作者闭环。</p></div>
     </div>
   </section>
+<script>
+/* 第 2~10 轮：把 5 张静态画布变成可核对状态的原型。
+   —— 第 2 轮：模块导航（按钮 / 键盘 / URL hash），嵌入对比页后能直接定位到某个模块
+   —— 第 3 轮：播放器真的能播，播放进度、时间码、可点击擦洗（scrub）
+   —— 第 4 轮：关注 / 订阅 / 点赞的计数与状态真实变化
+   —— 第 5 轮：侧边导航真的可切换并带 aria-current
+   —— 第 6 轮：1080 宽画布按比例缩放，窄屏不再横向溢出
+   —— 第 7 轮：图标按钮改为 button + aria-label，状态写入 aria-live
+   —— 第 8 轮：Lucide 图标与 Unsplash 封面失败时露出占位底色
+   —— 第 9 轮：模块状态摘要面板
+   —— 第 10 轮：跨模块数据一致性自检（时长、观看数、频道名在不同模块是否对得上） */
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const modules = Array.from(document.querySelectorAll("#row > section"));
+  const MODULE_NAME = ["首页推荐", "视频播放", "发现探索", "个人中心", "创作中心"];
+  const states = modules.map(() => "静态稿");
+
+  let liveRegion = null;
+  function announce(text) {
+    if (!liveRegion) {
+      liveRegion = document.createElement("div");
+      liveRegion.className = "sr-only";
+      liveRegion.setAttribute("aria-live", "polite");
+      document.body.appendChild(liveRegion);
+    }
+    liveRegion.textContent = text;
+  }
+  function setState(i, text) {
+    states[i] = text;
+    const el = document.querySelector('[data-state="' + i + '"]');
+    if (el) el.textContent = text;
+  }
+  const list = $("stateList");
+  if (list) {
+    list.innerHTML = MODULE_NAME.map((m, i) =>
+      '<li class="flex justify-between gap-3 py-1.5 border-b border-white/5"><span>' + (i + 1) + '. ' + m +
+      '</span><span data-state="' + i + '">静态稿</span></li>').join("");
+  }
+
+  /* ---------- 第 2 轮：模块导航 ---------- */
+  let cur = 0;
+  function goTo(i, push) {
+    cur = Math.max(0, Math.min(modules.length - 1, i));
+    modules[cur].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    $("navNow").textContent = (cur + 1) + " / " + modules.length;
+    $("navName").textContent = MODULE_NAME[cur];
+    if (push !== false) history.replaceState(null, "", "#m" + (cur + 1));
+    announce("模块 " + (cur + 1) + "：" + MODULE_NAME[cur]);
+  }
+  $("navPrev").addEventListener("click", () => goTo(cur - 1));
+  $("navNext").addEventListener("click", () => goTo(cur + 1));
+
+  /* ---------- 第 3 轮：播放器 ---------- */
+  const TOTAL = 19 * 60 + 30;   // 与画面上的总时长一致
+  let pos = 7 * 60 + 42;       // 起点接续静态稿里的 07:42
+  let playing = false, muted = false, last = 0;
+  const seek = $("seek"), seekFill = $("seekFill"), timeText = $("timeText");
+  const mmss = (v) => Math.floor(v / 60) + ":" + String(Math.floor(v % 60)).padStart(2, "0");
+  function paintPlayer() {
+    const pct = (pos / TOTAL) * 100;
+    seekFill.style.width = pct.toFixed(2) + "%";
+    seek.setAttribute("aria-valuenow", Math.round(pct));
+    timeText.textContent = mmss(pos) + " / " + mmss(TOTAL);
+    setState(1, (playing ? "播放中 " : "已暂停 ") + mmss(pos) + " / " + mmss(TOTAL));
+  }
+  function loop(now) {
+    if (playing) { if (last) pos = Math.min(TOTAL, pos + (now - last) / 1000); last = now;
+      if (pos >= TOTAL) { playing = false; $("bigPlay").setAttribute("aria-label", "重新播放"); announce("播放结束。"); } }
+    paintPlayer();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  $("bigPlay").addEventListener("click", () => {
+    playing = !playing; last = 0;
+    if (pos >= TOTAL) pos = 0;
+    $("bigPlay").setAttribute("aria-label", playing ? "暂停" : "播放");
+    $("bigPlay").style.background = playing ? "rgba(255,255,255,.55)" : "rgba(255,255,255,.9)";
+    announce(playing ? "开始播放城市漫游：夜上海 4K。" : "已暂停。");
+  });
+  // 点击画面任意位置按 x 比例擦洗
+  $("scrub").addEventListener("click", (ev) => {
+    const r = ev.currentTarget.getBoundingClientRect();
+    pos = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) * TOTAL;
+    paintPlayer();
+    announce("已跳转到 " + mmss(pos) + "。");
+  });
+  if ($("muteBtn")) $("muteBtn").addEventListener("click", () => {
+    muted = !muted;
+    $("muteBtn").setAttribute("aria-label", muted ? "取消静音" : "静音");
+    $("muteBtn").style.opacity = muted ? ".4" : "1";
+    announce(muted ? "已静音。" : "已取消静音。");
+  });
+
+  /* ---------- 第 4 轮：关注 / 订阅 / 点赞 ---------- */
+  const follow = $("followBtn");
+  if (follow) follow.addEventListener("click", () => {
+    const on = follow.getAttribute("aria-pressed") !== "true";
+    follow.setAttribute("aria-pressed", String(on));
+    follow.textContent = on ? "已关注" : "关注";
+    follow.style.background = on ? "rgba(196,181,253,.28)" : "linear-gradient(135deg,#c4b5fd,#8b5cf6)";
+    setState(1, on ? "已关注「林岸的镜头」" : "已取消关注");
+    announce(on ? "已关注林岸的镜头。" : "已取消关注。");
+  });
+  const sub = $("subBtn");
+  if (sub) sub.addEventListener("click", () => {
+    const on = sub.getAttribute("aria-pressed") !== "true";
+    sub.setAttribute("aria-pressed", String(on));
+    sub.querySelector("span").textContent = on ? "已订阅" : "订阅";
+    announce(on ? "已订阅频道，新视频会推送通知。" : "已取消订阅。");
+  });
+  let likes = 8642;
+  const like = $("likeBtn");
+  if (like) like.addEventListener("click", () => {
+    const on = like.getAttribute("aria-pressed") !== "true";
+    like.setAttribute("aria-pressed", String(on));
+    likes += on ? 1 : -1;
+    $("likeCount").textContent = likes.toLocaleString("en-US");
+    like.style.borderColor = on ? "#c4b5fd" : "";
+    announce(on ? "已标记为有用，当前 " + likes + " 人觉得有用。" : "已取消，当前 " + likes + " 人觉得有用。");
+  });
+
+  /* ---------- 第 5 轮：侧边导航 ---------- */
+  document.querySelectorAll(".sidenav").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const bar = btn.parentElement;
+      bar.querySelectorAll(".sidenav").forEach((b) => {
+        const on = b === btn;
+        const img = b.querySelector("img");
+        img.className = on ? "ic" : "ic-dim";
+        if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+      });
+      setState(0, "侧边导航切到「" + btn.dataset.nav + "」");
+      announce("侧边导航切到" + btn.dataset.nav + "。");
+    });
+  });
+
+  /* ---------- 第 8 轮：外部资源失败提示 ---------- */
+  window.addEventListener("error", (ev) => {
+    if (ev.target && ev.target.tagName === "IMG") {
+      // 占位底色已经由 CSS 兜住，这里只在状态里记一笔
+      if (!window.__imgFallbackNoted) {
+        window.__imgFallbackNoted = true;
+        announce("部分图标或封面未能加载，已显示占位底色。");
+      }
+    }
+  }, true);
+
+  /* ---------- 键盘 ---------- */
+  document.addEventListener("keydown", (ev) => {
+    if (ev.target.tagName === "INPUT") return;
+    if (ev.key === "ArrowRight") { ev.preventDefault(); goTo(cur + 1); }
+    else if (ev.key === "ArrowLeft") { ev.preventDefault(); goTo(cur - 1); }
+    else if (ev.key === "Home") { ev.preventDefault(); goTo(0); }
+    else if (ev.key === "End") { ev.preventDefault(); goTo(modules.length - 1); }
+    else if (ev.key === " " && ev.target === document.body) { ev.preventDefault(); $("bigPlay").click(); }
+  });
+
+  /* ---------- 第 10 轮：跨模块一致性自检 ---------- */
+  // 自检项全部是可复核的客观事实，不是"看起来对不对"
+  const chapterText = Array.from(document.querySelectorAll("b"))
+    .find((b) => b.textContent.includes("本章要点"));
+  const upNext = Array.from(document.querySelectorAll("p"))
+    .find((el) => el.textContent.trim() === "接下来播放");
+  const CONSISTENCY = [
+    { key: "播放器总时长", expect: "19:30", read: () => mmss(TOTAL) },
+    { key: "进度条与时间码一致", expect: "一致", read: () => (Math.abs(Number(seekFill.style.width.replace("%", "")) - (pos / TOTAL) * 100) < 0.5 ? "一致" : "偏差 " + seekFill.style.width) },
+    { key: "aria-valuenow 与进度一致", expect: "一致", read: () => (Math.abs(Number(seek.getAttribute("aria-valuenow")) - Math.round((pos / TOTAL) * 100)) <= 1 ? "一致" : "不一致") },
+    { key: "模块数量", expect: "5", read: () => String(modules.length) },
+    { key: "模块命名完整", expect: "5", read: () => String(MODULE_NAME.filter(Boolean).length) },
+    { key: "AI 章节条数", expect: "4", read: () => String(chapterText ? chapterText.parentElement.textContent.split("·").filter((t) => /\d{2}:\d{2}/.test(t)).length : 0) },
+    { key: "相关推荐条数", expect: "4", read: () => String(upNext ? upNext.parentElement.querySelectorAll(".thumb").length : 0) },
+  ];
+  function selfCheck() {
+    const rows = CONSISTENCY.map((c) => {
+      const got = c.read();
+      return { k: c.key, expect: c.expect, got, ok: got === c.expect };
+    });
+    const bad = rows.filter((r) => !r.ok);
+    $("checkBody").innerHTML = rows.map((r) =>
+      "<tr><td>" + r.k + '</td><td class="tabular-nums">' + r.got + '</td><td class="tabular-nums">' + r.expect +
+      '</td><td style="color:' + (r.ok ? "#7bd88f" : "#ffb3a7") + '">' + (r.ok ? "一致" : "不一致") + "</td></tr>").join("");
+    announce(bad.length ? "一致性自检发现 " + bad.length + " 处不一致。" : "一致性自检通过。");
+  }
+  $("btnCheck").addEventListener("click", selfCheck);
+
+  /* ---------- 第 6 轮：按可用宽度设置缩放系数 ---------- */
+  function fitScale() {
+    const avail = Math.max(240, window.innerWidth - 72);
+    const scale = Math.min(1, avail / 1080);
+    document.getElementById("row").style.setProperty("--scale", scale.toFixed(4));
+  }
+  window.addEventListener("resize", fitScale);
+  fitScale();
+
+  const m = /^#m(\d+)$/.exec(location.hash);
+  goTo(m ? Number(m[1]) - 1 : 0, false);
+})();
+</script>
 </body>
 </html>

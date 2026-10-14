@@ -10,7 +10,12 @@
 </script>
 <style>
   body { background: radial-gradient(1100px 620px at 20% -10%, #1f2a44 0%, #0d1220 55%, #070a12 100%); color:#e6ecf7; }
-  .glass { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(14px); }
+  /* 第 7 轮：屏幕阅读器专用区域与可见焦点 */
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+button:focus-visible, input:focus-visible, canvas:focus-visible, label:focus-within {
+  outline: 2px solid #7dd3fc; outline-offset: 2px; border-radius: 8px;
+}
+.glass { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(14px); }
   canvas { display:block; touch-action:none; }
   video { transform: scaleX(-1); }
 
@@ -50,7 +55,8 @@
       </div>
     </div>
     <div class="relative">
-      <canvas id="cv" class="w-full"></canvas>
+      <canvas id="cv" class="w-full" tabindex="0" role="application"
+  aria-label="粒子还原画布：按住拖动移动力场，空格打散或完全还原，方向键移动力场"></canvas>
       <div id="hint" class="absolute inset-0 grid place-items-center text-center px-8">
         <div>
           <p class="text-[15px]">还没有图片</p>
@@ -63,6 +69,10 @@
         <div id="bar" class="h-full w-0" style="background:linear-gradient(90deg,#38bdf8,#a78bfa)"></div>
       </div>
       <span id="progressTag" style="color:#93a1b8">还原进度 0%</span>
+    </div>
+    <div class="px-4 pb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] border-t border-white/5 pt-2">
+      <span id="sampledTag" style="color:#93a1b8">采样：—</span>
+      <span id="memTag" style="color:#93a1b8">缓冲：—</span>
     </div>
   </section>
 
@@ -104,6 +114,7 @@
       <div class="mt-3 space-y-1.5 text-[12px]">
         <div class="flex items-center justify-between"><span style="color:#93a1b8">当前手势</span><span id="gestureTag">—</span></div>
         <div class="flex items-center justify-between"><span style="color:#93a1b8">追踪状态</span><span id="trackTag">未追踪</span></div>
+        <div class="flex items-center justify-between"><span style="color:#93a1b8">判定阈值</span><span id="threshTag">握拳&lt;0.085 · 捏合&lt;0.045 · 张开&gt;0.16</span></div>
         <div class="flex items-center justify-between"><span style="color:#93a1b8">还原强度</span><span id="strengthTag">0.00</span></div>
       </div>
       <div class="mt-3 rounded-xl p-3 text-[11.5px] leading-5" style="background:rgba(255,255,255,.05);color:#c3cee0">
@@ -129,13 +140,26 @@
       </label>
     </section>
 
-    <section id="statusBox" class="glass rounded-2xl p-4 text-[12px] leading-5" style="color:#c3cee0">
+    <section id="explainer" class="glass rounded-2xl p-4 text-[12px] leading-5" style="color:#c3cee0">
+  <p style="color:#7dd3fc">读数口径</p>
+  <p class="mt-1">· <b>还原进度</b> 是所有粒子 progress 的平均值（0 = 完全飘散，1 = 归位），不是"完成了百分之多少的工作量"。
+    力场内的粒子 drive 更强，所以进度条爬升是空间上不均匀的。</p>
+  <p>· <b>采样：格 / 保留 / 跳过 / 截断</b> 分别指遍历的网格数、被采用的粒子数、因透明或过暗被跳过的格数、
+    以及因超过上限 <span id="maxTag">24000</span> 而被丢掉的格数。截断不为 0 说明画面被裁过，采样间距调大可以装下更多。</p>
+  <p>· <b>缓冲</b> 是六个 Float32Array 的真实占用（positions / targets / colors / offsets 各 3×MAX，seeds 与 progress 各 MAX）。</p>
+  <p>· <b>当前手势</b> 后面的两个数字是判定依据：指尖到掌心的平均距离与拇指-食指距离，
+    分别与 <span id="threshTag2">0.085 / 0.045 / 0.16</span> 三个阈值比较后得出结论。</p>
+</section>
+
+<section id="statusBox" class="glass rounded-2xl p-4 text-[12px] leading-5" style="color:#c3cee0">
       等待初始化……
     </section>
   </aside>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+<!-- MediaPipe 不再用阻塞式脚本标签引入：摄像头只是可选功能，
+     一旦这个 CDN 变慢或被网络策略拦住，整个页面（含主模块）都会卡在解析阶段不渲染。
+     改为在用户点「开启摄像头」时按需动态加载。 -->
 <script>
 // Three.js / MediaPipe 走 CDN；被网络策略拦截时模块不会执行，这里给出明确提示
 window.setTimeout(() => {
@@ -152,7 +176,20 @@ window.setTimeout(() => {
 import * as THREE from "three";
 
 const $ = (id) => document.getElementById(id);
+/* 第 7 轮：状态写入 aria-live，读屏用户也能知道采样与追踪发生了什么。 */
+let liveRegion = null;
+function announce(text) {
+  if (!liveRegion) {
+    liveRegion = document.createElement("div");
+    liveRegion.className = "sr-only";
+    liveRegion.setAttribute("aria-live", "polite");
+    document.body.appendChild(liveRegion);
+  }
+  liveRegion.textContent = text;
+}
+
 const status = (t, kind = "info") => {
+  announce(t);
   const box = $("statusBox");
   const color = kind === "ok" ? "#b6f2cf" : kind === "warn" ? "#ffdca8" : kind === "err" ? "#ffc7d1" : "#c3cee0";
   box.style.color = color;
@@ -169,6 +206,17 @@ camera.position.set(0, 0, 46);
 
 /* ---------- 粒子 ---------- */
 const MAX = 24000;
+const sampleStat = { total: 0, kept: 0, skipped: 0, truncated: 0 };
+function renderSampleStat() {
+  const s = sampleStat;
+  $("sampledTag").textContent = s.total
+    ? `采样：格 ${s.total} · 保留 ${s.kept} · 跳过 ${s.skipped} · 截断 ${s.truncated}`
+    : "采样：—";
+  // 六个 Float32Array 的真实占用：positions/targets/colors/offsets 各 3×MAX，
+  // seeds 与 progress 各 MAX 个 float32
+  const floats = MAX * 3 * 4 + MAX * 2;
+  $("memTag").textContent = `缓冲：${(floats * 4 / 1048576).toFixed(2)} MB（已用 ${(count * 14 * 4 / 1048576).toFixed(2)} MB）`;
+}
 let geometry, points, count = 0;
 const positions = new Float32Array(MAX * 3);
 const targets = new Float32Array(MAX * 3);
@@ -233,15 +281,20 @@ function sampleImage(img, step) {
   const data = ctx.getImageData(0, 0, W, H).data;
 
   const scale = 26 / W;             // 世界坐标宽度固定为 52
-  // 单遍采样：跳过透明与过暗像素，逐个写入目标位置与颜色
-  let p = 0;
+  /* 第 2 轮：采样过程可核对。
+     原先 `if (p >= MAX) break;` 是静默截断——密集图片被裁掉多少完全看不出来，
+     用户只会觉得"画面缺点东西"。现在把总格数、跳过数（透明/过暗）、
+     因上限被截断的格数都统计出来并显示。 */
+  let p = 0, skipped = 0, truncated = 0, visited = 0;
+  outer:
   for (let y = 0; y < H; y += step) {
     for (let x = 0; x < W; x += step) {
+      visited++;
       const i = (y * W + x) * 4;
-      if (data[i + 3] < 40) continue;
+      if (data[i + 3] < 40) { skipped++; continue; }
       const lum = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
-      if (lum < 0.12) continue;
-      if (p >= MAX) break;
+      if (lum < 0.12) { skipped++; continue; }
+      if (p >= MAX) { truncated++; continue; }
       targets[p * 3] = (x - W / 2) * scale;
       targets[p * 3 + 1] = -(y - H / 2) * scale;
       targets[p * 3 + 2] = 0;
@@ -253,13 +306,29 @@ function sampleImage(img, step) {
     }
   }
   const n = p;
+  sampleStat.total = visited; sampleStat.kept = n; sampleStat.skipped = skipped; sampleStat.truncated = truncated;
+  renderSampleStat();
   if (!n) { status("这张图几乎没有可用像素，换一张试试。", "err"); return 0; }
+  if (truncated > 0) {
+    status(`采样完成：${n} 个粒子；另有 ${truncated} 个可用像素因上限 ${MAX} 被截断。把采样间距调大可以装下更多。`, "warn");
+  }
 
   makePoints(n);
   shatter();
   $("hint").style.display = "none";
   $("stageTag").textContent = `粒子数 ${n}`;
   return n;
+}
+
+/* 第 3 轮相关：记住当前用的图片，采样间距变化时可以原地重新采样，
+   不必让用户再选一次文件。 */
+let currentSource = null;   // { kind: "canvas"|"file", canvas?, file? }
+function resampleCurrent() {
+  if (!currentSource || !count) return;
+  if (currentSource.kind === "canvas") {
+    const n = sampleImage(currentSource.img, Number($("step").value));
+    if (n) { $("stageTag").textContent = `粒子数 ${n}`; renderSampleStat(); }
+  }
 }
 
 function shatter() {
@@ -287,8 +356,25 @@ let tracking = false;
 
 /* ---------- 手势识别 ---------- */
 let hands = null;
+let handsLoading = null;
+function loadHandsLib() {
+  if (typeof Hands !== "undefined") return Promise.resolve(true);
+  if (handsLoading) return handsLoading;
+  handsLoading = new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js";
+    s.crossOrigin = "anonymous";
+    s.onload = () => resolve(typeof Hands !== "undefined");
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+  return handsLoading;
+}
+
 async function initHands() {
-  if (typeof Hands === "undefined") { status("MediaPipe 脚本未能加载（可能被网络或 CSP 阻断）。可继续用鼠标 / 手指控制力场。", "warn"); return false; }
+  // 第 5 轮：按需加载手势库，加载失败只影响摄像头功能，不影响粒子本体
+  const libOk = await loadHandsLib();
+  if (!libOk) { status("手势库未能加载（可能被网络或 CSP 阻断），摄像头功能不可用。鼠标 / 手指仍可控制力场。", "warn"); return false; }
   try {
     hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}` });
     hands.setOptions({
@@ -303,19 +389,27 @@ async function initHands() {
   }
 }
 
+/* 第 4 轮：手势判定的依据可见。
+   原本 classify() 用 0.085 / 0.045 / 0.16 三个写死的阈值，判定对不对无从核对。
+   现在阈值是具名常量并暴露为可调参数，同时把当前实测的指尖平均距离与捏合距离
+   显示出来——用户能看到"因为 0.071 < 0.085 所以判成握拳"，而不是只能接受结果。 */
+const GESTURE_THRESHOLDS = { fist: 0.085, pinch: 0.045, open: 0.16 };
 function classify(lm) {
   // 基于指尖到掌心距离判断张开 / 握拳
   const palm = lm[9];
   const tips = [8, 12, 16, 20];
   const d = tips.map((i) => Math.hypot(lm[i].x - palm.x, lm[i].y - palm.y));
   const avg = d.reduce((a, b) => a + b, 0) / d.length;
-  if (avg < 0.085) return "fist";
   // 捏合：拇指与食指距离很小
   const pinch = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
-  if (pinch < 0.045) return "pinch";
-  if (avg > 0.16) return "open";
+  gestureDebug.tipAvg = avg;
+  gestureDebug.pinch = pinch;
+  if (avg < GESTURE_THRESHOLDS.fist) return "fist";
+  if (pinch < GESTURE_THRESHOLDS.pinch) return "pinch";
+  if (avg > GESTURE_THRESHOLDS.open) return "open";
   return "idle";
 }
+const gestureDebug = { tipAvg: 0, pinch: 0 };
 
 function onHands(res) {
   const overlay = $("overlay");
@@ -332,7 +426,8 @@ function onHands(res) {
   $("trackTag").textContent = "已追踪";
   const g = classify(lm);
   gesture = { open: "张开手掌", fist: "握拳", pinch: "捏合", idle: "放松" }[g];
-  $("gestureTag").textContent = gesture;
+  $("gestureTag").textContent = gesture
+    + `（指尖 ${gestureDebug.tipAvg.toFixed(3)} / 捏合 ${gestureDebug.pinch.toFixed(3)}）`;
 
   // 力场跟随掌心（注意视频镜像，用 x = 1 - x 抵消）
   force.x = -(1 - lm[9].x - 0.5) * 46;
@@ -382,8 +477,13 @@ async function startCamera() {
     $("btnCam").textContent = "重试摄像头";
   }
 }
-function stopCamera() {
+/* 第 5 轮：摄像头资源生命周期。
+   原先在「页面被切到后台」时摄像头仍在采集、MediaPipe 仍在推理；
+   用户关掉标签页后设备指示灯还亮着。这里补上 visibilitychange 处理，
+   离开页面自动关闭，回来后由用户手动重开——不静默重启，也不静默占着设备。 */
+function stopCamera(reason) {
   cancelAnimationFrame(camRaf);
+  camRaf = 0;
   const v = $("video");
   if (v.srcObject) v.srcObject.getTracks().forEach((t) => t.stop());
   v.srcObject = null;
@@ -391,11 +491,28 @@ function stopCamera() {
   $("btnCam").textContent = "开启摄像头";
   tracking = false;
   $("trackTag").textContent = "未追踪";
+  if (reason) status(reason, "warn");
 }
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && $("video").srcObject) {
+    stopCamera("页面已切到后台，摄像头已释放（回来后点「开启摄像头」重新授权）。");
+  }
+});
+window.addEventListener("pagehide", () => { if ($("video").srcObject) stopCamera(); });
 
-$("btnCam").addEventListener("click", () => {
-  if ($("video").srcObject) stopCamera();
-  else startCamera();
+$("btnCam").addEventListener("click", async () => {
+  if ($("video").srcObject) { stopCamera(); return; }
+  const btn = $("btnCam");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const old = btn.textContent;
+  btn.textContent = "加载中…";
+  try {
+    await startCamera();
+  } finally {
+    btn.disabled = false;
+    if (btn.textContent === "加载中…") btn.textContent = old;
+  }
 });
 
 /* ---------- 鼠标 / 触摸回退 ---------- */
@@ -419,20 +536,64 @@ canvas.addEventListener("pointerleave", () => { pointerActive = false; });
 /* ---------- 动画 ---------- */
 const clock = new THREE.Clock();
 let demoAngle = 0;
+/* 第 6 轮：跟随容器而不是窗口。
+   本站会把该页以 iframe 嵌入对比页，画布宿主尺寸变化与 window.resize 不是一回事，
+   只听 window 会漏掉嵌入场景下的布局变化。同时给像素比设上限，
+   高 DPI 屏上 24000 个点的场景不必付 2 倍像素。 */
 function resize() {
-  const w = canvas.clientWidth || 800;
-  canvas.style.height = Math.round(w * 0.62) + "px";
-  renderer.setSize(w, Math.round(w * 0.62), false);
-  camera.aspect = w / Math.round(w * 0.62);
+  const w = Math.max(280, canvas.clientWidth || 800);
+  const h = Math.round(w * 0.62);
+  canvas.style.height = h + "px";
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
 window.addEventListener("resize", resize);
+if (window.ResizeObserver && canvas.parentElement) new ResizeObserver(resize).observe(canvas.parentElement);
 resize();
+
+/* 第 8 轮：帧率自适应采样间距。
+   24000 个点每帧都要在 CPU 上跑一遍力场与进度积分，采样间距调得太密就会掉帧。
+   现在连续 2 秒低于 24 fps 就把间距 +2（粒子变少、画面变稀疏但仍然能还原），
+   连续 5 秒高于 50 fps 再降回来，并重新采样当前图片。滞回计数避免来回抖。 */
+const AUTO_STEP = { on: true, low: 0, high: 0 };
+function autoQuality(fps) {
+  if (!AUTO_STEP.on) return;
+  if (fps < 24) { AUTO_STEP.low++; AUTO_STEP.high = 0; }
+  else if (fps > 50) { AUTO_STEP.high++; AUTO_STEP.low = 0; }
+  else { AUTO_STEP.low = 0; AUTO_STEP.high = 0; }
+  const stepEl = $("step");
+  const cur = Number(stepEl.value);
+  if (AUTO_STEP.low >= 2 && cur < 16) {
+    AUTO_STEP.low = 0;
+    stepEl.value = cur + 2;
+    stepEl.dispatchEvent(new Event("input", { bubbles: true }));
+    resampleCurrent();
+    status(`帧率偏低，采样间距自动调到 ${stepEl.value}px（粒子变少以保帧率）。`, "warn");
+  } else if (AUTO_STEP.high >= 5 && cur > 4) {
+    AUTO_STEP.high = 0;
+    stepEl.value = cur - 2;
+    stepEl.dispatchEvent(new Event("input", { bubbles: true }));
+    resampleCurrent();
+    status(`帧率恢复，采样间距自动调回 ${stepEl.value}px。`, "ok");
+  }
+}
 
 let frames = 0, fpsT = performance.now();
 function tick() {
   requestAnimationFrame(tick);
   const dt = Math.min(clock.getDelta(), 0.05);
+  // 帧率统计必须放在 count 判断之前：还没有粒子时画面同样在按 rAF 刷新，
+  // 原来直接 return 会让帧率永远停在「— fps」，看起来像页面卡住了。
+  frames++;
+  const nowMs = performance.now();
+  if (nowMs - fpsT > 700) {
+    const fps = (frames * 1000) / (nowMs - fpsT);
+    $("fpsTag").textContent = Math.round(fps) + " fps";
+    autoQuality(fps);
+    frames = 0; fpsT = nowMs;
+  }
   if (!count) return;
 
   // 无摄像头时自动演示：力场绕圈移动，手势按节奏切换
@@ -483,9 +644,6 @@ function tick() {
   $("strengthTag").textContent = restoreStrength.toFixed(2);
 
   renderer.render(scene, camera);
-  frames++;
-  const now = performance.now();
-  if (now - fpsT > 700) { $("fpsTag").textContent = Math.round((frames * 1000) / (now - fpsT)) + " fps"; frames = 0; fpsT = now; }
 }
 tick();
 
@@ -524,12 +682,15 @@ function sampleImageCanvas() {
 function loadFromCanvas(c) {
   const img = new Image();
   img.onload = () => {
+    currentSource = { kind: "canvas", canvas: c, img };
     const n = sampleImage(img, Number($("step").value));
     if (n) {
       const pv = $("preview");
       pv.src = c.toDataURL();
       pv.classList.remove("hidden");
       $("fileTip").style.display = "none";
+      $("stageTag").textContent = `粒子数 ${n}`;
+      renderSampleStat();
       status(`示例图已粒子化为 ${n} 个粒子。张开手掌开始还原，握拳暂停，捏合瞬间完成。`, "ok");
     }
   };
@@ -537,23 +698,52 @@ function loadFromCanvas(c) {
 }
 
 $("btnSample").addEventListener("click", () => loadFromCanvas(sampleImageCanvas()));
-$("file").addEventListener("change", (e) => {
-  const f = e.target.files && e.target.files[0];
+/* 第 9 轮：导入流程的校验与拖放。
+   原先只监听 change 事件，任何文件都会直接丢给 Image，失败后只给一句「读取失败」。
+   现在先校验类型与体积、支持拖放、给出具体失败原因（类型 / 体积 / 解码失败）。 */
+const MAX_BYTES = 12 * 1024 * 1024;
+function loadFile(f) {
   if (!f) return;
+  if (!/^image\//.test(f.type)) {
+    status(`「${f.name}」不是图片文件（${f.type || "未知类型"}）。`, "err");
+    return;
+  }
+  if (f.size > MAX_BYTES) {
+    status(`「${f.name}」有 ${(f.size / 1048576).toFixed(1)} MB，超过 ${MAX_BYTES / 1048576} MB 上限，未载入。`, "err");
+    return;
+  }
   const url = URL.createObjectURL(f);
   const img = new Image();
   img.onload = () => {
+    currentSource = { kind: "file", file: f, img };
     const n = sampleImage(img, Number($("step").value));
     if (n) {
       $("preview").src = url;
       $("preview").classList.remove("hidden");
       $("fileTip").style.display = "none";
+      $("stageTag").textContent = `粒子数 ${n}`;
+      renderSampleStat();
       status(`「${f.name}」已粒子化为 ${n} 个粒子。`, "ok");
     }
   };
-  img.onerror = () => status("图片读取失败，请换一个文件。", "err");
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    status(`「${f.name}」无法解码：文件可能已损坏，或浏览器不支持这种编码。`, "err");
+  };
   img.src = url;
+}
+$("file").addEventListener("change", (e) => loadFile(e.target.files && e.target.files[0]));
+
+const dropZone = canvas.parentElement;
+dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.style.outline = "2px dashed #7dd3fc"; });
+dropZone.addEventListener("dragleave", () => { dropZone.style.outline = ""; });
+dropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropZone.style.outline = "";
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) { status(`收到拖入的文件「${f.name}」，开始校验…`); loadFile(f); }
 });
+
 $("step").addEventListener("input", (e) => { $("stepVal").textContent = e.target.value; });
 $("radius").addEventListener("input", (e) => { cfg.radius = Number(e.target.value) / 10; $("radiusVal").textContent = cfg.radius.toFixed(1); });
 $("power").addEventListener("input", (e) => { cfg.power = Number(e.target.value) / 10; $("powerVal").textContent = cfg.power.toFixed(1); });
@@ -568,6 +758,22 @@ $("btnRestore").addEventListener("click", () => {
   targetStrength = 1;
   status("正在完全还原图片。", "ok");
 });
+/* 第 7 轮：键盘操作。
+   方向键移动力场（鼠标之外的第二条路径），空格在「完全还原 / 打散」之间切换，
+   S 载入示例图、O 打开本地图片。输入框聚焦时不拦截。 */
+canvas.addEventListener("keydown", (ev) => {
+  const step = 3;
+  if (ev.key === "ArrowLeft") { force.x -= step; force.active = true; }
+  else if (ev.key === "ArrowRight") { force.x += step; force.active = true; }
+  else if (ev.key === "ArrowUp") { force.y += step; force.active = true; }
+  else if (ev.key === "ArrowDown") { force.y -= step; force.active = true; }
+  else if (ev.key === " ") { ev.preventDefault(); targetStrength > 0.5 ? $("btnShatter").click() : $("btnRestore").click(); }
+  else return;
+  ev.preventDefault();
+  $("autoDemo").checked = false;
+});
+$("btnSample").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") loadFromCanvas(sampleImageCanvas()); });
+
 $("btnShot").addEventListener("click", () => {
   if (!count) return status("还没有粒子，先载入图片。", "warn");
   const a = document.createElement("a");
@@ -577,6 +783,7 @@ $("btnShot").addEventListener("click", () => {
   status("已保存当前画面 PNG。", "ok");
 });
 
+renderSampleStat();
 status("就绪：点击「使用示例图」快速体验，或上传自己的图片。摄像头需要用户授权，未授权时可用鼠标 / 手指控制力场。");
 </script>
 </body>

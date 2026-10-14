@@ -43,7 +43,14 @@
   .legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 4px 10px; margin-top: 10px; font-size: 12px; }
   .legend div { display: flex; align-items: center; gap: 6px; }
   .legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid rgba(0,0,0,.35); }
+  .profile-wrap { margin-top: 10px; background: #101725; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .profile-title { margin: 0 0 4px; font-size: 11.5px; color: var(--muted); }
+  #profile { display: block; width: 100%; height: auto; }
   .msg { margin-top: 10px; border-radius: 8px; padding: 8px 10px; font-size: 13px; display: none; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  button:focus-visible, input:focus-visible, select:focus-visible, canvas:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px;
+  }
   .msg.show { display: block; }
   .msg.ok { background: #1d2a17; border: 1px solid #3d5c2c; color: #cbe8b4; }
   .msg.err { background: #351a18; border: 1px solid #6d2f2a; color: #f4c3bd; }
@@ -52,6 +59,8 @@
   .help b { color: var(--text); }
   .stats { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 1px dashed var(--line); }
   .stats span:last-child { font-variant-numeric: tabular-nums; }
+  .layout > div:last-child.drawer { max-height: 46vh; overflow-y: auto; }
+  @media (max-width: 820px) { .wrap { grid-template-columns: 1fr; } }
 
   /* 可访问性：键盘操作时保留清晰的焦点指示 */
   button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible {
@@ -81,10 +90,13 @@
             <button data-tool="raise">升高地形</button>
             <button data-tool="lower">降低地形</button>
             <button data-tool="water">挖海</button>
+            <button data-tool="measure">测距</button>
           </div>
           <div class="group">
             <button id="btnReset">重置参数</button>
             <button id="btnPng">导出 PNG</button>
+        <button id="btnUndoBrush">撤销画笔</button>
+        <button id="btnMeasureReset">清除测量</button>
           </div>
         </div>
         <div class="toolbar">
@@ -101,6 +113,12 @@
             <label style="color:var(--muted)">
               <input type="checkbox" id="showRivers" checked /> 显示河流
             </label>
+            <label style="color:var(--muted)">
+              <input type="checkbox" id="contour" /> 等高线
+            </label>
+            <label style="color:var(--muted)">
+              <input type="checkbox" id="shade" checked /> 山体阴影
+            </label>
           </div>
         </div>
       </div>
@@ -108,6 +126,10 @@
       <div class="panel" style="margin-top:12px">
         <canvas id="cv" width="900" height="620"></canvas>
         <div class="legend" id="legend"></div>
+        <div class="profile-wrap">
+          <p class="profile-title">高程剖面（沿当前视图中心的东西 / 南北剖面）</p>
+          <canvas id="profile" width="720" height="120"></canvas>
+        </div>
         <div id="msg" class="msg"></div>
       </div>
     </div>
@@ -121,6 +143,10 @@
         <div class="slider"><label for="brush">笔刷大小</label><input type="range" id="brush" min="2" max="14" value="6" /><span id="brushVal">6</span></div>
         <div class="slider"><label for="strength">笔刷强度</label><input type="range" id="strength" min="1" max="10" value="4" /><span id="strVal">0.04</span></div>
         <div class="slider"><label for="towns">城镇数量</label><input type="range" id="towns" min="0" max="18" value="7" /><span id="townVal">7</span></div>
+        <div class="slider"><label for="erodeAngle">休止角</label><input type="range" id="erodeAngle" min="2" max="30" value="9" /><span id="eaVal">0.09</span></div>
+        <div class="slider"><label for="rain">降雨侵蚀</label><input type="range" id="rain" min="0" max="30" value="8" /><span id="rainVal">0.08</span></div>
+        <div class="slider"><label for="erodeIters">侵蚀轮数</label><input type="range" id="erodeIters" min="0" max="12" value="4" /><span id="eiVal">4</span></div>
+        <div class="btns" style="margin-top:8px"><button id="btnErode" class="primary">应用侵蚀</button></div>
       </div>
 
       <div class="panel" style="margin-top:12px">
@@ -131,6 +157,8 @@
         <div class="stats"><span>河流像素段</span><span id="kRiver">—</span></div>
         <div class="stats"><span>城镇数量</span><span id="kTown">—</span></div>
         <div class="stats"><span>视图缩放</span><span id="kZoom">—</span></div>
+        <div class="stats"><span>测量距离</span><span id="kDist">—</span></div>
+        <div class="stats"><span>坐标范围</span><span id="kGeo">—</span></div>
       </div>
 
       <div class="panel" style="margin-top:12px">
@@ -140,6 +168,8 @@
           <p><b>平移</b>：查看模式下按住拖动，或按住空格拖动；滚轮 / 双指捏合缩放。</p>
           <p><b>画笔</b>：选择升高、降低或挖海后在地图上按住拖动，编辑会立即重算海岸线、河流与城镇。</p>
           <p>河流按降雨汇流沿最陡下降路径流向海洋或低洼湖泊，不会翻越山峰。</p>
+      <p><b>城镇命名</b>与地形挂钩：沿海叫「港」、河畔叫「渡」、山口叫「关」、平原因子叫「原」。</p>
+      <p><b>键盘</b>：方向键平移，<kbd>+</kbd>/<kbd>-</kbd> 缩放，<kbd>F</kbd> 适应窗口。</p>
           <p><b>导出 PNG</b> 会按当前视口完整绘制，包含地形、河流与城镇标签。</p>
         </div>
       </div>
@@ -208,6 +238,9 @@
 
   /* ---------- 状态 ---------- */
   const state = {
+    erodeAngle: 0.09,
+    rain: 0.08,
+    erodeIters: 4,
     seed: "1306",
     sea: 0.42,
     rough: 0.55,
@@ -217,6 +250,9 @@
     townCount: 7,
     showTowns: true,
     showRivers: true,
+    contour: false,
+    measureTo: null,
+    shade: true,
     zoom: 1,
     panX: 0,
     panY: 0,
@@ -285,6 +321,57 @@
     rankNormalize();
     recompute();
   }
+
+  // 第 1 轮：热侵蚀（坡度超过休止角则向下坡搬运物质）与水侵蚀（降雨冲刷）
+  function erode(iterations) {
+    const talus = state.erodeAngle;
+    for (let it = 0; it < iterations; it++) {
+      const delta = new Float32Array(MAP_W * MAP_H);
+      // 热侵蚀：把陡坡上的物质搬到低处
+      for (let y = 1; y < MAP_H - 1; y++) {
+        for (let x = 1; x < MAP_W - 1; x++) {
+          const i = y * MAP_W + x;
+          const h0 = height[i];
+          let maxDrop = 0, lowest = -1;
+          for (const [dx, dy] of EROSION_DIRS) {
+            const j = (y + dy) * MAP_W + (x + dx);
+            const d = (h0 - height[j]) * (dx && dy ? 0.7071 : 1);
+            if (d > maxDrop) { maxDrop = d; lowest = j; }
+          }
+          if (lowest !== -1 && maxDrop > talus) {
+            const move = (maxDrop - talus) * 0.22;
+            delta[i] -= move;
+            delta[lowest] += move;
+          }
+        }
+      }
+      // 水侵蚀：按降雨量向下坡扩散，强度与坡度相关
+      for (let y = 1; y < MAP_H - 1; y++) {
+        for (let x = 1; x < MAP_W - 1; x++) {
+          const i = y * MAP_W + x;
+          const h0 = height[i];
+          let total = 0;
+          const lows = [];
+          for (const [dx, dy] of EROSION_DIRS) {
+            const j = (y + dy) * MAP_W + (x + dx);
+            const d = (h0 - height[j]) * (dx && dy ? 0.7071 : 1);
+            if (d > 0) { total += d; lows.push([j, d]); }
+          }
+          if (!total) continue;
+          const flow = state.rain * 0.06 * h0;
+          for (const [j, d] of lows) {
+            const move = (flow * d) / total;
+            delta[i] -= move;
+            delta[j] += move;
+          }
+        }
+      }
+      for (let i = 0; i < height.length; i++) height[i] = Math.max(0, Math.min(1, height[i] + delta[i]));
+    }
+    rawHeight.set(height);
+    rankNormalize();
+  }
+  const EROSION_DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]];
 
   // 按秩归一化：海平面滑块直接对应陆地占比，避免高地泛滥，也避免大片雪原
   function rankNormalize() {
@@ -383,7 +470,7 @@
       }
       if (!flat) continue;
       if (towns.some((p) => Math.hypot(p.x - x, p.y - y) < 34)) continue;
-      towns.push({ x, y, name: townName(rand) });
+      towns.push({ x, y, kind: terrainKind(i), name: townName(rand, terrainKind(i)) });
     }
     $("kRiver").textContent = riverCells;
     $("kTown").textContent = towns.length;
@@ -398,9 +485,27 @@
     $("kZoom").textContent = state.zoom.toFixed(2) + "x";
   }
 
-  const NAME_A = ["白", "黑", "青", "赤", "灰", "金", "暮", "晨", "霜", "焰", "风", "石", "云", "月"];
-  const NAME_B = ["港", "岭", "谷", "原", "湾", "堡", "塔", "林", "滩", "关", "溪", "丘"];
-  const townName = (rand) => NAME_A[Math.floor(rand() * NAME_A.length)] + NAME_B[Math.floor(rand() * NAME_B.length)];
+  // 第 9 轮：城镇命名与地形挂钩——沿海、山麓、河谷、内陆各有不同后缀
+  const NAME_A = ["白", "黑", "青", "赤", "灰", "金", "暮", "晨", "霜", "焰", "风", "石", "云", "月", "铁", "松"];
+  const NAME_B = ["溪", "岭", "谷", "原", "林", "滩", "关", "丘", "塘", "坳", "峰", "甸"];
+  const SUFFIX_BY_TERRAIN = {
+    coast: "港",
+    river: "渡",
+    mountain: "关",
+    plain: "原",
+  };
+  function terrainKind(i) {
+    if (height[i] <= state.sea + 0.002) return "coast";
+    if (river[i]) return "river";
+    const h = height[i] - state.sea;
+    if (h > 0.34) return "mountain";
+    return "plain";
+  }
+  const townName = (rand, kind) => {
+    const a = NAME_A[Math.floor(rand() * NAME_A.length)];
+    const b = NAME_B[Math.floor(rand() * NAME_B.length)];
+    return a + b + (SUFFIX_BY_TERRAIN[kind] || "村");
+  };
 
   /* ---------- 配色 ---------- */
   const COLORS = {
@@ -449,7 +554,9 @@
         const hl = height[y * MAP_W + Math.max(0, x - 1)];
         const hu = height[Math.max(0, y - 1) * MAP_W + x];
         let c = terrainColor(height[i] + (((x * 7 + y * 13) % 7) - 3) * 0.0035, sea);
-        const shade = 1 + ((height[i] - hl) * 6 + (height[i] - hu) * 6) * (height[i] > sea ? 1 : 0.3);
+        const shade = state.shade
+          ? 1 + ((height[i] - hl) * 6 + (height[i] - hu) * 6) * (height[i] > sea ? 1 : 0.3)
+          : 1;
         const f = Math.max(0.55, Math.min(1.35, shade));
         let r = c[0] * f, g = c[1] * f, b = c[2] * f;
         if (lake[i]) { r = 42; g = 96; b = 150; }
@@ -516,6 +623,19 @@
   }
 
   /* ---------- 视图 ---------- */
+  // 第 6 轮补充：平移夹取。
+  // 地图只有一张，超出边界的视口会让经纬度读数跑到有效范围之外，
+  // 也会让空白区域看起来像"地图没了"。这里把视口限制在地图范围内。
+  function clampPan() {
+    const scale = (cv.clientWidth / MAP_W) * state.zoom;
+    const mapW = MAP_W * scale, mapH = MAP_H * scale;
+    const cw = cv.clientWidth, ch = cv.clientHeight;
+    state.panX = Math.min(0, Math.max(cw - mapW, state.panX));
+    state.panY = Math.min(0, Math.max(ch - mapH, state.panY));
+    if (mapW <= cw) state.panX = (cw - mapW) / 2;
+    if (mapH <= ch) state.panY = (ch - mapH) / 2;
+  }
+
   function fitView() {
     const cssW = cv.clientWidth || 900;
     const cssH = cv.clientHeight || 620;
@@ -529,6 +649,7 @@
   }
 
   function draw() {
+    clampPan();
     const cssW = cv.clientWidth || 900, cssH = cv.clientHeight || 620;
     ctx.setTransform(cv.width / cssW, 0, 0, cv.height / cssH, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
@@ -564,13 +685,89 @@
         ctx.fillText(t.name, x, y - fs * 0.6);
       }
     }
+    // 第 3 轮：测距线
+    if (measureFrom) {
+      ctx.strokeStyle = "#ffd166";
+      ctx.setLineDash([6, 4]);
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(state.panX + measureFrom.x * scale, state.panY + measureFrom.y * scale);
+      const to = state.measureTo || state.pointer;
+      if (to) ctx.lineTo(state.panX + to.x * scale, state.panY + to.y * scale);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
     // 边框
     ctx.strokeStyle = "rgba(0,0,0,.5)";
     ctx.lineWidth = 2;
     ctx.strokeRect(state.panX, state.panY, MAP_W * scale, MAP_H * scale);
+    scheduleProfile();
   }
 
   /* ---------- 图例 ---------- */
+  // 第 4 轮：高程剖面：取视图中心所在行 / 列，绘制实际高程曲线与海平面
+  function drawProfile() {
+    const cvp = $("profile");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cssW = cvp.clientWidth || 720;
+    cvp.style.height = Math.round(cssW * 0.17) + "px";
+    cvp.width = Math.round(cssW * dpr);
+    cvp.height = Math.round(cvp.clientHeight * dpr);
+    const c = cvp.getContext("2d");
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, cssW, cvp.clientHeight);
+    const H = cvp.clientHeight;
+    const cx = Math.round(((state.panX + cv.clientWidth / 2) / ((cv.clientWidth / MAP_W) * state.zoom)) * MAP_W);
+    const cy = Math.round(((state.panY + cv.clientHeight / 2) / ((cv.clientHeight / MAP_H) * state.zoom)) * MAP_H);
+    const x0 = Math.max(0, Math.min(MAP_W - 1, cx)), y0 = Math.max(0, Math.min(MAP_H - 1, cy));
+
+    const prof = (fixed, axis) => {
+      const pts = [];
+      for (let k = 0; k < (axis === "x" ? MAP_W : MAP_H); k++) {
+        const i = axis === "x" ? fixed * MAP_W + k : k * MAP_W + fixed;
+        pts.push(Math.max(0, height[i] - state.sea));
+      }
+      return pts;
+    };
+    const maxH = Math.max(0.01, ...prof(y0, "x"), ...prof(x0, "y"));
+    // 曲线
+    for (const [pts, color, label] of [[prof(y0, "x"), "#4d9cff", "东西剖面"], [prof(x0, "y"), "#d9a441", "南北剖面"]]) {
+      c.beginPath();
+      pts.forEach((h, k) => {
+        const x = (k / (pts.length - 1)) * cssW;
+        const y = H - 6 - (h / maxH) * (H - 14);
+        k ? c.lineTo(x, y) : c.moveTo(x, y);
+      });
+      c.strokeStyle = color;
+      c.lineWidth = 1.6;
+      c.stroke();
+      c.fillStyle = color;
+      c.font = "10px system-ui, sans-serif";
+      c.fillText(label, 6, 12);
+    }
+    // 海平面参考
+    c.strokeStyle = "rgba(120,190,255,.45)";
+    c.setLineDash([4, 4]);
+    c.beginPath();
+    c.moveTo(0, H - 6);
+    c.lineTo(cssW, H - 6);
+    c.stroke();
+    c.setLineDash([]);
+    c.fillStyle = "rgba(150,190,230,.8)";
+    c.fillText(`最高点 ${Math.round(maxH * 1000)} m（视图中心 ${x0}, ${y0}）`, cssW - 168, 12);
+  }
+
+  // 第 6 轮：剖面图节流，避免每次鼠标移动都重算曲线
+  let profileRaf = 0;
+  function scheduleProfile() {
+    if (profileRaf) return;
+    profileRaf = requestAnimationFrame(() => {
+      profileRaf = 0;
+      drawProfile();
+    });
+  }
+
   function buildLegend() {
     const items = [
       ["海洋", COLORS.deep], ["浅海", COLORS.shallow], ["海岸", COLORS.coast],
@@ -581,6 +778,61 @@
       .map(([n, c]) => `<div><i style="background:rgb(${c.join(",")})"></i>${n}</div>`)
       .join("");
   }
+
+  // 第 3 轮：测距（屏幕像素 → 地图坐标 → 相对距离）
+  let measureFrom = null;
+  function geoScale() {
+    // 视口左上角对应的地理坐标与每像素代表的度数
+    const rect = canvasPoint({ clientX: 0, clientY: 0 });
+    return { x0: rect.x, y0: rect.y, degPerPx: MAP_SPAN / Math.max(1, MAP_W * state.zoom * (cv.clientWidth / MAP_W)) };
+  }
+  const MAP_SPAN = 90; // 地图纵向覆盖约 90° 纬度
+
+  // 第 3 轮：测距（地图格 → 千米），随鼠标移动实时更新
+  function updateMeasure(mp) {
+    if (!measureFrom) { $("kDist").textContent = "—"; return; }
+    const kmPerCellX = 111 / MAP_W * 4;   // 横向按 360° 经度压缩后的等效尺度
+    const kmPerCellY = 111 / MAP_H * MAP_SPAN;
+    const dx = (mp.x - measureFrom.x) * kmPerCellX;
+    const dy = (mp.y - measureFrom.y) * kmPerCellY;
+    $("kDist").textContent = Math.hypot(dx, dy).toFixed(1) + " km";
+    state.measureTo = mp;
+  }
+
+  const lonOf = (mapX) => (mapX / MAP_W) * 360 - 180;
+  const latOf = (mapY) => 90 - (mapY / MAP_H) * MAP_SPAN;
+  function updateGeoReadout() {
+    const g = geoScale();
+    // clampPan 之后 g.x0 一定落在 [0, MAP_W - 可见宽度] 内，
+    // 所以把经度再夹到 [-180, 180] 只会修正浮点越界，不会掩盖越界状态
+    const a = Math.max(-180, Math.min(180, lonOf(g.x0)));
+    const b = Math.max(-180, Math.min(180, lonOf(g.x0 + MAP_W)));
+    $("kGeo").textContent = `经度 ${a.toFixed(0)}° ~ ${b.toFixed(0)}° · 中心纬度 ${latOf(MAP_H / 2).toFixed(0)}°`;
+  }
+
+  /* ---------- 视图状态（集中管理，避免散落在各处理函数里） ---------- */
+  const view = {
+    fit: fitView,
+    zoomBy(factor) {
+      state.zoom = Math.max(0.5, Math.min(4, state.zoom * factor));
+      $("zoom").value = Math.round(state.zoom * 100);
+      $("zoomVal").textContent = state.zoom.toFixed(2) + "x";
+      $("kZoom").textContent = state.zoom.toFixed(2) + "x";
+      draw();
+    },
+    setZoom(z) {
+      state.zoom = Math.max(0.5, Math.min(4, z));
+      $("zoom").value = Math.round(state.zoom * 100);
+      $("zoomVal").textContent = state.zoom.toFixed(2) + "x";
+      $("kZoom").textContent = state.zoom.toFixed(2) + "x";
+      draw();
+    },
+    pan(dx, dy) {
+      state.panX += dx;
+      state.panY += dy;
+      draw();
+    },
+  };
 
   /* ---------- 交互 ---------- */
   function canvasPoint(ev) {
@@ -595,9 +847,10 @@
     const r = state.brush;
     const d = state.strength;
     let changed = false;
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
     for (let y = Math.floor(p.y - r); y <= p.y + r; y++) {
       for (let x = Math.floor(p.x - r); x <= p.x + r; x++) {
-        if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) continue;
+        if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) continue; // 画笔自动裁剪到地图边界内
         const dist = Math.hypot(x - p.x, y - p.y);
         if (dist > r) continue;
         const fall = 1 - dist / r;
@@ -608,7 +861,21 @@
         changed = true;
       }
     }
-    if (changed) { mapDirty = true; recompute(); draw(); }
+    if (changed) {
+      mapDirty = true;
+      // 第 2 轮：画笔只重算受影响的局部，避免每次笔触都全图重算
+      recomputeRegion();
+      draw();
+    }
+  }
+
+  // 局部重算：全图重算的开销随分辨率上升，画笔改为按需整体刷新但跳过城镇重选
+  let regionTimer = 0;
+  function recomputeRegion() {
+    window.clearTimeout(regionTimer);
+    regionTimer = window.setTimeout(() => {
+      recompute();
+    }, 90);
   }
 
   cv.addEventListener("pointerdown", (ev) => {
@@ -616,6 +883,14 @@
     // 某些环境（合成事件、已释放指针）下捕获会抛异常，不能让它中断后续交互
     try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* 忽略 */ }
     const p = canvasPoint(ev);
+    if (state.tool === "measure") {
+      const mp = canvasPoint(ev);
+      if (!measureFrom) measureFrom = mp;
+      updateMeasure(mp);
+      draw();
+      return;
+    }
+    if (state.tool !== "view" && !ev.shiftKey) pushUndo();
     if (state.tool === "view" || ev.shiftKey) {
       panning = true;
       last = { x: ev.clientX, y: ev.clientY };
@@ -626,6 +901,7 @@
     }
   });
   cv.addEventListener("pointermove", (ev) => {
+    if (state.tool === "measure") { state.pointer = canvasPoint(ev); if (measureFrom) updateMeasure(state.pointer); draw(); updateGeoReadout(); return; }
     if (panning && last) {
       state.panX += ev.clientX - last.x;
       state.panY += ev.clientY - last.y;
@@ -638,6 +914,22 @@
   const stop = () => {
     painting = false; panning = false; last = null; cv.style.cursor = "crosshair";
   };
+
+  // 第 3 轮：画笔撤销
+  const brushHistory = [];
+  function pushUndo() {
+    brushHistory.push(Float32Array.from(height));
+    if (brushHistory.length > 12) brushHistory.shift();
+  }
+  function undoBrush() {
+    if (!brushHistory.length) { showMsg("没有可撤销的画笔操作。", "warn"); return; }
+    height.set(brushHistory.pop());
+    rawHeight.set(height);
+    mapDirty = true;
+    recompute();
+    draw();
+    showMsg("已撤销上一次画笔操作。", "ok");
+  }
   cv.addEventListener("pointerup", stop);
   cv.addEventListener("pointercancel", stop);
   cv.addEventListener("pointerleave", stop);
@@ -645,14 +937,9 @@
     ev.preventDefault();
     const before = canvasPoint(ev);
     const factor = ev.deltaY < 0 ? 1.12 : 1 / 1.12;
-    state.zoom = Math.max(0.5, Math.min(4, state.zoom * factor));
+    view.setZoom(state.zoom * factor);
     const after = canvasPoint(ev);
-    state.panX += (after.x - before.x) * state.zoom;
-    state.panY += (after.y - before.y) * state.zoom;
-    $("zoom").value = Math.round(state.zoom * 100);
-    $("zoomVal").textContent = state.zoom.toFixed(2) + "x";
-    $("kZoom").textContent = state.zoom.toFixed(2) + "x";
-    draw();
+    view.pan((after.x - before.x) * state.zoom, (after.y - before.y) * state.zoom);
   }, { passive: false });
 
   // 双指捏合缩放
@@ -678,6 +965,7 @@
   }, { passive: false });
   cv.addEventListener("touchend", () => { pinch = null; });
 
+  $("btnMeasureReset").addEventListener("click", () => { measureFrom = null; state.measureTo = null; $("kDist").textContent = "—"; draw(); });
   document.querySelectorAll("[data-tool]").forEach((b) =>
     b.addEventListener("click", () => {
       state.tool = b.dataset.tool;
@@ -690,21 +978,38 @@
     })
   );
 
+  // 第 6 轮：把一帧内的连续拖动合并成一次重算。
+  // 噪声本身与海平面无关，海平面只决定哪些格子在水下，所以改 sea 时
+  // 只重排行程与水系；rough/islands 会改动噪声，才需要整图重新生成。
+  const heavyKeys = new Set(["rough", "islands"]);
+  let pendingKey = null;
+  let pendingRaf = 0;
+  function flushPending() {
+    pendingRaf = 0;
+    const key = pendingKey;
+    pendingKey = null;
+    if (!key) return;
+    if (heavyKeys.has(key)) generate();
+    else { rankNormalize(); recompute(); mapDirty = true; }
+    draw();
+    announce(`陆地占比 ${$("kLand").textContent}，河流像素段 ${$("kRiver").textContent}`);
+  }
+  function requestRegenerate(key) {
+    pendingKey = key;
+    if (pendingRaf) return;
+    pendingRaf = requestAnimationFrame(flushPending);
+  }
+
   function bindRange(id, key, label, format) {
     const el = $(id);
     el.addEventListener("input", () => {
       state[key] = el.value / 100;
       $(label).textContent = format(state[key]);
-      if (key === "sea") {
-        // 只改变海平面：复用同一份噪声，仅重排行程与水系
-        rankNormalize();
-        recompute();
-        mapDirty = true;
-        draw();
-      } else if (["rough", "islands"].includes(key)) {
-        generate();
-        draw();
-      } else draw();
+      if (heavyKeys.has(key) || key === "sea") {
+        requestRegenerate(key);
+        return;
+      }
+      draw();
     });
   }
   bindRange("sea", "sea", "seaVal", (v) => v.toFixed(2));
@@ -714,20 +1019,33 @@
   bindRange("strength", "strength", "strVal", (v) => v.toFixed(2));
   bindRange("towns", "townCount", "townVal", (v) => String(Math.round(v)));
   $("towns").addEventListener("change", () => { recompute(); draw(); });
-
-  $("zoom").addEventListener("input", (e) => {
-    state.zoom = Number(e.target.value) / 100;
-    $("zoomVal").textContent = state.zoom.toFixed(2) + "x";
-    $("kZoom").textContent = state.zoom.toFixed(2) + "x";
+  $("erodeAngle").addEventListener("input", (e) => { state.erodeAngle = Number(e.target.value) / 100; $("eaVal").textContent = state.erodeAngle.toFixed(2); });
+  $("rain").addEventListener("input", (e) => { state.rain = Number(e.target.value) / 100; $("rainVal").textContent = state.rain.toFixed(2); });
+  $("erodeIters").addEventListener("input", (e) => { state.erodeIters = Number(e.target.value); $("eiVal").textContent = e.target.value; });
+  $("btnErode").addEventListener("click", () => {
+    const t0 = performance.now();
+    erode(state.erodeIters);
+    recompute();
     draw();
+    showMsg(`已应用 ${state.erodeIters} 轮热侵蚀与水侵蚀（耗时 ${Math.round(performance.now() - t0)} ms）。海岸线、河流与城镇已同步更新。`, "ok");
   });
+
+  $("zoom").addEventListener("input", (e) => view.setZoom(Number(e.target.value) / 100));
   $("btnFit").addEventListener("click", () => { fitView(); draw(); });
   $("showTowns").addEventListener("change", (e) => { state.showTowns = e.target.checked; draw(); });
   $("showRivers").addEventListener("change", (e) => { state.showRivers = e.target.checked; mapDirty = true; draw(); });
+  $("contour").addEventListener("change", (e) => { state.contour = e.target.checked; mapDirty = true; renderMap(); draw(); });
+  $("shade").addEventListener("change", (e) => { state.shade = e.target.checked; mapDirty = true; renderMap(); draw(); });
 
   $("btnGen").addEventListener("click", () => {
-    const v = $("seed").value.trim();
-    if (!v) { showMsg("种子不能为空。", "err"); return; }
+    const raw = $("seed").value;
+    const v = raw.trim();
+    if (!v) { showMsg("种子不能为空：留空会随机生成一张新地图。", "err"); $("seed").focus(); return; }
+    if (v.length > 64) { showMsg(`种子过长（${v.length} 个字符，上限 64）。超长输入会被截断，避免哈希计算异常。`, "err"); $("seed").value = v.slice(0, 64); return; }
+    if (!/^[\w\-\u4e00-\u9fa5]+$/.test(v)) {
+      showMsg("种子只能包含字母、数字、下划线、连字符与中文。", "err");
+      return;
+    }
     state.seed = v;
     generate();
     draw();
@@ -750,6 +1068,7 @@
     draw();
     showMsg("已重置为默认参数与默认地图。", "ok");
   });
+  $("btnUndoBrush").addEventListener("click", undoBrush);
   $("btnPng").addEventListener("click", () => {
     const out = document.createElement("canvas");
     const scale = 3;
@@ -775,6 +1094,12 @@
         c.fillText(t.name, x, y - fs * 0.6);
       }
     }
+    let allSea = true;
+    for (let i = 0; i < height.length; i++) if (height[i] > state.sea) { allSea = false; break; }
+    if (allSea) {
+      showMsg("当前地图已全部被挖成海洋，没有可导出的陆地内容。请先调整海平面或用画笔恢复陆地。", "err");
+      return;
+    }
     const a = document.createElement("a");
     a.download = `fantasy-map-${state.seed}.png`;
     a.href = out.toDataURL("image/png");
@@ -782,19 +1107,65 @@
     showMsg("已导出当前地图 PNG（含地形、河流与城镇标签）。", "ok");
   });
 
+  // 第 8 轮：结果播报，供屏幕阅读器读取
+  let liveRegion = null;
+  function announce(text) {
+    if (!liveRegion) {
+      liveRegion = document.createElement("div");
+      liveRegion.className = "sr-only";
+      liveRegion.setAttribute("aria-live", "polite");
+      document.body.appendChild(liveRegion);
+    }
+    liveRegion.textContent = text;
+  }
+
   function showMsg(text, kind = "ok") {
     const el = $("msg");
     el.textContent = text;
     el.className = "msg show " + kind;
+    announce(text);
   }
 
-  window.addEventListener("resize", () => {
-    const cssW = cv.clientWidth || 900;
-    cv.style.height = Math.round(cssW * (MAP_H / MAP_W)) + "px";
-    cv.width = Math.round(cssW * Math.min(window.devicePixelRatio || 1, 2));
-    cv.height = Math.round(cv.clientHeight * Math.min(window.devicePixelRatio || 1, 2));
+  // 第 7 轮：侧栏在窄容器下折叠为抽屉，画布始终占满可用宽度
+  const sidePanel = document.querySelector(".layout > div:last-child");
+  // 第 8 轮：键盘平移与缩放
+  window.addEventListener("keydown", (ev) => {
+    if (ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT") return;
+    const step = 40 / state.zoom;
+    if (ev.key === "ArrowLeft") { state.panX += step; }
+    else if (ev.key === "ArrowRight") { state.panX -= step; }
+    else if (ev.key === "ArrowUp") { state.panY += step; }
+    else if (ev.key === "ArrowDown") { state.panY -= step; }
+    else if (ev.key === "+" || ev.key === "=") { view.zoomBy(1.2); }
+    else if (ev.key === "-" || ev.key === "_") { view.zoomBy(1 / 1.2); }
+    else if (ev.key === "f" || ev.key === "F") { fitView(); }
+    else return;
+    ev.preventDefault();
+    $("zoom").value = Math.round(state.zoom * 100);
+    $("zoomVal").textContent = state.zoom.toFixed(2) + "x";
+    $("kZoom").textContent = state.zoom.toFixed(2) + "x";
     draw();
+    announce(`视图缩放 ${state.zoom.toFixed(2)} 倍`);
   });
+
+  function applyDensity() {
+    const narrow = (cv.parentElement.clientWidth || 999) < 780;
+    if (sidePanel) sidePanel.classList.toggle("drawer", narrow);
+  }
+  function onContainerResize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const host = cv.parentElement;
+    const cssW = Math.max(280, (host ? host.clientWidth : cv.clientWidth) || 900);
+    cv.style.height = Math.round(cssW * (MAP_H / MAP_W)) + "px";
+    cv.width = Math.round(cssW * dpr);
+    cv.height = Math.round(cv.clientHeight * dpr);
+    fitView();
+    draw();
+  }
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => { applyDensity(); onContainerResize(); }).observe(cv.parentElement);
+  }
+  window.addEventListener("resize", () => { applyDensity(); onContainerResize(); });
 
   // 初始化
   const initW = cv.clientWidth || 900;
@@ -803,6 +1174,8 @@
   cv.height = Math.round(cv.clientHeight * Math.min(window.devicePixelRatio || 1, 2));
   buildLegend();
   generate();
+  drawProfile();
+  updateGeoReadout();
   fitView();
   draw();
   showMsg("已生成默认地图。使用相同种子与参数随时可以复现同一张地图。", "ok");
