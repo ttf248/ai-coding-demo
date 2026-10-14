@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Pixel Flow · 图片粒子化与手势还原</title>
+    <style>
+      :root { --bg:#0a0d18; --panel:#141a2c; --line:#26304a; --text:#dbe4f5; --muted:#8296b8; --accent:#7dd3fc; }
+      * { box-sizing: border-box; }
+      html, body { margin:0; height:100%; background:var(--bg); color:var(--text);
+        font-family: system-ui,"PingFang SC","Microsoft YaHei",sans-serif; overflow:hidden; }
+      #gl { position:fixed; inset:0; display:block; touch-action:none; }
+      .ui { position:fixed; top:12px; left:12px; width:270px; background:rgba(20,26,44,.88);
+        border:1px solid var(--line); border-radius:14px; padding:12px; z-index:10;
+        backdrop-filter: blur(8px); font-size:12.5px; }
+      .ui h1 { font-size:15px; margin:0 0 2px; letter-spacing:1px; }
+      .ui p.sub { color:var(--muted); margin:0 0 10px; font-size:11px; }
+      .row { display:flex; gap:6px; align-items:center; margin:8px 0; flex-wrap:wrap; }
+      button, label.btn { background:#1c2540; border:1px solid var(--line); color:var(--text);
+        border-radius:8px; padding:7px 10px; font-size:12.5px; cursor:pointer; display:inline-block; }
+      button.on { border-color:var(--accent); color:var(--accent); }
+      input[type=file] { display:none; }
+      input[type=range] { width:120px; accent-color:var(--accent); }
+      .stat { color:var(--muted); font-size:11px; }
+      b.g { color:#a7f3d0; }
+      #gesture { position:fixed; top:12px; right:12px; z-index:10; background:rgba(20,26,44,.88);
+        border:1px solid var(--line); border-radius:14px; padding:10px 12px; font-size:12px; text-align:center; }
+      #gesture .big { font-size:20px; }
+      #cam { position:fixed; right:12px; bottom:12px; width:180px; height:135px;
+        border-radius:12px; border:1px solid var(--line); object-fit:cover; z-index:9;
+        transform:scaleX(-1); background:#000; }
+      #fallback { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:10;
+        background:rgba(36,26,12,.92); border:1px solid #7a5b23; color:#fcd9a0; font-size:12px;
+        border-radius:12px; padding:8px 14px; display:none; max-width:520px; line-height:1.6; }
+      #loading { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+        background:var(--bg); z-index:30; font-size:13px; color:var(--muted); flex-direction:column; gap:10px; }
+      #loading .spin { width:26px; height:26px; border-radius:50%;
+        border:3px solid #24405e; border-top-color:var(--accent); animation:sp 1s linear infinite; }
+      @keyframes sp { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <canvas id="gl"></canvas>
+
+    <div class="ui">
+      <h1>Pixel Flow</h1>
+      <p class="sub">上传本地图片 → 粒子打散 → 手势“张开手掌”吸附还原</p>
+      <label class="btn" style="width:100%;text-align:center">
+        📂 选择本地图片<input type="file" id="file" accept="image/*" />
+      </label>
+      <div class="row">
+        <span class="stat">采样率</span>
+        <input type="range" id="sample" min="1" max="6" value="3" />
+        <span class="stat" id="sampleV">3</span>
+      </div>
+      <div class="row">
+        <span class="stat">力场半径</span>
+        <input type="range" id="radius" min="60" max="320" value="170" />
+        <span class="stat" id="radiusV">170</span>
+      </div>
+      <div class="row">
+        <span class="stat">还原速度</span>
+        <input type="range" id="speed" min="2" max="10" value="6" />
+      </div>
+      <div class="row">
+        <button id="scatter">散开</button>
+        <button id="restore">强制还原</button>
+        <button id="demo">载入演示图</button>
+      </div>
+      <div class="row stat">
+        进度 <b class="g" id="prog">0%</b> · 粒子 <b class="g" id="count">0</b>
+      </div>
+      <div class="row stat" id="mode">输入模式：检测中…</div>
+    </div>
+
+    <div id="gesture">
+      <div class="big" id="gIcon">🖐️</div>
+      <div id="gText">张开手掌=吸附<br/>握拳=暂停吸附</div>
+    </div>
+    <video id="cam" autoplay muted playsinline></video>
+    <div id="fallback"></div>
+    <div id="loading"><div class="spin"></div><div id="loadTxt">初始化…</div></div>
+
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+    <script>
+      "use strict";
+      const $ = (id) => document.getElementById(id);
+      const loading = $("loading");
+      function fail(msg) {
+        $("loadTxt").textContent = msg;
+        $("loadTxt").style.color = "#fca5a5";
+      }
+      if (typeof THREE === "undefined") {
+        fail("无法加载 Three.js（CDN 不可达）。请在联网环境打开本页面。");
+        throw new Error("three missing");
+      }
+
+      /* ============ 渲染器与场景 ============ */
+      const canvas = $("gl");
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a0d18);
+      const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+      camera.position.z = 2;
+      let aspect = 1;
+      function resize() {
+        renderer.setSize(innerWidth, innerHeight);
+        aspect = innerWidth / innerHeight;
+        camera.left = -aspect; camera.right = aspect;
+        camera.top = 1; camera.bottom = -1;
+        camera.updateProjectionMatrix();
+      }
+      resize();
+      addEventListener("resize", resize);
+
+      /* ============ 粒子系统 ============ */
+      const MAX = 36000;
+      const positions = new Float32Array(MAX * 3);
+      const targets = new Float32Array(MAX * 3);
+      const colors = new Float32Array(MAX * 3);
+      const seeds = new Float32Array(MAX);
+      for (let i = 0; i < MAX; i++) seeds[i] = Math.random();
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      const mat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        vertexShader: `
+          attribute vec3 color; varying vec3 vColor;
+          void main() {
+            vColor = color;
+            vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            gl_PointSize = 3.0;
+            gl_Position = projectionMatrix * mv;
+          }`,
+        fragmentShader: `
+          varying vec3 vColor;
+          void main() {
+            vec2 d = gl_PointCoord - 0.5;
+            float m = smoothstep(0.5, 0.18, length(d));
+            gl_FragColor = vec4(vColor, m);
+          }`,
+      });
+      const points = new THREE.Points(geo, mat);
+      scene.add(points);
+
+      let N = 0; // 当前活跃粒子数
+      let progress = 0;
+
+      function setImageFromCanvas(src) {
+        const sw = src.width, sh = src.height;
+        const step = +$("sample").value * 2;
+        const c = document.createElement("canvas");
+        c.width = sw; c.height = sh;
+        c.getContext("2d").drawImage(src, 0, 0);
+        const data = c.getContext("2d").getImageData(0, 0, sw, sh).data;
+        const scale = Math.min((2 * aspect * 0.82) / sw, (2 * 0.82) / sh);
+        const ox = -(sw * scale) / 2, oy = -(sh * scale) / 2;
+        let n = 0;
+        outer: for (let y = 0; y < sh; y += step) {
+          for (let x = 0; x < sw; x += step) {
+            const i = (y * sw + x) * 4;
+            if (data[i + 3] < 40) continue;
+            if (n >= MAX) break outer;
+            const px = ox + x * scale, py = oy + (sh - y) * scale;
+            targets[n * 3] = px; targets[n * 3 + 1] = py; targets[n * 3 + 2] = 0;
+            colors[n * 3] = data[i] / 255;
+            colors[n * 3 + 1] = data[i + 1] / 255;
+            colors[n * 3 + 2] = data[i + 2] / 255;
+            const a = Math.random() * Math.PI * 2, r = 0.6 + Math.random() * 1.4;
+            positions[n * 3] = Math.cos(a) * r * aspect;
+            positions[n * 3 + 1] = Math.sin(a) * r;
+            positions[n * 3 + 2] = 0;
+            n++;
+          }
+        }
+        N = n;
+        geo.setDrawRange(0, N);
+        geo.attributes.position.needsUpdate = true;
+        geo.attributes.color.needsUpdate = true;
+        $("count").textContent = N.toLocaleString();
+      }
+
+      function makeDemoImage() {
+        const c = document.createElement("canvas");
+        c.width = 360; c.height = 240;
+        const g = c.getContext("2d");
+        const grd = g.createLinearGradient(0, 0, 360, 240);
+        grd.addColorStop(0, "#0ea5e9"); grd.addColorStop(0.55, "#8b5cf6"); grd.addColorStop(1, "#f472b6");
+        g.fillStyle = grd; g.fillRect(0, 0, 360, 240);
+        g.fillStyle = "#facc15";
+        g.beginPath(); g.arc(270, 62, 34, 0, 7); g.fill();
+        g.fillStyle = "#052e16";
+        g.beginPath();
+        g.moveTo(0, 240); g.lineTo(80, 120); g.lineTo(150, 240);
+        g.moveTo(110, 240); g.lineTo(210, 92); g.lineTo(320, 240);
+        g.fill();
+        g.fillStyle = "rgba(255,255,255,.9)";
+        g.font = "bold 30px sans-serif";
+        g.fillText("PIXEL FLOW", 60, 218);
+        return c;
+      }
+
+      /* ============ 力场与动画 ============ */
+      const field = { x: 0, y: 0, on: false, radius: 170, source: "none" };
+      let manualAttract = false; // 强制还原 / 鼠标按下
+
+      const pxToScene = (px) => {
+        const r = field.radius / Math.min(innerWidth, innerHeight) * 2;
+        return r;
+      };
+
+      function animate(t) {
+        const speed = +$("speed").value / 10;
+        const rad = pxToScene();
+        const attracting = field.on || manualAttract;
+        let near = 0;
+        const time = t * 0.001;
+        for (let i = 0; i < N; i++) {
+          const ix = i * 3;
+          const tx = targets[ix], ty = targets[ix + 1];
+          const sx = positions[ix], sy = positions[ix + 1];
+          if (attracting) {
+            const dx = field.x - sx, dy = field.y - sy;
+            const d = Math.hypot(dx, dy);
+            if (manualAttract || d < rad) {
+              // 进入力场：朝目标位置加速
+              positions[ix] += (tx - sx) * (0.05 + 0.16 * speed);
+              positions[ix + 1] += (ty - sy) * (0.05 + 0.16 * speed);
+            } else {
+              swirl(sx, sy, ix, time, seeds[i]);
+            }
+          } else {
+            swirl(sx, sy, ix, time, seeds[i]);
+          }
+          const dd = Math.hypot(positions[ix] - tx, positions[ix + 1] - ty);
+          if (dd < 0.012) near++;
+        }
+        progress = N ? Math.round((near / N) * 100) : 0;
+        $("prog").textContent = progress + "%";
+        geo.attributes.position.needsUpdate = true;
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+      }
+      function swirl(x, y, ix, time, seed) {
+        positions[ix] += Math.sin(time * 0.6 + y * 2.1 + seed * 6.28) * 0.004;
+        positions[ix + 1] += Math.cos(time * 0.5 + x * 1.7 + seed * 6.28) * 0.004;
+        const tx = targets[ix], ty = targets[ix + 1];
+        const r = Math.hypot(x, y);
+        if (r > 2.6) { positions[ix] *= 0.995; positions[ix + 1] *= 0.995; }
+        void tx; void ty;
+      }
+      requestAnimationFrame(animate);
+
+      /* ============ 输入：图片上传 ============ */
+      $("file").addEventListener("change", (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        const url = URL.createObjectURL(f);
+        const img = new Image();
+        img.onload = () => { setImageFromCanvas(img); URL.revokeObjectURL(url); };
+        img.onerror = () => alert("图片读取失败，请换一张。");
+        img.src = url;
+      });
+      $("sample").addEventListener("input", (e) => ($("sampleV").textContent = e.target.value));
+      $("sample").addEventListener("change", () => {
+        const src = lastImageSrc || makeDemoImage();
+        setImageFromCanvas(src);
+      });
+      let lastImageSrc = null;
+      $("radius").addEventListener("input", (e) => ($("radiusV").textContent = e.target.value));
+      $("scatter").addEventListener("click", () => {
+        manualAttract = false;
+        for (let i = 0; i < N; i++) {
+          const a = Math.random() * Math.PI * 2, r = 0.4 + Math.random() * 1.8;
+          positions[i * 3] = Math.cos(a) * r * aspect;
+          positions[i * 3 + 1] = Math.sin(a) * r;
+        }
+      });
+      $("restore").addEventListener("click", () => { manualAttract = !manualAttract; $("restore").classList.toggle("on", manualAttract); });
+      $("demo").addEventListener("click", () => { lastImageSrc = makeDemoImage(); setImageFromCanvas(lastImageSrc); });
+
+      /* ============ 鼠标兜底（无摄像头 / 拒绝权限） ============ */
+      let mouseMode = false;
+      function enableMouseMode(reason) {
+        mouseMode = true;
+        $("mode").textContent = "输入模式：鼠标/触摸力场" + (reason ? "（" + reason + "）" : "");
+        const fb = $("fallback");
+        fb.style.display = "block";
+        fb.innerHTML = "摄像头或 MediaPipe 不可用：" + (reason || "") +
+          "。已切换为<b>力场手动模式</b>——在画面上按住拖动 = 张开手掌（吸附还原），松开 = 握拳（暂停）。完整手势体验需通过 https/localhost 打开并允许摄像头。";
+        $("gIcon").textContent = "🖱️";
+        $("gText").innerHTML = "按住拖动=吸附力场<br/>松开=暂停";
+        canvas.addEventListener("pointerdown", (e) => {
+          field.on = true;
+          setFieldFromClient(e.clientX, e.clientY);
+        });
+        canvas.addEventListener("pointermove", (e) => {
+          if (field.on) setFieldFromClient(e.clientX, e.clientY);
+        });
+        addEventListener("pointerup", () => { if (mouseMode) field.on = false; });
+      }
+      function setFieldFromClient(cx, cy) {
+        field.x = (cx / innerWidth) * 2 * aspect - aspect;
+        field.y = -((cy / innerHeight) * 2 - 1);
+      }
+
+      /* ============ MediaPipe Hands ============ */
+      async function startHandTracking() {
+        if (typeof Hands === "undefined") {
+          enableMouseMode("MediaPipe Hands 脚本未能从 CDN 加载");
+          return;
+        }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          enableMouseMode("当前上下文不安全或非 https/localhost，无法调用摄像头");
+          return;
+        }
+        try {
+          await navigator.permissions?.query({ name: "camera" });
+        } catch { /* 忽略 */ }
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" } });
+        } catch (err) {
+          enableMouseMode("摄像头权限被拒绝或不可用");
+          return;
+        }
+        const video = $("cam");
+        video.srcObject = stream;
+        $("mode").textContent = "输入模式：摄像头手势";
+        const hands = new Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
+        });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.55 });
+        hands.onResults(onHandResults);
+        const send = async () => {
+          if (video.readyState >= 2) {
+            try { await hands.send({ video }); } catch (e) { /* 模型加载失败时退回兜底 */
+              enableMouseMode("MediaPipe 模型加载失败");
+              return;
+            }
+          }
+          setTimeout(send, 40);
+        };
+        video.onloadeddata = () => setTimeout(send, 100);
+
+        function onHandResults(res) {
+          const lm = res.multiHandLandmarks?.[0];
+          if (!lm) {
+            field.on = false;
+            $("gIcon").textContent = "🔍";
+            $("gText").textContent = "未检测到手";
+            return;
+          }
+          const wrist = lm[0], midMcp = lm[9];
+          const palm = Math.hypot(wrist.x - midMcp.x, wrist.y - midMcp.y) || 1e-3;
+          const tips = [8, 12, 16, 20];
+          let openness = 0;
+          for (const t of tips) openness += Math.hypot(lm[t].x - wrist.x, lm[t].y - wrist.y) / palm;
+          openness /= tips.length;
+          // 手掌中心 → 场景坐标（镜像）
+          const p = lm[9];
+          field.x = (1 - p.x) * 2 * aspect - aspect;
+          field.y = -(p.y * 2 - 1);
+          if (openness > 1.65) {
+            field.on = true;
+            $("gIcon").textContent = "🖐️";
+            $("gText").textContent = "张开手掌 · 吸附还原中";
+          } else if (openness < 1.15) {
+            field.on = false;
+            $("gIcon").textContent = "✊";
+            $("gText").textContent = "握拳 · 已暂停吸附";
+          } else {
+            $("gIcon").textContent = "👋";
+            $("gText").textContent = "手势过渡区间…";
+          }
+        }
+      }
+
+      /* ============ 启动 ============ */
+      lastImageSrc = makeDemoImage();
+      setImageFromCanvas(lastImageSrc);
+      loading.style.display = "none";
+      startHandTracking();
+    </script>
+  </body>
+</html>

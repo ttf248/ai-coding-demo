@@ -45,7 +45,7 @@ test("summary omits large bodies and deduplicated inputs preserve normalized tex
     new Set(catalog.runs.map((run) => run.rawHash)).size,
   );
   assert.ok(
-    Buffer.byteLength(outputs.get("assets/generated/catalog.js")) < 600000,
+    Buffer.byteLength(outputs.get("assets/generated/catalog.js")) < 625000,
   );
 });
 test("input relationships and completeness work before lazy body loading", () => {

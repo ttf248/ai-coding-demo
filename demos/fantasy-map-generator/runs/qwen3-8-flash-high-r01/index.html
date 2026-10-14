@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>奇幻地图生成器</title>
+    <style>
+      :root { --ink:#3b2f1e; --panel:#f3ead6; --line:#c9b88a; }
+      * { box-sizing: border-box; }
+      html, body { margin:0; height:100%; background:#e7dcc0;
+        font-family: system-ui,"PingFang SC","Microsoft YaHei",serif; color:var(--ink); }
+      body { display:flex; flex-direction:column; overflow-x:hidden; }
+      header { padding:8px 12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+        background:var(--panel); border-bottom:2px solid var(--line); }
+      h1 { font-size:16px; margin:0 8px 0 0; letter-spacing:2px; }
+      input, select, button { font:inherit; color:var(--ink); background:#fffdf6;
+        border:1px solid var(--line); border-radius:6px; padding:5px 9px; font-size:13px;
+        touch-action: manipulation; }
+      button { cursor:pointer; }
+      button.on { background:var(--ink); color:#f6efdd; }
+      label { font-size:12px; display:flex; align-items:center; gap:4px; }
+      #seed { width:110px; }
+      .stage { position:relative; flex:1; min-height:320px; }
+      canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; display:block; }
+      .legend { position:absolute; left:10px; bottom:10px; background:rgba(243,234,214,.92);
+        border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:11.5px;
+        line-height:1.8; pointer-events:none; max-width: 200px; }
+      .sw { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px;
+        vertical-align:-2px; border:1px solid rgba(0,0,0,.15); }
+      #msg { position:absolute; top:8px; left:50%; transform:translateX(-50%);
+        background:rgba(59,47,30,.85); color:#f6efdd; padding:5px 12px; border-radius:16px;
+        font-size:12px; opacity:0; transition:opacity .25s; pointer-events:none; white-space:nowrap; }
+      #msg.show { opacity:1; }
+      .help { font-size:11.5px; color:#6b5a3c; }
+      @media (max-width:640px){ .legend{ font-size:10px; padding:6px 8px; } header{padding:6px 8px;} }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>奇幻岛屿地图</h1>
+      <label>种子 <input id="seed" value="中土大陆" /></label>
+      <button id="gen">生成</button>
+      <label>海平面 <input id="sea" type="range" min="20" max="60" value="38" /></label>
+      <label>粗糙度 <input id="rough" type="range" min="1" max="8" value="4" /></label>
+      <button id="modeView" class="tool on">平移/缩放</button>
+      <button id="modeUp" class="tool">升高地形</button>
+      <button id="modeDown" class="tool">降低地形</button>
+      <label>画笔 <input id="brush" type="range" min="1" max="8" value="3" /></label>
+      <label><input id="labels" type="checkbox" checked /> 城镇标签</label>
+      <button id="export">导出 PNG</button>
+      <button id="reset">重置</button>
+    </header>
+    <div class="stage">
+      <canvas id="cv"></canvas>
+      <div class="legend" id="legend"></div>
+      <div id="msg"></div>
+    </div>
+
+    <script>
+      "use strict";
+      /* ================= 工具 ================= */
+      function hashStr(s) {
+        let h = 2166136261;
+        for (let i = 0; i < s.length; i++) {
+          h ^= s.charCodeAt(i);
+          h = Math.imul(h, 16777619);
+        }
+        return h >>> 0;
+      }
+      function mulberry32(a) {
+        return function () {
+          a |= 0; a = (a + 0x6d2b79f5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+      /* ================= 地图数据 ================= */
+      const N = 96; // 网格边长
+      const map = {
+        height: new Float32Array(N * N),
+        moisture: new Float32Array(N * N),
+        land: new Uint8Array(N * N),   // 0海洋 1海岸 2平原 3森林 4山脉 5湖
+        river: new Float32Array(N * N),
+        towns: [],
+        baseSeedText: "",
+        rough: 4,
+        seaLevel: 0.38,
+      };
+
+      // 值噪声
+      function noiseField(rng, roughness) {
+        const out = new Float32Array(N * N);
+        const octaves = 4;
+        let amp = 1, total = 0;
+        const persistence = 0.42 + roughness * 0.06; // 粗糙度越大细节越强
+        for (let o = 0; o < octaves; o++) {
+          const latticeSize = 3 << o; // 3,6,12,24
+          const lat = new Float32Array((latticeSize + 1) * (latticeSize + 1));
+          for (let i = 0; i < lat.length; i++) lat[i] = rng();
+          const sx = (N - 1) / latticeSize;
+          for (let y = 0; y < N; y++) {
+            for (let x = 0; x < N; x++) {
+              const fx = x / sx, fy = y / sx;
+              const ix = Math.floor(fx), iy = Math.floor(fy);
+              const tx = fx - ix, ty = fy - iy;
+              const s = (t) => t * t * (3 - 2 * t);
+              const a = lat[iy * (latticeSize + 1) + ix];
+              const b = lat[iy * (latticeSize + 1) + ix + 1];
+              const c = lat[(iy + 1) * (latticeSize + 1) + ix];
+              const d = lat[(iy + 1) * (latticeSize + 1) + ix + 1];
+              out[y * N + x] += amp * (a + (b - a) * s(tx) + (c - a) * s(ty) +
+                (a - b - c + d) * s(tx) * s(ty));
+            }
+          }
+          total += amp;
+          amp *= persistence;
+        }
+        for (let i = 0; i < out.length; i++) out[i] /= total;
+        return out;
+      }
+
+      function generate(seedText) {
+        const seed = hashStr(seedText + "|r" + map.rough);
+        const rngH = mulberry32(seed);
+        const rngM = mulberry32(seed ^ 0x9e3779b9);
+        const h = noiseField(rngH, map.rough);
+        map.moisture = noiseField(rngM, 2);
+        const cx = (N - 1) / 2;
+        for (let y = 0; y < N; y++) {
+          for (let x = 0; x < N; x++) {
+            const dx = (x - cx) / cx, dy = (y - cx) / cx;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            const falloff = clamp(1.08 - Math.pow(d * 1.18, 3.2), 0, 1);
+            map.height[y * N + x] = clamp(h[y * N + x] * 0.55 + 0.45 * falloff * (0.6 + 0.75 * h[y * N + x]) - (1 - falloff) * 0.35, 0, 1);
+          }
+        }
+        map.baseSeedText = seedText;
+        reclassify();
+        regenTowns(mulberry32(seed ^ 0x51ed270b));
+      }
+
+      function reclassify() {
+        const sea = map.seaLevel;
+        for (let i = 0; i < N * N; i++) {
+          if (map.land[i] === 5) map.land[i] = 0; // 旧湖随重算清除
+          const hv = map.height[i];
+          if (hv < sea) map.land[i] = 0;
+          else if (hv < sea + 0.035) map.land[i] = 1;
+          else if (hv > 0.78) map.land[i] = 4;
+          else if (map.moisture[i] > 0.58 && hv < 0.7) map.land[i] = 3;
+          else map.land[i] = 2;
+        }
+        computeRivers();
+      }
+
+      /* ================= 河流：严格下坡 ================= */
+      const NEI4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+      function computeRivers() {
+        map.river.fill(0);
+        const rng = mulberry32(hashStr(map.baseSeedText + "|riv" + map.seaLevel.toFixed(3)));
+        // 找山脉高地作为源头（局部较高）
+        const cand = [];
+        for (let y = 2; y < N - 2; y++)
+          for (let x = 2; x < N - 2; x++) {
+            const i = y * N + x;
+            if (map.height[i] > 0.72) {
+              let isPeak = true;
+              for (const [dy, dx] of NEI4)
+                if (map.height[i + dy * N + dx] > map.height[i]) { isPeak = false; break; }
+              if (isPeak) cand.push(i);
+            }
+          }
+        cand.sort((a, b) => map.height[b] - map.height[a]);
+        const sources = [];
+        for (const i of cand) {
+          if (sources.length >= 9) break;
+          const y = (i / N) | 0, x = i % N;
+          if (sources.every((s) => {
+            const sy = (s / N) | 0, sx = s % N;
+            return Math.hypot(sx - x, sy - y) > 10;
+          })) sources.push(i);
+        }
+        for (const s of sources) traceRiver(s, rng);
+      }
+
+      function traceRiver(start, rng) {
+        let i = start, guard = 0;
+        const visited = new Set([i]);
+        while (guard++ < N * 2) {
+          const y = (i / N) | 0, x = i % N;
+          if (map.land[i] === 0 || map.land[i] === 5) return; // 入海 / 入湖
+          let best = -1, bestH = map.height[i];
+          for (const [dy, dx] of NEI4) {
+            const ny = y + dy, nx = x + dx;
+            if (ny < 0 || ny >= N || nx < 0 || nx >= N) continue;
+            const ni = ny * N + nx;
+            if (visited.has(ni)) continue;
+            // 允许水平移动一点（蜿蜒），但禁止上坡
+            if (map.height[ni] <= bestH &&
+                (map.height[ni] < bestH || rng() < 0.35)) {
+              bestH = map.height[ni]; best = ni;
+            }
+          }
+          if (best < 0) {
+            // 洼地 → 形成合理的内陆湖
+            for (let dy = -1; dy <= 1; dy++)
+              for (let dx = -1; dx <= 1; dx++) {
+                const ny = y + dy, nx = x + dx;
+                if (ny >= 0 && ny < N && nx >= 0 && nx < N) {
+                  const ni = ny * N + nx;
+                  if (map.land[ni] > 1) map.land[ni] = 5;
+                }
+              }
+            return;
+          }
+          i = best; visited.add(i);
+          map.river[i] += 1 + visited.size * 0.01;
+        }
+      }
+
+      /* ================= 城镇 ================= */
+      const SYL1 = ["风", "河", "石", "云", "松", "月", "银", "金", "雾", "霜", "星", "岚"];
+      const SYL2 = ["落", "渡", "壁", "栖", "谷", "泉", "门", "丘", "陵", "川", "影", "语"];
+      const SYL3 = ["镇", "堡", "港", "城", "村", "寨"];
+
+      function regenTowns(rng) {
+        map.towns = [];
+        const tries = [];
+        for (let y = 3; y < N - 3; y++)
+          for (let x = 3; x < N - 3; x++) {
+            const i = y * N + x;
+            const l = map.land[i];
+            if (l === 2 || l === 3) {
+              let nearWater = map.river[i] > 0;
+              outer: if (!nearWater)
+                for (let dy = -2; dy <= 2; dy++)
+                  for (let dx = -2; dx <= 2; dx++) {
+                    const ni = (y + dy) * N + (x + dx);
+                    if (map.land[ni] === 1 || map.river[ni] > 0) { nearWater = true; break outer; }
+                  }
+              if (nearWater) tries.push(i);
+            }
+          }
+        for (let k = 0; k < tries.length && map.towns.length < 7; k++) {
+          const i = tries[Math.floor(rng() * tries.length)];
+          const y = (i / N) | 0, x = i % N;
+          if (map.towns.some((t) => Math.hypot(t.x - x, t.y - y) < 14)) continue;
+          map.towns.push({
+            x, y,
+            name: SYL1[Math.floor(rng() * SYL1.length)] +
+              SYL2[Math.floor(rng() * SYL2.length)] +
+              SYL3[Math.floor(rng() * SYL3.length)],
+          });
+        }
+      }
+
+      /* ================= 视图与绘制 ================= */
+      const cv = document.getElementById("cv");
+      const ctx = cv.getContext("2d");
+      const view = { scale: 1, ox: 0, oy: 0 };
+      let showLabels = true;
+      let mode = "view"; // view | up | down
+      let brushR = 3;
+
+      const COLORS = ["#a8c8de", "#e6d8a8", "#cfe0b0", "#9fc291", "#b9b3a6", "#9fc2de"];
+      const LEGEND_ROWS = [
+        [0, "海洋"], [1, "海岸"], [2, "平原"], [3, "森林"], [4, "山脉"], [5, "湖泊"],
+      ];
+      document.getElementById("legend").innerHTML =
+        "<b>图例</b><br>" +
+        LEGEND_ROWS.map(([i, n]) =>
+          `<span class="sw" style="background:${COLORS[i]}"></span>${n}`).join("<br>") +
+        `<br><span class="sw" style="background:#4a7ba6"></span>河流` +
+        `<br><span class="sw" style="background:#8c5a3c;border-radius:50%"></span>城镇`;
+
+      function resize() {
+        const r = cv.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        cv.width = Math.max(1, Math.round(r.width * dpr));
+        cv.height = Math.max(1, Math.round(r.height * dpr));
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        fitView(false);
+        draw();
+      }
+
+      function worldSize() {
+        const r = cv.getBoundingClientRect();
+        return Math.min(r.width, r.height) * 0.92;
+      }
+      function fitView() {
+        const s = worldSize();
+        view.scale = s / N;
+        const r = cv.getBoundingClientRect();
+        view.ox = (r.width - s) / 2;
+        view.oy = (r.height - s) / 2;
+      }
+      const cellPx = () => view.scale;
+      const toWorld = (sx, sy) => [(sx - view.ox) / view.scale, (sy - view.oy) / view.scale];
+
+      let jitterCache = null, jitterSeed = 0;
+      function coastJitter() {
+        const sd = hashStr(map.baseSeedText + "|coast" + map.seaLevel.toFixed(3) +
+          "|" + Array.from(map.height.subarray(0, 64)).reduce((a, v) => a + Math.round(v * 100), 0));
+        if (jitterCache && jitterSeed === sd) return jitterCache;
+        jitterSeed = sd;
+        const rng = mulberry32(sd);
+        jitterCache = new Float32Array(N * N * 4);
+        for (let i = 0; i < jitterCache.length; i++) jitterCache[i] = rng() - 0.5;
+        return jitterCache;
+      }
+
+      function paint(target) {
+        const t = target.ctx, cell = target.cell;
+        // 羊皮纸底色
+        t.fillStyle = "#efe3c6";
+        t.fillRect(0, 0, target.W, target.H);
+        const rngPaper = mulberry32(hashStr("paper|" + (target.paperSeed || "")));
+        t.globalAlpha = 0.05;
+        for (let i = 0; i < 400; i++) {
+          t.fillStyle = i % 2 ? "#c9b88a" : "#fff";
+          t.fillRect(rngPaper() * target.W, rngPaper() * target.H, 2, 2);
+        }
+        t.globalAlpha = 1;
+
+        const j = coastJitter();
+        // 地形色块
+        for (let y = 0; y < N; y++)
+          for (let x = 0; x < N; x++) {
+            const l = map.land[y * N + x];
+            t.fillStyle = COLORS[l];
+            t.fillRect(target.ox + x * cell, target.oy + y * cell, cell + 0.5, cell + 0.5);
+          }
+        // 海洋波纹线（手绘感）
+        t.strokeStyle = "rgba(74,123,166,0.5)";
+        t.lineWidth = Math.max(0.6, cell * 0.06);
+        for (let y = 0; y < N; y++)
+          for (let x = 0; x < N; x++) {
+            const i = y * N + x;
+            if (map.land[i] !== 0) continue;
+            const northIsLand = y > 0 && map.land[i - N] > 1;
+            if (northIsLand) {
+              const k = i * 4;
+              t.beginPath();
+              t.arc(target.ox + (x + 0.5) * cell + j[k] * cell,
+                target.oy + (y + 0.9) * cell, cell * 0.6, Math.PI * 0.15, Math.PI * 0.85);
+              t.stroke();
+            }
+          }
+        // 海岸线：逐边描边
+        t.strokeStyle = "#4d3f2a";
+        t.lineWidth = Math.max(0.8, cell * 0.12);
+        t.beginPath();
+        for (let y = 0; y < N; y++)
+          for (let x = 0; x < N; x++) {
+            const i = y * N + x;
+            const l = map.land[i];
+            const isLand = l > 1 || l === 1;
+            if (!isLand || l === 0) continue;
+            const edges = [[0, -1, 0, 0, 1, 0], [0, 1, 0, 1, 1, 1], [-1, 0, 0, 0, 0, 1], [1, 0, 1, 0, 1, 1]];
+            for (const [dy, dx, ax, ay, bx, by] of edges) {
+              const ny = y + dy, nx = x + dx;
+              const nIn = ny >= 0 && ny < N && nx >= 0 && nx < N;
+              const nl = nIn ? map.land[ny * N + nx] : 0;
+              if (nl === 0 || nl === 5) {
+                const k = (i * 4 + edges.findIndex((e) => e[0] === dy && e[1] === dx)) % j.length;
+                const off = j[Math.abs(k)] * cell * 0.4;
+                t.moveTo(target.ox + (x + ax) * cell + off, target.oy + (y + ay) * cell - off);
+                t.lineTo(target.ox + (x + bx) * cell - off, target.oy + (y + by) * cell + off);
+              }
+            }
+          }
+        t.stroke();
+        // 山脉符号
+        t.fillStyle = "#5d5442";
+        for (let y = 0; y < N; y++)
+          for (let x = 0; x < N; x++) {
+            if (map.land[y * N + x] !== 4) continue;
+            if ((x + y) % 2) continue;
+            const px = target.ox + (x + 0.5) * cell, py = target.oy + (y + 0.5) * cell;
+            const s2 = cell * 0.75;
+            t.beginPath();
+            t.moveTo(px - s2 / 2, py + s2 / 3);
+            t.lineTo(px, py - s2 / 2);
+            t.lineTo(px + s2 / 2, py + s2 / 3);
+            t.closePath();
+            t.fill();
+          }
+        // 森林符号
+        t.fillStyle = "#3f6f45";
+        for (let y = 0; y < N; y++)
+          for (let x = 0; x < N; x++) {
+            if (map.land[y * N + x] !== 3) continue;
+            if ((x * 3 + y * 5) % 4) continue;
+            const px = target.ox + (x + 0.5) * cell, py = target.oy + (y + 0.5) * cell;
+            t.beginPath();
+            t.arc(px, py - cell * 0.1, cell * 0.22, 0, 7);
+            t.fill();
+            t.fillRect(px - cell * 0.04, py, cell * 0.08, cell * 0.22);
+          }
+        // 河流
+        t.strokeStyle = "#4a7ba6";
+        t.lineCap = "round";
+        let maxR = 1;
+        for (let i = 0; i < map.river.length; i++) maxR = Math.max(maxR, map.river[i]);
+        for (let y = 0; y < N; y++)
+          for (let x = 0; x < N; x++) {
+            const i = y * N + x;
+            const rv = map.river[i];
+            if (rv <= 0) continue;
+            t.lineWidth = Math.max(cell * 0.12, (rv / maxR) * cell * 0.5);
+            const px = target.ox + (x + 0.5) * cell, py = target.oy + (y + 0.5) * cell;
+            t.beginPath();
+            t.moveTo(px - cell / 2, py);
+            t.lineTo(px + cell / 2, py);
+            t.stroke();
+            t.beginPath();
+            t.moveTo(px, py - cell / 2);
+            t.lineTo(px, py + cell / 2);
+            t.stroke();
+          }
+        // 城镇
+        for (const tw of map.towns) {
+          const i = tw.y * N + tw.x;
+          if (map.land[i] <= 1) continue; // 地形改动后城镇随迁：先隐藏失效者
+          const px = target.ox + (tw.x + 0.5) * cell, py = target.oy + (tw.y + 0.5) * cell;
+          t.fillStyle = "#8c5a3c";
+          t.beginPath();
+          t.arc(px, py, cell * 0.28, 0, 7);
+          t.fill();
+          t.strokeStyle = "#f3ead6";
+          t.lineWidth = Math.max(1, cell * 0.08);
+          t.stroke();
+          if (showLabels) {
+            t.font = `${Math.max(9, cell * 1.15)}px "KaiTi","STKaiti",serif`;
+            t.fillStyle = "#3b2f1e";
+            t.textAlign = "left";
+            t.textBaseline = "bottom";
+            t.fillText(tw.name, px + cell * 0.5, py - cell * 0.1);
+          }
+        }
+        // 边框
+        t.strokeStyle = "#6b5a3c";
+        t.lineWidth = 2;
+        t.strokeRect(target.ox - 2, target.oy - 2, cell * N + 4, cell * N + 4);
+      }
+
+      function draw() {
+        const r = cv.getBoundingClientRect();
+        paint({
+          ctx, cell: view.scale, ox: view.ox, oy: view.oy,
+          W: r.width, H: r.height, paperSeed: "live",
+        });
+      }
+
+      /* ================= 导出 ================= */
+      function exportPNG() {
+        try {
+          const S = 1152;
+          const off = document.createElement("canvas");
+          off.width = S; off.height = S;
+          const octx = off.getContext("2d");
+          paint({
+            ctx: octx, cell: S / (N + 8), ox: (S / (N + 8)) * 4, oy: (S / (N + 8)) * 4,
+            W: S, H: S, paperSeed: "export",
+          });
+          const url = off.toDataURL("image/png");
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `fantasy-map-${map.baseSeedText}.png`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          toast("已导出当前地图 PNG");
+        } catch (e) {
+          toast("导出失败：" + e.message, true);
+        }
+      }
+
+      /* ================= 画笔 ================= */
+      function applyBrush(sx, sy, dir) {
+        const [wx, wy] = toWorld(sx, sy);
+        const gx = Math.floor(wx), gy = Math.floor(wy);
+        const r = brushR;
+        let touched = false;
+        for (let y = gy - r; y <= gy + r; y++)
+          for (let x = gx - r; x <= gx + r; x++) {
+            if (x < 0 || y < 0 || x >= N || y >= N) continue;
+            const d = Math.hypot(x - gx, y - gy);
+            if (d > r) continue;
+            const i = y * N + x;
+            const fall = Math.cos((d / (r + 1)) * Math.PI * 0.5);
+            map.height[i] = clamp(map.height[i] + dir * 0.06 * fall, 0, 1);
+            touched = true;
+          }
+        if (touched) {
+          reclassify();
+          draw();
+        }
+      }
+
+      /* ================= 指针交互 ================= */
+      const pointers = new Map();
+      let pinchDist = 0, moved = false, panning = false;
+
+      function localXY(e) {
+        const r = cv.getBoundingClientRect();
+        return [e.clientX - r.left, e.clientY - r.top];
+      }
+
+      cv.addEventListener("pointerdown", (e) => {
+        cv.setPointerCapture(e.pointerId);
+        const [x, y] = localXY(e);
+        pointers.set(e.pointerId, { x, y, startX: x, startY: y });
+        moved = false;
+        if (pointers.size === 2) {
+          const [a, b] = [...pointers.values()];
+          pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+        } else if (mode === "view") panning = true;
+        else applyBrush(x, y, mode === "up" ? 1 : -1);
+      });
+
+      cv.addEventListener("pointermove", (e) => {
+        const p = pointers.get(e.pointerId);
+        if (!p) return;
+        const [x, y] = localXY(e);
+        const dx = x - p.x, dy = y - p.y;
+        p.x = x; p.y = y;
+        if (Math.hypot(x - p.startX, y - p.startY) > 4) moved = true;
+        if (pointers.size === 2) {
+          const [a, b] = [...pointers.values()];
+          const nd = Math.hypot(a.x - b.x, a.y - b.y);
+          if (pinchDist > 0) {
+            const cxm = (a.x + b.x) / 2, cym = (a.y + b.y) / 2;
+            zoomAt(cxm, cym, nd / pinchDist);
+          }
+          pinchDist = nd;
+          return;
+        }
+        if (panning) {
+          view.ox += dx; view.oy += dy;
+          draw();
+        } else if (mode !== "view" && (moved || true)) {
+          applyBrush(x, y, mode === "up" ? 1 : -1);
+        }
+      });
+
+      function endPointer(e) {
+        pointers.delete(e.pointerId);
+        if (pointers.size < 2) pinchDist = 0;
+        if (pointers.size === 0) panning = false;
+      }
+      cv.addEventListener("pointerup", endPointer);
+      cv.addEventListener("pointercancel", endPointer);
+
+      cv.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const [x, y] = localXY(e);
+        zoomAt(x, y, e.deltaY < 0 ? 1.15 : 1 / 1.15);
+      }, { passive: false });
+
+      function zoomAt(sx, sy, factor) {
+        const ns = clamp(view.scale * factor, 2.5, 40);
+        const k = ns / view.scale;
+        view.ox = sx - (sx - view.ox) * k;
+        view.oy = sy - (sy - view.oy) * k;
+        view.scale = ns;
+        draw();
+      }
+
+      /* ================= 控件 ================= */
+      const $ = (id) => document.getElementById(id);
+      $("gen").addEventListener("click", () => {
+        const s = $("seed").value.trim();
+        if (!s) { toast("请填写种子", true); return; }
+        generate(s);
+        draw();
+        toast(`种子“${s}”已生成`);
+      });
+      $("sea").addEventListener("input", (e) => {
+        map.seaLevel = +e.target.value / 100;
+        reclassify();
+        draw();
+      });
+      $("rough").addEventListener("input", (e) => {
+        map.rough = +e.target.value;
+        generate($("seed").value.trim() || map.baseSeedText);
+        draw();
+      });
+      const tools = [["modeView", "view"], ["modeUp", "up"], ["modeDown", "down"]];
+      tools.forEach(([id, m]) => {
+        $(id).addEventListener("click", () => {
+          mode = m;
+          tools.forEach(([tid]) => $(tid).classList.toggle("on", tid === id));
+        });
+      });
+      $("brush").addEventListener("input", (e) => (brushR = +e.target.value));
+      $("labels").addEventListener("change", (e) => {
+        showLabels = e.target.checked;
+        draw();
+      });
+      $("export").addEventListener("click", exportPNG);
+      $("reset").addEventListener("click", () => {
+        $("sea").value = 38; map.seaLevel = 0.38;
+        $("rough").value = 4; map.rough = 4;
+        $("brush").value = 3; brushR = 3;
+        mode = "view";
+        tools.forEach(([tid]) => $(tid).classList.toggle("on", tid === "modeView"));
+        generate($("seed").value.trim() || "中土大陆");
+        fitView();
+        draw();
+        toast("已重置为默认地图");
+      });
+
+      let toastTimer = 0;
+      function toast(text, err) {
+        const el = $("msg");
+        el.textContent = text;
+        el.style.background = err ? "rgba(140,60,50,.9)" : "rgba(59,47,30,.85)";
+        el.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove("show"), 1800);
+      }
+
+      window.addEventListener("resize", resize);
+      generate("中土大陆");
+      resize();
+    </script>
+  </body>
+</html>

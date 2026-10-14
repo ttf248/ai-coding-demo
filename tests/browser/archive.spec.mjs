@@ -398,12 +398,16 @@ test("built apps render their local images under the configured base", async ({
   for (const r of blueLocalBuilds) {
     const failures = [];
     const watch = (res) => {
-      const expectedDemoFallback =
-        "/previews/bluebook/claude-sonnet-5-5-medium-r01/missing/";
+      const expectedDemoFallbacks = [
+        "/previews/bluebook/claude-sonnet-5-5-medium-r01/missing/",
+        // This run intentionally points one card at a missing image to show
+        // its built-in fallback state.
+        "/previews/bluebook/qwen3-8-flash-high-r01/images/deleted-5.jpg",
+      ];
       if (
         res.url().startsWith(baseURL) &&
         res.status() >= 400 &&
-        !res.url().includes(expectedDemoFallback)
+        !expectedDemoFallbacks.some((path) => res.url().includes(path))
       )
         failures.push(res.url());
     };
