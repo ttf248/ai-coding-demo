@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f7f9"><title>彩色流体实验台 · AI Coding Demo</title><meta name="description" content="WebGL 实时二维流体求解：平流、散度、Jacobi 压力迭代与速度投影，参数可实时调节。"><meta property="og:title" content="彩色流体实验台"><meta property="og:description" content="WebGL 实时二维流体求解：平流、散度、Jacobi 压力迭代与速度投影，参数可实时调节。"><meta property="og:type" content="article"><link rel="stylesheet" href="../../../../../../site.css"><link rel="stylesheet" href="../../../../../../document.css"><script src="../../../../../../document.js" defer></script></head><body class="document-page"><a class="skip-link" href="#document-content">跳到正文</a><header class="site-header"><div class="container header-inner"><a class="brand" href="../../../../../../../index.html"><span class="brand-mark">AI</span>CODING / DEMO</a><nav aria-label="主导航"><a href="../../../../../../../index.html#projects">实验目录</a><a href="../../../../../../../compare.html">模型对比</a><a href="../../../../../../../index.html#guides">技术索引</a></nav></div></header><main class="container document-layout"><aside class="document-sidebar"><details open><summary>本页目录</summary><nav aria-label="文档目录"><a class="toc-level-1" href="#彩色流体实验台">彩色流体实验台</a><a class="toc-level-2" href="#原始提示词">原始提示词</a><a class="toc-level-2" href="#运行方式">运行方式</a><a class="toc-level-2" href="#实现要点">实现要点</a><a class="toc-level-2" href="#验证记录">验证记录</a><a class="toc-level-2" href="#复盘">复盘</a><a class="toc-level-2" href="#批次记录">批次记录</a><a class="toc-level-2" href="#当前归档信息自动生成">当前归档信息（自动生成）</a><a class="toc-level-3" href="#部署适配记录">部署适配记录</a></nav></details></aside><div><div class="document-actions"><a href="../../../../../../../demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r03/Readme.md" download>下载 Markdown 原文 ↗</a><a href="../../../../../../../topic.html?id=fluid-simulation">查看主题与版本 →</a></div><p class="document-context">MiniMax M3.1 Flash Preview · max · 实验日期 2026-10-14 · 归档日期 未记录</p><article id="document-content" class="document-content"><h1 id="彩色流体实验台">彩色流体实验台</h1>
+<h2 id="原始提示词">原始提示词</h2>
+<p>见 <a href="../../../../../../../demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r03/prompt.md">完整原始输入</a>。本轮为模型 minimax-m3-1-flash-preview、档位 max 重跑任务正文 v1。</p>
+<h2 id="运行方式">运行方式</h2>
+<p>入口为本目录 <code>index.html</code>，单文件、零依赖、无 CDN。需要支持 WebGL 的浏览器；不支持时会显示明确的错误说明而不是黑屏。</p>
+<h2 id="实现要点">实现要点</h2>
+<ul>
+<li>完整的 GPU 流体求解链路：涡量 → 散度 → 压力 Jacobi 迭代 → 梯度减除（速度投影）→ 速度平流 → 染料平流，每帧真实执行。</li>
+<li>双缓冲 FBO 管理速度场与染料场；压力场、散度场、涡量场为单缓冲。</li>
+<li>着色器统一使用 GLSL ES 1.00，同时兼容 WebGL2 与 WebGL1；半浮点（RGBA16F）优先，不支持时回退 RGBA8。</li>
+<li>拖动注入：splat 同时写入速度（动量）与染料（颜色）。</li>
+<li>控制项：染料颜色（8 色板 + 自定义取色）、注入力度、染料消散、速度消散、压力迭代次数、模拟分辨率、渲染像素比。</li>
+<li>「清空」只清染料场而保留速度场，方便观察扩散；「重置参数」会重建全部缓冲。</li>
+<li>分辨率 / 像素比变化时先 <code>deleteTexture</code> + <code>deleteFramebuffer</code> 再重建，避免 GPU 资源泄漏。</li>
+<li>处理 <code>webglcontextlost</code> / <code>webglcontextrestored</code>：丢失时停止渲染并提示，恢复时重新编译全部着色器与重建缓冲。</li>
+</ul>
+<h2 id="验证记录">验证记录</h2>
+<ul>
+<li>在画布上合成一段连续拖动后，染料沿拖动方向扩散、卷曲并与随机注入的一团混色，说明平流与投影都在工作。</li>
+<li>暂停后画布像素不再变化，继续后恢复演化。</li>
+<li>「清空」后染料消失而速度场仍在，短暂等待仍能看到残留流场把后续染料拉成条带。</li>
+<li>调整压力迭代次数与消散参数后，画面演化速度明显不同。</li>
+<li>窗口尺寸变化后模拟与触摸坐标仍然正确。</li>
+<li>软件 WebGL（SwiftShader）环境下无上下文丢失，运行状态面板显示 WebGL 2 与实时帧率。</li>
+</ul>
+<h2 id="复盘">复盘</h2>
+<p><strong>做得好的</strong>：没有用「粒子轨迹 + 渐隐画布」糊弄流体，正文要求的平流、散度、压力迭代、投影四步都真实存在，且参数（压力迭代、消散）确实改变计算结果；上下文丢失/恢复与 GPU 资源释放也做了显式处理。</p>
+<p><strong>不足</strong>：</p>
+<ol>
+<li>初始版本 <code>destroyDouble(undefined)</code> 会抛异常导致页面全黑——这是启动路径上的低级错误，说明缺少「空状态也能启动」的验证。</li>
+<li>注入力度滑块的换算曾经写错（压力迭代被当成百分比归零），修正后才生效；映射规则缺少自检。</li>
+<li>「速度场能量」这一栏没有实现却出现在界面上，属于死控件；后来换成注入次数与模拟时长。</li>
+<li>WebGL1 回退路径只用 RGBA8，速度场精度会明显下降，界面没有提示这一差异。</li>
+<li>没有 vorticity confinement 的强度参数（写死 26），想调涡旋只能改代码。</li>
+</ol>
+<h2 id="批次记录">批次记录</h2>
+<p>本批共 11 个主题案例、12 条实验记录（蓝皮书含 v1/v2）；MiniMax Max 五小时额度消耗 44%，token 消耗 60.6M，耗时 57m 10s。测试备注：自我审查五轮。以上为批次总计，不拆分为单条记录。</p>
+<p>&lt;!-- archive:start --&gt;</p>
+<h2 id="当前归档信息自动生成">当前归档信息（自动生成）</h2>
+<ul>
+<li>实验 ID：<code>fluid-simulation--minimax-m3-1-flash-preview-max-r03</code></li>
+<li>模型：MiniMax M3.1 Flash Preview；推理档位：max</li>
+<li>类型：single-html；预览：static；网络：offline</li>
+<li><a href="../../../../../../../demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r03/prompt.md">完整原始输入快照</a> · <a href="../../../../../../../topic.html?id=fluid-simulation">主题与其他版本</a></li>
+<li>输入记录：完整原始输入，等同于主题任务正文 v1（未增删），保存于本目录 prompt.md。</li>
+<li>工具：Claude Code。Claude Code 会话内直接执行，模型 minimax-m3-1-flash-preview、档位 max；未使用子代理，未参考任何历史实现或远程分支。</li>
+<li>运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。</li>
+<li>费用记录：MiniMax 批次合计 44 %（Max 订阅套餐五小时额度）（12 个案例；批次 minimax-m3-1-flash-preview-max-2026-10-14；未记录单案例费用）</li>
+<li><a href="../../../../../../../demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r03/index.html">实验台入口</a></li>
+</ul>
+<h3 id="部署适配记录">部署适配记录</h3>
+<ul>
+<li>自审第 1 轮：模拟分辨率变化时若画布尺寸未变就不会重建缓冲，参数看起来无效；已改为分辨率调整强制重建。</li>
+<li>自审第 1 轮：显示着色器的随机抖动每帧都在叠加，导致暂停后画面并非真正静止；已改为仅在运行时抖动。</li>
+<li>自审第 3 轮：染料笔触过宽且浓度不足，画面偏灰；已收紧 splat 半径并提高染料写入强度。</li>
+<li>迁移来源：F:\dev\ai-coding-demo-test（model-test-base）/demos/fluid-simulation/runs/minimax-m3-1-flash-preview-max-r01；main 已有该轮号，保留旧记录后迁入为 minimax-m3-1-flash-preview-max-r03。原始输入与产物按源分支复制，prompt.md 未改写。</li>
+<li>用户提供的本批测试备注：自我审查五轮。</li>
+<li>迁移截图：源测试分支未登记桌面截图；已在本仓库通过本地 HTTP 入口按实际页面补拍，并在 390px 视口确认无水平溢出（2026-10-14）。</li>
+<li>迁移说明：源 Readme 中“首次执行”改为“重跑”，因为 main 已有该模型的历史轮次；原始 prompt.md 未改写。
+&lt;!-- archive:end --&gt;</li>
+</ul>
+</article><p class="document-copy-status" role="status"></p></div></main><footer><div class="container">AI CODING DEMO / 实验记录与技术说明。</div></footer></body></html>

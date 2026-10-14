@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>彩色流体实验台</title>
+<style>
+  :root {
+    --bg: #07090d;
+    --panel: #10151c;
+    --panel2: #182029;
+    --line: #263140;
+    --text: #e8eef7;
+    --muted: #8fa0b6;
+    --accent: #4d9cff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; overflow-x: hidden; background: var(--bg); }
+  body { color: var(--text); font: 14px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 14px 12px 40px; }
+  h1 { margin: 4px 0 2px; font-size: 20px; }
+  .sub { color: var(--muted); margin: 0 0 12px; font-size: 13px; }
+  .layout { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  @media (min-width: 960px) { .layout { grid-template-columns: minmax(0,1fr) 272px; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+  button, input, select { font: inherit; color: var(--text); }
+  button { background: var(--panel2); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 8px 11px; cursor: pointer; min-height: 38px; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: #1d4ed8; border-color: #2563eb; }
+  button.warn { background: #7a3b1d; border-color: #c26a2b; }
+  .stage { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); background: #05070a; }
+  canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+  .slider { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .slider label { width: 86px; color: var(--muted); font-size: 12.5px; }
+  .slider input[type="range"] { flex: 1; min-width: 60px; accent-color: var(--accent); }
+  .slider span { width: 44px; text-align: right; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sw { width: 26px; height: 26px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; padding: 0; }
+  .sw.active { border-color: #fff; }
+  input[type="color"] { width: 46px; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); padding: 2px; cursor: pointer; }
+  .msg { margin-top: 10px; border-radius: 8px; padding: 8px 10px; font-size: 13px; display: none; }
+  .msg.show { display: block; }
+  .msg.ok { background: #12321f; border: 1px solid #1f6b42; color: #b6f2cf; }
+  .msg.err { background: #3a1b22; border: 1px solid #7f2b39; color: #ffc7d1; }
+  .help { color: var(--muted); font-size: 12px; }
+  .help p { margin: 0 0 6px; }
+  .help b { color: var(--text); }
+  .stats { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .stats span:last-child { font-variant-numeric: tabular-nums; }
+  .fatal { padding: 20px; border-radius: 10px; background: #2a1418; border: 1px solid #7f2b39; color: #ffd7dd; }
+  .fatal h2 { margin: 0 0 8px; font-size: 16px; }
+
+  /* 可访问性：键盘操作时保留清晰的焦点指示 */
+  button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent, #4d9cff);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>彩色流体实验台</h1>
+  <p class="sub">GPU 实时求解二维速度场：平流 → 散度 → 压力迭代 → 速度投影 → 染料平流，鼠标或手指拖动注入颜色与动量。</p>
+
+  <div id="app">
+    <div class="layout">
+      <div>
+        <div class="panel">
+          <div class="toolbar">
+            <button id="btnPause" class="primary">暂停</button>
+            <button id="btnClear">清空</button>
+            <button id="btnReset">重置参数</button>
+            <button id="btnShot">保存 PNG</button>
+            <button id="btnSplat" class="warn">随机注入一团</button>
+          </div>
+          <div id="stage" class="stage" style="margin-top:10px">
+            <canvas id="cv"></canvas>
+          </div>
+          <div id="msg" class="msg"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <h2 style="font-size:14px;margin:0 0 10px">染料颜色</h2>
+          <div class="swatches" id="swatches"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+            <span style="color:var(--muted);font-size:12.5px">自定义</span>
+            <input type="color" id="colorPick" value="#4d9cff" />
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:12px">
+          <h2 style="font-size:14px;margin:0 0 10px">模拟参数</h2>
+          <div class="slider"><label for="force">注入力度</label><input type="range" id="force" min="0" max="100" value="45" /><span id="forceVal">4500</span></div>
+          <div class="slider"><label for="diss">染料消散</label><input type="range" id="diss" min="0" max="100" value="12" /><span id="dissVal">0.988</span></div>
+          <div class="slider"><label for="velDiss">速度消散</label><input type="range" id="velDiss" min="0" max="100" value="18" /><span id="velDissVal">0.980</span></div>
+          <div class="slider"><label for="press">压力迭代</label><input type="range" id="press" min="1" max="60" value="22" data-raw="1" /><span id="pressVal">22</span></div>
+          <div class="slider"><label for="res">模拟分辨率</label><input type="range" id="res" min="60" max="400" value="180" /><span id="resVal">180</span></div>
+          <div class="slider"><label for="dpr">渲染像素比</label><input type="range" id="dpr" min="50" max="200" value="100" /><span id="dprVal">1.00</span></div>
+        </div>
+
+        <div class="panel" style="margin-top:12px">
+          <h2 style="font-size:14px;margin:0 0 8px">运行状态</h2>
+          <div class="stats"><span>状态</span><span id="kState">运行中</span></div>
+          <div class="stats"><span>WebGL</span><span id="kGl">—</span></div>
+          <div class="stats"><span>网格分辨率</span><span id="kRes">—</span></div>
+          <div class="stats"><span>帧率</span><span id="kFps">—</span></div>
+          <div class="stats"><span>染料注入次数</span><span id="kSplats">0</span></div>
+          <div class="stats"><span>已模拟时长</span><span id="kTime">0.0 s</span></div>
+        </div>
+
+        <div class="panel" style="margin-top:12px">
+          <h2 style="font-size:14px;margin:0 0 8px">说明</h2>
+          <div class="help">
+            <p><b>这是真实的实时流体求解</b>，不是粒子轨迹或渐隐画布：每帧依次执行平流、散度、Jacobi 压力迭代与速度投影。</p>
+            <p>在画布上<b>按住拖动</b>注入染料与动量；快速甩动会产生涡流。</p>
+            <p>暂停后画面完全停止演化；清空只清除染料，速度场保持不变，方便观察扩散。</p>
+            <p>分辨率与像素比改变时会重建并释放 GPU 纹理，画布尺寸同步更新。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- 能力检测 ---------- */
+  const canvas = $("cv");
+  let gl = null;
+  let glVersion = "";
+  const fatal = (msg) => {
+    $("app").innerHTML =
+      '<div class="fatal"><h2>无法运行流体模拟</h2><p>' + msg +
+      "</p><p>请更换支持 WebGL 的浏览器，或在显卡设置中启用硬件加速后重试。</p></div>";
+  };
+  try {
+    gl = canvas.getContext("webgl2", { alpha: false, depth: false, stencil: false, antialias: false, preserveDrawingBuffer: true })
+      || canvas.getContext("webgl", { alpha: false, depth: false, stencil: false, antialias: false, preserveDrawingBuffer: true })
+      || canvas.getContext("experimental-webgl", { alpha: false });
+  } catch (e) { gl = null; }
+  if (!gl) {
+    fatal("当前浏览器或设备没有提供可用的 WebGL 上下文。");
+    return;
+  }
+  const isGL2 = typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext;
+  glVersion = isGL2 ? "WebGL 2" : "WebGL 1";
+  $("kGl").textContent = glVersion;
+
+  // 必要能力：浮点纹理（半浮点优先，否则退回字节格式）
+  const supportLinearFloat = (() => {
+    if (isGL2) return !!gl.getExtension("EXT_color_buffer_float");
+    return !!gl.getExtension("OES_texture_float") || !!gl.getExtension("OES_texture_half_float");
+  })();
+  const supportLinear = (() => {
+    if (isGL2) return !!gl.getExtension("OES_texture_float_linear");
+    return !!gl.getExtension("OES_texture_float_linear") || !!gl.getExtension("OES_texture_half_float_linear") || supportLinearFloat;
+  })();
+  if (!supportLinearFloat && !supportLinearFloat) {
+    fatal("当前设备不支持流体求解所需的浮点纹理格式（EXT_color_buffer_float / OES_texture_float）。");
+    return;
+  }
+  // 速度与压力统一使用 RGBA16F / RGBA8 兜底
+  const useHalfFloat = isGL2 ? true : !!gl.getExtension("OES_texture_half_float");
+
+  /* ---------- 配置 ---------- */
+  const config = {
+    force: 4500,
+    dyeDissipation: 0.988,
+    velocityDissipation: 0.98,
+    pressureIterations: 22,
+    simRes: 180,
+    dpr: 1,
+    color: [0.30, 0.61, 1.0],
+  };
+  const DEFAULTS = { ...config };
+
+  /* ---------- 着色器 ---------- */
+  const VS = `
+    attribute vec2 aPosition;
+    varying vec2 vUv, vL, vR, vT, vB;
+    void main () {
+      vUv = aPosition * 0.5 + 0.5;
+      vL = vUv - vec2(1.0, 0.0);
+      vR = vUv + vec2(1.0, 0.0);
+      vT = vUv + vec2(0.0, 1.0);
+      vB = vUv - vec2(0.0, 1.0);
+      gl_Position = vec4(aPosition, 0.0, 1.0);
+    }`;
+
+  const FS_COPY = `
+    precision mediump float; precision mediump sampler2D;
+    varying vec2 vUv;
+    uniform sampler2D uTexture;
+    void main () { gl_FragColor = texture2D(uTexture, vUv); }`;
+
+  const FS_CLEAR = `
+    precision mediump float; precision mediump sampler2D;
+    varying vec2 vUv;
+    uniform sampler2D uTexture;
+    uniform float value;
+    void main () { gl_FragColor = value * texture2D(uTexture, vUv); }`;
+
+  const FS_SPLAT = `
+    precision highp float; precision highp sampler2D;
+    varying vec2 vUv;
+    uniform sampler2D uTarget;
+    uniform float aspectRatio;
+    uniform vec3 color;
+    uniform vec2 point;
+    uniform float radius;
+    void main () {
+      vec2 p = vUv - point.xy;
+      p.x *= aspectRatio;
+      vec3 splat = exp(-dot(p, p) / radius) * color;
+      vec3 base = texture2D(uTarget, vUv).xyz;
+      gl_FragColor = vec4(base + splat, 1.0);
+    }`;
+
+  const FS_ADVECT = `
+    precision highp float; precision highp sampler2D;
+    varying vec2 vUv;
+    uniform sampler2D uVelocity;
+    uniform sampler2D uSource;
+    uniform vec2 texelSize;
+    uniform vec2 dyeTexelSize;
+    uniform float dt;
+    uniform float dissipation;
+    void main () {
+      vec2 coord = vUv - dt * texture2D(uVelocity, vUv).xy * texelSize;
+      vec4 result = texture2D(uSource, coord);
+      float decay = 1.0 + dissipation * dt;
+      gl_FragColor = result / decay;
+    }`;
+
+  const FS_DIVERGENCE = `
+    precision mediump float; precision mediump sampler2D;
+    varying vec2 vUv;
+    varying vec2 vL, vR, vT, vB;
+    uniform sampler2D uVelocity;
+    void main () {
+      float L = texture2D(uVelocity, vL).x;
+      float R = texture2D(uVelocity, vR).x;
+      float T = texture2D(uVelocity, vT).y;
+      float B = texture2D(uVelocity, vB).y;
+      vec2 C = texture2D(uVelocity, vUv).xy;
+      if (vL.x < 0.0) L = -C.x;
+      if (vR.x > 1.0) R = -C.x;
+      if (vT.y > 1.0) T = -C.y;
+      if (vB.y < 0.0) B = -C.y;
+      float div = 0.5 * (R - L + T - B);
+      gl_FragColor = vec4(div, 0.0, 0.0, 1.0);
+    }`;
+
+  const FS_CURL = `
+    precision mediump float; precision mediump sampler2D;
+    varying vec2 vUv; varying vec2 vL, vR, vT, vB;
+    uniform sampler2D uVelocity;
+    void main () {
+      float L = texture2D(uVelocity, vL).y;
+      float R = texture2D(uVelocity, vR).y;
+      float T = texture2D(uVelocity, vT).x;
+      float B = texture2D(uVelocity, vB).x;
+      float vorticity = R - L - T + B;
+      gl_FragColor = vec4(0.5 * vorticity, 0.0, 0.0, 1.0);
+    }`;
+
+  const FS_VORTICITY = `
+    precision highp float; precision highp sampler2D;
+    varying vec2 vUv; varying vec2 vL, vR, vT, vB;
+    uniform sampler2D uVelocity;
+    uniform sampler2D uCurl;
+    uniform float curl;
+    uniform float dt;
+    void main () {
+      float L = texture2D(uCurl, vL).x;
+      float R = texture2D(uCurl, vR).x;
+      float T = texture2D(uCurl, vT).x;
+      float B = texture2D(uCurl, vB).x;
+      float C = texture2D(uCurl, vUv).x;
+      vec2 force = 0.5 * vec2(abs(T) - abs(B), abs(R) - abs(L));
+      force /= length(force) + 0.0001;
+      force *= curl * C;
+      force.y *= -1.0;
+      vec2 vel = texture2D(uVelocity, vUv).xy;
+      vel += force * dt;
+      vel = min(max(vel, -1000.0), 1000.0);
+      gl_FragColor = vec4(vel, 0.0, 1.0);
+    }`;
+
+  const FS_PRESSURE = `
+    precision mediump float; precision mediump sampler2D;
+    varying vec2 vUv; varying vec2 vL, vR, vT, vB;
+    uniform sampler2D uPressure;
+    uniform sampler2D uDivergence;
+    void main () {
+      float L = texture2D(uPressure, vL).x;
+      float R = texture2D(uPressure, vR).x;
+      float T = texture2D(uPressure, vT).x;
+      float B = texture2D(uPressure, vB).x;
+      float divergence = texture2D(uDivergence, vUv).x;
+      float pressure = (L + R + B + T - divergence) * 0.25;
+      gl_FragColor = vec4(pressure, 0.0, 0.0, 1.0);
+    }`;
+
+  const FS_GRADIENT_SUBTRACT = `
+    precision mediump float; precision mediump sampler2D;
+    varying vec2 vUv; varying vec2 vL, vR, vT, vB;
+    uniform sampler2D uPressure;
+    uniform sampler2D uVelocity;
+    void main () {
+      float L = texture2D(uPressure, vL).x;
+      float R = texture2D(uPressure, vR).x;
+      float T = texture2D(uPressure, vT).x;
+      float B = texture2D(uPressure, vB).x;
+      vec2 velocity = texture2D(uVelocity, vUv).xy;
+      velocity.xy -= vec2(R - L, T - B);
+      gl_FragColor = vec4(velocity, 0.0, 1.0);
+    }`;
+
+  const FS_SHOW = `
+    precision mediump float; precision mediump sampler2D;
+    varying vec2 vUv; varying vec2 vL, vR, vT, vB;
+    uniform sampler2D uTexture;
+    uniform vec3 dither;
+    void main () {
+      vec3 c = texture2D(uTexture, vUv).rgb;
+      c += dither;
+      gl_FragColor = vec4(c, 1.0);
+    }`;
+
+  /* ---------- 程序 ---------- */
+  function compile(type, source) {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, source);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      throw Error("着色器编译失败：" + gl.getShaderInfoLog(sh));
+    }
+    return sh;
+  }
+  function Program(vsSource, fsSource) {
+    this.vs = compile(gl.VERTEX_SHADER, vsSource);
+    this.fs = compile(gl.FRAGMENT_SHADER, fsSource);
+    this.program = gl.createProgram();
+    gl.attachShader(this.program, this.vs);
+    gl.attachShader(this.program, this.fs);
+    gl.bindAttribLocation(this.program, 0, "aPosition");
+    gl.linkProgram(this.program);
+    if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
+      throw Error("着色器链接失败：" + gl.getProgramInfoLog(this.program));
+    }
+    this.uniforms = {};
+    const n = gl.getProgramParameter(this.program, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) {
+      const name = gl.getActiveUniform(this.program, i).name.replace(/\[0\]$/, "");
+      this.uniforms[name] = gl.getUniformLocation(this.program, name);
+    }
+  }
+  Program.prototype.bind = function () { gl.useProgram(this.program); };
+  function blit(target) {
+    if (target == null) {
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    } else {
+      gl.viewport(0, 0, target.width, target.height);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+    }
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  let copyProgram, clearProgram, splatProgram, advectProgram, divergenceProgram, curlProgram,
+    vorticityProgram, pressureProgram, gradienSubtractProgram, displayProgram;
+
+  /* ---------- 双缓冲 ---------- */
+  function createFBO(w, h, internalFormat, format, type, param) {
+    gl.activeTexture(gl.TEXTURE0);
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, param);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, param);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, null);
+
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    gl.viewport(0, 0, w, h);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return {
+      texture, fbo, width: w, height: h,
+      texelSizeX: 1 / w, texelSizeY: 1 / h,
+      attach(id) { gl.activeTexture(gl.TEXTURE0 + id); gl.bindTexture(gl.TEXTURE_2D, texture); return id; },
+    };
+  }
+  function createDoubleFBO(w, h, internalFormat, format, type, param) {
+    let fbo1 = createFBO(w, h, internalFormat, format, type, param);
+    let fbo2 = createFBO(w, h, internalFormat, format, type, param);
+    return {
+      width: w, height: h, texelSizeX: 1 / w, texelSizeY: 1 / h,
+      get read() { return fbo1; }, set read(v) { fbo1 = v; },
+      get write() { return fbo2; }, set write(v) { fbo2 = v; },
+      swap() { const tmp = fbo1; fbo1 = fbo2; fbo2 = tmp; },
+    };
+  }
+  // 显式释放 GPU 资源，避免分辨率调整后泄漏
+  function destroyFBO(f) {
+    if (!f) return;
+    gl.deleteTexture(f.texture);
+    gl.deleteFramebuffer(f.fbo);
+  }
+  function destroyDouble(d) { if (!d) return; destroyFBO(d.read); destroyFBO(d.write); }
+
+  const formats = useHalfFloat
+    ? { internalFormat: gl.RGBA16F, format: gl.RGBA, type: gl.HALF_FLOAT }
+    : { internalFormat: gl.RGBA8, format: gl.RGBA, type: gl.UNSIGNED_BYTE };
+
+  let dye, velocity, divergence, curl, pressure;
+
+  function getResolution(base) {
+    let aspect = canvas.width / canvas.height;
+    if (aspect < 1) aspect = 1 / aspect;
+    const min = Math.round(base);
+    const max = Math.round(base * aspect);
+    return canvas.width > canvas.height ? { width: max, height: min } : { width: min, height: max };
+  }
+
+  function initFramebuffers() {
+    const simRes = Math.min(config.simRes, 512);
+    const dyeRes = Math.min(1024, simRes * 2);
+    const dyeR = getResolution(dyeRes);
+    const simR = getResolution(simRes);
+    destroyDouble(dye); destroyDouble(velocity);
+    destroyFBO(divergence); destroyFBO(curl); destroyFBO(pressure);
+    dye = createDoubleFBO(dyeR.width, dyeR.height, formats.internalFormat, formats.format, formats.type, gl.LINEAR);
+    velocity = createDoubleFBO(simR.width, simR.height, formats.internalFormat, formats.format, formats.type, gl.LINEAR);
+    divergence = createFBO(simR.width, simR.height, formats.internalFormat, formats.format, formats.type, gl.NEAREST);
+    curl = createFBO(simR.width, simR.height, formats.internalFormat, formats.format, formats.type, gl.NEAREST);
+    pressure = createDoubleFBO(simR.width, simR.height, formats.internalFormat, formats.format, formats.type, gl.NEAREST);
+    $("kRes").textContent = simR.width + " × " + simR.height + "（染料 " + dyeR.width + "×" + dyeR.height + "）";
+  }
+
+  function resizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2) * config.dpr;
+    const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
+    const h = Math.max(1, Math.round(canvas.clientWidth * 0.62 * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w; canvas.height = h;
+      return true;
+    }
+    return false;
+  }
+
+  /* ---------- 注入 ---------- */
+  function splat(x, y, dx, dy, color) {
+    splatProgram.bind();
+    gl.uniform1i(splatProgram.uniforms.uTarget, velocity.read.attach(0));
+    gl.uniform1f(splatProgram.uniforms.aspectRatio, canvas.width / canvas.height);
+    gl.uniform2f(splatProgram.uniforms.point, x, y);
+    gl.uniform3f(splatProgram.uniforms.color, dx, dy, 0);
+    gl.uniform1f(splatProgram.uniforms.radius, 0.0015);
+    blit(velocity.write);
+    velocity.swap();
+
+    gl.uniform1i(splatProgram.uniforms.uTarget, dye.read.attach(0));
+    // 染料浓度略高于 1，使多次注入后颜色饱和而不发灰
+    gl.uniform3f(splatProgram.uniforms.color, color[0] * 1.45, color[1] * 1.45, color[2] * 1.45);
+    blit(dye.write);
+    dye.swap();
+  }
+
+  /* ---------- 步骤 ---------- */
+  let lastTime = performance.now();
+  function step(now) {
+    const dt = Math.min((now - lastTime) / 1000, 0.016);
+    lastTime = now;
+    if (!paused && running) {
+      simTime += dt;
+      gl.disable(gl.BLEND);
+      curlProgram.bind();
+      gl.uniform1i(curlProgram.uniforms.uVelocity, velocity.read.attach(0));
+      blit(curl);
+
+      vorticityProgram.bind();
+      gl.uniform1i(vorticityProgram.uniforms.uVelocity, velocity.read.attach(0));
+      gl.uniform1i(vorticityProgram.uniforms.uCurl, curl.attach(1));
+      gl.uniform1f(vorticityProgram.uniforms.curl, 26);
+      gl.uniform1f(vorticityProgram.uniforms.dt, dt);
+      blit(velocity.write);
+      velocity.swap();
+
+      divergenceProgram.bind();
+      gl.uniform1i(divergenceProgram.uniforms.uVelocity, velocity.read.attach(0));
+      blit(divergence);
+
+      clearProgram.bind();
+      gl.uniform1i(clearProgram.uniforms.uTexture, pressure.read.attach(0));
+      gl.uniform1f(clearProgram.uniforms.value, 0.8);
+      blit(pressure.write);
+      pressure.swap();
+
+      pressureProgram.bind();
+      gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence.attach(0));
+      for (let i = 0; i < config.pressureIterations; i++) {
+        gl.uniform1i(pressureProgram.uniforms.uPressure, pressure.read.attach(1));
+        blit(pressure.write);
+        pressure.swap();
+      }
+
+      gradienSubtractProgram.bind();
+      gl.uniform1i(gradienSubtractProgram.uniforms.uPressure, pressure.read.attach(0));
+      gl.uniform1i(gradienSubtractProgram.uniforms.uVelocity, velocity.read.attach(1));
+      blit(velocity.write);
+      velocity.swap();
+
+      advectProgram.bind();
+      gl.uniform2f(advectProgram.uniforms.texelSize, velocity.texelSizeX, velocity.texelSizeY);
+      gl.uniform1i(advectProgram.uniforms.uVelocity, velocity.read.attach(0));
+      gl.uniform1i(advectProgram.uniforms.uSource, velocity.read.attach(0));
+      gl.uniform1f(advectProgram.uniforms.dt, dt);
+      gl.uniform1f(advectProgram.uniforms.dissipation, 0.2 + (1 - config.velocityDissipation) * 4);
+      blit(velocity.write);
+      velocity.swap();
+
+      gl.uniform1i(advectProgram.uniforms.uVelocity, velocity.read.attach(0));
+      gl.uniform1i(advectProgram.uniforms.uSource, dye.read.attach(1));
+      gl.uniform2f(advectProgram.uniforms.dyeTexelSize, dye.texelSizeX, dye.texelSizeY);
+      gl.uniform1f(advectProgram.uniforms.dissipation, 1 - config.dyeDissipation);
+      blit(dye.write);
+      dye.swap();
+    }
+    const w = canvas.width, h = canvas.height;
+    displayProgram.bind();
+    gl.uniform1i(displayProgram.uniforms.uTexture, dye.read.attach(0));
+    // 抖动只在运行时叠加，暂停时画面需要真正静止
+    const ditherOn = !paused && running;
+    gl.uniform3f(
+      displayProgram.uniforms.dither,
+      ditherOn ? (Math.random() - 0.5) / 255 : 0,
+      ditherOn ? (Math.random() - 0.5) / 255 : 0,
+      ditherOn ? (Math.random() - 0.5) / 255 : 0
+    );
+    blit(null);
+    requestAnimationFrame(step);
+  }
+
+  /* ---------- 启动 ---------- */
+  try {
+    copyProgram = new Program(VS, FS_COPY);
+    clearProgram = new Program(VS, FS_CLEAR);
+    splatProgram = new Program(VS, FS_SPLAT);
+    advectProgram = new Program(VS, FS_ADVECT);
+    divergenceProgram = new Program(VS, FS_DIVERGENCE);
+    curlProgram = new Program(VS, FS_CURL);
+    vorticityProgram = new Program(VS, FS_VORTICITY);
+    pressureProgram = new Program(VS, FS_PRESSURE);
+    gradienSubtractProgram = new Program(VS, FS_GRADIENT_SUBTRACT);
+    displayProgram = new Program(VS, FS_SHOW);
+  } catch (e) {
+    fatal(String(e.message || e));
+    return;
+  }
+
+  // 全屏三角形
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(0);
+
+  resizeCanvas();
+  initFramebuffers();
+
+  /* ---------- 交互 ---------- */
+  let paused = false;
+  let running = true;
+  let splatCount = 0;
+  let simTime = 0;
+  function pointerPos(ev) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: (ev.clientX - rect.left) / rect.width, y: 1 - (ev.clientY - rect.top) / rect.height };
+  }
+  let lastInput = null;
+  function handleInput(p) {
+    const dx = (p.x - lastInput.x) * config.force;
+    const dy = (p.y - lastInput.y) * config.force;
+    splat(p.x, p.y, dx, dy, config.color);
+    splatCount++;
+    lastInput = p;
+  }
+  canvas.addEventListener("pointerdown", (ev) => {
+    ev.preventDefault();
+    lastInput = pointerPos(ev);
+    handleInput(lastInput);
+    try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* 合成事件可能没有活动指针 */ }
+  });
+  canvas.addEventListener("pointermove", (ev) => {
+    if (!lastInput) return;
+    handleInput(pointerPos(ev));
+  });
+  const endInput = () => { lastInput = null; };
+  canvas.addEventListener("pointerup", endInput);
+  canvas.addEventListener("pointercancel", endInput);
+  canvas.addEventListener("pointerleave", endInput);
+
+  /* ---------- 控件 ---------- */
+  function bindRange(id, key, label, fmt, scale) {
+    const el = $(id);
+    el.addEventListener("input", () => {
+      const v = Number(el.value) / (scale || 100);
+      config[key] = fmt(v);
+      $(label).textContent = fmt(v);
+      if (key === "simRes") {
+        // 模拟分辨率与画布尺寸无关：即使画布没变也必须重建缓冲
+        resizeCanvas();
+        initFramebuffers();
+      } else if (key === "dpr") {
+        if (resizeCanvas()) initFramebuffers();
+      }
+    });
+  }
+  bindRange("force", "force", "forceVal", (v) => Math.round(v * 10000));
+  bindRange("diss", "dyeDissipation", "dissVal", (v) => (0.90 + v * 0.0999).toFixed(3));
+  bindRange("velDiss", "velocityDissipation", "velDissVal", (v) => (0.90 + v * 0.0999).toFixed(3));
+  bindRange("press", "pressureIterations", "pressVal", (v) => String(Math.round(v)), 1);
+  bindRange("res", "simRes", "resVal", (v) => Math.round(60 + v * 3.4));
+  bindRange("dpr", "dpr", "dprVal", (v) => v.toFixed(2));
+
+  const SWATCHES = [
+    "#4d9cff", "#ff5c7a", "#3ddc97", "#f0a92b", "#b98cff", "#ff8a3d", "#ffffff", "#00e5ff",
+  ];
+  $("swatches").innerHTML = SWATCHES.map(
+    (c, i) => `<button class="sw${i === 0 ? " active" : ""}" data-color="${c}" style="background:${c}" aria-label="选择颜色 ${c}"></button>`
+  ).join("");
+  function setColor(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    config.color = [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+    document.querySelectorAll(".sw").forEach((b) => b.classList.toggle("active", b.dataset.color.toLowerCase() === hex.toLowerCase()));
+  }
+  document.querySelectorAll(".sw").forEach((b) =>
+    b.addEventListener("click", () => { setColor(b.dataset.color); $("colorPick").value = b.dataset.color; })
+  );
+  $("colorPick").addEventListener("input", (e) => setColor(e.target.value));
+
+  function showMsg(text, kind = "ok") {
+    $("msg").textContent = text;
+    $("msg").className = "msg show " + kind;
+  }
+
+  $("btnPause").addEventListener("click", () => {
+    paused = !paused;
+    $("btnPause").textContent = paused ? "继续" : "暂停";
+    $("kState").textContent = paused ? "已暂停" : "运行中";
+    showMsg(paused ? "已暂停：速度场与染料都不再演化，画面保持不变。" : "已继续运行。", "ok");
+  });
+  $("btnClear").addEventListener("click", () => {
+    // 只清除染料，保留速度场
+    clearProgram.bind();
+    gl.uniform1i(clearProgram.uniforms.uTexture, dye.read.attach(0));
+    gl.uniform1f(clearProgram.uniforms.value, 0);
+    blit(dye.write);
+    dye.swap();
+    showMsg("已清空染料，速度场保持不变。", "ok");
+  });
+  $("btnReset").addEventListener("click", () => {
+    Object.assign(config, DEFAULTS);
+    $("force").value = 45; $("diss").value = 12; $("velDiss").value = 18;
+    $("press").value = 22; $("res").value = 180; $("dpr").value = 100;
+    $("forceVal").textContent = "4500"; $("dissVal").textContent = "0.988";
+    $("velDissVal").textContent = "0.980"; $("pressVal").textContent = "22";
+    $("resVal").textContent = "180"; $("dprVal").textContent = "1.00";
+    setColor("#4d9cff"); $("colorPick").value = "#4d9cff";
+    initFramebuffers();
+    splatCount = 0;
+    simTime = 0;
+    showMsg("已重置为默认参数并重建模拟缓冲。", "ok");
+  });
+  $("btnSplat").addEventListener("click", () => {
+    const x = 0.25 + Math.random() * 0.5, y = 0.25 + Math.random() * 0.5;
+    splat(x, y, (Math.random() - 0.5) * config.force, (Math.random() - 0.5) * config.force, config.color);
+    splatCount++;
+    showMsg("已随机注入一团染料与动量。", "ok");
+  });
+  $("btnShot").addEventListener("click", () => {
+    const a = document.createElement("a");
+    a.download = "fluid-simulation.png";
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+    showMsg("已保存当前画面 PNG。", "ok");
+  });
+
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (resizeCanvas()) initFramebuffers();
+      showMsg("窗口尺寸已变化，模拟缓冲与触摸坐标已同步重建。", "ok");
+    }, 150);
+  });
+
+  /* ---------- 帧率 ---------- */
+  let frames = 0, fpsTime = performance.now();
+  function tickFps() {
+    frames++;
+    const now = performance.now();
+    if (now - fpsTime >= 1000) {
+      $("kFps").textContent = Math.round((frames * 1000) / (now - fpsTime)) + " fps";
+      $("kSplats").textContent = splatCount;
+      $("kTime").textContent = simTime.toFixed(1) + " s";
+      frames = 0;
+      fpsTime = now;
+    }
+    requestAnimationFrame(tickFps);
+  }
+
+  showMsg("流体模拟已启动：在画布上按住拖动即可注入染料与动量。", "ok");
+  // 上下文丢失时给出明确提示，而不是留下一块黑屏
+  canvas.addEventListener("webglcontextlost", (ev) => {
+    ev.preventDefault();
+    running = false;
+    $("kState").textContent = "上下文丢失";
+    showMsg("WebGL 上下文已丢失（可能由驱动重置或显卡切换导致）。请刷新页面重新运行。", "err");
+  });
+  canvas.addEventListener("webglcontextrestored", () => {
+    try {
+      copyProgram = new Program(VS, FS_COPY);
+      clearProgram = new Program(VS, FS_CLEAR);
+      splatProgram = new Program(VS, FS_SPLAT);
+      advectProgram = new Program(VS, FS_ADVECT);
+      divergenceProgram = new Program(VS, FS_DIVERGENCE);
+      curlProgram = new Program(VS, FS_CURL);
+      vorticityProgram = new Program(VS, FS_VORTICITY);
+      pressureProgram = new Program(VS, FS_PRESSURE);
+      gradienSubtractProgram = new Program(VS, FS_GRADIENT_SUBTRACT);
+      displayProgram = new Program(VS, FS_SHOW);
+      const buffer2 = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer2);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(0);
+      dye = velocity = divergence = curl = pressure = null;
+      initFramebuffers();
+      running = true;
+      $("kState").textContent = "运行中";
+      showMsg("WebGL 上下文已恢复，着色器与模拟缓冲已重建。", "ok");
+    } catch (err) {
+      showMsg("上下文恢复失败：" + (err.message || err) + "，请刷新页面。", "err");
+    }
+  });
+  requestAnimationFrame(step);
+  requestAnimationFrame(tickFps);
+})();
+</script>
+</body>
+</html>

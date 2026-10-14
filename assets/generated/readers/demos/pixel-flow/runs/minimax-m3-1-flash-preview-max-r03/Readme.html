@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f7f9"><title>Pixel Flow 图片粒子化与手势还原 · AI Coding Demo</title><meta name="description" content="本地图片采样为 Three.js 粒子流，通过 MediaPipe 手势（张开 / 握拳 / 捏合）驱动力场完成还原。"><meta property="og:title" content="Pixel Flow 图片粒子化与手势还原"><meta property="og:description" content="本地图片采样为 Three.js 粒子流，通过 MediaPipe 手势（张开 / 握拳 / 捏合）驱动力场完成还原。"><meta property="og:type" content="article"><link rel="stylesheet" href="../../../../../../site.css"><link rel="stylesheet" href="../../../../../../document.css"><script src="../../../../../../document.js" defer></script></head><body class="document-page"><a class="skip-link" href="#document-content">跳到正文</a><header class="site-header"><div class="container header-inner"><a class="brand" href="../../../../../../../index.html"><span class="brand-mark">AI</span>CODING / DEMO</a><nav aria-label="主导航"><a href="../../../../../../../index.html#projects">实验目录</a><a href="../../../../../../../compare.html">模型对比</a><a href="../../../../../../../index.html#guides">技术索引</a></nav></div></header><main class="container document-layout"><aside class="document-sidebar"><details open><summary>本页目录</summary><nav aria-label="文档目录"><a class="toc-level-1" href="#pixel-flow-图片粒子化与手势还原">Pixel Flow · 图片粒子化与手势还原</a><a class="toc-level-2" href="#原始提示词">原始提示词</a><a class="toc-level-2" href="#运行方式">运行方式</a><a class="toc-level-2" href="#实现要点">实现要点</a><a class="toc-level-2" href="#验证记录">验证记录</a><a class="toc-level-2" href="#复盘">复盘</a><a class="toc-level-2" href="#批次记录">批次记录</a><a class="toc-level-2" href="#当前归档信息自动生成">当前归档信息（自动生成）</a><a class="toc-level-3" href="#部署适配记录">部署适配记录</a></nav></details></aside><div><div class="document-actions"><a href="../../../../../../../demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r03/Readme.md" download>下载 Markdown 原文 ↗</a><a href="../../../../../../../topic.html?id=pixel-flow">查看主题与版本 →</a></div><p class="document-context">MiniMax M3.1 Flash Preview · max · 实验日期 2026-10-14 · 归档日期 未记录</p><article id="document-content" class="document-content"><h1 id="pixel-flow-图片粒子化与手势还原">Pixel Flow · 图片粒子化与手势还原</h1>
+<h2 id="原始提示词">原始提示词</h2>
+<p>见 <a href="../../../../../../../demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r03/prompt.md">完整原始输入</a>。本轮为模型 minimax-m3-1-flash-preview、档位 max 重跑任务正文 v1。</p>
+<h2 id="运行方式">运行方式</h2>
+<p>入口为本目录 <code>index.html</code>。Three.js r160 通过 importmap、MediaPipe Hands 通过 jsDelivr 引入，<strong>需要联网</strong>；摄像头需要用户授权，未授权时可用鼠标 / 手指驱动同一套力场。</p>
+<h2 id="实现要点">实现要点</h2>
+<ul>
+<li>图片采样：把图片缩放到 320px 宽的离屏 canvas，用 <code>getImageData</code> 按可调间距（2–16px）采样，跳过透明与过暗像素，写入 Three.js 粒子的目标坐标与颜色。</li>
+<li>粒子用 <code>ShaderMaterial</code> + <code>THREE.Points</code>，片元着色器做柔边与发光，颜色即采样得到的原图颜色。</li>
+<li>手势识别用 MediaPipe Hands，实时取 21 个关键点：按「指尖到掌心的平均距离」区分张开 / 握拳，按「拇指—食指距离」识别捏合，并把手部骨架实时画在视频叠层上。</li>
+<li>力场跟随掌心（做了镜像抵消），力场内的粒子被更强地拉向目标位置；每个粒子维护 0→1 的 <code>progress</code>，界面显示全局还原进度。</li>
+<li>三种手势对应任务正文要求的「激活 / 控制 / 完成」：张开手掌累积还原强度，握拳衰减，捏合瞬间置满。</li>
+<li>摄像头不可用时提供两条退路：鼠标 / 手指在画布上移动驱动力场，以及内置自动演示（力场绕圈、手势按节奏切换），保证无人环境也能看到完整效果。</li>
+<li>附内置示例图（Canvas 绘制的黄昏海岸），不需要用户先去找图片。</li>
+</ul>
+<h2 id="验证记录">验证记录</h2>
+<ul>
+<li>载入示例图后生成 1880 个粒子，初始状态为弥散粒子流，还原进度条从 0% 逐步上升。</li>
+<li>自动演示模式下「当前手势」在张开手掌 / 握拳 / 捏合之间切换，画布中的粒子随之向原图位置聚拢。</li>
+<li>点击「完全还原」后进度快速推向 100%，画面可辨认出示例图的山形与太阳。</li>
+<li>「打散粒子」重新回到弥散状态，「保存截图」导出当前画面。</li>
+<li>控制台无报错；WebGL 与 CDN 资源均正常加载。</li>
+</ul>
+<h2 id="复盘">复盘</h2>
+<p><strong>做得好的</strong>：任务正文的难点是「手势识别成功率和直观性」，本轮没有硬塞复杂手势，而是用三个判据明确的简单手势（张开 / 握拳 / 捏合）并且把判据本身写进了 UI 说明；更重要的是补齐了摄像头不可用时的退路（鼠标力场 + 自动演示），使这个依赖摄像头的应用在静态站点预览里仍然可验证。</p>
+<p><strong>不足</strong>：</p>
+<ol>
+<li>采样函数初版有两段重复的写入逻辑，其中一段的取色写法是错的，靠后面那段才正确；属于写完没有立刻跑一遍的痕迹。</li>
+<li>粒子初始太小（约 1.6px），在深色背景上几乎不可见，需要把 <code>gl_PointSize</code> 的缩放系数从 34 提到 150 才达到可读密度。</li>
+<li>摄像头视频叠加层的画布尺寸被固定为 480×360，如果实际视频流比例不同，关键点会与画面错位。</li>
+<li>采样上限 24000 只按数组长度截断，<code>step</code> 调小时是按行序截断，会丢掉图片下半部分，逻辑上应该是等间隔抽样。</li>
+<li>MediaPipe 的 wasm 与模型文件全部走 CDN，离线环境会退化到演示模式；界面有提示但没有把「已降级」这一状态持久化。</li>
+</ol>
+<h2 id="批次记录">批次记录</h2>
+<p>本批共 11 个主题案例、12 条实验记录（蓝皮书含 v1/v2）；MiniMax Max 五小时额度消耗 44%，token 消耗 60.6M，耗时 57m 10s。测试备注：自我审查五轮。以上为批次总计，不拆分为单条记录。</p>
+<p>&lt;!-- archive:start --&gt;</p>
+<h2 id="当前归档信息自动生成">当前归档信息（自动生成）</h2>
+<ul>
+<li>实验 ID：<code>pixel-flow--minimax-m3-1-flash-preview-max-r03</code></li>
+<li>模型：MiniMax M3.1 Flash Preview；推理档位：max</li>
+<li>类型：app；预览：static；网络：required</li>
+<li><a href="../../../../../../../demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r03/prompt.md">完整原始输入快照</a> · <a href="../../../../../../../topic.html?id=pixel-flow">主题与其他版本</a></li>
+<li>输入记录：完整原始输入，等同于主题任务正文 v1（未增删），保存于本目录 prompt.md。</li>
+<li>工具：Claude Code。Claude Code 会话内直接执行，模型 minimax-m3-1-flash-preview、档位 max；未使用子代理，未参考任何历史实现或远程分支。</li>
+<li>运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。</li>
+<li>费用记录：MiniMax 批次合计 44 %（Max 订阅套餐五小时额度）（12 个案例；批次 minimax-m3-1-flash-preview-max-2026-10-14；未记录单案例费用）</li>
+<li><a href="../../../../../../../demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r03/index.html">应用入口</a></li>
+</ul>
+<h3 id="部署适配记录">部署适配记录</h3>
+<ul>
+<li>自审第 5 轮：补 CDN 加载失败时的明确提示；自审第 4 轮补 :focus-visible 样式。</li>
+<li>迁移来源：F:\dev\ai-coding-demo-test（model-test-base）/demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01；main 已有该轮号，保留旧记录后迁入为 minimax-m3-1-flash-preview-max-r03。原始输入与产物按源分支复制，prompt.md 未改写。</li>
+<li>用户提供的本批测试备注：自我审查五轮。</li>
+<li>迁移截图：源测试分支未登记桌面截图；已在本仓库通过本地 HTTP 入口按实际页面补拍，并在 390px 视口确认无水平溢出（2026-10-14）。</li>
+<li>迁移说明：源 Readme 中“首次执行”改为“重跑”，因为 main 已有该模型的历史轮次；原始 prompt.md 未改写。
+&lt;!-- archive:end --&gt;</li>
+</ul>
+</article><p class="document-copy-status" role="status"></p></div></main><footer><div class="container">AI CODING DEMO / 实验记录与技术说明。</div></footer></body></html>
