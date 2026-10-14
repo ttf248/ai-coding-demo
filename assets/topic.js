@@ -697,7 +697,9 @@
                       e(U.modelLabel(data, r)) +
                       '<small class="topic-run-model-maker">' +
                       e(U.modelProvider(data, r)) +
-                      '</small></th><td class="topic-run-provider"><span class="mobile-cell-label" aria-hidden="true">接入/付费供应商</span><span>' +
+                      "</small>" +
+                      U.scoreBadge(r) +
+                      '</th><td class="topic-run-provider"><span class="mobile-cell-label" aria-hidden="true">接入/付费供应商</span><span>' +
                       e(r.billing?.provider || "未记录") +
                       '</span><small class="topic-run-tool">' +
                       e(toolLabel(r)) +
@@ -725,8 +727,7 @@
                       '">' +
                       e(U.completenessLabel(r.input?.completeness)) +
                       "</span><small>" +
-                      (U.executionModeBadge(r) ||
-                        e(U.executionModeText(r))) +
+                      (U.executionModeBadge(r) || e(U.executionModeText(r))) +
                       '</small></td><td class="topic-run-actions"><div class="topic-row-actions">' +
                       (U.screenshotURL(r)
                         ? '<a href="' +

@@ -145,6 +145,15 @@ writeJSON(`${dir}/run.json`, {
     embed: false,
     externalUrl: null,
   },
+  score: {
+    rubricVersion: 1,
+    status: "pending",
+    total: null,
+    dimensions: null,
+    assessedAt: null,
+    screenshotHash: null,
+    evidence: "草稿待补齐真实截图并按案例评分规则完成评分。",
+  },
   build: null,
   links: [],
 });

@@ -17,7 +17,9 @@
     testing: ["active", "archived", "all"].includes(params.get("testing"))
       ? params.get("testing")
       : "active",
-    sort: ["complexity", "recent", "title"].includes(params.get("sort"))
+    sort: ["score", "complexity", "recent", "title"].includes(
+      params.get("sort"),
+    )
       ? params.get("sort")
       : "complexity",
     group: params.get("group") || "topics",
@@ -145,7 +147,11 @@
       '">' +
       '<span class="cover-hint" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="m8 8-5-5m13 5 5-5M8 16l-5 5m13-5 5 5"/></svg></span></button>' +
       '<div class="image-feedback" role="status"><span>截图加载中…</span><button data-retry-image hidden>重试</button></div>' +
-      "<figcaption><span>实际截图</span><strong>" +
+      "<figcaption><span>实际截图 · " +
+      (U.scoreValue(run) === null
+        ? "未评分"
+        : "评分 " + U.scoreValue(run) + "/100") +
+      "</span><strong>" +
       e(U.modelLabel(data, run)) +
       "</strong></figcaption></figure>"
     );
@@ -208,6 +214,7 @@
             /(<div class="card-top"><span class="eyebrow">[\s\S]*?<\/span>)([\s\S]*?)(<\/div><h3>)/,
             '$1<div class="card-badges">' +
               U.executionModeBadge(r) +
+              U.scoreBadge(r) +
               U.complexityBadge(data.topics.find((t) => t.id === r.topicId)) +
               "$2</div>$3",
           )
@@ -268,17 +275,21 @@
             (b.date || "").localeCompare(a.date || "") ||
             U.compareModelRuns(data, a, b),
         )[0];
+        const topRated = U.bestScoredRun(runs);
+        const summaryRun = topRated || latest;
+        const summaryLabel =
+          U.scoreValue(summaryRun) !== null
+            ? "最高评分 · " + U.scoreValue(summaryRun) + "/100"
+            : "最新实验 · " + (summaryRun?.date || "日期未记录");
         let previewRun =
           latest && U.previewURL(latest)
             ? latest
             : runs.find((r) => U.previewURL(r));
-        const screenshotRun = [...runs]
-          .filter((r) => U.screenshotURL(r))
-          .sort(
-            (a, b) =>
-              (b.date || "").localeCompare(a.date || "") ||
-              U.compareModelRuns(data, a, b),
-          )[0];
+        const screenshotRun =
+          U.bestScoredRun(runs.filter((r) => U.screenshotURL(r))) ||
+          [...runs]
+            .filter((r) => U.screenshotURL(r))
+            .sort(U.compareRunScores)[0];
         const coverRun =
           t.thumbnail &&
           data.runs.find((r) => r.id === t.thumbnail.sourceRunId);
@@ -316,6 +327,7 @@
           '</span><div class="card-badges">' +
           (U.isTopicArchived(t) ? '<span class="pill">已归档</span>' : "") +
           U.executionModeBadge(previewRun) +
+          (displayedRun ? U.scoreBadge(displayedRun) : "") +
           U.complexityBadge(t) +
           '</div></div><h3><a href="topic.html?id=' +
           t.id +
@@ -330,14 +342,14 @@
           runs.length +
           " 个版本" +
           (runs.length !== all.length ? " / 共 " + all.length + " 个" : "") +
-          '</p><details class="experiment-info"><summary>实验信息</summary><div class="latest-run"><span>最新实验 · ' +
-          e(latest?.date || "日期未记录") +
+          '</p><details class="experiment-info"><summary>实验信息</summary><div class="latest-run"><span>' +
+          e(summaryLabel) +
           "</span><strong>" +
           e(
-            latest
-              ? U.modelLabel(data, latest) +
+            summaryRun
+              ? U.modelLabel(data, summaryRun) +
                   " · " +
-                  U.effortLabel(latest.effort)
+                  U.effortLabel(summaryRun.effort)
               : "尚无实验记录",
           ) +
           '</strong></div><details class="topic-models"><summary>全部模型</summary><div class="tags">' +
@@ -462,7 +474,7 @@
       .filter(
         (key) =>
           state[key] &&
-          !(key === "sort" && ["complexity", "recent"].includes(state[key])) &&
+          !(key === "sort" && state[key] === "complexity") &&
           !(key === "testing" && state[key] === "active"),
       )
       .map((key) => {
@@ -611,7 +623,11 @@
     if (!button) return;
     const key = button.dataset.removeFilter;
     state[key] =
-      key === "sort" ? "complexity" : key === "testing" ? "active" : "";
+      key === "sort"
+        ? "complexity"
+        : key === "testing"
+          ? "active"
+          : "";
     render(true);
   });
   $("advanced-filters").open = !!(
