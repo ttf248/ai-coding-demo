@@ -643,7 +643,70 @@
       '" aria-pressed="false">加入对比</button></div></article>'
     );
   }
+  // Scores describe the recorded screenshot, never unobserved functionality.
+  function scoreDetails(run) {
+    const s = run?.score;
+    const total = scoreValue(run);
+    const status = {
+      insufficient: "证据不足",
+      unavailable: "无截图",
+      pending: "待评分",
+    };
+    const capture = {
+      result: "结果态",
+      initial: "初始态",
+      partial: "局部展示",
+      blocked: "环境阻塞",
+      undemonstrated: "主体未展示",
+    };
+    const dimensions = [
+      ["taskCoverage", "任务可见覆盖", 40],
+      ["composition", "构图与层级", 20],
+      ["readability", "可读性", 15],
+      ["interactionClarity", "操作表达", 10],
+      ["craft", "视觉精修", 15],
+    ];
+    return (
+      '<details class="score-details"><summary>截图评分 · ' +
+      (total === null ? status[s?.status] || "待评分" : total + "/100") +
+      '</summary><div class="score-evidence"><p class="score-context">规则 v' +
+      escape(s?.rubricVersion || "未记录") +
+      " · " +
+      escape(capture[s?.captureState] || "取景未记录") +
+      "</p>" +
+      (total !== null && s?.dimensions
+        ? '<div class="score-dimensions">' +
+          dimensions
+            .map(
+              ([key, label, max]) =>
+                '<div class="score-dimension"><span>' +
+                label +
+                '</span><meter min="0" max="' +
+                max +
+                '" value="' +
+                s.dimensions[key] +
+                '" aria-label="' +
+                label +
+                '"></meter><span>' +
+                s.dimensions[key] +
+                "/" +
+                max +
+                "</span></div>",
+            )
+            .join("") +
+          "</div>"
+        : "") +
+      "<p>" +
+      escape(s?.evidence || "暂无足够的截图评分依据。") +
+      "</p>" +
+      (s?.ceiling < 100 && total !== null
+        ? "<p>环境阻塞上限：" + s.ceiling + " 分；维度独立评分。</p>"
+        : "") +
+      "<small>仅评价截图可见成果；同任务、同规则下参考，不能证明功能或性能。</small></div></details>"
+    );
+  }
   global.ArchiveUI = {
+    scoreDetails,
     completenessLabel,
     hasRecordedInput,
     documentURL,

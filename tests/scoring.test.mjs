@@ -95,3 +95,17 @@ test("task points, dimension weights and blocking ceilings cannot drift", () => 
   stale.rubricVersion = 1;
   assert.equal(validate(stale), false);
 });
+test("score details preserve evidence states and escape review text", () => {
+  for (const status of ["insufficient", "unavailable", "pending"]) {
+    const html = ui.scoreDetails({
+      score: { status, total: null, evidence: "<script>bad</script>" },
+    });
+    assert.ok(!html.includes("<meter"));
+    assert.ok(!html.includes("0/100"));
+    assert.ok(html.includes("&lt;script&gt;"));
+  }
+  const html = ui.scoreDetails(rated);
+  assert.equal((html.match(/<meter /g) || []).length, 5);
+  assert.ok(html.includes(`${rated.score.total}/100`));
+  assert.ok(html.includes("规则 v2"));
+});
