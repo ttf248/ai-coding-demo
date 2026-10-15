@@ -1,7 +1,8 @@
 (function () {
   const slug = document.body.dataset.guide;
-  const bar = document.createElement("div");
+  const bar = document.createElement("nav");
   bar.className = "guide-sitebar";
+  bar.setAttribute("aria-label", "实验档案导航");
   const root = new URL(
     "../",
     document.currentScript?.src ||
@@ -15,6 +16,8 @@
     a.href = new URL(file, root);
     bar.append(a);
   };
+  link("AI CODING / DEMO", "index.html");
+  bar.firstElementChild.className = "guide-archive-brand";
   link("← 技术索引", "index.html#guides");
   link("阅读技术说明", `assets/generated/readers/docs/${slug}/Readme.html`);
   const note = document.createElement("span");

@@ -2,6 +2,37 @@
   const status = document.querySelector(".document-copy-status");
   if (matchMedia("(max-width:700px)").matches)
     document.querySelector(".document-sidebar details").open = false;
+  const tocLinks = [...document.querySelectorAll(".document-sidebar nav a")];
+  const sections = tocLinks
+    .map((link) => ({
+      link,
+      heading: document.getElementById(decodeURIComponent(link.hash.slice(1))),
+    }))
+    .filter((item) => item.heading);
+  let scheduled = false;
+  function updateSection() {
+    scheduled = false;
+    const current =
+      sections
+        .filter((item) => item.heading.getBoundingClientRect().top <= 140)
+        .at(-1) || sections[0];
+    for (const item of sections) {
+      if (item === current) item.link.setAttribute("aria-current", "location");
+      else item.link.removeAttribute("aria-current");
+    }
+  }
+  addEventListener(
+    "scroll",
+    () => {
+      if (!scheduled) {
+        scheduled = true;
+        requestAnimationFrame(updateSection);
+      }
+    },
+    { passive: true },
+  );
+  addEventListener("resize", updateSection);
+  updateSection();
   document.querySelectorAll(".document-content pre").forEach((pre) => {
     const button = document.createElement("button");
     button.className = "code-copy";
