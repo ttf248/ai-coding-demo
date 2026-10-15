@@ -31,6 +31,10 @@
     screenshot: params.get("screenshot") === "yes" ? "yes" : "",
     comparable: params.get("comparable") === "yes" ? "yes" : "",
     runGrouping: params.get("runGrouping") === "topic" ? "topic" : "",
+    pick: params.get("pick") || "",
+    pickPrompt: params.get("pickPrompt") || "",
+    pickSort: params.get("pickSort") === "recent" ? "recent" : "score",
+    pickAnchor: params.get("pickAnchor") || "",
   };
   if (state.group === "topics") state.sort = "complexity";
   let visible = 9;
@@ -375,14 +379,16 @@
           e(t.title) +
           "</a></h3><p>" +
           e(t.description) +
-          '</p><div class="topic-metadata"><p class="topic-metrics">' +
+          '</p><div class="topic-metadata"><button class="topic-metrics" data-pick-topic="' +
+          e(t.id) +
+          '" aria-haspopup="dialog" title="快速挑选同主题实验">' +
           new Set(runs.map((r) => r.modelId)).size +
           " 个模型 · " +
           (runs.length !== all.length ? "匹配 " : "") +
           runs.length +
           " 条实验" +
           (runs.length !== all.length ? " / 共 " + all.length + " 个" : "") +
-          '</p><details class="experiment-info"><summary>实验信息</summary><p class="topic-secondary">' +
+          ' ▾</button><details class="experiment-info"><summary>实验信息</summary><p class="topic-secondary">' +
           e(data.categories.find((c) => c.id === t.category).label) +
           " · " +
           U.complexityBadge(t) +
@@ -717,6 +723,200 @@
     state.prompt ||
     state.preview
   );
+  const quickDialog = $("quick-picker");
+  let quickRuns = [],
+    quickVisible = 6,
+    quickTrigger = null;
+  function syncQuickURL() {
+    const query = new URLSearchParams(location.search);
+    for (const key of ["pick", "pickPrompt", "pickSort", "pickAnchor"]) {
+      if (state.pick && state[key]) query.set(key, state[key]);
+      else query.delete(key);
+    }
+    history.replaceState(null, "", "?" + query.toString() + location.hash);
+  }
+  function quickSelection() {
+    let ids = [];
+    try {
+      ids = JSON.parse(sessionStorage.getItem("archive-selection") || "[]");
+    } catch {}
+    ids = Array.isArray(ids)
+      ? [...new Set(ids)]
+          .filter((id) => data.runs.some((r) => r.id === id))
+          .slice(0, 4)
+      : [];
+    $("quick-selection").textContent = `已选 ${ids.length}/4 条实验`;
+    $("quick-start").hidden = ids.length < 2;
+    const query = new URLSearchParams({ tab: "snapshot" });
+    ids.forEach((id, i) =>
+      query.set(["left", "right", "third", "fourth"][i], id),
+    );
+    if (ids.length > 2) query.set("layout", "quad");
+    $("quick-start").href = "compare.html?" + query;
+  }
+  function renderQuick() {
+    const runs = quickRuns.filter((r) => r.promptId === state.pickPrompt);
+    const rules = [
+      ...new Set(
+        runs.map((r) => r.score?.rubricVersion).filter(Number.isInteger),
+      ),
+    ].sort((a, b) => b - a);
+    const previousRule = $("quick-rule").value;
+    $("quick-rule").innerHTML = rules
+      .map((v) => `<option value="${v}">v${v}</option>`)
+      .join("");
+    if (rules.includes(Number(previousRule)))
+      $("quick-rule").value = previousRule;
+    $("quick-rule-control").hidden =
+      state.pickSort !== "score" || rules.length < 2;
+    const rule = Number($("quick-rule").value);
+    const candidates = runs
+      .filter(
+        (r) =>
+          state.pickSort !== "score" ||
+          !rules.length ||
+          r.score?.rubricVersion === rule,
+      )
+      .sort(
+        state.pickSort === "score"
+          ? U.compareRunScores
+          : (a, b) =>
+              (b.date || "").localeCompare(a.date || "") ||
+              a.id.localeCompare(b.id),
+      );
+    $("quick-sort").value = state.pickSort;
+    $("quick-prompt").value = state.pickPrompt;
+    $("quick-scope").textContent =
+      (state.pickAnchor
+        ? "全部同任务实验 · 未应用首页筛选"
+        : "当前首页筛选范围") +
+      " · 同任务版本" +
+      (state.pickSort === "score" && rules.length
+        ? " · 评分规则 v" + rule
+        : "") +
+      "。截图评分只反映可见成果，输入与执行条件仍需核对。";
+    $("quick-count").textContent =
+      `${candidates.length} 条候选 · 显示 ${Math.min(quickVisible, candidates.length)} 条`;
+    $("quick-candidates").innerHTML =
+      candidates
+        .slice(0, quickVisible)
+        .map((run) => {
+          const image = U.screenshotThumbnailURL(run) || U.screenshotURL(run);
+          return (
+            '<article class="quick-candidate"><div class="quick-image">' +
+            (image
+              ? '<a href="' +
+                e(U.screenshotURL(run)) +
+                '" target="_blank" rel="noopener" aria-label="查看 ' +
+                e(U.runSummary(data, run)) +
+                ' 截图"><img src="' +
+                e(image) +
+                '" alt="' +
+                e(run.title) +
+                ' 实际截图" loading="lazy"></a>'
+              : "<span>无截图</span>") +
+            '</div><div class="quick-identity"><strong>' +
+            e(U.modelLabel(data, run)) +
+            "</strong><span>" +
+            e(U.effortLabel(run.effort) + " · " + U.roundLabel(run)) +
+            "</span><small>" +
+            e(run.date || "日期未记录") +
+            " · " +
+            e(U.completenessLabel(run.input.completeness)) +
+            "</small>" +
+            U.executionModeBadge(run) +
+            '</div><div class="quick-score">' +
+            U.scoreBadge(run).replace(">评分 ", ">截图评分 ") +
+            '</div><button data-compare="' +
+            e(run.id) +
+            '" aria-pressed="false">加入对比</button></article>'
+          );
+        })
+        .join("") ||
+      '<p class="empty">当前范围没有候选，请切换任务版本或清除首页筛选。</p>';
+    $("quick-more").hidden = quickVisible >= candidates.length;
+    $("quick-all").href =
+      "topic.html?id=" +
+      encodeURIComponent(state.pick) +
+      "&prompt=" +
+      encodeURIComponent(state.pickPrompt) +
+      "&view=list";
+    selection();
+    quickSelection();
+    syncQuickURL();
+  }
+  document.addEventListener("archive-find-related", (event) => {
+    const run = data.runs.find((r) => r.id === event.detail.runId);
+    if (!run) return;
+    event.preventDefault();
+    openQuick(run.topicId, run.promptId, run.id);
+  });
+  function openQuick(topicId, promptId = "", anchorId = "") {
+    const topic = data.topics.find((t) => t.id === topicId);
+    if (!topic) return;
+    quickTrigger = document.activeElement;
+    state.pick = topicId;
+    state.pickAnchor = anchorId;
+    quickRuns = (anchorId ? data.runs : U.filterRuns(data, state)).filter(
+      (r) => r.topicId === topicId,
+    );
+    const prompts = data.prompts.filter(
+      (p) =>
+        p.topicId === topicId && quickRuns.some((r) => r.promptId === p.id),
+    );
+    state.pickPrompt = prompts.some((p) => p.id === promptId)
+      ? promptId
+      : prompts.at(-1)?.id || "";
+    $("quick-prompt").innerHTML = prompts
+      .map(
+        (p) =>
+          '<option value="' +
+          e(p.id) +
+          '">' +
+          e(p.title + " · " + p.id) +
+          "</option>",
+      )
+      .join("");
+    $("quick-title").textContent = topic.title;
+    quickVisible = 6;
+    renderQuick();
+    if (!quickDialog.open) quickDialog.showModal();
+    $("quick-prompt").focus();
+  }
+  document.addEventListener("click", (event) => {
+    const trigger = event.target.closest("[data-pick-topic]");
+    if (trigger) openQuick(trigger.dataset.pickTopic);
+    if (
+      event.target.closest(
+        "[data-compare], [data-remove], [data-clear], [data-slot]",
+      )
+    )
+      requestAnimationFrame(quickSelection);
+  });
+  $("quick-close").addEventListener("click", () => quickDialog.close());
+  quickDialog.addEventListener("close", () => {
+    state.pick = state.pickPrompt = state.pickAnchor = "";
+    syncQuickURL();
+    quickTrigger?.focus();
+  });
+  $("quick-prompt").addEventListener("change", (event) => {
+    state.pickPrompt = event.target.value;
+    quickVisible = 6;
+    renderQuick();
+  });
+  $("quick-sort").addEventListener("change", (event) => {
+    state.pickSort = event.target.value;
+    quickVisible = 6;
+    renderQuick();
+  });
+  $("quick-rule").addEventListener("change", () => {
+    quickVisible = 6;
+    renderQuick();
+  });
+  $("quick-more").addEventListener("click", () => {
+    quickVisible += 6;
+    renderQuick();
+  });
   const previewDialog = $("preview-dialog");
   let previewRuns = [],
     previewMode = "image",
@@ -959,5 +1159,6 @@
   if (location.hash === "#guides") $("guides").open = true;
   guides();
   render();
+  if (state.pick) openQuick(state.pick, state.pickPrompt, state.pickAnchor);
   if (restoredScroll) requestAnimationFrame(() => scrollTo(0, restoredScroll));
 })();
