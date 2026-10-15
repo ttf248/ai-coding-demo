@@ -52,13 +52,14 @@
     [data.topics.length, "实验主题"],
     [data.runs.length, "实验记录"],
     [data.runs.filter((r) => r.preview.kind !== "none").length, "可预览"],
-    [data.guides.length, "技术主题"],
   ]
     .map(
       ([n, label]) =>
         "<div><strong>" + n + "</strong><span>" + label + "</span></div>",
     )
     .join("");
+  $("guide-count").textContent =
+    data.guides.length + " 个技术主题 · 说明与可运行示例";
   const options = (id, items) =>
     $(id).insertAdjacentHTML(
       "beforeend",
@@ -150,12 +151,8 @@
       '">' +
       '<span class="cover-hint" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="m8 8-5-5m13 5 5-5M8 16l-5 5m13-5 5 5"/></svg></span></button>' +
       '<div class="image-feedback" role="status"><span>截图加载中…</span><button data-retry-image hidden>重试</button></div>' +
-      "<figcaption><span>实际截图 · " +
-      (U.scoreValue(run) === null
-        ? "未评分"
-        : "评分 " + U.scoreValue(run) + "/100") +
-      "</span><strong>" +
-      e(U.modelLabel(data, run)) +
+      "<figcaption><span>实际截图</span><strong>" +
+      e(U.modelLabel(data, run) + " · " + U.effortLabel(run.effort)) +
       "</strong></figcaption></figure>"
     );
   }
@@ -218,7 +215,7 @@
             /(<div class="card-top"><span class="eyebrow">[\s\S]*?<\/span>)([\s\S]*?)(<\/div><h3>)/,
             '$1<div class="card-badges">' +
               U.executionModeBadge(r) +
-              U.scoreBadge(r) +
+              U.scoreBadge(r).replace(">评分 ", ">截图评分 ") +
               U.complexityBadge(data.topics.find((t) => t.id === r.topicId)) +
               "$2</div>$3",
           )
@@ -283,7 +280,7 @@
         const summaryRun = topRated || latest;
         const summaryLabel =
           U.scoreValue(summaryRun) !== null
-            ? "最高评分 · " + U.scoreValue(summaryRun) + "/100"
+            ? "最高评分截图 · 当前筛选范围"
             : "最新实验 · " + (summaryRun?.date || "日期未记录");
         let previewRun =
           latest && U.previewURL(latest)
@@ -315,12 +312,6 @@
           previewRun = U.previewURL(displayedRun) ? displayedRun : null;
         const inspectRun = displayedRun || previewRun || first;
         if (inspectRun) previewScopes.set(inspectRun.id, { runs, source });
-        const recommended =
-          runs.find(
-            (r) =>
-              r.id !== first.id &&
-              U.promptFor(data, r)?.hash === U.promptFor(data, first)?.hash,
-          ) || runs[1];
         return (
           '<article class="card topic-card' +
           (cover ? " has-cover" : "") +
@@ -331,7 +322,9 @@
           '</span><div class="card-badges">' +
           (U.isTopicArchived(t) ? '<span class="pill">已归档</span>' : "") +
           U.executionModeBadge(previewRun) +
-          (displayedRun ? U.scoreBadge(displayedRun) : "") +
+          (displayedRun
+            ? U.scoreBadge(displayedRun).replace(">评分 ", ">截图评分 ")
+            : "") +
           U.complexityBadge(t) +
           '</div></div><h3><a href="topic.html?id=' +
           t.id +
@@ -344,7 +337,7 @@
           " 个模型 · " +
           (runs.length !== all.length ? "匹配 " : "") +
           runs.length +
-          " 个版本" +
+          " 条实验" +
           (runs.length !== all.length ? " / 共 " + all.length + " 个" : "") +
           '</p><details class="experiment-info"><summary>实验信息</summary><div class="latest-run"><span>' +
           e(summaryLabel) +
@@ -382,19 +375,11 @@
             : '<span class="no-preview">仅档案</span>') +
           '<a href="topic.html?id=' +
           t.id +
-          '">查看版本 →</a>' +
-          (recommended
-            ? '<a class="button" href="compare.html?left=' +
-              encodeURIComponent(first.id) +
-              "&right=" +
-              encodeURIComponent(recommended.id) +
-              '" title="' +
-              e(
-                U.runSummary(data, first) +
-                  " / " +
-                  U.runSummary(data, recommended),
-              ) +
-              '">比较实现</a>'
+          '">查看实验 →</a>' +
+          (inspectRun
+            ? '<button data-compare="' +
+              e(inspectRun.id) +
+              '" aria-pressed="false">加入对比</button>'
             : "") +
           "</div></div></article>"
         );
@@ -629,11 +614,7 @@
     if (!button) return;
     const key = button.dataset.removeFilter;
     state[key] =
-      key === "sort"
-        ? "complexity"
-        : key === "testing"
-          ? "active"
-          : "";
+      key === "sort" ? "complexity" : key === "testing" ? "active" : "";
     render(true);
   });
   $("advanced-filters").open = !!(

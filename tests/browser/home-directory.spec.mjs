@@ -144,7 +144,7 @@ test("homepage sorts by task complexity and shows each topic's highest-rated rec
     top.id,
   );
   await expect(first.locator(".score-chip").first()).toHaveText(
-    `评分 ${top.score.total}`,
+    `截图评分 ${top.score.total}`,
   );
   await expect(first.locator(".topic-cover img")).toHaveAttribute(
     "data-original",
@@ -620,4 +620,31 @@ test("legacy latest links return to complexity sorting and card badges stay grou
       ).toBe(true);
     }
   }
+});
+test("home distinguishes cumulative counts and selects the displayed screenshot experiment", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.locator(".overview-heading")).toHaveText("全站累计");
+  await expect(page.locator("#stats > div")).toHaveCount(3);
+  await expect(page.locator("#guide-count")).toContainText(
+    `${data.guides.length} 个技术主题`,
+  );
+  const card = page.locator(".topic-card").first();
+  await expect(card.locator("figcaption")).not.toContainText("评分");
+  await expect(card.locator(".score-chip")).toHaveCount(1);
+  await expect(card.locator(".topic-metrics")).toContainText("条实验");
+  const id = await card
+    .locator(".topic-cover")
+    .getAttribute("data-screenshot-run");
+  await expect(card.locator("[data-compare]")).toHaveAttribute(
+    "data-compare",
+    id,
+  );
+  await card.locator("[data-compare]").click();
+  await expect(page.locator("#compare-tray")).toContainText("1/4");
+  await expect(card.locator("[data-compare]")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 });
