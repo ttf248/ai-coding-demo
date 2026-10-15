@@ -246,18 +246,24 @@
         total +
         "/100 · 规则 v" +
         (run.score?.rubricVersion || 1) +
+        ({
+          result: " · 结果态",
+          initial: " · 初始态",
+          partial: " · 局部展示",
+          blocked: " · 环境阻塞",
+        }[run.score?.captureState] || "") +
+        escape(run.score?.evidence ? " · " + run.score.evidence : "") +
         '">评分 ' +
         total +
         "</span>"
       );
-    if (run?.score?.status === "unavailable")
+    if (run?.score?.status === "insufficient")
       return (
         '<span class="score-chip score-unavailable" title="' +
         escape(
-          run.score.evidence ||
-            "没有真实运行截图，因此未评分并排除在排序之外。",
+          run.score.evidence || "截图没有充分展示主体成果，补齐证据后评分。",
         ) +
-        '">无截图评分</span>'
+        '">证据不足</span>'
       );
     if (!run?.score || run.score.status === "unavailable")
       return (

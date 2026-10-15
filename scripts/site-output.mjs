@@ -52,7 +52,15 @@ export function browserOutputs(catalog) {
     json(rawHref, raw);
     return {
       ...summary,
-      ...(score.status === "rated" ? { score: score.total } : {}),
+      score: {
+        rubricVersion: score.rubricVersion,
+        status: score.status,
+        total: score.total,
+        captureState: score.captureState,
+        ...(score.status === "insufficient"
+          ? { evidence: score.evidence }
+          : {}),
+      },
       reader: readerPath(run.document),
       hasRaw: !!raw.trim(),
       rawHref,
@@ -119,6 +127,7 @@ export function documentOutputs(catalog, generated) {
       ...catalog.guides.map((guide) => guide.document),
       "docs/maintenance.md",
       "docs/case-scoring.md",
+      "docs/scoring-reviews/2026-10-15-v2.md",
       "docs/archive-workspace.md",
       "docs/vercel-root-directories.md",
     ]),

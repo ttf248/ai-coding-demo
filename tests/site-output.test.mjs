@@ -33,10 +33,12 @@ test("summary omits large bodies and deduplicated inputs preserve normalized tex
     assert.equal(run.billing, undefined);
     const original = catalog.runs.find((item) => item.id === run.id),
       raw = JSON.parse(outputs.get(run.rawHref));
-    assert.equal(
-      run.score,
-      original.score.status === "rated" ? original.score.total : undefined,
-    );
+    assert.equal(run.score.status, original.score.status);
+    assert.equal(run.score.total, original.score.total);
+    assert.equal(run.score.rubricVersion, original.score.rubricVersion);
+    assert.equal(run.score.captureState, original.score.captureState);
+    if (run.score.status === "insufficient")
+      assert.equal(run.score.evidence, original.score.evidence);
     assert.equal(raw, original.raw);
     assert.equal(hash(raw), original.rawHash);
   }
@@ -51,7 +53,7 @@ test("summary omits large bodies and deduplicated inputs preserve normalized tex
   assert.ok(
     // Keep the summary budget proportional to the growing archive.
     Buffer.byteLength(outputs.get("assets/generated/catalog.js")) <
-      catalog.runs.length * 2200,
+      catalog.runs.length * 2400,
   );
 });
 test("input relationships and completeness work before lazy body loading", () => {
