@@ -49,7 +49,9 @@
     ? params.get("effort")
     : "";
   let query = params.get("q") || "";
-  let sort = params.get("sort") === "recent" ? "recent" : "model";
+  let sort = ["recent", "score"].includes(params.get("sort"))
+    ? params.get("sort")
+    : "model";
   const allGroups = R.group(data, runs);
   const groupKeys = new Set(allGroups.map((group) => group.key));
   const conditionKeys = new Set(
@@ -115,7 +117,7 @@
           '<option value="' + e(v) + '">' + e(U.effortLabel(v)) + "</option>",
       )
       .join("") +
-    '</select></label><label id="topic-sort-field">排序<select id="topic-sort"><option value="model">模型 / 档位从高到低</option><option value="recent">日期从新到旧</option></select></label></div></details><button id="topic-reset">清除筛选</button></div>' +
+    '</select></label><label id="topic-sort-field">排序<select id="topic-sort"><option value="model">模型 / 档位从高到低</option><option value="recent">日期从新到旧</option><option value="score">截图评分（同任务内）</option></select></label></div></details><button id="topic-reset">清除筛选</button></div>' +
     '<div class="topic-results-heading"><p id="topic-count" role="status"></p><p id="topic-results-help"></p></div><section id="topic-matrix" aria-label="模型与档位实验矩阵" hidden></section><section id="topic-models" aria-label="按模型浏览实验"></section><section id="topic-list" hidden><div class="topic-run-groups"></div></section><section id="topic-prompts" class="prompt-library" hidden><h2>任务与版本</h2><div></div></section>';
   root.append(document.getElementById("pricing-context"));
   const refreshSelection = U.setupSelection(data);
@@ -508,9 +510,11 @@
       )
       .sort(
         (a, b) =>
+          (sort === "score" ? U.compareRunScores(a, b) : 0) ||
           (sort === "recent"
             ? (b.date || "").localeCompare(a.date || "")
-            : 0) || U.compareModelRuns(data, a, b),
+            : 0) ||
+          U.compareModelRuns(data, a, b),
       );
     const visibleModels = models.filter((m) =>
       matched.some((r) => r.modelId === m.id),
@@ -622,11 +626,13 @@
                       e(effort) +
                       '">' +
                       (items.length
-                        ? "<details" +
-                          (items.length === 1 ? " open" : "") +
-                          "><summary>" +
+                        ? "<details><summary>" +
                           items.length +
-                          " 条实验</summary>" +
+                          " 条实验 · " +
+                          (U.bestScoredRun(items)
+                            ? "截图 " + U.scoreValue(U.bestScoredRun(items))
+                            : "未评分") +
+                          "</summary>" +
                           entries(items) +
                           "</details>"
                         : '<span class="missing-record">无记录</span>') +
@@ -684,71 +690,34 @@
                 items.length +
                 ' 条实验</span></div><a href="compare.html?group=' +
                 encodeURIComponent(topic.id + "/" + p.id) +
-                '&tab=prompt">比较此版本 →</a></header><div class="topic-table-scroll" tabindex="0" aria-label="实验记录表，包含模型、工具、档位、日期、费用与耗时"><table class="topic-runs-table"><caption class="sr-only">' +
+                '&tab=snapshot">比较此版本 →</a></header><div class="topic-table-scroll" tabindex="0" aria-label="实验记录表，包含作品、模型、截图评分、费用与耗时"><table class="topic-runs-table"><caption class="sr-only">' +
                 e(p.title) +
-                '的实验记录</caption><thead><tr><th scope="col">模型 / 厂商</th><th scope="col">接入供应商 / 工具</th><th scope="col">档位 / 轮次</th><th scope="col">日期</th><th scope="col">费用记录</th><th scope="col">执行耗时</th><th scope="col">输入 / 执行模式</th><th scope="col">操作</th></tr></thead><tbody>' +
+                '的实验记录</caption><thead><tr><th scope="col">作品</th><th scope="col">模型 / 档位</th><th scope="col">截图评分</th><th scope="col">费用记录</th><th scope="col">执行耗时</th><th scope="col">操作</th></tr></thead><tbody>' +
                 items
                   .map((r) => {
-                    const href = U.previewURL(r);
-                    return (
-                      '<tr class="topic-run-row" id="run-' +
-                      e(r.id) +
-                      '"><th scope="row" class="topic-run-model">' +
-                      e(U.modelLabel(data, r)) +
-                      '<small class="topic-run-model-maker">' +
-                      e(U.modelProvider(data, r)) +
-                      "</small>" +
-                      U.scoreBadge(r) +
-                      '</th><td class="topic-run-provider"><span class="mobile-cell-label" aria-hidden="true">接入/付费供应商</span><span>' +
-                      e(r.billing?.provider || "未记录") +
-                      '</span><small class="topic-run-tool">' +
-                      e(toolLabel(r)) +
-                      '</small></td><td class="topic-run-condition"><span class="topic-run-effort">' +
-                      e(U.effortLabel(r.effort)) +
-                      '</span><small class="topic-run-round">' +
-                      e(U.roundLabel(r)) +
-                      '</small></td><td class="topic-run-date" id="date-' +
-                      e(r.id) +
-                      '"><time>' +
-                      e(r.date || "日期未记录") +
-                      '</time></td><td class="topic-run-billing" id="billing-' +
-                      e(r.id) +
-                      '">' +
-                      billingMarkup(r) +
-                      (r.billing?.plan
-                        ? '<small class="topic-run-plan">' +
-                          e(r.billing.plan) +
-                          "</small>"
-                        : "") +
-                      '</td><td class="topic-run-duration">' +
-                      durationMarkup(r) +
-                      '</td><td class="topic-run-input"><span title="' +
-                      e(r.input?.notes || "") +
-                      '">' +
-                      e(U.completenessLabel(r.input?.completeness)) +
-                      "</span><small>" +
-                      (U.executionModeBadge(r) || e(U.executionModeText(r))) +
-                      '</small></td><td class="topic-run-actions"><div class="topic-row-actions">' +
-                      (U.screenshotURL(r)
-                        ? '<a href="' +
-                          e(U.screenshotURL(r)) +
-                          '" target="_blank" rel="noopener">截图 ↗</a>'
-                        : "") +
-                      (href
-                        ? '<a href="' +
-                          e(href) +
-                          '" target="_blank" rel="noopener">' +
-                          (r.preview.kind === "external"
-                            ? "外部预览 ↗"
-                            : "预览 ↗") +
-                          "</a>"
-                        : '<span class="missing-record">无预览</span>') +
-                      '<button data-compare="' +
-                      e(r.id) +
-                      '" aria-pressed="false">加入对比</button><a href="' +
-                      e(U.documentURL(r)) +
-                      '">记录</a></div></td></tr>'
-                    );
+                    const href = U.previewURL(r),
+                      image = U.screenshotThumbnailURL(r) || U.screenshotURL(r);
+                    return `<tr class="topic-run-row" id="run-${e(r.id)}">
+                    <td class="topic-run-art">${image ? `<a href="${e(U.screenshotURL(r))}" target="_blank" rel="noopener" aria-label="查看 ${e(U.runSummary(data, r))} 截图"><img loading="lazy" src="${e(image)}" alt="${e(r.title)} 实际截图"></a>` : '<span class="missing-record">无截图</span>'}</td>
+                    <th scope="row" class="topic-run-model">${e(U.modelLabel(data, r))}
+                      <small class="topic-run-condition"><span class="topic-run-effort">${e(U.effortLabel(r.effort))}</span> · <span class="topic-run-round">${e(U.roundLabel(r))}</span></small>
+                      <span class="topic-run-input"><span>${e(U.completenessLabel(r.input?.completeness))}</span><small>${U.executionModeBadge(r)}</small></span>
+                      <details class="run-context"><summary>执行条件</summary><dl>
+                        <dt>模型厂商</dt><dd class="topic-run-model-maker">${e(U.modelProvider(data, r))}</dd>
+                        <dt>接入/付费供应商</dt><dd class="topic-run-provider">${e(r.billing?.provider || "未记录")}</dd>
+                        <dt>运行工具</dt><dd class="topic-run-tool">${e(toolLabel(r))}</dd>
+                        <dt>实验日期</dt><dd class="topic-run-date" id="date-${e(r.id)}">${e(r.date || "日期未记录")}</dd>
+                        <dt>执行模式</dt><dd>${e(U.executionModeText(r))}</dd>
+                      </dl></details>
+                    </th>
+                    <td class="topic-run-score">${U.scoreDetails(r)}</td>
+                    <td class="topic-run-billing" id="billing-${e(r.id)}">${billingMarkup(r)}${r.billing?.plan ? `<small class="topic-run-plan">${e(r.billing.plan)}</small>` : ""}</td>
+                    <td class="topic-run-duration">${durationMarkup(r)}</td>
+                    <td class="topic-run-actions"><div class="topic-row-actions">
+                      <button data-compare="${e(r.id)}" aria-pressed="false">加入对比</button>
+                      ${href ? `<a href="${e(href)}" target="_blank" rel="noopener">${r.preview.kind === "external" ? "外部预览 ↗" : "预览 ↗"}</a>` : '<span class="missing-record">无预览</span>'}
+                      <a href="${e(U.documentURL(r))}">记录</a>
+                    </div></td></tr>`;
                   })
                   .join("") +
                 "</tbody></table></div></section>"
@@ -914,7 +883,9 @@
     modelId = models.some((m) => m.id === p.get("model")) ? p.get("model") : "";
     effort = efforts.includes(p.get("effort")) ? p.get("effort") : "";
     query = p.get("q") || "";
-    sort = p.get("sort") === "recent" ? "recent" : "model";
+    sort = ["recent", "score"].includes(p.get("sort"))
+      ? p.get("sort")
+      : "model";
     openGroups = new Set(p.getAll("open").filter((key) => groupKeys.has(key)));
     openHistory = new Set(
       p.getAll("history").filter((key) => conditionKeys.has(key)),

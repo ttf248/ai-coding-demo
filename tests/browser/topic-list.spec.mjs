@@ -22,13 +22,11 @@ test("topic opens the complete compact list with recorded batch durations", asyn
     page.locator(`#run-${auditedRun.id} .topic-run-input .execution-mode-chip`),
   ).toHaveText("自我审查十轮");
   await expect(page.locator(".topic-runs-table thead th")).toHaveText([
-    "模型 / 厂商",
-    "接入供应商 / 工具",
-    "档位 / 轮次",
-    "日期",
+    "作品",
+    "模型 / 档位",
+    "截图评分",
     "费用记录",
     "执行耗时",
-    "输入 / 执行模式",
     "操作",
   ]);
   const table = page.locator(".topic-table-scroll");
@@ -39,7 +37,7 @@ test("topic opens the complete compact list with recorded batch durations", asyn
   ).toBe(true);
   const first = await page.locator(".topic-run-row").first().boundingBox();
   const eighth = await page.locator(".topic-run-row").nth(7).boundingBox();
-  expect(eighth.y + eighth.height - first.y).toBeLessThan(700);
+  expect(eighth.y + eighth.height - first.y).toBeLessThan(1200);
   await expect(page.locator("iframe")).toHaveCount(0);
 
   for (const run of runs.filter((run) => run.billing?.duration)) {
@@ -100,6 +98,8 @@ test("390px list exposes facts and duration without disclosures or page overflow
   );
   const row = page.locator(".topic-run-row");
   await expect(row).toHaveCount(1);
+  await expect(row.locator(".run-context")).not.toHaveAttribute("open", "");
+  await row.locator(".run-context summary").click();
   for (const selector of [
     ".topic-run-model-maker",
     ".topic-run-provider",
@@ -133,4 +133,21 @@ test("390px list exposes facts and duration without disclosures or page overflow
     path: "test-results/topic-list-mobile-" + test.info().project.name + ".png",
     fullPage: true,
   });
+});
+test("screenshot ranking restores from URL and expands real evidence", async ({
+  page,
+}) => {
+  await page.goto("topic.html?id=circuit-lab&sort=score");
+  const first = page.locator(".topic-run-row").first();
+  const expected = [...runs]
+    .filter((r) => r.score.status === "rated")
+    .sort((a, b) => b.score.total - a.score.total)[0];
+  await expect(first.locator(".score-details summary")).toContainText(
+    `${expected.score.total}/100`,
+  );
+  await first.locator(".score-details summary").click();
+  await expect(first.locator("meter")).toHaveCount(5);
+  await expect(first.locator(".score-evidence")).toContainText("规则 v2");
+  await page.reload();
+  await expect(page.locator("#topic-sort")).toHaveValue("score");
 });
