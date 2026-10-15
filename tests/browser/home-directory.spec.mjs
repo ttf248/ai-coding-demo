@@ -2,6 +2,39 @@ import { test, expect } from "@playwright/test";
 import { loadCatalog } from "../../scripts/lib.mjs";
 const data = loadCatalog();
 
+test("insufficient screenshot evidence remains visible without a numeric score", async ({
+  page,
+}) => {
+  const run = data.runs.find((item) => item.score.status === "insufficient");
+  const topic = data.topics.find((item) => item.id === run.topicId);
+  const query = new URLSearchParams({
+    group: "runs",
+    testing: "all",
+    model: run.modelId,
+    q: topic.title,
+  });
+  await page.goto("./?" + query);
+  const screenshot = page.locator(`[data-screenshot-run="${run.id}"]`);
+  const card = page.locator(".run-card").filter({ has: screenshot });
+  await expect(card).toHaveCount(1);
+  await expect(card.locator(".score-chip")).toHaveText("证据不足");
+  await expect(card.locator(".score-chip")).toHaveAttribute(
+    "title",
+    run.score.evidence,
+  );
+  await expect(screenshot.locator("img")).toHaveAttribute(
+    "data-original",
+    `${run.directory}/${run.screenshot}`,
+  );
+  const selected = await page.evaluate((topicId) => {
+    const candidates = window.ARCHIVE.runs.filter(
+      (item) => item.topicId === topicId,
+    );
+    return window.ArchiveUI.bestScoredRun(candidates)?.score.status;
+  }, topic.id);
+  expect(selected).toBe("rated");
+});
+
 test("homepage covers use registered run screenshots and direct previews", async ({
   page,
 }) => {
@@ -84,13 +117,12 @@ test("homepage sorts by task complexity and shows each topic's highest-rated rec
     data.runs
       .filter((run) => run.topicId === topicId)
       .reduce((date, run) => ((run.date || "") > date ? run.date : date), "");
-  const firstTopic = [...activeTopics]
-    .sort(
-      (a, b) =>
-        (b.complexity?.level || 0) - (a.complexity?.level || 0) ||
-        latestDate(b.id).localeCompare(latestDate(a.id)) ||
-        a.id.localeCompare(b.id),
-    )[0];
+  const firstTopic = [...activeTopics].sort(
+    (a, b) =>
+      (b.complexity?.level || 0) - (a.complexity?.level || 0) ||
+      latestDate(b.id).localeCompare(latestDate(a.id)) ||
+      a.id.localeCompare(b.id),
+  )[0];
   const top = data.runs
     .filter(
       (run) => run.topicId === firstTopic.id && run.score.status === "rated",
@@ -476,7 +508,8 @@ test("complexity is the home default across pagination, views and shared sorting
   await page.goto("./");
   await expect(page.locator("#sort")).toHaveValue("complexity");
   const expected = await page.evaluate(() => {
-    const d = window.ARCHIVE, U = window.ArchiveUI;
+    const d = window.ARCHIVE,
+      U = window.ArchiveUI;
     const runs = U.filterRuns(d, { testing: "active" });
     return d.topics
       .filter((t) => !U.isTopicArchived(t))

@@ -3,6 +3,7 @@ import path from "node:path";
 import Ajv from "ajv";
 import { isDeepStrictEqual } from "node:util";
 import { siteResourceOutputs } from "./site-assets.mjs";
+import { rubricErrors, scoreErrors } from "./scoring.mjs";
 import {
   ROOT,
   read,
@@ -41,6 +42,8 @@ const schemas = Object.fromEntries(
   ]),
 );
 const catalog = loadCatalog();
+const scoringRubric = readJSON("catalog/scoring-rubric.json");
+errors.push(...rubricErrors(scoringRubric, catalog, schema));
 for (const [kind, list] of [
   ["topic", catalog.topics],
   ["prompt", catalog.prompts],
@@ -244,40 +247,7 @@ for (const r of catalog.runs) {
       `Missing run screenshot ${r.id}`,
     );
   const score = r.score || {};
-  if (r.screenshot) {
-    check(
-      score.status === "rated",
-      `Run with screenshot must have a rating: ${r.id}`,
-    );
-    if (score.status === "rated" && score.dimensions) {
-      const total = Object.values(score.dimensions).reduce(
-        (sum, points) => sum + points,
-        0,
-      );
-      check(
-        total === score.total,
-        `Score total differs from dimensions ${r.id}`,
-      );
-      check(
-        score.screenshotHash === r.screenshotInfo?.hash,
-        `Screenshot changed; reassess score ${r.id}`,
-      );
-    }
-  } else {
-    check(
-      score.status === "unavailable" ||
-        (score.status === "pending" &&
-          r.status === "draft" &&
-          r.preview.kind === "none"),
-      `Run without screenshot must be unavailable or an unfinished draft: ${r.id}`,
-    );
-    if (score.status === "unavailable")
-      check(
-        typeof score.evidence === "string" &&
-          score.evidence.trim().length >= 12,
-        `Explain why score is unavailable ${r.id}`,
-      );
-  }
+  errors.push(...scoreErrors(r, scoringRubric));
   if (score.assessedAt) {
     const d = new Date(`${score.assessedAt}T00:00:00Z`);
     check(
