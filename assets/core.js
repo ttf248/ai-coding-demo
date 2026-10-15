@@ -320,7 +320,7 @@
   }
   function filterRuns(data, state) {
     const query = (state.q || "").trim().toLocaleLowerCase();
-    return data.runs
+    const filtered = data.runs
       .filter((r) => {
         const t = data.topics.find((t) => t.id === r.topicId);
         return (
@@ -334,6 +334,7 @@
             (r.environment?.toolId || "unknown") === state.tool) &&
           (!state.type || r.type === state.type) &&
           (!state.prompt || `${r.topicId}/${r.promptId}` === state.prompt) &&
+          (!state.screenshot || Boolean(screenshotURL(r))) &&
           (!state.preview ||
             (state.preview === "yes") === (r.preview.kind !== "none")) &&
           (!query ||
@@ -367,6 +368,17 @@
               (b.date || "").localeCompare(a.date || "") ||
               a.id.localeCompare(b.id),
       );
+    if (!state.comparable) return filtered;
+    const groups = new Map();
+    for (const run of filtered) {
+      const key = promptFor(data, run)?.hash;
+      if (!key || run.modelId === "unknown") continue;
+      if (!groups.has(key)) groups.set(key, new Set());
+      groups.get(key).add(run.modelId);
+    }
+    return filtered.filter(
+      (run) => (groups.get(promptFor(data, run)?.hash)?.size || 0) >= 2,
+    );
   }
   function diff(a, b) {
     const tokenize = (s) =>

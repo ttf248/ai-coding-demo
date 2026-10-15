@@ -25,11 +25,17 @@
     group: ["topics", "runs"].includes(params.get("group"))
       ? params.get("group")
       : "topics",
-    view: params.get("view") || "grid",
+    view: ["compact", "grid", "list"].includes(params.get("view"))
+      ? params.get("view")
+      : "compact",
+    screenshot: params.get("screenshot") === "yes" ? "yes" : "",
+    comparable: params.get("comparable") === "yes" ? "yes" : "",
+    runGrouping: params.get("runGrouping") === "topic" ? "topic" : "",
   };
   if (state.group === "topics") state.sort = "complexity";
   let visible = 9;
   let restoredScroll = 0;
+  let lastViewed = "";
   try {
     const saved = JSON.parse(
       sessionStorage.getItem("archive-home-return") || "null",
@@ -38,16 +44,35 @@
     if (saved?.url === location.href && navigation?.type === "back_forward") {
       visible = saved.visible;
       restoredScroll = saved.scroll;
+      lastViewed = saved.lastItem || "";
     }
   } catch {}
   addEventListener("pagehide", () => {
     try {
       sessionStorage.setItem(
         "archive-home-return",
-        JSON.stringify({ url: location.href, visible, scroll: scrollY }),
+        JSON.stringify({
+          url: location.href,
+          visible,
+          scroll: scrollY,
+          lastItem: lastViewed,
+        }),
       );
     } catch {}
   });
+  $("project-grid").addEventListener("click", (event) => {
+    if (event.target.closest("a, [data-preview]"))
+      lastViewed =
+        event.target.closest("[data-item]")?.dataset.item || lastViewed;
+  });
+  function markVisited() {
+    document
+      .querySelectorAll("[data-item]")
+      .forEach((card) =>
+        card.classList.toggle("last-visited", card.dataset.item === lastViewed),
+      );
+  }
+  addEventListener("pageshow", markVisited);
   $("stats").innerHTML = [
     [data.topics.length, "实验主题"],
     [data.runs.length, "实验记录"],
@@ -231,12 +256,27 @@
             '<a href="' + e(U.previewURL(r)) + '"',
             '<a class="preview-link" href="' + e(U.previewURL(r)) + '"',
           )
-          .replace("</article>", "</div></article>");
+          .replace(
+            '<article class="card run-card">',
+            '<article class="card run-card" data-item="' +
+              e(r.id) +
+              '" data-topic="' +
+              e(r.topicId) +
+              '">',
+          )
+          .replace(
+            "</article>",
+            '<div class="run-list-score">' +
+              U.scoreBadge(r).replaceAll("score-chip", "list-score") +
+              '</div><time class="run-list-date">' +
+              e(r.date || "日期未记录") +
+              "</time></div></article>",
+          );
         return r.screenshot
           ? html
           : html.replace(
-              '<article class="card run-card">',
-              '<article class="card run-card">' + placeholder(r.title),
+              '<div class="run-body">',
+              placeholder(r.title) + '<div class="run-body">',
             );
       });
     else {
@@ -249,7 +289,9 @@
         !state.model &&
         !state.type &&
         !state.prompt &&
-        !state.preview
+        !state.preview &&
+        !state.screenshot &&
+        !state.comparable
       ) {
         topics.push(
           ...data.topics.filter(
@@ -315,17 +357,18 @@
         return (
           '<article class="card topic-card' +
           (cover ? " has-cover" : "") +
+          '" data-item="' +
+          e(t.id) +
           '">' +
           (cover || placeholder(t.title)) +
           '<div class="topic-body"><div class="card-top"><span class="eyebrow">' +
-          e(data.categories.find((c) => c.id === t.category).label) +
+          "实验主题" +
           '</span><div class="card-badges">' +
           (U.isTopicArchived(t) ? '<span class="pill">已归档</span>' : "") +
           U.executionModeBadge(previewRun) +
           (displayedRun
             ? U.scoreBadge(displayedRun).replace(">评分 ", ">截图评分 ")
             : "") +
-          U.complexityBadge(t) +
           '</div></div><h3><a href="topic.html?id=' +
           t.id +
           '">' +
@@ -339,7 +382,11 @@
           runs.length +
           " 条实验" +
           (runs.length !== all.length ? " / 共 " + all.length + " 个" : "") +
-          '</p><details class="experiment-info"><summary>实验信息</summary><div class="latest-run"><span>' +
+          '</p><details class="experiment-info"><summary>实验信息</summary><p class="topic-secondary">' +
+          e(data.categories.find((c) => c.id === t.category).label) +
+          " · " +
+          U.complexityBadge(t) +
+          '</p><div class="latest-run"><span>' +
           e(summaryLabel) +
           "</span><strong>" +
           e(
@@ -386,8 +433,29 @@
       });
     }
     $("project-grid").className =
-      "cards " + (state.view === "list" ? "list" : "");
-    $("project-grid").innerHTML = items.slice(0, visible).join("");
+      "cards " +
+      state.view +
+      (state.group === "runs" && state.view === "list" ? " run-ledger" : "");
+    let displayed = items.slice(0, visible);
+    const ledger = state.group === "runs" && state.view === "list";
+    if (ledger && state.runGrouping === "topic") {
+      const groups = [
+        ...new Set(matched.slice(0, visible).map((r) => r.topicId)),
+      ];
+      displayed = groups.flatMap((id) => [
+        '<h3 class="run-group-title">' +
+          e(data.topics.find((t) => t.id === id).title) +
+          "</h3>",
+        ...displayed.filter((html, i) => matched[i].topicId === id),
+      ]);
+    }
+    $("project-grid").innerHTML =
+      (ledger
+        ? '<div class="run-list-heading" aria-hidden="true"><span>作品</span><span>主题 / 实验</span><span>模型 / 档位</span><span>截图评分</span><span>日期</span><span>操作</span></div>'
+        : "") + displayed.join("");
+    $("run-grouping-control").hidden = !ledger;
+    $("run-grouping").checked = state.runGrouping === "topic";
+    markVisited();
     setupGalleryImages();
     $("result-count").textContent =
       "当前范围：" +
@@ -430,6 +498,14 @@
       "aria-pressed",
       String(state.preview === "yes"),
     );
+    document
+      .querySelectorAll("[data-quick]")
+      .forEach((button) =>
+        button.setAttribute(
+          "aria-pressed",
+          String(state[button.dataset.quick] === "yes"),
+        ),
+      );
     const filterCount = [
       "provider",
       "tool",
@@ -460,6 +536,8 @@
       "preview",
       "testing",
       "sort",
+      "screenshot",
+      "comparable",
     ]
       .filter(
         (key) =>
@@ -468,8 +546,9 @@
           !(key === "testing" && state[key] === "active"),
       )
       .map((key) => {
-        const label =
-          key === "q"
+        const label = ["screenshot", "comparable"].includes(key)
+          ? { screenshot: "有截图", comparable: "多模型可对比" }[key]
+          : key === "q"
             ? "搜索：" + state[key]
             : key === "testing"
               ? { active: "参与测试", archived: "已归档", all: "全部案例" }[
@@ -588,6 +667,17 @@
     visible += 9;
     render();
   });
+  $("run-grouping").addEventListener("change", (event) => {
+    state.runGrouping = event.target.checked ? "topic" : "";
+    render();
+  });
+  document.querySelectorAll("[data-quick]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const key = button.dataset.quick;
+      state[key] = state[key] ? "" : "yes";
+      render(true);
+    }),
+  );
   $("preview-only").addEventListener("click", () => {
     state.preview = state.preview === "yes" ? "" : "yes";
     render(true);
@@ -603,6 +693,8 @@
         type: "",
         prompt: "",
         preview: "",
+        screenshot: "",
+        comparable: "",
         testing: "active",
         sort: "complexity",
       });
@@ -620,8 +712,6 @@
   $("advanced-filters").open = !!(
     state.provider ||
     state.tool ||
-    state.group !== "topics" ||
-    state.view !== "grid" ||
     state.category ||
     state.type ||
     state.prompt ||
