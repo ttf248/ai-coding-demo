@@ -28,6 +28,8 @@ test("mobile experiment cards show actions without horizontal scrolling and expa
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("topic.html?id=fluid-simulation&view=list");
   const row = page.locator(".topic-run-row").first();
+  await expect(row.locator(".topic-run-date")).toBeHidden();
+  await row.locator(".run-context summary").click();
   await expect(row.locator(".topic-run-date")).toBeVisible();
   await expect(row.locator(".topic-run-provider")).toBeVisible();
   await expect(row.locator(".topic-run-tool")).toBeVisible();
@@ -57,21 +59,26 @@ test("experiment rows distinguish model makers from billing providers and explai
     .filter({ hasText: "Claude Haiku 5.5" })
     .first();
   await expect(page.locator(".topic-runs-table thead th").nth(0)).toHaveText(
-    "模型 / 厂商",
+    "作品",
   );
   await expect(page.locator(".topic-runs-table thead th").nth(1)).toHaveText(
-    "接入供应商 / 工具",
+    "模型 / 档位",
   );
   await expect(row.locator(".topic-run-model-maker")).toContainText(
     "Anthropic",
   );
+  await row.locator(".run-context summary").click();
   await expect(row.locator(".topic-run-provider")).toBeVisible();
   await expect(row.locator(".topic-run-provider")).toContainText(
     "GitHub Copilot",
   );
-  await expect(
-    row.locator(".topic-run-provider .mobile-cell-label"),
-  ).toBeVisible();
+  await expect(row.locator(".run-context dt")).toContainText([
+    "模型厂商",
+    "接入/付费供应商",
+    "运行工具",
+    "实验日期",
+    "执行模式",
+  ]);
   await expect(row.locator(".topic-run-billing summary")).not.toContainText(
     "接入/付费供应商",
   );
@@ -99,7 +106,7 @@ test("experiment rows distinguish model makers from billing providers and explai
   const billingProviderBounds = await row
     .locator(".topic-run-provider")
     .boundingBox();
-  expect(billingProviderBounds.x).toBeGreaterThan(makerBounds.x);
+  expect(billingProviderBounds.y).toBeGreaterThan(makerBounds.y);
 });
 
 test("gallery screenshot errors can be retried without changing the preview source", async ({
