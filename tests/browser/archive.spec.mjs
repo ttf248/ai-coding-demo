@@ -27,7 +27,7 @@ const blueLocalBuilds = blueBuilds.filter(
     ),
 );
 const url = (a, b, extra = "") =>
-  `compare.html?left=${a.id}&right=${b.id}${extra}`;
+  `compare.html?left=${a.id}&right=${b.id}${extra}${extra.includes("tab=") ? "" : "&tab=preview"}`;
 test("homepage model dropdown has canonical names and vendor/version ordering", async ({
   page,
 }) => {
@@ -230,9 +230,11 @@ test("live previews, equal viewports, unloading and single-side reload", async (
   await page.locator("#panel-left .panel-more > summary").click();
   await page.locator('[data-unload="left"]').click();
   await expect(page.locator("iframe")).toHaveCount(2);
-  await page.locator('[data-tab="info"]').click();
+  await page.locator('[data-tab="conditions"]').click();
   await expect(page.locator("iframe")).toHaveCount(0);
-  await expect(page.locator("#panel-left")).toContainText("人工修改与部署适配");
+  await expect(page.locator("#conditions-view")).toContainText(
+    "人工修改与部署适配",
+  );
 });
 test("missing, duplicate, no preview and invalid page are recoverable", async ({
   page,
@@ -274,7 +276,7 @@ test("module selection, sharing, missing HTTP preview and external fallback", as
   context,
 }) => {
   const multi = data.runs.find((r) => r.preview.pages.length > 1);
-  await page.goto(url(multi, blue[0], "&tab=info"));
+  await page.goto(url(multi, blue[0], "&tab=snapshot"));
   await page.locator("#page-left").selectOption(multi.preview.pages[1].id);
   await expect(page).toHaveURL(
     new RegExp("leftPage=" + multi.preview.pages[1].id),

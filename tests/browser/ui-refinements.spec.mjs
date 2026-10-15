@@ -139,7 +139,7 @@ test("mobile comparison labels show models and expose only the current preview",
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(
-    "compare.html?left=fluid-simulation--claude-sonnet-5-5-medium-r01&right=fluid-simulation--claude-haiku-5-5-max-r01",
+    "compare.html?left=fluid-simulation--claude-sonnet-5-5-medium-r01&right=fluid-simulation--claude-haiku-5-5-max-r01&tab=preview",
   );
   await expect(page.locator("#layout")).toBeHidden();
   await expect(page.locator(".mobile-layout-note")).toBeVisible();
