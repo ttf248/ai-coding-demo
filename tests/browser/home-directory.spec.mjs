@@ -269,7 +269,7 @@ test("homepage grid and list keep preview controls within a mobile viewport", as
   await page.locator("#sort").selectOption("title");
   await page.reload();
   await expect(page.locator("#sort")).toHaveValue("title");
-  await expect(page.locator("#advanced-filters")).toHaveAttribute("open", "");
+  await expect(page.locator("#advanced-filters")).not.toHaveAttribute("open");
 });
 
 test("homepage exposes archived topics and keeps its directory compact", async ({
@@ -593,7 +593,10 @@ test("legacy latest links return to complexity sorting and card badges stay grou
           await page.locator(".card-badges .execution-mode-chip").count(),
         ).toBeGreaterThan(0);
       } else {
-        await expect(page.locator(".card-badges .pill").first()).toBeVisible();
+        const details = page.locator(".experiment-info").first();
+        await expect(details.locator(".topic-secondary .pill")).toBeHidden();
+        await details.locator(":scope > summary").click();
+        await expect(details.locator(".topic-secondary .pill")).toBeVisible();
       }
       const aligned = await page
         .locator("#project-grid .card-top")
