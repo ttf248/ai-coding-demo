@@ -43,12 +43,13 @@
         p.get("tab"),
       )
         ? p.get("tab")
-        : "preview",
+        : "snapshot",
       source: p.get("source") === "raw" ? "raw" : "task",
       relatedOnly: p.get("related") !== "0",
       differencesOnly: p.get("differencesOnly") === "1",
       mobile: sides.includes(p.get("mobile")) ? p.get("mobile") : "left",
     };
+    if (state.tab === "info") state.tab = "conditions";
     if (!state.group) {
       const initial = data.runs.find((r) => r.id === state.left);
       if (initial) state.group = initial.topicId + "/" + initial.promptId;
@@ -80,7 +81,7 @@
   }
   function fillGroup() {
     state.scope = "task";
-    const runs = pool();
+    const runs = groupPrompt() ? pool() : [];
     sides.forEach((side, i) => {
       state[side] = state.layout === "quad" || i < 2 ? runs[i]?.id || "" : "";
       state[side + "Page"] = "";
@@ -90,7 +91,12 @@
     state.focus = "";
   }
   function runLabel(r) {
-    return U.runSummary(data, r);
+    return (
+      (!state.group || state.scope === "all" || !state.relatedOnly
+        ? (data.topics.find((t) => t.id === r.topicId)?.title || r.topicId) +
+          " · "
+        : "") + U.runSummary(data, r)
+    );
   }
   const slots = () => (state.layout === "quad" ? sides : sides.slice(0, 2));
   function visibleSides() {
@@ -235,8 +241,18 @@
   }
   function renderLoaded() {
     document.getElementById("data-retry")?.remove();
+    const empty = !sides.some((side) => state[side]);
+    document.body.dataset.contentMode = state.tab;
+    document.body.classList.toggle("comparison-empty", empty);
+    $("compare-start").hidden = !empty;
+    $("viewport-control").hidden = state.tab !== "preview";
+    document.querySelector(".mobile-layout-note").textContent =
+      state.tab === "preview"
+        ? "单屏轮看 · 切换实验会重新加载页面"
+        : "单屏轮看 · 切换 A / B 查看截图与输入";
     const visible = state.tab === "conditions" ? [] : visibleSides();
-    document.querySelector(".compare-grid").hidden = state.tab === "conditions";
+    document.querySelector(".compare-grid").hidden =
+      empty || state.tab === "conditions";
     $("conditions-view").hidden = state.tab !== "conditions";
     document.querySelector(".mobile-tabs").hidden = state.tab === "conditions";
     document.body.dataset.mode = state.layout;
@@ -430,7 +446,7 @@
         (run
           ? '<details class="panel-more"><summary>更多</summary><div>'
           : "") +
-        (href
+        (href && state.tab === "preview"
           ? '<button data-reload="' +
             side +
             '">重载</button><button data-unload="' +
@@ -620,8 +636,95 @@
       });
     }
     renderPicker();
+    renderSummary();
     if (state.tab === "conditions") renderConditions();
     requestAnimationFrame(resizeFrames);
+  }
+  function costSummary(run) {
+    const b = run.billing;
+    if (!b) return "费用未记录";
+    if (b.type === "subscription")
+      return (b.plan ? b.plan + " · " : "") + "订阅额度（单次金额未记录）";
+    const amount =
+      b.amount == null
+        ? "金额未记录"
+        : b.amount + " " + (b.unit || "单位未记录");
+    return b.type === "batch"
+      ? amount + " / " + (b.caseCount ?? "未记录") + " 案例批次"
+      : amount + " · 单次";
+  }
+  function durationSummary(run) {
+    const b = run.billing;
+    return b?.duration
+      ? b.duration.text +
+          (b.type === "batch"
+            ? " / " + (b.caseCount ?? "未记录") + " 案例批次"
+            : " · 单次")
+      : "耗时未记录";
+  }
+  function renderSummary() {
+    const holder = $("comparison-summary");
+    const selected = slots().filter((side) => getRun(side));
+    holder.hidden = state.tab !== "snapshot" || !selected.length;
+    if (holder.hidden) {
+      holder.innerHTML = "";
+      return;
+    }
+    const key = selected.map((side) => state[side]).join("/");
+    if (holder.dataset.key === key && holder.children.length) return;
+    holder.dataset.key = key;
+    const base = getRun("left");
+    holder.innerHTML =
+      '<div class="summary-heading"><h2>截图与实验数据</h2><span>费用与耗时保留批次口径</span></div><div class="summary-columns">' +
+      selected
+        .map((side) => {
+          const run = getRun(side);
+          const comparable =
+            base &&
+            run.id !== base.id &&
+            U.promptFor(data, base)?.hash === U.promptFor(data, run)?.hash &&
+            base.score?.rubricVersion === run.score?.rubricVersion &&
+            base.score?.criteriaHash &&
+            base.score.criteriaHash === run.score?.criteriaHash &&
+            U.scoreValue(base) !== null &&
+            U.scoreValue(run) !== null;
+          const delta = comparable
+            ? U.scoreValue(run) - U.scoreValue(base)
+            : null;
+          return (
+            '<article class="summary-record"><h3>' +
+            labels[side] +
+            " · " +
+            e(U.runSummary(data, run)) +
+            "</h3>" +
+            U.scoreDetails(run) +
+            (delta !== null
+              ? '<p class="score-delta">与 A 截图分差 ' +
+                (delta > 0 ? "+" : "") +
+                delta +
+                " · 同任务同规则，仅供参考</p>"
+              : '<p class="score-delta">' +
+                (run.id === base?.id
+                  ? "A · 基准实验"
+                  : "分数不作直接差值比较") +
+                "</p>") +
+            "<dl><dt>费用</dt><dd>" +
+            e(costSummary(run)) +
+            "</dd><dt>耗时</dt><dd>" +
+            e(durationSummary(run)) +
+            "</dd><dt>输入</dt><dd>" +
+            e(
+              run.id === base?.id
+                ? U.completenessLabel(run.input.completeness)
+                : U.relation(data, base, run),
+            ) +
+            '</dd></dl><a class="summary-record-link" href="' +
+            e(U.documentURL(run)) +
+            '">完整实验记录 →</a></article>'
+          );
+        })
+        .join("") +
+      "</div>";
   }
   function renderConditions() {
     const columns = slots().filter((side) => state[side]);
@@ -641,6 +744,23 @@
         (r) => data.topics.find((t) => t.id === r.topicId)?.title || "未记录",
       ],
       ["模型", (r) => U.modelLabel(data, r)],
+      [
+        "截图评分",
+        (r) =>
+          U.scoreValue(r) === null
+            ? {
+                insufficient: "证据不足",
+                unavailable: "无截图",
+                pending: "待评分",
+              }[r.score?.status] || "待评分"
+            : U.scoreValue(r) + "/100 · 规则 v" + r.score.rubricVersion,
+      ],
+      ["评分依据", (r) => r.score?.evidence || "未记录"],
+      ["费用", costSummary],
+      ["耗时", durationSummary],
+      ["模型厂商", (r) => U.modelProvider(data, r)],
+      ["接入供应商", (r) => r.billing?.provider || "未记录"],
+      ["计费说明", (r) => r.billing?.note || "未记录"],
       ["推理档位", (r) => U.effortLabel(r.effort)],
       ["执行模式", (r) => U.executionModeText(r)],
       ["自主优化授权原文", (r) => r.input.authorization || "未记录"],

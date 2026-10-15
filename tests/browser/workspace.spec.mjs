@@ -15,7 +15,7 @@ async function prepare(page) {
       body: "<!doctype html><html><body><h1>Preview fixture</h1></body></html>",
     }),
   );
-  await page.goto("compare.html?group=bluebook%2Fv1");
+  await page.goto("compare.html?group=bluebook%2Fv1&tab=preview");
 }
 
 test("model picker groups vendors and sorts versions on desktop and mobile", async ({

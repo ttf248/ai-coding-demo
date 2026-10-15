@@ -178,14 +178,7 @@ test("design-enhanced authorization is visible on home, topic and comparison pag
     designRun.input.authorization,
   ]);
 
-  await page.locator('[data-tab="info"]').click();
-  await page.locator('[data-mobile="right"]').click();
-  await expect(page.locator("#panel-right")).toBeVisible();
-  await expect(page.locator("#panel-right .execution-mode-chip")).toHaveText(
-    "自主设计授权",
-  );
-  await expect(page.locator("#panel-right .execution-mode-chip")).toBeVisible();
-  await expect(page.locator("#panel-right .panel-info")).toContainText(
+  await expect(page.locator("#conditions-view")).toContainText(
     designRun.input.authorization,
   );
   await expect(
@@ -419,6 +412,8 @@ test("four-slot selection persists across pages, replaces, removes and opens exa
       .locator("[data-run]")
       .evaluateAll((nodes) => nodes.map((n) => n.value)),
   ).toEqual(chosen);
+  await expect(page.locator("iframe")).toHaveCount(0);
+  await page.locator('[data-tab="preview"]').click();
   await expect(page.locator("iframe")).toHaveCount(
     chosen.filter((id) => data.runs.find((r) => r.id === id).preview.embed)
       .length,
