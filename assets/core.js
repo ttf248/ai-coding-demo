@@ -525,7 +525,9 @@
           ? '<a class="button primary" href="compare.html?' +
             escape(params.toString()) +
             '">开始对比 ↗</a>'
-          : '<span role="status">再选一个实验开始对比</span>') +
+          : '<span role="status">再选一个实验开始对比</span><button data-find-related="' +
+            escape(selected[0]) +
+            '">寻找同任务实验</button>') +
         '</div></div><div class="selection-items">' +
         selected
           .map((id, i) => {
@@ -558,6 +560,24 @@
       });
     }
     document.addEventListener("click", (event) => {
+      const related = event.target.closest("[data-find-related]");
+      if (related) {
+        const run = data.runs.find((r) => r.id === related.dataset.findRelated);
+        if (!run) return;
+        const request = new CustomEvent("archive-find-related", {
+          detail: { runId: run.id },
+          cancelable: true,
+        });
+        if (document.dispatchEvent(request)) {
+          location.href =
+            "topic.html?" +
+            new URLSearchParams({
+              id: run.topicId,
+              prompt: run.promptId,
+              view: "list",
+            });
+        }
+      }
       const b = event.target.closest("[data-compare]");
       if (b) {
         const id = b.dataset.compare;
