@@ -232,7 +232,19 @@ export function documentOutputs(catalog, generated) {
     const actions =
       `<a href="${escape(relative(source))}" download>下载 Markdown 原文 ↗</a>` +
       (run
-        ? `<a href="${escape(relative("topic.html"))}?id=${escape(run.topicId)}">查看主题与版本 →</a>`
+        ? `<a href="${escape(relative("topic.html"))}?id=${escape(run.topicId)}#run-${escape(run.id)}">返回主题 →</a>` +
+          (() => {
+            const href =
+              run.preview.kind === "external"
+                ? run.preview.externalUrl
+                : run.preview.pages?.find(
+                    (page) => page.id === run.preview.defaultPage,
+                  )?.href;
+            return href
+              ? `<a class="button primary" href="${escape(run.preview.kind === "external" ? href : relative(href))}" target="_blank" rel="noopener">运行作品 ↗</a>`
+              : "";
+          })() +
+          `<a class="button" href="${escape(relative("compare.html"))}?left=${encodeURIComponent(run.id)}&amp;tab=snapshot">对比此实验</a>`
         : "") +
       (guide
         ? `<a class="button primary" href="${escape(relative(guide.example))}">运行示例 ↗</a>`
