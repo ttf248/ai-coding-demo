@@ -1,0 +1,4 @@
+import {create} from 'zustand';
+import {posts,Post} from './data';
+type State={posts:Post[];liked:number[];saved:number[];query:string;category:string;view:'discover'|'saved';toggleLike:(id:number)=>void;toggleSave:(id:number)=>void;setQuery:(v:string)=>void;setCategory:(v:string)=>void;setView:(v:'discover'|'saved')=>void;publish:(p:Post)=>void};
+export const useStore=create<State>(set=>({posts,liked:[],saved:[],query:'',category:'推荐',view:'discover',toggleLike:id=>set(s=>({liked:s.liked.includes(id)?s.liked.filter(i=>i!==id):[...s.liked,id]})),toggleSave:id=>set(s=>({saved:s.saved.includes(id)?s.saved.filter(i=>i!==id):[...s.saved,id]})),setQuery:query=>set({query}),setCategory:category=>set({category}),setView:view=>set({view,category:'推荐',query:''}),publish:post=>set(s=>({posts:[post,...s.posts],view:'discover',category:'推荐',query:''}))}));

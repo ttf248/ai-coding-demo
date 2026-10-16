@@ -1,0 +1,6 @@
+export type Post={id:number;title:string;author:string;image:string;ratio:number;likes:number;tag:string;body:string};
+const titles=['山不见我，我自去见山｜周末逃离计划','把春天装进客厅，家的松弛感就有了','今日份快乐：一杯咖啡，和慢一点的时间','在京都的小巷里，捡到一整个下午','把普通的一餐，过成喜欢的生活','日落之前，去海边发一会儿呆','终于找到属于自己的阅读角落了','我的通勤穿搭，不费力也很有态度','跟着光走，总能遇见惊喜','生活的留白，藏在这些小细节里','想和你分享的，是此刻的风景','今天也认真吃早餐，好好照顾自己'];
+const authors=['山野来信','小岛日常','栗子同学','橘子汽水','一口小满','阿北的相册','木木的家','白桃乌龙','慢拍一张','生活收藏家','远山有信','南瓜厨房'];
+const tags=['旅行','家居','美食','旅行','美食','旅行','家居','穿搭','摄影','家居','摄影','美食'];
+export const posts:Post[]=Array.from({length:80},(_,i)=>({id:i+1,title:titles[i%12]+(i>=12?` · 灵感手记 ${Math.floor(i/12)+1}`:''),author:authors[i%12],image:`./images/photo-${i%12+1}.jpg`,ratio:[.75,1,.8,.68,1,.78,.72,.85,1,.8,.7,.92][i%12],likes:48+(i*137)%2300,tag:tags[i%12],body:'把日常过成自己喜欢的样子，不需要等到某个特别的日子。记录一个小小的瞬间，也记录当时的心情。\n\n你最近发现了什么生活里的小美好？一起聊聊吧。'}));
+export const fallback='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="500" height="600"><rect width="500" height="600" fill="#e9e7df"/><circle cx="350" cy="160" r="65" fill="#e4b586"/><path d="M0 460L170 230L360 490L500 300V600H0" fill="#a4b49d"/><text x="250" y="550" text-anchor="middle" font-size="20" fill="#53654c">生活，自有风景</text></svg>');
