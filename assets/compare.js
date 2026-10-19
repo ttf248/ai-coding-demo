@@ -164,6 +164,17 @@
     state[side + "Page"] = "";
     unloaded[side] = false;
   }
+  function stepTopic(direction) {
+    const select = $("group");
+    // The empty option is for clearing the workspace, not keyboard navigation.
+    const index = Math.max(
+      1,
+      Math.min(select.options.length - 1, select.selectedIndex + direction),
+    );
+    if (!select.options[index] || index === select.selectedIndex) return;
+    select.selectedIndex = index;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  }
   function renderPicker() {
     $("scope").value = state.scope;
     const q = $("model-search").value.trim().toLocaleLowerCase();
@@ -313,6 +324,9 @@
     $("layout").value = state.layout;
     $("layout").hidden = narrow.matches;
     $("group").value = state.group;
+    $("previous-topic").disabled = $("group").selectedIndex <= 1;
+    $("next-topic").disabled =
+      $("group").selectedIndex === $("group").options.length - 1;
     document
       .querySelector(".mobile-tabs")
       .classList.toggle("show-tabs", state.layout === "single");
@@ -956,6 +970,10 @@
   document.addEventListener("click", (event) => {
     const el = event.target.closest("button");
     if (!el) return;
+    if (el.id === "previous-topic" || el.id === "next-topic") {
+      stepTopic(el.id === "previous-topic" ? -1 : 1);
+      return;
+    }
     if (el.hasAttribute("data-start-comparison")) {
       $("group").focus();
       try {
@@ -1058,6 +1076,19 @@
       })
       .join("");
   $("model-search").addEventListener("input", renderPicker);
+  $("group").addEventListener("keydown", (event) => {
+    if (
+      !["ArrowUp", "ArrowDown"].includes(event.key) ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.isComposing
+    )
+      return;
+    event.preventDefault();
+    stepTopic(event.key === "ArrowUp" ? -1 : 1);
+  });
   new ResizeObserver(resizeFrames).observe(
     document.querySelector(".compare-grid"),
   );
