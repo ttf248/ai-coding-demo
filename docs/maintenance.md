@@ -121,6 +121,10 @@ node --input-type=module -e "import {read,hash} from './scripts/lib.mjs'; consol
 
 ### 预览配置
 
+嵌入展示是新增和导入案例的入库条件：设置 `preview.embed: true` 前，须在对比页实际打开该入口并确认主体可见。静态 HTML 与构建产物在本地 HTTP 和 Pages 子路径下验证；外部页面须使用真实可访问的 HTTPS 地址，并确认响应策略允许 iframe。验证失败或地址未就绪时，暂缓导入该记录。全栈案例保留源码和运行说明，取得可用部署地址后再登记；仅提示词或无网页产物的案例须先有明确标注的嵌入式记录展示入口，不能伪装成模型产物。历史记录可保留 `kind: "none"` 与 `embed: false`，不批量改写历史。
+
+`new:demo` 生成的工作草稿可以暂时使用无预览配置；完成入口后再登记为正式记录。提交新导入案例前，运行 `npm run test:browser` 并确认对比页中的实际展示。
+
 静态单文件和原型设置 `preview.kind: "static"`，入口相对于实验目录。新单文件入口用 `index.html`。多页面配置 `pages`，每项包含 `id`、`label`、`path`，`defaultPage` 指向其中一项。
 
 新建或迁移可运行的 ready run 时，应登记一张代表性的桌面实际运行截图：PNG 放在本 run 目录，`run.json` 的 `screenshot` 填相对路径。迁移时优先复制源记录已有的实测截图；没有截图但入口可运行时，使用 HTTP 页面补拍。不要把占位图或主题缩略图登记成本 run 的截图。每张真实截图都要按[案例截图评分规则](case-scoring.md)写入 `run.json`；截图变化后需重评。首页按主题聚合时，默认显示当前筛选结果中评分最高的 run，其评分、截图和可用预览保持一致；按 run 聚合时显示各自已登记的截图。没有 run 截图时才回退到主题 `thumbnail`，且无截图记录不参加评分排序。
@@ -148,12 +152,13 @@ npm run build:demo -- bluebook--minimax-m2-unknown-r01
 
 脚本在该实验内 `npm ci`、执行登记的 npm 命令，复制产物到 `previews/{topic}/{run}/` 并记录源码和输出指纹。预览产物必须随源码提交；不要只提交源码 `index.html`。指纹覆盖源码、图片、构建配置与构建脚本，不含文档。默认每个 demo 独立依赖，不合并 lockfile。
 
-外部部署设置 `kind: "external"`、HTTPS `externalUrl`、空 `pages`、null `defaultPage`、null `build`，默认 `embed: false`，确认允许 iframe 后才能启用。仅源码或提示词记录设置 `kind: "none"`、`embed: false`，不提供伪预览。外部备用地址放在 `links` 中。
+外部部署设置 `kind: "external"`、HTTPS `externalUrl`、空 `pages`、null `defaultPage`、null `build`；新导入的外部案例经 iframe 验证后设置 `embed: true`，未验证或被站点策略阻止时暂缓导入。历史上的无预览记录可设置 `kind: "none"`、`embed: false`，新案例不得以此状态入库，也不提供伪预览。外部备用地址放在 `links` 中。
 
 ```sh
 npm run generate
 npm run validate
 npm test
+npm run test:browser
 npm run preview
 ```
 

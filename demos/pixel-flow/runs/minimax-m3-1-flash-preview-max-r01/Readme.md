@@ -87,4 +87,5 @@ npx serve .          # 或任意静态服务器
 - 渲染修正：粒子全部归位后加色混合会过曝成白块，改为普通混合并按还原度微调亮度，完整还原时能正确还原出原图配色。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/pixel-flow/runs/minimax-m3-1-flash-preview-max-r01；保留该测试轮号。
 - 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
+- 维护者 2026-10-20：启用对比页 iframe 嵌入；通过本地 HTTP 页面确认默认入口可加载。未改动实验源码、原始输入和截图。
 <!-- archive:end -->
