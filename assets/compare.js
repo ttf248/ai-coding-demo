@@ -854,8 +854,10 @@
       return;
     }
     if (el.id === "group") {
+      const hasSelectedRuns = sides.some((side) => state[side]);
       state.group = el.value;
-      fillGroup();
+      state.scope = "task";
+      if (!hasSelectedRuns) fillGroup();
     } else if (el.id === "layout") {
       state.layout = el.value;
       state.focus = "";
