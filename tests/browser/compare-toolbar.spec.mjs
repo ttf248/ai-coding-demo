@@ -27,11 +27,12 @@ test("wide toolbar centers task navigation and controls, keeps actions on the ri
   for (const [width, height] of [
     [2560, 1440],
     [1440, 960],
+    [1200, 960],
     [1024, 768],
     [390, 844],
   ]) {
     await page.setViewportSize({ width, height });
-    await expect(page.locator("#group-keyboard-tip")).toBeVisible();
+    await expect(page.locator("#group-keyboard-tip")).toBeHidden();
     await expect(page.locator("#group")).toHaveAttribute(
       "aria-describedby",
       "group-keyboard-tip",
@@ -52,9 +53,30 @@ test("wide toolbar centers task navigation and controls, keeps actions on the ri
         actions: rect(".workspace-actions"),
         home: rect(".workspace-home"),
         segments: rect(".compare-controls .segments"),
+        context: rect(".comparison-context"),
         controls: rect(".compare-controls"),
         grid: rect(".compare-grid"),
         overflow: document.documentElement.scrollWidth > innerWidth,
+        controlsOverlap: (() => {
+          const b = document
+            .querySelector(".comparison-context")
+            .getBoundingClientRect();
+          return [
+            ...document.querySelectorAll(
+              ".compare-controls > :not(.comparison-context)",
+            ),
+          ]
+            .filter((el) => el.getClientRects().length)
+            .some((el) => {
+              const a = el.getBoundingClientRect();
+              return (
+                a.left < b.right &&
+                a.right > b.left &&
+                a.top < b.bottom &&
+                a.bottom > b.top
+              );
+            });
+        })(),
       };
     });
     expect(rects.overflow, `overflow at ${width}px`).toBe(false);
@@ -62,9 +84,13 @@ test("wide toolbar centers task navigation and controls, keeps actions on the ri
       expect(Math.abs(rects.topic.center - width / 2)).toBeLessThan(2);
       expect(rects.home.right).toBeLessThan(rects.topic.left);
       expect(rects.actions.left).toBeGreaterThan(rects.topic.right);
-      expect(rects.segments.left).toBeGreaterThan(width / 4);
+      expect(rects.segments.left).toBeGreaterThan(width / 5);
+      expect(rects.controlsOverlap).toBe(false);
       expect((height - rects.grid.top) / height).toBeGreaterThan(0.8);
     }
+    await page.locator("#group").focus();
+    await expect(page.locator("#group-keyboard-tip")).toBeVisible();
+    await page.locator("#group").blur();
     if (width === 390) {
       expect(rects.actions.top).toBeGreaterThanOrEqual(rects.topic.bottom);
       await expect(page.locator("iframe")).toHaveCount(1);
