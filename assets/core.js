@@ -47,6 +47,24 @@
       Number(!x?.provider) - Number(!y?.provider) ||
       (x?.provider || "").localeCompare(y?.provider || "", "en");
     if (providerOrder) return providerOrder;
+    const xDate = x?.ordering?.releaseDate || "";
+    const yDate = y?.ordering?.releaseDate || "";
+    const unresolvedOrder = Number(!xDate) - Number(!yDate);
+    if (unresolvedOrder) return unresolvedOrder;
+    // Generations are explicitly registered; minor product revisions can share one.
+    const xGeneration = x?.ordering?.generation || [];
+    const yGeneration = y?.ordering?.generation || [];
+    for (let i = 0; i < Math.max(xGeneration.length, yGeneration.length); i++) {
+      const order = (yGeneration[i] || 0) - (xGeneration[i] || 0);
+      if (order) return order;
+    }
+    // Capability priorities apply within a provider and generation, never globally.
+    const capabilityOrder =
+      (y?.ordering?.capabilityRank ?? -1) - (x?.ordering?.capabilityRank ?? -1);
+    if (xDate && capabilityOrder) return capabilityOrder;
+    const dateOrder = yDate.localeCompare(xDate);
+    if (dateOrder) return dateOrder;
+    // Unresolved records retain a deterministic fallback without inventing dates.
     for (
       let i = 0;
       i < Math.max(x?.version?.length || 0, y?.version?.length || 0);

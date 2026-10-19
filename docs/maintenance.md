@@ -20,6 +20,16 @@
 - `catalog/batches.json`：费用批次字典。新实验可使用 `billing: {"type":"batch","batchId":"已登记批次"}`。既有实验中的完整费用快照继续保留，校验器核对它与字典的一致性。
 - 根 README 的 catalog 区块、主题 README、实验 README 的 archive 区块由脚本维护。区块外的历史记录不会被生成器覆盖。
 
+### 模型发布日期与排序
+
+模型排序依据保存在 `catalog/models.json` 的 `ordering`，契约见 `catalog/schema.json` 的 `modelOrdering`。查看[完整排序及官方来源核对表](model-ordering.md)，该表及其静态阅读页由 `npm run generate` 从模型字典生成，禁止手工维护第二份顺序。
+
+厂商内部先按 `generation` 显式登记的代际从新到旧，再按同代 `capabilityRank` 从大到小，最后按 `releaseDate` 从新到旧。代际不直接等同显示版本：GPT-6.1 Sol 与 GPT-6 Astra / Sol / Luna 归入 `[6]`；Claude Opus / Sonnet / Haiku 5.5 归入 `[5, 5]`，因此较晚发布的 Haiku 5.5 不会越过同代 Opus / Sonnet。能力优先级依据已保存的官方产品定位和比较作维护判断，仅在同厂商同代比较，不是跨代或跨厂商分数。官方依据只能确认月份时保留 `YYYY-MM`，不能补造具体日期。缺少日期置于厂商末尾；同代能力未比较的型号置于已登记优先级之后；其余并列保留版本、变体及 ID 的稳定顺序，不表示能力强弱。筛选列表、主题实验列表、模型分组、档位矩阵和对比候选统一使用 `ArchiveUI.compareModels`，不按显示名称拆解或另排一套顺序。显式选择“实验日期”或“截图评分”时继续使用对应的实验排序。
+
+`releaseDate` 记录模型首次官方公布的日期，不是实验日期、知识截止日期、文档修改日期、降价日、区域或第三方平台接入日期。Free 等接入标签可按明确可识别的基础型号首发排序，并在 `note` 注明边界；不得将正式版日期或能力结论套用到预览检查点。型号不明确或名称与官方不一致时保持原有 ID、名称及历史输入，日期和能力填 `null`，等待维护者确认。
+
+新增模型前执行 `npm run models:pending`。输出中的 `needsResearch` 才需要查询官方消息；已有记录直接复用，包括已明确记为未知的型号。`needsConfirmation` 是查过但仍需确认的项目，不代表每次都要重新查询。除新增缺失记录或维护者明确要求刷新外，日常生成、校验和浏览都不联网查询模型资料。保存 `checkedAt`、官方 `sources`、日期说明 `note` 和能力依据 `capabilityNote`；`status` 分别使用 `verified`（已确认）、`partial`（月份确认但日不明确）、`unresolved`（仍待确认）或 `not-applicable`（仅 unknown）。不能将未查证和查证后未知混为一谈。
+
 实验费用写在 `run.json` 的 `billing` 中。`type: "subscription"` 记录订阅方式，未知的货币金额填 `null`；`type: "batch"` 的 `amount` 是批次合计，关联批次的多条 run 可重复引用同一 `batchId`，不得将总额误读或拆算为单案例费用。金额换算时，`sourceAmount`、`sourceUnit` 与 `conversionRate` 保留原始数值及换算比例；`amount` 和 `unit` 记录换算结果。平台没有提供的额度或费用明细保持未知，并在 `note` 说明口径。
 
 所有元数据使用 `schemaVersion: 1`，契约见 [schema](../catalog/schema.json)。实验 ID 为 `{topic}--{run}`；目录用小写 kebab-case，显示名称不受 slug 限制。模型重跑新增 `r02`，不是覆盖 `r01`。未知模型用 `unknown`；日期允许年、月、日精度，缺失为 null。
@@ -182,7 +192,7 @@ V2 的旧路径对照保存在 [迁移清单](../catalog/migration-v2.json)，�
 
 模型字典显式维护 `provider`（厂商）、`version`（数字版本数组，如 `[6, 1]`）和 `variant`（变体，无则为空字符串）。未知模型用 null 厂商和空版本数组，不从实验目录或标题猜测。
 
-对比选择器按厂商英文名称升序分组，未知放最后；同厂商数字版本降序，变体按名称排序。同模型的明确档位按 max、xhigh、high、medium、low 从高到低排列；ultra 等非标准标签随后单独保留，default 再后，unknown 最后。default 不映射为某个固定强度，不推断 ultra 与明确档位的强弱关系。排序统一由 assets/core.js 维护，主题表格默认排序、档位筛选、矩阵列与对比选择器共用。同档位按实验日期降序、轮次降序，再按实验 ID 自然排序。分组计数反映当前范围和搜索结果；搜索支持显示名称、模型 ID 和厂商。首页模型筛选、侧栏下拉和弹窗使用同一模型排序与厂商分组；侧栏同正文候选用「同正文」标记，不改变厂商与版本顺序；上一/下一版本与默认填充采用选择器排序。
+对比选择器按厂商英文名称升序分组，未知放最后；厂商内部按[模型发布日期与排序](#模型发布日期与排序)使用已登记的代际、同代能力优先级及发布日期。同模型的明确档位按 max、xhigh、high、medium、low 从高到低排列；ultra 等非标准标签随后单独保留，default 再后，unknown 最后。default 不映射为某个固定强度，不推断 ultra 与明确档位的强弱关系。排序统一由 assets/core.js 维护，主题表格默认排序、档位筛选、矩阵列与对比选择器共用。同档位按实验日期降序、轮次降序，再按实验 ID 自然排序。分组计数反映当前范围和搜索结果；搜索支持显示名称、模型 ID 和厂商。首页模型筛选、侧栏下拉和弹窗使用同一模型排序与厂商分组；侧栏同正文候选用「同正文」标记，不改变模型顺序；上一/下一版本与默认填充采用选择器排序。
 
 档位定义参考 [OpenAI 推理模型文档](https://developers.openai.com/api/docs/guides/reasoning)：支持的档位及默认值因模型而异。上述从高到低是本站的浏览顺序，不能作为跨模型性能排名；仅排序已有归档数据，不为历史实验补写档位。
 

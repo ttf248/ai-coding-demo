@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { modelOrderingReport } from "./model-ordering.mjs";
 import {
   browserOutputs,
   documentOutputs,
@@ -332,6 +333,7 @@ export function generatedFiles(catalog) {
       "\n";
     outputs.set(r.document, replaceBlock(prefix, "archive", content));
   }
+  outputs.set("docs/model-ordering.md", modelOrderingReport(catalog.models));
   for (const [file, content] of documentOutputs(catalog, outputs))
     outputs.set(file, content);
   return outputs;

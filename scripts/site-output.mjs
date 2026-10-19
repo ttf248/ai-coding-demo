@@ -126,12 +126,15 @@ export function documentOutputs(catalog, generated) {
       ...catalog.topics.map((topic) => `${topic.directory}/Readme.md`),
       ...catalog.guides.map((guide) => guide.document),
       "docs/maintenance.md",
+      "docs/model-ordering.md",
       "docs/case-scoring.md",
       "docs/scoring-reviews/2026-10-15-v2.md",
       "docs/archive-workspace.md",
       "docs/vercel-root-directories.md",
     ]),
-  ].filter((file) => fs.existsSync(path.join(root, file)));
+  ].filter(
+    (file) => generated.has(file) || fs.existsSync(path.join(root, file)),
+  );
   const known = new Set(sourceFiles);
   const outputs = new Map();
   for (const source of sourceFiles) {
@@ -146,7 +149,8 @@ export function documentOutputs(catalog, generated) {
         path.posix.join(path.posix.dirname(source), file),
       );
       if (target.startsWith("../") || path.posix.isAbsolute(target)) return "#";
-      if (!fs.existsSync(path.join(root, target))) return null;
+      if (!generated.has(target) && !fs.existsSync(path.join(root, target)))
+        return null;
       return (
         relative(known.has(target) ? readerPath(target) : target) +
         (query ? "?" + query : "") +

@@ -36,7 +36,7 @@ const unique = (list, label) =>
 const ajv = new Ajv({ allErrors: true });
 const schema = readJSON("catalog/schema.json");
 const schemas = Object.fromEntries(
-  ["topic", "prompt", "run"].map((k) => [
+  ["topic", "prompt", "run", "modelOrdering"].map((k) => [
     k,
     ajv.compile({ ...schema, $ref: `#/$defs/${k}` }),
   ]),
@@ -73,6 +73,14 @@ for (const key of ["models", "categories"]) {
     );
 }
 for (const model of catalog.models) {
+  check(
+    schemas.modelOrdering(model.ordering),
+    `Invalid model ordering metadata: ${model.id}; run npm run models:pending: ${ajv.errorsText(schemas.modelOrdering.errors)}`,
+  );
+  check(
+    (model.ordering?.status === "not-applicable") === (model.id === "unknown"),
+    `Only the unknown model may omit release research: ${model.id}`,
+  );
   check(
     (model.id === "unknown"
       ? model.provider === null
@@ -353,10 +361,9 @@ for (const [file, content] of await siteResourceOutputs(catalog))
 const generated = generatedFiles(catalog);
 for (const [file, content] of generated) {
   if (!file.endsWith(".md")) continue;
-  const current =
-    file === "Readme.md" || file.split("/").length === 3
-      ? content
-      : content.split("<!-- archive:start -->")[1];
+  const current = catalog.runs.some((run) => run.document === file)
+    ? content.split("<!-- archive:start -->")[1]
+    : content;
   for (const match of current.matchAll(/\]\(([^\s)]+)\)/g)) {
     const href = match[1];
     if (/^(?:https?:|#)/.test(href)) continue;

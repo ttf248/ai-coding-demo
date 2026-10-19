@@ -18,7 +18,7 @@ async function prepare(page) {
   await page.goto("compare.html?group=bluebook%2Fv1&tab=preview");
 }
 
-test("model picker groups vendors and sorts versions on desktop and mobile", async ({
+test("model picker groups vendors and uses generations and capability on desktop and mobile", async ({
   page,
 }) => {
   await prepare(page);
@@ -59,22 +59,31 @@ test("model picker groups vendors and sorts versions on desktop and mobile", asy
       return buttons.map((b) => {
         const r = d.runs.find((r) => r.id === b.dataset.choice);
         const m = d.models.find((m) => m.id === r.modelId);
-        return { provider: m.provider, version: m.version };
+        return { provider: m.provider, id: m.id };
       });
     });
   const rows = await inspect();
-  for (let i = 1; i < rows.length; i++) {
-    const a = rows[i - 1],
-      b = rows[i];
-    if (a.provider !== b.provider) continue;
-    for (let j = 0; j < Math.max(a.version.length, b.version.length); j++) {
-      const diff = (a.version[j] || 0) - (b.version[j] || 0);
-      if (diff) {
-        expect(diff).toBeGreaterThan(0);
-        break;
-      }
-    }
-  }
+  const modelsFor = (provider) => [
+    ...new Set(
+      rows.filter((row) => row.provider === provider).map((row) => row.id),
+    ),
+  ];
+  expect(modelsFor("OpenAI")).toEqual([
+    "gpt-6-astra",
+    "gpt-6-1-sol",
+    "gpt-6-sol",
+    "gpt-6-luna",
+    "gpt-5-6-sol",
+    "gpt-5-6-luna",
+    "gpt-6",
+  ]);
+  expect(modelsFor("Anthropic")).toEqual([
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
+    "claude-haiku-5-5",
+    "claude-haiku-45",
+    "claude-4-0",
+  ]);
   await page.locator("#model-search").fill("gpt-6.1-sol");
   await expect(page.locator(".model-provider")).toHaveCount(1);
   await expect(page.locator(".model-choice").first()).toContainText(
@@ -83,7 +92,7 @@ test("model picker groups vendors and sorts versions on desktop and mobile", asy
   await page.locator("#model-search").fill("MiniMax");
   await expect(page.locator(".model-provider")).toHaveCount(1);
   await expect(page.locator(".model-choice").first()).toContainText(
-    "MiniMax M3.1 Flash Preview",
+    "MiniMax M3",
   );
   await page.setViewportSize({ width: 390, height: 844 });
   expect(

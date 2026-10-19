@@ -116,7 +116,7 @@
           '<option value="' + e(v) + '">' + e(U.effortLabel(v)) + "</option>",
       )
       .join("") +
-    '</select></label><label id="topic-sort-field">排序<select id="topic-sort"><option value="model">模型 / 档位从高到低</option><option value="recent">日期从新到旧</option><option value="score">截图评分（同任务内）</option></select></label></div></details><button id="topic-reset">清除筛选</button></div>' +
+    '</select></label><label id="topic-sort-field">排序<select id="topic-sort"><option value="model">模型代际 / 能力 / 发布日期</option><option value="recent">实验日期从新到旧</option><option value="score">截图评分（同任务内）</option></select></label></div></details><button id="topic-reset">清除筛选</button></div>' +
     '<div class="topic-results-heading"><p id="topic-count" role="status"></p><p id="topic-results-help"></p></div><section id="topic-matrix" aria-label="模型与档位实验矩阵" hidden></section><section id="topic-models" aria-label="按模型浏览实验"></section><section id="topic-list" hidden><div class="topic-run-groups"></div></section><section id="topic-prompts" class="prompt-library" hidden><h2>任务与版本</h2><div></div></section>';
   root.append(document.getElementById("pricing-context"));
   const refreshSelection = U.setupSelection(data);
