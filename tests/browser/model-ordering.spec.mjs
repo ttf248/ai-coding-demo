@@ -21,6 +21,7 @@ const expected = {
   ],
   "Alibaba Cloud": ["qwen3-8-max", "qwen3-8-flash"],
   MiniMax: [
+    "minimax-m3-1-flash",
     "minimax-m3",
     "minimax-m2-1",
     "minimax-m2",

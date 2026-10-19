@@ -76,11 +76,13 @@
 
 | 顺序 | 模型 | 代际 | 同代能力优先级 | 发布日期 | 状态 | 查证日期 |
 |---|---|---|---|---|---|---|
-| 1 | MiniMax M3 | 3 | 未比较 | 2026-06-01 | 已核实 | 2026-10-19 |
-| 2 | MiniMax M2.1 | 2.1 | 未比较 | 2025-12 | 月份已确认，日待确认 | 2026-10-19 |
-| 3 | MiniMax M2 | 2 | 未比较 | 2025-10-27 | 已核实 | 2026-10-19 |
-| 4 | MiniMax M3.1 Flash Preview | 未确认 | 未比较 | 未记录 | 待确认 | 2026-10-19 |
+| 1 | MiniMax M3.1 Flash | 3.1 | 未比较 | 2026-10-19 | 月份已确认，日待确认 | 2026-10-20 |
+| 2 | MiniMax M3 | 3 | 未比较 | 2026-06-01 | 已核实 | 2026-10-19 |
+| 3 | MiniMax M2.1 | 2.1 | 未比较 | 2025-12 | 月份已确认，日待确认 | 2026-10-19 |
+| 4 | MiniMax M2 | 2 | 未比较 | 2025-10-27 | 已核实 | 2026-10-19 |
+| 5 | MiniMax M3.1 Flash Preview | 未确认 | 未比较 | 未记录 | 待确认 | 2026-10-19 |
 
+- **MiniMax M3.1 Flash**（`minimax-m3-1-flash`）：MiniMax 官方研究博客将 M3.1 Flash 列为 2026-10-19 正式推出；按官方名称登记代际 [3,1]。 官方资料未提供与 M3.1 Flash Preview 的同代能力顺序，暂不赋能力优先级；Preview 的正式首发日期仍未确认。 [官方来源 1](https://www.minimax.io/blog/minimax-m31f)
 - **MiniMax M3**（`minimax-m3`）：官方博客及模型更新日志均记载 2026-06-01 发布。 同厂商同代没有其他已登记型号，无需比较能力。 [官方来源 1](https://www.minimax.io/blog/minimax-m3) · [官方来源 2](https://platform.minimax.io/docs/release-notes/models)
 - **MiniMax M2.1**（`minimax-m2-1`）：官方模型更新日志标注 2025-12-22，博客标注 2025-12-23。仅登记双方一致的月份，不擅自选定日期。 同厂商同代没有其他已登记型号，无需比较能力。 [官方来源 1](https://platform.minimax.io/docs/release-notes/models) · [官方来源 2](https://www.minimax.io/blog/minimax-m21)
 - **MiniMax M2**（`minimax-m2`）：官方博客及模型更新日志均记载 2025-10-27 发布。 同厂商同代没有其他已登记型号，无需比较能力。 [官方来源 1](https://www.minimax.io/blog/minimax-m2-en-1748600000) · [官方来源 2](https://platform.minimax.io/docs/release-notes/models)

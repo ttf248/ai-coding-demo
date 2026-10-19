@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f7f9"><script src="../../../../../../analytics.js" defer></script><title>彩色流体实验台 · AI Coding Demo</title><meta name="description" content="WebGL 彩色流体实验台：真实求解二维不可压缩流体的平流、散度、压力迭代与速度投影，拖动注入染料与动量，可调颜色、注入力度、消散、压力迭代、模拟分辨率与卷曲强度，支持暂停、清空、重置与 PNG 截图。"><meta property="og:title" content="彩色流体实验台"><meta property="og:description" content="WebGL 彩色流体实验台：真实求解二维不可压缩流体的平流、散度、压力迭代与速度投影，拖动注入染料与动量，可调颜色、注入力度、消散、压力迭代、模拟分辨率与卷曲强度，支持暂停、清空、重置与 PNG 截图。"><meta property="og:type" content="article"><link rel="stylesheet" href="../../../../../../site.css"><link rel="stylesheet" href="../../../../../../document.css"><script src="../../../../../../document.js" defer></script></head><body class="document-page"><a class="skip-link" href="#document-content">跳到正文</a><header class="site-header"><div class="container header-inner"><a class="brand" href="../../../../../../../index.html"><span class="brand-mark">AI</span>CODING / DEMO</a><nav aria-label="主导航"><a href="../../../../../../../index.html#projects">实验目录</a><a href="../../../../../../../compare.html">模型对比</a><a href="../../../../../../../index.html#guides">技术索引</a></nav></div></header><main class="container document-layout"><aside class="document-sidebar"><details open><summary>本页目录</summary><nav aria-label="文档目录"><a class="toc-level-1" href="#彩色流体实验台minimax-m31-flash-max">彩色流体实验台（MiniMax M3.1 Flash / max）</a><a class="toc-level-2" href="#原始提示词">原始提示词</a><a class="toc-level-2" href="#实现说明">实现说明</a><a class="toc-level-3" href="#求解流程gpu-上真实数值求解">求解流程（GPU 上真实数值求解）</a><a class="toc-level-3" href="#交互与参数">交互与参数</a><a class="toc-level-3" href="#上下文丢失处理">上下文丢失处理</a><a class="toc-level-2" href="#运行与验证">运行与验证</a><a class="toc-level-2" href="#当前归档信息自动生成">当前归档信息（自动生成）</a><a class="toc-level-3" href="#部署适配记录">部署适配记录</a></nav></details></aside><div><div class="document-actions"><a href="../../../../../../../demos/fluid-simulation/runs/minimax-m3-1-flash-max-r01/Readme.md" download>下载 Markdown 原文 ↗</a><a href="../../../../../../../topic.html?id=fluid-simulation#run-fluid-simulation--minimax-m3-1-flash-max-r01">返回主题 →</a><a class="button primary" href="../../../../../../../demos/fluid-simulation/runs/minimax-m3-1-flash-max-r01/index.html" target="_blank" rel="noopener">运行作品 ↗</a><a class="button" href="../../../../../../../compare.html?left=fluid-simulation--minimax-m3-1-flash-max-r01">对比此实验</a></div><p class="document-context">MiniMax M3.1 Flash · max · 实验日期 2026-10-19 · 归档日期 未记录</p><article id="document-content" class="document-content"><h1 id="彩色流体实验台minimax-m31-flash-max">彩色流体实验台（MiniMax M3.1 Flash / max）</h1>
+<h2 id="原始提示词">原始提示词</h2>
+<p>见 <a href="../../../../../../../demos/fluid-simulation/runs/minimax-m3-1-flash-max-r01/prompt.md">完整原始输入</a>。该输入与主题提示词 v1 正文一致。</p>
+<h2 id="实现说明">实现说明</h2>
+<p>单文件 <code>index.html</code>，HTML / CSS / JavaScript / GLSL 全部内联，无后端、无 CDN、无构建步骤。</p>
+<h3 id="求解流程gpu-上真实数值求解">求解流程（GPU 上真实数值求解）</h3>
+<p>每帧按顺序执行：</p>
+<ol>
+<li><strong>涡量与卷曲增强</strong>：由速度场求涡量，再沿涡量梯度方向注入约束力，让流体产生卷曲与混合。</li>
+<li><strong>散度</strong>：计算速度场散度。</li>
+<li><strong>压力迭代</strong>：对压力做 Jacobi 迭代（次数由滑块控制，1–60），上一帧压力按 0.8 衰减。</li>
+<li><strong>速度投影</strong>：从速度场中减去压力梯度，使速度场近似无散。</li>
+<li><strong>速度场自平流</strong>。</li>
+<li><strong>染料平流</strong>：染料作为被动标量随速度场平流，并按消散系数衰减。</li>
+</ol>
+<p>全部步骤在浮点纹理上用片元着色器完成，速度场、压力场、散度场、染料场均为双缓冲 FBO。速度场与压力场使用 <code>RGBA16F</code>（WebGL 2）或 <code>OES_texture_float</code>（WebGL 1）纹理；不满足条件时给出明确的中文提示，不会留下空白页。</p>
+<h3 id="交互与参数">交互与参数</h3>
+<ul>
+<li>鼠标 / 触摸拖动注入染料与动量，拖动方向决定流动方向，快速拖动会自动插值补点。</li>
+<li>染料颜色、注入力度、染料消散、压力迭代次数、模拟分辨率、卷曲强度六个滑块全部实时生效。</li>
+<li>暂停 / 继续、清空流体、重置参数、保存 PNG 截图。</li>
+<li>设备像素比上限为 2；窗口尺寸变化时按新宽高比重建全部纹理，旧纹理与 FBO 显式释放，触摸坐标按画布实际尺寸换算。</li>
+</ul>
+<h3 id="上下文丢失处理">上下文丢失处理</h3>
+<p>浏览器可能因显卡驱动重置等原因回收 WebGL 上下文。实现监听 <code>webglcontextlost</code>，暂停渲染循环、替换画布并重建着色器与纹理后继续运行（见下方 <code>changes</code>）。</p>
+<h2 id="运行与验证">运行与验证</h2>
+<p>Playwright + Chromium 自动化校验（模型生成的实现，均通过）：</p>
+<ul>
+<li>WebGL 2 上下文创建成功，<code>EXT_color_buffer_float</code> 可用，模拟纹理 310 × 192、染料纹理 619 × 384 已创建。</li>
+<li>注入后画面出现染料（像素和 0 → 2868），继续演化后像素分布改变（2868 → 2117）。</li>
+<li>向右拖动：右半区像素和 2458、左半区 68；向左拖动：左半区 2470、右半区 68，方向确实影响流动。</li>
+<li>暂停后 500ms 内像素和完全不变；继续后重新演化。</li>
+<li>清空后像素和归零。</li>
+<li>参数面板改动立即反映到求解设置（迭代 45、消散 3.0、模拟分辨率 128 → 纹理高度 128）。</li>
+<li>PNG 截图返回有效 <code>data:image/png;base64</code>。</li>
+<li>390px 视口无水平溢出；触摸点击可注入染料；控制台无错误。</li>
+<li>已知限制：测试环境为软件渲染（SwiftShader），帧率偏低；真实 GPU 上可稳定接近 60FPS。</li>
+</ul>
+<p>&lt;!-- archive:start --&gt;</p>
+<h2 id="当前归档信息自动生成">当前归档信息（自动生成）</h2>
+<ul>
+<li>实验 ID：<code>fluid-simulation--minimax-m3-1-flash-max-r01</code></li>
+<li>模型：MiniMax M3.1 Flash；推理档位：max</li>
+<li>类型：single-html；预览：static；网络：offline</li>
+<li><a href="../../../../../../../demos/fluid-simulation/runs/minimax-m3-1-flash-max-r01/prompt.md">完整原始输入快照</a> · <a href="../../../../../../../topic.html?id=fluid-simulation">主题与其他版本</a></li>
+<li>输入记录：完整原始输入快照，与主题提示词 v1 正文一致（任务正文本身即原始输入）。</li>
+<li>工具：Claude Code CLI（当前会话，模型 MiniMax-M3.1-Flash，档位 max）。单会话直接实现，未使用子代理；本地用 Playwright/Chromium 以 file:// 与 390px 视口做自动化校验。</li>
+<li>运行方式：浏览器直接打开本目录入口；CDN/外部素材需要联网。</li>
+<li>费用记录：MiniMax 批次合计 金额未记录（11 个案例；批次 minimax-m3-1-flash-max-2026-10-19；未记录单案例费用）</li>
+<li><a href="../../../../../../../demos/fluid-simulation/runs/minimax-m3-1-flash-max-r01/index.html">流体实验台主页面</a></li>
+</ul>
+<h3 id="部署适配记录">部署适配记录</h3>
+<ul>
+<li>实现中加入了 WebGL 上下文丢失后的自动重建：无头/受限环境可能回收首个 WebGL 上下文，此时会替换画布并重新初始化着色器与纹理，避免留下空白画面。</li>
+<li>迁移来源：F:\dev\ai-coding-demo-test 的 experiment/minimax-m3-1-flash-max 分支，提交 871beb18e0e85d6dd542cadca398e67aa4ff1247；保留该提交中的任务输入、实现源码和原有说明。</li>
+<li>维护者于 2026-10-20 按本仓库统计规则为网页入口引用公共 assets/analytics.js；原始任务输入未改动。</li>
+<li>维护者于 2026-10-20 在本仓库本地 HTTP 预览中补拍真实桌面截图，并按案例评分规则 v2 逐项复核。</li>
+<li>维护者于 2026-10-20 按用户要求重新逐图评分，原始 PNG、输入及实现不变；旧分、新分、逐项观察和规则快照保存在 catalog/score-reviews/2026-10-20-minimax-m3-1-flash-max-v2.json。
+&lt;!-- archive:end --&gt;</li>
+</ul>
+</article><p class="document-copy-status" role="status"></p></div></main><footer><div class="container">AI CODING DEMO / 实验记录与技术说明。</div></footer></body></html>

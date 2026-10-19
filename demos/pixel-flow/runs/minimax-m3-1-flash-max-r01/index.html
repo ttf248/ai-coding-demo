@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pixel Flow · 图片粒子化与手势还原</title>
+    <style>
+      :root {
+        --bg: #070a12;
+        --panel: rgba(16, 22, 38, 0.78);
+        --line: rgba(130, 165, 220, 0.22);
+        --text: #e9eefb;
+        --muted: #93a6c4;
+        --accent: #7ad7ff;
+        --ok: #52e0a4;
+        --warn: #ffc46b;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.55 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+        overflow: hidden;
+      }
+      #scene { position: fixed; inset: 0; }
+      #scene canvas { display: block; width: 100%; height: 100%; }
+      .glass {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-radius: 14px;
+      }
+      #panel {
+        position: absolute;
+        top: 14px;
+        left: 14px;
+        width: 292px;
+        padding: 12px;
+        max-height: calc(100vh - 28px);
+        overflow-y: auto;
+      }
+      #panel h1 { margin: 0; font-size: 15px; letter-spacing: 0.6px; }
+      #panel h2 {
+        margin: 12px 0 6px;
+        font-size: 11.5px;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+      }
+      .sub { color: var(--muted); font-size: 11.5px; margin: 2px 0 0; }
+      #videoBox {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #0a0e18;
+        border: 1px solid var(--line);
+        aspect-ratio: 4 / 3;
+      }
+      #video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+        display: block;
+      }
+      #videoPlaceholder {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        color: var(--muted);
+        font-size: 11.5px;
+        padding: 12px;
+      }
+      #hand {
+        position: absolute;
+        width: 46px;
+        height: 46px;
+        margin: -23px 0 0 -23px;
+        border: 2px solid var(--accent);
+        border-radius: 50%;
+        box-shadow: 0 0 18px rgba(122, 215, 255, 0.6);
+        display: none;
+      }
+      .status {
+        margin-top: 8px;
+        border-radius: 10px;
+        padding: 7px 9px;
+        font-size: 12px;
+        background: rgba(122, 215, 255, 0.1);
+        border: 1px solid var(--line);
+      }
+      .status b { color: var(--accent); }
+      .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+      .row label { color: var(--muted); font-size: 11.5px; white-space: nowrap; width: 62px; }
+      input[type="range"] { width: 100%; accent-color: var(--accent); }
+      button {
+        font: inherit;
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 6px 10px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      button:hover { border-color: var(--accent); }
+      button.primary { background: rgba(122, 215, 255, 0.16); border-color: rgba(122, 215, 255, 0.5); }
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      #hint {
+        position: absolute;
+        bottom: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 7px 14px;
+        border-radius: 999px;
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+        max-width: calc(100vw - 28px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #stats {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        padding: 9px 12px;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+      #stats b { color: var(--text); }
+      #drop {
+        position: absolute;
+        inset: 0;
+        display: none;
+        place-items: center;
+        background: rgba(7, 10, 18, 0.82);
+        border: 2px dashed var(--accent);
+        z-index: 5;
+      }
+      @media (max-width: 760px) {
+        #panel { width: calc(100vw - 28px); max-height: 46vh; }
+        #stats { display: none; }
+        #hint { display: none; }
+      }
+    </style>
+    <script src="../../../../assets/analytics.js" defer></script>
+  </head>
+  <body>
+    <div id="scene"></div>
+
+    <section id="panel" class="glass">
+      <h1>Pixel Flow</h1>
+      <p class="sub">图片粒子化 · 手势还原原图</p>
+
+      <h2>摄像头与手势</h2>
+      <div id="videoBox">
+        <video id="video" playsinline muted></video>
+        <div id="videoPlaceholder">摄像头未开启<br />可先使用「自动演示」体验还原过程</div>
+        <div id="hand"></div>
+      </div>
+      <div class="status" id="status">状态：<b>等待载入图片</b></div>
+
+      <h2>图片</h2>
+      <div class="grid2">
+        <button id="pickBtn" class="primary">选择图片</button>
+        <button id="sampleBtn">使用示例图</button>
+      </div>
+      <input id="file" type="file" accept="image/*" hidden />
+      <div class="row">
+        <label>采样密度</label>
+        <input id="density" type="range" min="1" max="10" value="4" />
+      </div>
+
+      <h2>还原</h2>
+      <div class="row">
+        <label>还原速度</label>
+        <input id="speed" type="range" min="1" max="100" value="34" />
+      </div>
+      <div class="row">
+        <label>力场半径</label>
+        <input id="radius" type="range" min="10" max="80" value="42" />
+      </div>
+      <div class="grid2">
+        <button id="scatterBtn">重新打散</button>
+        <button id="restoreBtn">全部还原</button>
+      </div>
+      <div class="grid2" style="margin-top:6px">
+        <button id="autoBtn">自动演示</button>
+        <button id="camBtn">开启摄像头</button>
+      </div>
+      <div class="grid2" style="margin-top:6px">
+        <button id="shotBtn">保存截图</button>
+      </div>
+    </section>
+
+    <div id="stats" class="glass">
+      粒子数：<b id="pCount">0</b><br />
+      还原进度：<b id="progress">0%</b><br />
+      渲染：<b id="fps">–</b>
+    </div>
+
+    <div id="hint">
+      上传本地图片 → 粒子被打散成流动的点云 → 张开手掌吸引粒子还原，握拳暂停吸引
+    </div>
+
+    <div id="drop"><div>松开以载入图片</div></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+    <script type="module">
+      import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+
+      const sceneEl = document.getElementById("scene");
+      const video = document.getElementById("video");
+      const handEl = document.getElementById("hand");
+      const statusEl = document.getElementById("status");
+      const fileEl = document.getElementById("file");
+      const dropEl = document.getElementById("drop");
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        preserveDrawingBuffer: true,
+      });
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      sceneEl.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        55,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        100,
+      );
+      camera.position.set(0, 0, 6.4);
+
+      const params = {
+        density: 4,
+        speed: 0.34,
+        radius: 0.42,
+        auto: false,
+        autoT: 0,
+      };
+
+      let geometry = null,
+        points = null,
+        targetPos = null,
+        scatterPos = null,
+        restoreT = null,
+        colors = null,
+        count = 0;
+
+      const material = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        uniforms: { size: { value: 30 * renderer.getPixelRatio() } },
+        vertexShader: `
+          attribute vec3 aColor;
+          attribute float aScale;
+          uniform float size;
+          varying vec3 vColor;
+          void main(){
+            vColor = aColor;
+            vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            gl_PointSize = size * aScale / max(0.2, -mv.z);
+            gl_Position = projectionMatrix * mv;
+          }`,
+        fragmentShader: `
+          varying vec3 vColor;
+          void main(){
+            vec2 uv = gl_PointCoord - 0.5;
+            float d = length(uv);
+            if(d > 0.5) discard;
+            float a = smoothstep(0.5, 0.05, d);
+            gl_FragColor = vec4(vColor, a);
+          }`,
+      });
+
+      function setStatus(text, tone) {
+        statusEl.innerHTML = `状态：<b>${text}</b>`;
+        statusEl.style.color = tone === "warn" ? "var(--warn)" : "var(--text)";
+      }
+
+      /* ---------------- 载入图片并生成粒子 ---------------- */
+      function buildFromImage(img) {
+        const size = 96;
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+        const scale = Math.max(w, h) / size;
+        const cw = Math.max(1, Math.round(w / scale));
+        const ch = Math.max(1, Math.round(h / scale));
+        const cnv = document.createElement("canvas");
+        cnv.width = cw;
+        cnv.height = ch;
+        const ctx = cnv.getContext("2d");
+        ctx.drawImage(img, 0, 0, cw, ch);
+        const data = ctx.getImageData(0, 0, cw, ch).data;
+
+        const step = Math.max(1, Math.round(params.density));
+        const positions = [];
+        const cols = [];
+        const scales = [];
+        const aspect = cw / ch;
+        const planeH = 4.3;
+        const planeW = planeH * aspect;
+        for (let y = 0; y < ch; y += step) {
+          for (let x = 0; x < cw; x += step) {
+            const i = (y * cw + x) * 4;
+            positions.push(
+              (x / cw - 0.5) * planeW,
+              (0.5 - y / ch) * planeH,
+              0,
+            );
+            cols.push(data[i] / 255, data[i + 1] / 255, data[i + 2] / 255);
+            scales.push(0.7 + (data[i] / 255) * 0.9);
+          }
+        }
+        count = positions.length / 3;
+        targetPos = new Float32Array(positions);
+        scatterPos = new Float32Array(positions.length);
+        restoreT = new Float32Array(count);
+        for (let i = 0; i < count; i++) {
+          scatterPos[i * 3] = (Math.random() - 0.5) * 12;
+          scatterPos[i * 3 + 1] = (Math.random() - 0.5) * 8;
+          scatterPos[i * 3 + 2] = (Math.random() - 0.5) * 6 - 1.5;
+          restoreT[i] = 0;
+        }
+        const pos = new Float32Array(scatterPos);
+        const colArr = new Float32Array(cols);
+        const scaleArr = new Float32Array(scales);
+        if (geometry) geometry.dispose();
+        geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+        geometry.setAttribute("aColor", new THREE.BufferAttribute(colArr, 3));
+        geometry.setAttribute("aScale", new THREE.BufferAttribute(scaleArr, 1));
+        if (points) {
+          scene.remove(points);
+          points.geometry = geometry;
+        } else {
+          points = new THREE.Points(geometry, material);
+          scene.add(points);
+        }
+        document.getElementById("pCount").textContent = String(count);
+        setStatus(`已载入图片，生成 ${count} 个粒子`);
+      }
+
+      function sampleCanvas() {
+        const c = document.createElement("canvas");
+        c.width = 320;
+        c.height = 320;
+        const x = c.getContext("2d");
+        const g = x.createLinearGradient(0, 0, 320, 320);
+        g.addColorStop(0, "#2b6cff");
+        g.addColorStop(0.45, "#7b2ff7");
+        g.addColorStop(1, "#ff5f8f");
+        x.fillStyle = g;
+        x.fillRect(0, 0, 320, 320);
+        x.fillStyle = "rgba(255,255,255,0.92)";
+        x.beginPath();
+        x.arc(160, 128, 58, 0, Math.PI * 2);
+        x.fill();
+        x.fillStyle = "rgba(20,24,40,0.9)";
+        x.beginPath();
+        x.arc(140, 116, 9, 0, Math.PI * 2);
+        x.arc(184, 116, 9, 0, Math.PI * 2);
+        x.fill();
+        x.strokeStyle = "rgba(20,24,40,0.9)";
+        x.lineWidth = 7;
+        x.beginPath();
+        x.arc(160, 140, 34, 0.25 * Math.PI, 0.75 * Math.PI);
+        x.stroke();
+        x.fillStyle = "rgba(255,255,255,0.95)";
+        x.fillRect(60, 214, 200, 84);
+        x.fillStyle = "rgba(30,36,60,0.85)";
+        x.fillRect(78, 232, 164, 10);
+        x.fillRect(78, 252, 120, 10);
+        x.fillRect(78, 272, 142, 10);
+        return c;
+      }
+
+      document.getElementById("sampleBtn").addEventListener("click", () => {
+        buildFromImage(sampleCanvas());
+      });
+      document.getElementById("pickBtn").addEventListener("click", () => fileEl.click());
+      fileEl.addEventListener("change", (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const url = URL.createObjectURL(f);
+        const img = new Image();
+        img.onload = () => {
+          buildFromImage(img);
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      });
+      ["dragenter", "dragover"].forEach((ev) =>
+        window.addEventListener(ev, (e) => {
+          e.preventDefault();
+          dropEl.style.display = "grid";
+        }),
+      );
+      ["dragleave", "drop"].forEach((ev) =>
+        window.addEventListener(ev, (e) => {
+          e.preventDefault();
+          if (ev === "dragleave" && e.relatedTarget) return;
+          dropEl.style.display = "none";
+        }),
+      );
+      window.addEventListener("drop", (e) => {
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (!f || !f.type.startsWith("image/")) return;
+        const url = URL.createObjectURL(f);
+        const img = new Image();
+        img.onload = () => {
+          buildFromImage(img);
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      });
+
+      /* ---------------- 手势识别 ---------------- */
+      const handState = {
+        present: false,
+        x: 0,
+        y: 0,
+        gesture: "none",
+        openness: 0,
+      };
+      let hands = null;
+      let cameraReady = false;
+
+      const landmarkDist = (a, b) =>
+        Math.hypot(a.x - b.x, a.y - b.y, (a.z - b.z) * 0.5);
+      function readGesture(lm) {
+        const wrist = lm[0];
+        const fingers = [
+          [8, 6],
+          [12, 10],
+          [16, 14],
+          [20, 18],
+        ];
+        let extended = 0;
+        for (const [tip, pip] of fingers)
+          if (landmarkDist(lm[tip], wrist) > landmarkDist(lm[pip], wrist) * 1.12)
+            extended++;
+        const palm =
+          (landmarkDist(lm[0], lm[9]) + landmarkDist(lm[0], lm[5])) / 2;
+        return { extended, openness: extended / 4, palm };
+      }
+
+      function onResults(res) {
+        const lms = res.multiHandLandmarks;
+        if (!lms || !lms.length) {
+          handState.present = false;
+          handState.gesture = "none";
+          handEl.style.display = "none";
+          if (cameraReady && !params.auto)
+            setStatus("未检测到手部，尝试张开手掌或握拳", "warn");
+          return;
+        }
+        const lm = lms[0];
+        const g = readGesture(lm);
+        handState.present = true;
+        handState.openness = g.openness;
+        const palm = lm[9];
+        handState.x = (1 - palm.x - 0.5) * 6.2;
+        handState.y = (0.5 - palm.y) * 4.2;
+        handState.gesture = g.extended >= 4 ? "open" : g.extended <= 1 ? "fist" : "pinch";
+        handEl.style.display = "block";
+        handEl.style.left = ((1 - palm.x) * 100).toFixed(2) + "%";
+        handEl.style.top = (palm.y * 100).toFixed(2) + "%";
+        const names = { open: "张开手掌（吸引粒子）", fist: "握拳（暂停吸引）", pinch: "过渡手势" };
+        setStatus(`手势：${names[handState.gesture]}`);
+      }
+
+      async function initCamera() {
+        if (cameraReady) {
+          cameraReady = false;
+          if (hands) await hands.close();
+          hands = null;
+          video.srcObject.getTracks().forEach((t) => t.stop());
+          video.srcObject = null;
+          document.getElementById("videoPlaceholder").style.display = "grid";
+          setStatus("摄像头已关闭");
+          return;
+        }
+        if (!window.Hands) {
+          setStatus("手势识别库未加载，请检查网络", "warn");
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 640, height: 480, facingMode: "user" },
+          });
+          video.srcObject = stream;
+          await video.play();
+          hands = new window.Hands({
+            locateFile: (f) =>
+              `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`,
+          });
+          hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6,
+          });
+          hands.onResults(onResults);
+          await hands.initialize();
+          cameraReady = true;
+          document.getElementById("videoPlaceholder").style.display = "none";
+          setStatus("摄像头已开启，尝试张开手掌");
+          pump();
+        } catch (e) {
+          setStatus("无法访问摄像头：" + (e && e.message ? e.message : e), "warn");
+        }
+      }
+      async function pump() {
+        if (!cameraReady) return;
+        try {
+          await hands.send({ image: video });
+        } catch (e) {}
+        requestAnimationFrame(pump);
+      }
+      document.getElementById("camBtn").addEventListener("click", initCamera);
+
+      /* ---------------- 控制 ---------------- */
+      document.getElementById("density").addEventListener("input", (e) => {
+        params.density = Number(e.target.value);
+        if (count) buildFromImage(currentImage);
+      });
+      document.getElementById("speed").addEventListener("input", (e) => {
+        params.speed = Number(e.target.value) / 100;
+      });
+      document.getElementById("radius").addEventListener("input", (e) => {
+        params.radius = Number(e.target.value) / 100 * 2.6;
+      });
+      document.getElementById("scatterBtn").addEventListener("click", () => {
+        if (!count) return;
+        for (let i = 0; i < count; i++) {
+          scatterPos[i * 3] = (Math.random() - 0.5) * 12;
+          scatterPos[i * 3 + 1] = (Math.random() - 0.5) * 8;
+          scatterPos[i * 3 + 2] = (Math.random() - 0.5) * 6 - 1.5;
+          restoreT[i] = 0;
+        }
+        setStatus("粒子已重新打散");
+      });
+      document.getElementById("restoreBtn").addEventListener("click", () => {
+        if (!count) return;
+        for (let i = 0; i < count; i++) restoreT[i] = 1;
+        setStatus("已全部还原为原图");
+      });
+      document.getElementById("autoBtn").addEventListener("click", (e) => {
+        params.auto = !params.auto;
+        e.target.classList.toggle("primary", params.auto);
+        setStatus(params.auto ? "自动演示：模拟手掌轨迹" : "自动演示已关闭");
+      });
+      document.getElementById("shotBtn").addEventListener("click", () => {
+        renderer.render(scene, camera);
+        const a = document.createElement("a");
+        a.href = renderer.domElement.toDataURL("image/png");
+        a.download = "pixel-flow.png";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setStatus("已保存当前画面 PNG");
+      });
+
+      let currentImage = null;
+      const origBuild = buildFromImage;
+      buildFromImage = function (img) {
+        currentImage = img;
+        origBuild(img);
+      };
+
+      /* ---------------- 动画 ---------------- */
+      const clock = new THREE.Clock();
+      let frames = 0,
+        fpsTime = performance.now();
+      const tmp = new THREE.Vector3();
+      function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(0.05, clock.getDelta());
+        const t = clock.elapsedTime;
+
+        /* 自动演示：模拟一只张开的手在画面中移动 */
+        if (params.auto) {
+          params.autoT += dt;
+          const phase = params.autoT * 0.8;
+          const spiral = params.autoT * 0.22;
+          handState.present = true;
+          handState.gesture = "open";
+          handState.openness = 1;
+          handState.x = Math.cos(spiral) * 1.9;
+          handState.y = Math.sin(spiral * 1.3) * 1.4;
+          handEl.style.display = "block";
+          handEl.style.left = (50 + Math.cos(spiral) * 22).toFixed(1) + "%";
+          handEl.style.top = (50 + Math.sin(spiral * 1.3) * 18).toFixed(1) + "%";
+          if (Math.sin(phase) > 0.72) handState.gesture = "fist";
+          setStatus(
+            handState.gesture === "fist"
+              ? "自动演示：握拳（暂停吸引）"
+              : "自动演示：张开手掌（吸引粒子）",
+          );
+        }
+
+        if (points && count) {
+          const pos = geometry.attributes.position.array;
+          const pull = handState.gesture === "fist" ? 0 : 1;
+          const inField = handState.present && handState.gesture !== "fist";
+          const hx = handState.x,
+            hy = handState.y;
+          for (let i = 0; i < count; i++) {
+            const ix = i * 3;
+            const tx = targetPos[ix],
+              ty = targetPos[ix + 1],
+              tz = targetPos[ix + 2];
+            let dx = tx - pos[ix],
+              dy = ty - pos[ix + 1],
+              dz = tz - pos[ix + 2];
+            const distToTarget = Math.hypot(dx, dy, dz);
+            let rate = params.speed * dt * (0.22 + (1 - Math.min(1, distToTarget / 6)) * 0.5);
+            if (inField) {
+              const d = Math.hypot(pos[ix] - hx, pos[ix + 1] - hy);
+              if (d < params.radius) {
+                const k = 1 - d / params.radius;
+                rate += params.speed * dt * 2.6 * k;
+                /* 力场内的涡旋扰动 */
+                const ang = Math.atan2(pos[ix + 1] - hy, pos[ix] - hx) + 1.2;
+                pos[ix] += Math.cos(ang) * k * dt * 1.4;
+                pos[ix + 1] += Math.sin(ang) * k * dt * 1.4;
+              }
+            }
+            if (!pull) rate = 0;
+            restoreT[i] = Math.min(1, restoreT[i] + rate);
+            const e = restoreT[i] * restoreT[i] * (3 - 2 * restoreT[i]);
+            pos[ix] = scatterPos[ix] + (tx - scatterPos[ix]) * e;
+            pos[ix + 1] = scatterPos[ix + 1] + (ty - scatterPos[ix + 1]) * e;
+            pos[ix + 2] = scatterPos[ix + 2] + (tz - scatterPos[ix + 2]) * e;
+          }
+          geometry.attributes.position.needsUpdate = true;
+          let sum = 0;
+          for (let i = 0; i < count; i++) sum += restoreT[i];
+          document.getElementById("progress").textContent =
+            Math.round((sum / count) * 100) + "%";
+        }
+        renderer.render(scene, camera);
+        frames++;
+        const now = performance.now();
+        if (now - fpsTime > 1000) {
+          document.getElementById("fps").textContent =
+            Math.round((frames * 1000) / (now - fpsTime)) + " FPS";
+          frames = 0;
+          fpsTime = now;
+        }
+      }
+      animate();
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      /* 自动化检查接口 */
+      window.pixelFlow = {
+        params,
+        get count() {
+          return count;
+        },
+        get progress() {
+          if (!count) return 0;
+          let sum = 0;
+          for (let i = 0; i < count; i++) sum += restoreT[i];
+          return sum / count;
+        },
+        get hand() {
+          return { ...handState };
+        },
+        useSample: () => document.getElementById("sampleBtn").click(),
+        setAuto: (v) => {
+          params.auto = !!v;
+          document.getElementById("autoBtn").classList.toggle("primary", params.auto);
+        },
+        scatter: () => document.getElementById("scatterBtn").click(),
+        restore: () => document.getElementById("restoreBtn").click(),
+        shot: () => {
+          renderer.render(scene, camera);
+          return renderer.domElement.toDataURL("image/png");
+        },
+        status: () => statusEl.textContent,
+      };
+    </script>
+  </body>
+</html>
