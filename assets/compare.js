@@ -49,12 +49,25 @@
       differencesOnly: p.get("differencesOnly") === "1",
       mobile: sides.includes(p.get("mobile")) ? p.get("mobile") : "left",
     };
+    for (const side of sides) {
+      const run = getRun(side);
+      const model = p.get(side + "Model") || run?.modelId || "";
+      state[side + "Model"] = run?.modelId || model;
+      state[side + "Effort"] =
+        (!run || model === run.modelId ? p.get(side + "Effort") : "") ||
+        run?.effort ||
+        "";
+    }
     if (state.tab === "info") state.tab = "conditions";
     if (!state.group) {
       const initial = data.runs.find((r) => r.id === state.left);
       if (initial) state.group = initial.topicId + "/" + initial.promptId;
     }
-    if (!state.left && !state.right && groupPrompt()) fillGroup();
+    if (
+      !sides.some((side) => state[side] || state[side + "Model"]) &&
+      groupPrompt()
+    )
+      fillGroup();
   }
   function groupPrompt() {
     return data.prompts.find((p) => p.topicId + "/" + p.id === state.group);
@@ -79,11 +92,47 @@
         return U.promptFor(data, r)?.hash === prompt.hash;
       });
   }
-  function fillGroup() {
+  function fillGroup(preserveModels = false) {
     state.scope = "task";
     const runs = groupPrompt() ? pool() : [];
+    const keep =
+      preserveModels &&
+      groupPrompt() &&
+      sides.some((side) => state[side + "Model"]);
+    const selected = new Map(),
+      used = new Set();
+    if (keep) {
+      // Reserve exact records and efforts across all slots before model fallbacks.
+      for (const matches of [
+        (r, side) => r.id === state[side],
+        (r, side) =>
+          r.modelId !== "unknown" &&
+          r.modelId === state[side + "Model"] &&
+          r.effort === state[side + "Effort"],
+        (r, side) =>
+          r.modelId !== "unknown" && r.modelId === state[side + "Model"],
+      ]) {
+        for (const side of slots()) {
+          if (selected.has(side) || !state[side + "Model"]) continue;
+          const run = runs.find((r) => !used.has(r.id) && matches(r, side));
+          if (run) {
+            selected.set(side, run);
+            used.add(run.id);
+          }
+        }
+      }
+    }
     sides.forEach((side, i) => {
-      state[side] = state.layout === "quad" || i < 2 ? runs[i]?.id || "" : "";
+      const run = slots().includes(side)
+        ? keep
+          ? selected.get(side)
+          : runs[i]
+        : null;
+      state[side] = run?.id || "";
+      if (!keep) {
+        state[side + "Model"] = run?.modelId || "";
+        state[side + "Effort"] = run?.effort || "";
+      }
       state[side + "Page"] = "";
       unloaded[side] = false;
     });
@@ -109,6 +158,9 @@
   }
   function choose(side, id) {
     state[side] = id;
+    const run = getRun(side);
+    state[side + "Model"] = run?.modelId || "";
+    state[side + "Effort"] = run?.effort || "";
     state[side + "Page"] = "";
     unloaded[side] = false;
   }
@@ -241,7 +293,7 @@
   }
   function renderLoaded() {
     document.getElementById("data-retry")?.remove();
-    const empty = !sides.some((side) => state[side]);
+    const empty = !sides.some((side) => state[side] || state[side + "Model"]);
     document.body.dataset.contentMode = state.tab;
     document.body.classList.toggle("comparison-empty", empty);
     $("compare-start").hidden = !empty;
@@ -269,11 +321,14 @@
         state.layout !== "quad" &&
         ["third", "fourth"].includes(btn.dataset.mobile);
       const run = getRun(btn.dataset.mobile);
-      btn.textContent =
-        labels[btn.dataset.mobile] +
-        " · " +
-        (run ? U.modelLabel(data, run) : "未选择");
-      btn.title = run ? runLabel(run) : "未选择实验";
+      const model = state[btn.dataset.mobile + "Model"];
+      const name = run
+        ? U.modelLabel(data, run)
+        : model
+          ? U.modelLabel(data, { modelId: model }) + "（暂无实验）"
+          : "未选择";
+      btn.textContent = labels[btn.dataset.mobile] + " · " + name;
+      btn.title = run ? runLabel(run) : name;
     });
     const a = getRun("left"),
       b = getRun("right");
@@ -358,6 +413,7 @@
       // Keep an untouched iframe in place: moving its DOM node would reload it.
       const viewKey = JSON.stringify([
         frameKey(side),
+        !run && [state.group, state[side + "Model"], state[side + "Effort"]],
         state.tab,
         state.tab === "prompt"
           ? diffCache.key
@@ -396,7 +452,10 @@
                 U.effortLabel(run.effort) +
                 " · " +
                 U.roundLabel(run)
-            : "未选择实验",
+            : state[side + "Model"]
+              ? U.modelLabel(data, { modelId: state[side + "Model"] }) +
+                " · 暂无实验"
+              : "未选择实验",
         ) +
         "</strong><h2>" +
         (labels[side] + (side === "left" ? " · 基准" : "")) +
@@ -468,10 +527,20 @@
         '</p><p class="panel-status" data-size></p></div><div data-content></div>';
       const content = panel.querySelector("[data-content]");
       if (!run) {
+        const model = state[side + "Model"];
         content.innerHTML =
           '<div class="frame-placeholder"><h3>' +
-          (state[side] ? "实验不存在或已经迁移" : "选一个实验开始") +
-          "</h3><p>先选择主题，系统会按现有模型排序填入实验；也可以分别选择 A / B。候选中的同正文版本会单独标注。</p><button data-start-comparison>选择主题开始 →</button></div>";
+          (state[side]
+            ? "实验不存在或已经迁移"
+            : model
+              ? "此任务暂无所选模型的实验"
+              : "选一个实验开始") +
+          "</h3><p>" +
+          (model && !state[side]
+            ? e(U.modelLabel(data, { modelId: model })) +
+              " · 已保留模型选择，可切换主题或手动更换实验。"
+            : "先选择主题，系统会按现有模型排序填入实验；也可以分别选择 A / B。候选中的同正文版本会单独标注。") +
+          "</p><button data-start-comparison>选择主题开始 →</button></div>";
         continue;
       }
       if (
@@ -854,10 +923,8 @@
       return;
     }
     if (el.id === "group") {
-      const hasSelectedRuns = sides.some((side) => state[side]);
       state.group = el.value;
-      state.scope = "task";
-      if (!hasSelectedRuns) fillGroup();
+      fillGroup(true);
     } else if (el.id === "layout") {
       state.layout = el.value;
       state.focus = "";
@@ -874,9 +941,7 @@
       }
     } else if (el.dataset.run) {
       const side = el.dataset.run;
-      state[side] = el.value;
-      state[side + "Page"] = "";
-      unloaded[side] = false;
+      choose(side, el.value);
     } else if (el.dataset.page) {
       state[el.dataset.page + "Page"] = el.value;
       unloaded[el.dataset.page] = false;
@@ -943,6 +1008,11 @@
       delete $("panel-" + side).dataset.viewKey;
     } else if (el.id === "swap") {
       [state.left, state.right] = [state.right, state.left];
+      [state.leftModel, state.rightModel] = [state.rightModel, state.leftModel];
+      [state.leftEffort, state.rightEffort] = [
+        state.rightEffort,
+        state.leftEffort,
+      ];
       [state.leftPage, state.rightPage] = [state.rightPage, state.leftPage];
       [unloaded.left, unloaded.right] = [unloaded.right, unloaded.left];
     } else return;
