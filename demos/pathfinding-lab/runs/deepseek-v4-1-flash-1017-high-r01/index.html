@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<script src="../../../../assets/analytics.js" defer></script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>寻路算法实验室</title>
+<style>
+  :root {
+    --ink: #14253c;
+    --muted: #61758d;
+    --line: #cfdbe8;
+    --panel: #ffffff;
+    --bg: #edf3fa;
+    --accent: #2563eb;
+    --accent-2: #0f766e;
+    --warn: #b45309;
+    --danger: #b91c1c;
+    --shadow: 0 14px 36px rgba(27, 52, 88, .13);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background:
+      radial-gradient(circle at 85% 0%, #ffffff 0, transparent 34rem),
+      linear-gradient(150deg, #f7faff, var(--bg) 58%, #e6eef8);
+  }
+  .page { width: min(1220px, 100%); margin: 0 auto; padding: 20px clamp(10px, 3vw, 28px) 34px; }
+  header { margin-bottom: 14px; }
+  h1 { margin: 0; font-size: clamp(22px, 3.4vw, 31px); letter-spacing: -.02em; }
+  .sub { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.65; max-width: 860px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid rgba(170, 189, 211, .8);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+  .controls { padding: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-bottom: 1px solid #e5edf6; }
+  .group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .group-label { font-size: 11px; color: var(--muted); letter-spacing: .05em; margin-right: 2px; }
+  .divider { width: 1px; align-self: stretch; min-height: 28px; background: #e5edf6; margin: 0 3px; }
+  button {
+    font: inherit; font-size: 13px; color: var(--ink);
+    background: #f7fafd; border: 1px solid var(--line); border-radius: 9px;
+    padding: 8px 11px; cursor: pointer; touch-action: manipulation;
+    transition: background .15s, border-color .15s, transform .08s;
+  }
+  button:hover { background: #fff; border-color: #9fb6d0; }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: #1d4fd7; }
+  button.good { background: #e9f7f2; border-color: #9ed4c5; color: #0f6b57; }
+  button[aria-pressed="true"] {
+    background: #e6efff; border-color: #8db4f8; color: #1549a8;
+    box-shadow: inset 0 0 0 1px rgba(37,99,235,.12);
+  }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; align-items: start; margin-top: 14px; }
+  .board-card { overflow: hidden; }
+  canvas { display: block; width: 100%; aspect-ratio: 32 / 20; touch-action: none; cursor: crosshair; }
+  .board-foot { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 10px 14px; border-top: 1px solid #e5edf6; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .legend i { display: inline-block; width: 13px; height: 13px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; border: 1px solid rgba(0,0,0,.1); }
+  aside { display: grid; gap: 12px; min-width: 0; }
+  aside .card { padding: 14px; }
+  aside h2 { margin: 0 0 10px; font-size: 14px; }
+  .stat { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed #e5edf6; font-size: 13px; }
+  .stat:last-child { border-bottom: 0; }
+  .stat span:first-child { color: var(--muted); }
+  .stat strong { font-variant-numeric: tabular-nums; text-align: right; }
+  .status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 9px; border-radius: 999px; background: #eef4fb; color: #36516e; }
+  .status-badge.running { background: #e8f0ff; color: #1d4ed8; }
+  .status-badge.done { background: #e8f8f1; color: #0f766e; }
+  .status-badge.fail { background: #fff1ef; color: #b91c1c; }
+  .note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.75; }
+  .note b { color: var(--ink); }
+  .speed { display: flex; align-items: center; gap: 8px; }
+  input[type=range] { width: 120px; max-width: 100%; accent-color: var(--accent); }
+  .speed output { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); min-width: 62px; }
+  .toast { margin-top: 10px; font-size: 12px; line-height: 1.6; padding: 8px 10px; border-radius: 8px; background: #eef4fb; color: #36516e; }
+  .toast.err { background: #fff1ef; color: #b91c1c; }
+  .toast.ok { background: #e8f8f1; color: #0f766e; }
+  @media (max-width: 920px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    aside { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .page { padding: 12px 10px 26px; }
+    aside { grid-template-columns: minmax(0, 1fr); }
+    .controls { padding: 10px; }
+    .divider { display: none; }
+    button { padding: 7px 9px; font-size: 12.5px; }
+    .group-label { width: 100%; }
+    .speed { width: 100%; }
+    input[type=range] { flex: 1; width: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>寻路算法实验室</h1>
+    <p class="sub">
+      在网格上比较 BFS、Dijkstra 与 A*。BFS 按步数搜索；Dijkstra 与 A* 按地形代价搜索。
+      起点代价不计入，普通格进入代价 1，高代价地形进入代价 5。A* 使用曼哈顿距离作为启发函数。
+    </p>
+  </header>
+
+  <div class="card">
+    <div class="controls">
+      <div class="group" aria-label="算法">
+        <span class="group-label">算法</span>
+        <button data-algo="bfs" aria-pressed="true">BFS</button>
+        <button data-algo="dijkstra" aria-pressed="false">Dijkstra</button>
+        <button data-algo="astar" aria-pressed="false">A*</button>
+      </div>
+      <div class="divider" aria-hidden="true"></div>
+      <div class="group" aria-label="绘制工具">
+        <span class="group-label">工具</span>
+        <button data-tool="wall" aria-pressed="true">障碍</button>
+        <button data-tool="erase" aria-pressed="false">擦除</button>
+        <button data-tool="weight" aria-pressed="false">高代价地形</button>
+        <button data-tool="start" aria-pressed="false">起点</button>
+        <button data-tool="end" aria-pressed="false">终点</button>
+      </div>
+      <div class="divider" aria-hidden="true"></div>
+      <div class="group">
+        <button id="run" class="primary">运行</button>
+        <button id="pause">暂停</button>
+        <button id="step">单步</button>
+        <button id="clear-search">清除搜索</button>
+      </div>
+      <div class="divider" aria-hidden="true"></div>
+      <div class="group">
+        <button id="preset" class="good">载入预设地图</button>
+        <button id="reset">重置地图</button>
+      </div>
+      <div class="group speed">
+        <span class="group-label">速度</span>
+        <input id="speed" type="range" min="1" max="240" value="36" step="1" aria-label="搜索速度" />
+        <output id="speed-out">36 步/秒</output>
+      </div>
+    </div>
+    <div class="board-card">
+      <canvas id="grid" aria-label="寻路网格画布"></canvas>
+      <div class="board-foot">
+        <div class="legend">
+          <span><i style="background:#f8fbff"></i>空地</span>
+          <span><i style="background:#334155"></i>障碍</span>
+          <span><i style="background:#f7c873"></i>代价 5</span>
+          <span><i style="background:#bcd6ff"></i>前沿</span>
+          <span><i style="background:#6f9fe8"></i>已访问</span>
+          <span><i style="background:#ffd24d"></i>路径</span>
+        </div>
+        <div>触摸或拖动即可绘制；直接拖动起点 / 终点可改变位置。搜索期间编辑地图会停止并清除当前搜索。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <section class="card" aria-label="统计与说明" style="padding:14px;">
+      <h2 style="margin:0 0 10px;font-size:14px;">搜索结果</h2>
+      <div class="stat"><span>状态</span><strong><span id="badge" class="status-badge">就绪</span></strong></div>
+      <div class="stat"><span>已访问节点</span><strong id="visited">0</strong></div>
+      <div class="stat"><span>当前前沿</span><strong id="frontier">0</strong></div>
+      <div class="stat"><span>路径步数</span><strong id="steps">—</strong></div>
+      <div class="stat"><span>路径总代价</span><strong id="cost">—</strong></div>
+      <div class="stat"><span>算法指标</span><strong id="metric">—</strong></div>
+      <div id="toast" class="toast">选择算法与工具，然后点击“运行”。也可以先单步观察搜索前沿的扩张。</div>
+    </section>
+
+    <aside>
+      <div class="card">
+        <h2>算法说明</h2>
+        <p class="note">
+          <b>BFS</b>：按步数最少搜索，队列先进先出，不考虑地形代价。<br />
+          <b>Dijkstra</b>：按累计地形代价最小搜索。<br />
+          <b>A*</b>：累计代价 + 曼哈顿距离启发；在四方向、最小进入代价为 1 时保持可采纳性。
+          加权地图上 Dijkstra 与 A* 应得到相同的最小代价。
+        </p>
+      </div>
+      <div class="card">
+        <h2>操作提示</h2>
+        <p class="note">
+          起点与终点不能被障碍或高代价地形覆盖。若终点被障碍完全封闭，搜索会明确显示“不可达”。
+          暂停后画面停止扩张；单步每次只扩展一个节点。改变算法、地图或端点都会清除旧搜索，避免混用状态。
+        </p>
+      </div>
+      <div class="card">
+        <h2>预设地图</h2>
+        <p class="note">预设使用固定布局：包含墙体缺口、高代价沼泽与一条可通行路径，便于重复比较三种算法。</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const COLS = 32, ROWS = 20;
+  const NORMAL_COST = 1, WEIGHT_COST = 5;
+  const DIRS = [
+    { x: 0, y: -1, name: "上" },
+    { x: 1, y: 0, name: "右" },
+    { x: 0, y: 1, name: "下" },
+    { x: -1, y: 0, name: "左" }
+  ];
+  const canvas = document.getElementById("grid");
+  const ctx = canvas.getContext("2d");
+  const badge = document.getElementById("badge");
+  const visitedEl = document.getElementById("visited");
+  const frontierEl = document.getElementById("frontier");
+  const stepsEl = document.getElementById("steps");
+  const costEl = document.getElementById("cost");
+  const metricEl = document.getElementById("metric");
+  const toast = document.getElementById("toast");
+  const speedInput = document.getElementById("speed");
+  const speedOut = document.getElementById("speed-out");
+
+  let walls = new Set();
+  let weighted = new Set();
+  let start = { x: 2, y: 10 };
+  let end = { x: 29, y: 10 };
+  let algo = "bfs";
+  let tool = "wall";
+  let search = null;
+  let cellSize = 24;
+  let running = false;
+  let pointerDown = false;
+  let dragTarget = null;
+  let lastCell = null;
+  let speed = 36;
+  let accumulator = 0;
+  let lastFrame = 0;
+
+  const key = (x, y) => `${x},${y}`;
+  const parseKey = (k) => { const [x, y] = k.split(",").map(Number); return { x, y }; };
+  const inBounds = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
+  const isWall = (x, y) => walls.has(key(x, y));
+  const isWeighted = (x, y) => weighted.has(key(x, y));
+  const isStart = (x, y) => start.x === x && start.y === y;
+  const isEnd = (x, y) => end.x === x && end.y === y;
+  const enterCost = (x, y) => (isWeighted(x, y) ? WEIGHT_COST : NORMAL_COST);
+  const sameCell = (a, b) => a.x === b.x && a.y === b.y;
+
+  function stopSearch() {
+    running = false;
+    search = null;
+    accumulator = 0;
+  }
+
+  function clearSearch() {
+    stopSearch();
+    updateStats();
+    render();
+    setToast("已清除搜索状态，地图保持不变。");
+  }
+
+  function setToast(text, kind = "") {
+    toast.textContent = text;
+    toast.className = "toast" + (kind ? " " + kind : "");
+  }
+
+  /* ---------- algorithms ---------- */
+
+  class MinHeap {
+    constructor(compare) { this.items = []; this.compare = compare; }
+    get size() { return this.items.length; }
+    push(value) {
+      const a = this.items;
+      a.push(value);
+      let i = a.length - 1;
+      while (i > 0) {
+        const p = (i - 1) >> 1;
+        if (this.compare(a[p], a[i]) <= 0) break;
+        [a[p], a[i]] = [a[i], a[p]];
+        i = p;
+      }
+    }
+    pop() {
+      const a = this.items;
+      if (!a.length) return null;
+      const top = a[0];
+      const last = a.pop();
+      if (a.length && last !== undefined) {
+        a[0] = last;
+        let i = 0;
+        for (;;) {
+          const l = i * 2 + 1, r = l + 1;
+          let m = i;
+          if (l < a.length && this.compare(a[l], a[m]) < 0) m = l;
+          if (r < a.length && this.compare(a[r], a[m]) < 0) m = r;
+          if (m === i) break;
+          [a[i], a[m]] = [a[m], a[i]];
+          i = m;
+        }
+      }
+      return top;
+    }
+  }
+
+  function startSearch() {
+    stopSearch();
+    const sk = key(start.x, start.y);
+    const ek = key(end.x, end.y);
+    if (sameCell(start, end)) {
+      setToast("起点与终点不能重合，请先移动其中一个端点。", "err");
+      updateStats();
+      return;
+    }
+    if (isWall(start.x, start.y) || isWall(end.x, end.y)) {
+      setToast("起点或终点被障碍覆盖，请先移除障碍。", "err");
+      updateStats();
+      return;
+    }
+    search = {
+      algo,
+      done: false,
+      reachable: null,
+      visited: new Set(),
+      frontier: new Set([sk]),
+      parent: new Map(),
+      g: new Map([[sk, 0]]),
+      cost: new Map([[sk, 0]]),
+      steps: new Map([[sk, 0]]),
+      queue: [sk],
+      head: 0,
+      heap: null,
+      startKey: sk,
+      endKey: ek,
+      path: [],
+      expansions: 0
+    };
+    if (algo !== "bfs") {
+      search.heap = new MinHeap((a, b) =>
+        a.priority === b.priority ? a.h - b.h : a.priority - b.priority
+      );
+      search.heap.push({ key: sk, g: 0, h: manhattan(start, end), priority: manhattan(start, end) });
+    }
+    running = true;
+    accumulator = 0;
+    setToast(algo === "bfs"
+      ? "BFS 正在按步数搜索；每一帧扩展队列头部的节点。"
+      : algo === "dijkstra"
+        ? "Dijkstra 正在按累计地形代价搜索。"
+        : "A* 正在按累计代价 + 曼哈顿距离搜索。");
+    updateStats();
+    render();
+  }
+
+  function manhattan(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
+
+  function neighbors(k) {
+    const { x, y } = parseKey(k);
+    const out = [];
+    for (const d of DIRS) {
+      const nx = x + d.x, ny = y + d.y;
+      if (inBounds(nx, ny) && !isWall(nx, ny)) out.push(key(nx, ny));
+    }
+    return out;
+  }
+
+  function finishSearch(found) {
+    search.done = true;
+    search.reachable = found;
+    running = false;
+    if (found) {
+      const path = [];
+      let cur = search.endKey;
+      while (cur !== undefined) {
+        path.push(cur);
+        if (cur === search.startKey) break;
+        cur = search.parent.get(cur);
+      }
+      path.reverse();
+      search.path = path;
+      let cost = 0;
+      for (let i = 1; i < path.length; i++) {
+        const p = parseKey(path[i]);
+        cost += enterCost(p.x, p.y);
+      }
+      search.totalCost = cost;
+      search.pathSteps = path.length - 1;
+      setToast(
+        `已找到路径：${search.pathSteps} 步，总代价 ${cost}。` +
+        (search.algo === "bfs" ? " BFS 只保证步数最少，不保证地形代价最小。" : ""),
+        "ok"
+      );
+    } else {
+      search.path = [];
+      setToast("终点不可达：搜索前沿已耗尽，当前障碍与地形下没有可行路径。", "err");
+    }
+    updateStats();
+    render();
+  }
+
+  function stepSearch() {
+    if (!search || search.done) return false;
+    search.expansions++;
+
+    if (search.algo === "bfs") {
+      // Pop one node from the FIFO queue.
+      let current = null;
+      while (search.head < search.queue.length) {
+        const candidate = search.queue[search.head++];
+        if (!search.visited.has(candidate)) { current = candidate; break; }
+      }
+      if (current === null) { finishSearch(false); return false; }
+      search.visited.add(current);
+      search.frontier.delete(current);
+      if (current === search.endKey) { finishSearch(true); return true; }
+      const { x, y } = parseKey(current);
+      for (const nb of neighbors(current)) {
+        if (search.visited.has(nb) || search.frontier.has(nb)) continue;
+        search.frontier.add(nb);
+        search.parent.set(nb, current);
+        search.steps.set(nb, (search.steps.get(current) || 0) + 1);
+        search.queue.push(nb);
+        // Record terrain cost for display, though BFS does not optimize it.
+        const p = parseKey(nb);
+        search.cost.set(nb, (search.cost.get(current) || 0) + enterCost(p.x, p.y));
+      }
+      void x; void y;
+      return true;
+    }
+
+    // Dijkstra / A*: pop the minimum-priority live entry.
+    let entry = null;
+    while (search.heap.size) {
+      const candidate = search.heap.pop();
+      if (!search.frontier.has(candidate.key) || search.visited.has(candidate.key)) continue;
+      entry = candidate;
+      break;
+    }
+    if (!entry) { finishSearch(false); return false; }
+    search.frontier.delete(entry.key);
+    search.visited.add(entry.key);
+    if (entry.key === search.endKey) { finishSearch(true); return true; }
+    const current = entry.key;
+    const { x, y } = parseKey(current);
+    const baseCost = search.g.get(current) || 0;
+    const baseSteps = search.steps.get(current) || 0;
+    for (const nb of neighbors(current)) {
+      if (search.visited.has(nb)) continue;
+      const p = parseKey(nb);
+      const nextCost = baseCost + enterCost(p.x, p.y);
+      const known = search.g.get(nb);
+      if (known === undefined || nextCost < known) {
+        search.g.set(nb, nextCost);
+        search.cost.set(nb, nextCost);
+        search.steps.set(nb, baseSteps + 1);
+        search.parent.set(nb, current);
+        search.frontier.add(nb);
+        const h = manhattan(p, end);
+        const priority = search.algo === "astar" ? nextCost + h : nextCost;
+        search.heap.push({ key: nb, g: nextCost, h, priority });
+        void x; void y;
+      }
+    }
+    return true;
+  }
+
+  /* ---------- stats / UI ---------- */
+
+  function updateStats() {
+    const active = search;
+    visitedEl.textContent = active ? String(active.visited.size) : "0";
+    frontierEl.textContent = active ? String(active.frontier.size) : "0";
+    if (active && active.done) {
+      if (active.reachable) {
+        stepsEl.textContent = String(active.pathSteps);
+        costEl.textContent = String(active.totalCost);
+        metricEl.textContent = active.algo === "bfs" ? "最少步数" : "最小地形代价";
+      } else {
+        stepsEl.textContent = "—";
+        costEl.textContent = "—";
+        metricEl.textContent = "不可达";
+      }
+    } else {
+      stepsEl.textContent = "—";
+      costEl.textContent = "—";
+      metricEl.textContent = active ? (running ? "搜索中" : "已暂停") : "—";
+    }
+    badge.className = "status-badge";
+    if (!active) {
+      badge.textContent = "就绪";
+    } else if (active.done && active.reachable) {
+      badge.classList.add("done");
+      badge.textContent = "已找到路径";
+    } else if (active.done) {
+      badge.classList.add("fail");
+      badge.textContent = "不可达";
+    } else if (running) {
+      badge.classList.add("running");
+      badge.textContent = "搜索中";
+    } else {
+      badge.textContent = "已暂停";
+    }
+    document.getElementById("run").textContent =
+      active && !active.done && !running ? "继续" : active && active.done ? "再次运行" : "运行";
+  }
+
+  /* ---------- map editing ---------- */
+
+  function stopForEdit() {
+    if (search) {
+      stopSearch();
+      setToast("地图已修改，旧搜索已停止并清除，避免混用前后状态。");
+    }
+  }
+
+  function moveStartTo(x, y) {
+    if (!inBounds(x, y) || isEnd(x, y)) return;
+    stopForEdit();
+    walls.delete(key(x, y));
+    weighted.delete(key(x, y));
+    start = { x, y };
+    updateStats();
+    render();
+  }
+
+  function moveEndTo(x, y) {
+    if (!inBounds(x, y) || isStart(x, y)) return;
+    stopForEdit();
+    walls.delete(key(x, y));
+    weighted.delete(key(x, y));
+    end = { x, y };
+    updateStats();
+    render();
+  }
+
+  function applyTool(x, y) {
+    if (!inBounds(x, y)) return;
+    if (isStart(x, y) || isEnd(x, y)) return;
+    stopForEdit();
+    const k = key(x, y);
+    if (tool === "wall") {
+      walls.add(k);
+      weighted.delete(k);
+    } else if (tool === "erase") {
+      walls.delete(k);
+      weighted.delete(k);
+    } else if (tool === "weight") {
+      weighted.add(k);
+      walls.delete(k);
+    } else if (tool === "start") {
+      moveStartTo(x, y);
+      return;
+    } else if (tool === "end") {
+      moveEndTo(x, y);
+      return;
+    }
+    updateStats();
+    render();
+  }
+
+  function lineCells(a, b) {
+    const out = [];
+    let x0 = a.x, y0 = a.y;
+    const x1 = b.x, y1 = b.y;
+    const dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    const dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    for (;;) {
+      out.push({ x: x0, y: y0 });
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) { err += dy; x0 += sx; }
+      if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+    return out;
+  }
+
+  function cellFromEvent(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((event.clientX - rect.left) / (rect.width / COLS));
+    const y = Math.floor((event.clientY - rect.top) / (rect.height / ROWS));
+    return { x: Math.max(0, Math.min(COLS - 1, x)), y: Math.max(0, Math.min(ROWS - 1, y)) };
+  }
+
+  canvas.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    pointerDown = true;
+    lastCell = null;
+    const p = cellFromEvent(event);
+    if (isStart(p.x, p.y)) dragTarget = "start";
+    else if (isEnd(p.x, p.y)) dragTarget = "end";
+    else dragTarget = null;
+    if (dragTarget === "start") moveStartTo(p.x, p.y);
+    else if (dragTarget === "end") moveEndTo(p.x, p.y);
+    else applyTool(p.x, p.y);
+    lastCell = p;
+    canvas.setPointerCapture(event.pointerId);
+  });
+
+  canvas.addEventListener("pointermove", (event) => {
+    if (!pointerDown) return;
+    event.preventDefault();
+    const p = cellFromEvent(event);
+    if (dragTarget === "start") {
+      moveStartTo(p.x, p.y);
+    } else if (dragTarget === "end") {
+      moveEndTo(p.x, p.y);
+    } else if (lastCell) {
+      for (const c of lineCells(lastCell, p)) applyTool(c.x, c.y);
+    }
+    lastCell = p;
+  });
+
+  function endPointer(event) {
+    if (!pointerDown) return;
+    pointerDown = false;
+    dragTarget = null;
+    lastCell = null;
+    if (event && canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    updateStats();
+  }
+  canvas.addEventListener("pointerup", endPointer);
+  canvas.addEventListener("pointercancel", endPointer);
+
+  // Pointer leave without button up can leave a drag active on some devices.
+  window.addEventListener("pointerup", () => { if (pointerDown) endPointer(null); });
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  /* ---------- rendering ---------- */
+
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cellSize = rect.width / COLS;
+    render();
+  }
+
+  function drawCell(x, y, fill) {
+    const pad = Math.max(1, cellSize * 0.045);
+    ctx.fillStyle = fill;
+    ctx.fillRect(
+      x * cellSize + pad, y * cellSize + pad,
+      cellSize - pad * 2, cellSize - pad * 2
+    );
+  }
+
+  function render() {
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    if (!w || !h) return;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#f8fbff";
+    ctx.fillRect(0, 0, w, h);
+
+    // Cell backgrounds.
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const k = key(x, y);
+        if (walls.has(k)) {
+          drawCell(x, y, "#334155");
+        } else if (weighted.has(k)) {
+          drawCell(x, y, "#f7c873");
+          // Small dots suggest rough terrain without hiding the cost meaning.
+          if (cellSize > 11) {
+            ctx.fillStyle = "rgba(120, 72, 10, .38)";
+            const cx = x * cellSize + cellSize / 2;
+            const cy = y * cellSize + cellSize / 2;
+            ctx.beginPath();
+            ctx.arc(cx - cellSize * .14, cy + cellSize * .1, Math.max(1, cellSize * .04), 0, Math.PI * 2);
+            ctx.arc(cx + cellSize * .14, cy - cellSize * .12, Math.max(1, cellSize * .04), 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+    }
+
+    // Grid lines.
+    ctx.strokeStyle = "#dbe6f2";
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= COLS; x++) {
+      const px = Math.round(x * cellSize) + 0.5;
+      ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
+    }
+    for (let y = 0; y <= ROWS; y++) {
+      const py = Math.round(y * cellSize) + 0.5;
+      ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
+    }
+
+    if (search) {
+      // Visited, then frontier, then final path.
+      for (const k of search.visited) {
+        const p = parseKey(k);
+        drawCell(p.x, p.y, "#6f9fe8");
+      }
+      for (const k of search.frontier) {
+        if (search.visited.has(k)) continue;
+        const p = parseKey(k);
+        drawCell(p.x, p.y, "#bcd6ff");
+      }
+      if (search.done && search.reachable && search.path.length) {
+        ctx.strokeStyle = "#f0a500";
+        ctx.lineWidth = Math.max(2, cellSize * 0.16);
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        search.path.forEach((k, i) => {
+          const p = parseKey(k);
+          const cx = p.x * cellSize + cellSize / 2;
+          const cy = p.y * cellSize + cellSize / 2;
+          if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+        });
+        ctx.stroke();
+        for (const k of search.path) {
+          const p = parseKey(k);
+          drawCell(p.x, p.y, "rgba(255, 210, 77, .55)");
+        }
+      }
+    }
+
+    // Start / end drawn last so they remain visible.
+    const drawEndpoint = (p, fill, label) => {
+      const cx = p.x * cellSize + cellSize / 2;
+      const cy = p.y * cellSize + cellSize / 2;
+      const r = Math.max(5, cellSize * 0.32);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.lineWidth = Math.max(1.5, cellSize * .06);
+      ctx.strokeStyle = "rgba(255,255,255,.9)";
+      ctx.stroke();
+      if (cellSize > 15) {
+        ctx.fillStyle = "#fff";
+        ctx.font = `600 ${Math.max(9, Math.round(cellSize * .34))}px "Segoe UI", "PingFang SC", sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, cx, cy + 0.5);
+      }
+    };
+    drawEndpoint(start, "#0f9d66", "起");
+    drawEndpoint(end, "#d3382f", "终");
+  }
+
+  /* ---------- presets ---------- */
+
+  function loadPreset() {
+    stopSearch();
+    walls = new Set();
+    weighted = new Set();
+    // Two vertical walls with staggered gaps.
+    for (let y = 1; y <= 15; y++) {
+      if (y < 5 || y > 11) walls.add(key(8, y));
+    }
+    for (let y = 4; y <= 18; y++) {
+      if (y < 12 || y > 16) walls.add(key(20, y));
+    }
+    // A swamp band in the middle.
+    for (let x = 11; x <= 17; x++) {
+      for (let y = 7; y <= 12; y++) {
+        if (x === 14 && y === 9) continue;
+        weighted.add(key(x, y));
+      }
+    }
+    // A couple of scattered obstacles.
+    [[4, 12], [4, 13], [25, 6], [26, 6], [25, 14], [26, 14], [14, 17], [15, 17]].forEach(([x, y]) => walls.add(key(x, y)));
+    start = { x: 2, y: 10 };
+    end = { x: 29, y: 10 };
+    walls.delete(key(start.x, start.y));
+    walls.delete(key(end.x, end.y));
+    weighted.delete(key(start.x, start.y));
+    weighted.delete(key(end.x, end.y));
+    updateStats();
+    render();
+    setToast("已载入固定预设地图。可运行三种算法比较访问节点数与路径代价。", "ok");
+  }
+
+  function resetMap() {
+    stopSearch();
+    walls = new Set();
+    weighted = new Set();
+    start = { x: 2, y: 10 };
+    end = { x: 29, y: 10 };
+    updateStats();
+    render();
+    setToast("地图已重置为空地，起点与终点恢复到默认位置。", "ok");
+  }
+
+  /* ---------- controls ---------- */
+
+  document.querySelectorAll("[data-algo]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      algo = btn.dataset.algo;
+      document.querySelectorAll("[data-algo]").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      stopSearch();
+      updateStats();
+      render();
+      setToast(`已切换到 ${algo === "bfs" ? "BFS" : algo === "dijkstra" ? "Dijkstra" : "A*"}，旧搜索已清除。`);
+    });
+  });
+  document.querySelectorAll("[data-tool]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      tool = btn.dataset.tool;
+      document.querySelectorAll("[data-tool]").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      setToast(`当前工具：${btn.textContent}。`);
+    });
+  });
+
+  document.getElementById("run").addEventListener("click", () => {
+    if (!search || search.done) startSearch();
+    else {
+      running = true;
+      accumulator = 0;
+      setToast("继续搜索。");
+      updateStats();
+    }
+  });
+  document.getElementById("pause").addEventListener("click", () => {
+    if (!search || search.done) { setToast("当前没有正在运行的搜索。"); return; }
+    running = false;
+    setToast("搜索已暂停；可单步继续观察。");
+    updateStats();
+  });
+  document.getElementById("step").addEventListener("click", () => {
+    if (!search || search.done) {
+      startSearch();
+      if (!search) return;
+    }
+    running = false;
+    const advanced = stepSearch();
+    if (advanced && search && !search.done) setToast("单步：已扩展一个搜索节点。");
+    updateStats();
+    render();
+  });
+  document.getElementById("clear-search").addEventListener("click", clearSearch);
+  document.getElementById("preset").addEventListener("click", loadPreset);
+  document.getElementById("reset").addEventListener("click", resetMap);
+  speedInput.addEventListener("input", () => {
+    speed = Number(speedInput.value);
+    speedOut.textContent = `${speed} 步/秒`;
+  });
+
+  /* ---------- animation ---------- */
+
+  function frame(now) {
+    if (!lastFrame) lastFrame = now;
+    const dt = Math.min(120, now - lastFrame);
+    lastFrame = now;
+    if (running && search && !search.done) {
+      accumulator += (dt / 1000) * speed;
+      let budget = Math.floor(accumulator);
+      if (budget > 0) accumulator -= budget;
+      // Cap work per frame so a very high speed cannot lock the page.
+      budget = Math.min(budget, 4000);
+      let expanded = 0;
+      while (budget-- > 0 && search && !search.done) {
+        if (!stepSearch()) break;
+        expanded++;
+      }
+      if (expanded) {
+        updateStats();
+        render();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener("resize", resizeCanvas);
+  if (window.ResizeObserver) new ResizeObserver(resizeCanvas).observe(canvas);
+  resizeCanvas();
+  updateStats();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

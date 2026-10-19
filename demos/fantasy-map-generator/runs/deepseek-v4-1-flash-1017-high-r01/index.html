@@ -1,0 +1,1176 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<script src="../../../../assets/analytics.js" defer></script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>奇幻地图生成器</title>
+<style>
+  :root {
+    --ink: #34291e;
+    --muted: #76634d;
+    --line: #cdbb9d;
+    --panel: #fbf6ea;
+    --bg: #e9dfca;
+    --accent: #7a4f25;
+    --accent-2: #2f6d83;
+    --shadow: 0 16px 40px rgba(74, 55, 31, .18);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background:
+      radial-gradient(circle at 12% 0%, #f9f2e3 0, transparent 32rem),
+      linear-gradient(150deg, #f2ead8, var(--bg) 55%, #ddd0b6);
+  }
+  .page { width: min(1320px, 100%); margin: 0 auto; padding: 20px clamp(10px, 3vw, 28px) 34px; }
+  header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 10px 22px; margin-bottom: 14px; }
+  h1 {
+    margin: 0; font-family: Georgia, "STSong", "SimSun", serif;
+    font-size: clamp(24px, 3.6vw, 34px); letter-spacing: .02em;
+  }
+  .sub { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.65; max-width: 820px; }
+  .seal {
+    font-family: Georgia, "STSong", "SimSun", serif;
+    color: #8b2f23; border: 2px solid #a84333; border-radius: 8px;
+    padding: 7px 10px; font-size: 13px; letter-spacing: .18em;
+    transform: rotate(-2deg); background: rgba(255, 248, 235, .5);
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid rgba(178, 155, 118, .72);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+  .toolbar { padding: 11px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-bottom: 1px solid #eadfc9; }
+  .group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .group-label { font-size: 11px; color: var(--muted); letter-spacing: .06em; margin-right: 1px; }
+  .divider { width: 1px; min-height: 28px; align-self: stretch; background: #eadfc9; margin: 0 3px; }
+  button {
+    font: inherit; font-size: 13px; color: var(--ink);
+    background: #fdf9ef; border: 1px solid var(--line); border-radius: 9px;
+    padding: 8px 11px; cursor: pointer; touch-action: manipulation;
+    transition: background .15s, border-color .15s, transform .08s;
+  }
+  button:hover { background: #fff; border-color: #a98e68; }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff8ea; }
+  button.primary:hover { background: #633f1c; }
+  button[aria-pressed="true"] { background: #f0e2c7; border-color: #a57b45; color: #5c3a16; box-shadow: inset 0 0 0 1px rgba(122,79,37,.12); }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 312px; gap: 14px; align-items: start; margin-top: 14px; }
+  .map-card { overflow: hidden; }
+  .map-wrap { position: relative; background: #e7dcc4; }
+  canvas#map { display: block; width: 100%; height: clamp(340px, 58vh, 650px); touch-action: none; cursor: crosshair; }
+  .map-foot { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 9px 14px; border-top: 1px solid #eadfc9; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .legend { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+  .legend i { display: inline-block; width: 13px; height: 13px; border-radius: 3px; border: 1px solid rgba(52,41,30,.16); vertical-align: -2px; margin-right: 4px; }
+  aside { display: grid; gap: 12px; min-width: 0; }
+  aside .card { padding: 14px; }
+  aside h2 { margin: 0 0 10px; font-size: 14px; letter-spacing: .02em; }
+  .field { margin: 0 0 12px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .field strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+  input[type="text"], input[type="number"] {
+    width: 100%; font: inherit; font-size: 14px; color: var(--ink);
+    padding: 8px 9px; border: 1px solid var(--line); border-radius: 8px; background: #fffdf8;
+  }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .seed-row { display: flex; gap: 6px; }
+  .seed-row input { min-width: 0; }
+  .seed-row button { white-space: nowrap; }
+  .checkbox { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .checkbox input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.75; }
+  .note b { color: var(--ink); }
+  .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .action-grid button { width: 100%; }
+  .hint { margin-top: 9px; padding: 8px 10px; border-radius: 8px; background: #f3ead7; color: #6e5738; font-size: 12px; line-height: 1.6; }
+  .hint.err { background: #fbe9e5; color: #9b2f22; }
+  .hint.ok { background: #eaf2e3; color: #3c6232; }
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    aside { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .page { padding: 12px 10px 26px; }
+    aside { grid-template-columns: minmax(0, 1fr); }
+    .toolbar { padding: 10px; }
+    .divider { display: none; }
+    button { padding: 7px 9px; font-size: 12.5px; }
+    canvas#map { height: 62vh; min-height: 320px; }
+    .group-label { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div>
+      <h1>奇幻地图生成器</h1>
+      <p class="sub">
+        用种子生成手绘岛屿：海平面、地形粗糙度、河流、森林、山脉与城镇都可重复。拖动“升高 / 降低”笔刷会修改地形，
+        海岸线与河流随之重新计算；滚轮或双指缩放，拖动平移，导出 PNG 保存当前地图。
+      </p>
+    </div>
+    <div class="seal">群岛志</div>
+  </header>
+
+  <div class="layout">
+    <section class="card map-card">
+      <div class="toolbar">
+        <div class="group" aria-label="笔刷工具">
+          <span class="group-label">工具</span>
+          <button data-tool="raise" aria-pressed="true">升高地形</button>
+          <button data-tool="lower" aria-pressed="false">降低地形</button>
+          <button data-tool="pan" aria-pressed="false">平移</button>
+        </div>
+        <div class="divider" aria-hidden="true"></div>
+        <div class="group" aria-label="视图">
+          <button id="zoom-out" title="缩小">−</button>
+          <button id="zoom-in" title="放大">＋</button>
+          <button id="zoom-fit">适应窗口</button>
+        </div>
+        <div class="divider" aria-hidden="true"></div>
+        <div class="group">
+          <button id="png" class="primary">导出 PNG</button>
+          <button id="reset-map">重置地图</button>
+        </div>
+        <div class="group">
+          <label class="checkbox"><input type="checkbox" id="show-towns" checked /> 显示城镇标签</label>
+        </div>
+      </div>
+      <div class="map-wrap">
+        <canvas id="map" aria-label="奇幻岛屿地图，可拖动、缩放并使用地形笔刷"></canvas>
+      </div>
+      <div class="map-foot">
+        <div class="legend">
+          <span><i style="background:#254b69"></i>深海</span>
+          <span><i style="background:#7aacc0"></i>浅海</span>
+          <span><i style="background:#e0ce9d"></i>海岸</span>
+          <span><i style="background:#aec476"></i>平原</span>
+          <span><i style="background:#5c8552"></i>森林</span>
+          <span><i style="background:#8b7c69"></i>山脉</span>
+          <span><i style="background:#3d7fa3"></i>河流</span>
+          <span><i style="background:#8b2f23"></i>城镇</span>
+        </div>
+        <div>滚轮缩放 · 拖动平移（平移工具）· 双指缩放 · 笔刷半径可在右侧调整</div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="card">
+        <h2>地图参数</h2>
+        <div class="field">
+          <label for="seed">世界种子</label>
+          <div class="seed-row">
+            <input id="seed" type="text" value="星海湾" maxlength="40" autocomplete="off" />
+            <button id="random-seed" title="随机种子">随机</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="sea">海平面 <strong id="sea-out">0.44</strong></label>
+          <input id="sea" type="range" min="0.32" max="0.60" step="0.005" value="0.44" />
+        </div>
+        <div class="field">
+          <label for="rough">地形粗糙度 <strong id="rough-out">0.55</strong></label>
+          <input id="rough" type="range" min="0" max="1" step="0.01" value="0.55" />
+        </div>
+        <div class="field">
+          <label for="brush">笔刷半径 <strong id="brush-out">4 格</strong></label>
+          <input id="brush" type="range" min="2" max="14" step="1" value="4" />
+        </div>
+        <div class="action-grid">
+          <button id="regenerate" class="primary">按种子生成</button>
+          <button id="reset-params">恢复默认参数</button>
+        </div>
+        <div id="hint" class="hint">相同种子与参数会生成相同地图。初次生成后，笔刷编辑只修改当前地图；再次生成会重置地形。</div>
+      </div>
+      <div class="card">
+        <h2>地理规则</h2>
+        <p class="note">
+          河流沿地势下降，优先流入海洋或内陆湖泊，不会逆坡翻越山峰。海洋、海岸、平原、森林、山脉与雪线由高度与湿度共同划分；
+          城镇只出现在海拔适中的陆地上。导出图片会包含当前种子、参数、完整地图与图例。
+        </p>
+      </div>
+      <div class="card">
+        <h2>操作提示</h2>
+        <p class="note">
+          触摸设备：单指使用当前笔刷或平移，双指捏合缩放；缩放后笔刷坐标仍按地图坐标计算。
+          如果画布看起来没有变化，请确认当前工具不是“平移”。所有计算均在浏览器本地完成，无外部资源。
+        </p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const MAP_W = 200, MAP_H = 130;
+  const SCALE = 3;
+  const canvas = document.getElementById("map");
+  const ctx = canvas.getContext("2d");
+  const hint = document.getElementById("hint");
+  const seedInput = document.getElementById("seed");
+  const seaInput = document.getElementById("sea");
+  const roughInput = document.getElementById("rough");
+  const brushInput = document.getElementById("brush");
+  const seaOut = document.getElementById("sea-out");
+  const roughOut = document.getElementById("rough-out");
+  const brushOut = document.getElementById("brush-out");
+  const showTowns = document.getElementById("show-towns");
+
+  let seedText = seedInput.value.trim() || "星海湾";
+  let seedNum = hashSeed(seedText);
+  let seaLevel = Number(seaInput.value);
+  let roughness = Number(roughInput.value);
+  let brushRadius = Number(brushInput.value);
+  let heights = new Float32Array(MAP_W * MAP_H);
+  let moisture = new Float32Array(MAP_W * MAP_H);
+  let terrain = new Uint8Array(MAP_W * MAP_H);
+  let riverSegments = [];
+  let lakes = [];
+  let coastSegments = [];
+  let towns = [];
+  let mapImage = document.createElement("canvas");
+  let mapCtx = mapImage.getContext("2d");
+  mapImage.width = MAP_W * SCALE;
+  mapImage.height = MAP_H * SCALE;
+  let camera = { x: MAP_W / 2, y: MAP_H / 2, zoom: 4 };
+  let tool = "raise";
+  let viewAdjusted = false;
+  let brushWorld = null;
+  let painting = false;
+  let panning = false;
+  let lastPaint = null;
+  let lastPan = null;
+  let needsRebuild = false;
+  let drawQueued = false;
+  let pointerMap = new Map();
+  let pinch = null;
+  let viewW = 800, viewH = 520;
+
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const smoothstep = (a, b, x) => {
+    const t = clamp((x - a) / (b - a), 0, 1);
+    return t * t * (3 - 2 * t);
+  };
+  function hashSeed(text) {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function intHash(x, y, seed = seedNum) {
+    let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ seed;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  function makePerm(seed) {
+    const rng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+    const p = Array.from({ length: 256 }, (_, i) => i);
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [p[i], p[j]] = [p[j], p[i]];
+    }
+    return new Uint8Array([...p, ...p]);
+  }
+  const permFor = (seed) => makePerm(seed);
+  function gridNoise(ix, iy, perm) {
+    return perm[(perm[ix & 255] + (iy & 255)) & 511] / 255;
+  }
+  function valueNoise(x, y, perm) {
+    const x0 = Math.floor(x), y0 = Math.floor(y);
+    const fx = x - x0, fy = y - y0;
+    const u = fx * fx * (3 - 2 * fx);
+    const v = fy * fy * (3 - 2 * fy);
+    const n00 = gridNoise(x0, y0, perm);
+    const n10 = gridNoise(x0 + 1, y0, perm);
+    const n01 = gridNoise(x0, y0 + 1, perm);
+    const n11 = gridNoise(x0 + 1, y0 + 1, perm);
+    return lerp(lerp(n00, n10, u), lerp(n01, n11, u), v);
+  }
+  function fbm(x, y, octaves, persistence, perm) {
+    let sum = 0, amp = 1, freq = 1, norm = 0;
+    for (let i = 0; i < octaves; i++) {
+      sum += valueNoise(x * freq, y * freq, perm) * amp;
+      norm += amp;
+      amp *= persistence;
+      freq *= 2;
+    }
+    return sum / norm;
+  }
+
+  /* ---------- generation ---------- */
+
+  function generateHeights() {
+    const perm = permFor(seedNum);
+    const persistence = 0.32 + roughness * 0.5;
+    const h = new Float32Array(MAP_W * MAP_H);
+    const m = new Float32Array(MAP_W * MAP_H);
+    const raw = new Float32Array(MAP_W * MAP_H);
+    let min = Infinity, max = -Infinity;
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const nx = (x / (MAP_W - 1) - 0.5) * 2;
+        const ny = (y / (MAP_H - 1) - 0.5) * 2.25;
+        const warp = fbm(x * 0.018 + 17.3, y * 0.018 + 6.1, 3, 0.5, perm);
+        const dist = Math.sqrt(nx * nx + ny * ny) + (warp - 0.5) * 0.62;
+        const island = smoothstep(1.18, 0.30, dist);
+        const base = fbm(x * 0.032 + 3.7, y * 0.032 + 9.2, 5, persistence, perm);
+        const ridge = 1 - Math.abs(fbm(x * 0.052 + 30.1, y * 0.052 + 12.4, 4, persistence, perm) * 2 - 1);
+        const v = base * 0.56 + Math.pow(ridge, 1.6) * 0.16 + island * 0.52 - 0.10;
+        raw[y * MAP_W + x] = v;
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    }
+    const span = Math.max(1e-6, max - min);
+    for (let i = 0; i < raw.length; i++) h[i] = clamp((raw[i] - min) / span, 0, 1);
+    // Moisture is generated with the same seed but changes independently of
+    // the brush, so forests keep a stable distribution while sculpting.
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        m[y * MAP_W + x] = fbm(x * 0.055 + 51.9, y * 0.055 + 27.3, 4, 0.5, perm);
+      }
+    }
+    heights = h;
+    moisture = m;
+  }
+
+  function terrainAt(i) {
+    const h = heights[i];
+    const m = moisture[i];
+    if (h < seaLevel - 0.13) return 0; // deep ocean
+    if (h < seaLevel) return 1; // ocean
+    if (h < seaLevel + 0.018) return 2; // coast
+    if (h < seaLevel + 0.30) return m > 0.47 ? 4 : 3; // forest / plains
+    if (h < seaLevel + 0.47) return 5; // mountain
+    return 6; // snow
+  }
+
+  function recomputeDerived() {
+    const perm = permFor(seedNum);
+    for (let i = 0; i < heights.length; i++) terrain[i] = terrainAt(i);
+
+    // Downhill direction and flow accumulation.
+    const flow = new Float32Array(MAP_W * MAP_H);
+    const down = new Int32Array(MAP_W * MAP_H).fill(-1);
+    const land = [];
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const i = y * MAP_W + x;
+        if (heights[i] < seaLevel) continue;
+        flow[i] = 1;
+        land.push(i);
+        let best = -1, bestH = heights[i];
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+            const ni = ny * MAP_W + nx;
+            if (heights[ni] < bestH - 1e-7) { bestH = heights[ni]; best = ni; }
+          }
+        }
+        down[i] = best;
+      }
+    }
+    land.sort((a, b) => heights[b] - heights[a]);
+    for (const i of land) {
+      const d = down[i];
+      if (d >= 0) flow[d] += flow[i];
+    }
+    // Only draw rivers whose downhill path reaches the sea. This prevents
+    // rivers from ending in arbitrary noise pits and keeps every rendered
+    // watercourse physically consistent with the terrain.
+    const reachesSea = new Int8Array(MAP_W * MAP_H); // 0 unknown, 1 yes, -1 no
+    for (const start of land) {
+      if (reachesSea[start] !== 0) continue;
+      const path = [];
+      let cur = start;
+      let result = -1;
+      while (cur >= 0 && reachesSea[cur] === 0) {
+        path.push(cur);
+        const d = down[cur];
+        if (d < 0) { result = -1; break; }
+        if (heights[d] < seaLevel) { result = 1; break; }
+        cur = d;
+      }
+      if (result !== 1 && cur >= 0 && reachesSea[cur] === 1) result = 1;
+      for (const p of path) reachesSea[p] = result;
+    }
+    riverSegments = [];
+    for (const i of land) {
+      if (reachesSea[i] !== 1) continue;
+      const d = down[i];
+      if (d < 0 || flow[i] < 22) continue;
+      const x = i % MAP_W, y = Math.floor(i / MAP_W);
+      const dx = d % MAP_W, dy = Math.floor(d / MAP_W);
+      riverSegments.push({
+        x1: x + 0.5, y1: y + 0.5, x2: dx + 0.5, y2: dy + 0.5,
+        flow: flow[i]
+      });
+    }
+
+    coastSegments = buildCoastline();
+    rebuildMapImage();
+  }
+
+  function buildCoastline() {
+    const segs = [];
+    const level = seaLevel;
+    const interp = (x1, y1, v1, x2, y2, v2) => {
+      const t = Math.abs(v1 - v2) < 1e-9 ? 0.5 : v1 / (v1 - v2);
+      return { x: x1 + (x2 - x1) * t, y: y1 + (y2 - y1) * t };
+    };
+    for (let y = 0; y < MAP_H - 1; y++) {
+      for (let x = 0; x < MAP_W - 1; x++) {
+        const v0 = heights[y * MAP_W + x] - level;
+        const v1 = heights[y * MAP_W + x + 1] - level;
+        const v2 = heights[(y + 1) * MAP_W + x + 1] - level;
+        const v3 = heights[(y + 1) * MAP_W + x] - level;
+        const pts = [];
+        if ((v0 > 0) !== (v1 > 0)) pts.push(interp(x, y, v0, x + 1, y, v1));
+        if ((v1 > 0) !== (v2 > 0)) pts.push(interp(x + 1, y, v1, x + 1, y + 1, v2));
+        if ((v2 > 0) !== (v3 > 0)) pts.push(interp(x + 1, y + 1, v2, x, y + 1, v3));
+        if ((v3 > 0) !== (v0 > 0)) pts.push(interp(x, y + 1, v3, x, y, v0));
+        if (pts.length === 2) segs.push([pts[0], pts[1]]);
+        else if (pts.length === 4) segs.push([pts[0], pts[1]], [pts[2], pts[3]]);
+      }
+    }
+    return segs;
+  }
+
+  const PALETTE = {
+    0: [37, 75, 105], 1: [88, 138, 163], 2: [224, 206, 157],
+    3: [174, 196, 118], 4: [92, 133, 82], 5: [139, 124, 105], 6: [232, 229, 220]
+  };
+  function shadeColor(base, shade, jitter) {
+    return [
+      clamp(Math.round(base[0] * shade + jitter), 0, 255),
+      clamp(Math.round(base[1] * shade + jitter), 0, 255),
+      clamp(Math.round(base[2] * shade + jitter), 0, 255)
+    ];
+  }
+  function rebuildMapImage() {
+    mapImage.width = MAP_W * SCALE;
+    mapImage.height = MAP_H * SCALE;
+    mapCtx = mapImage.getContext("2d");
+    const img = mapCtx.createImageData(MAP_W * SCALE, MAP_H * SCALE);
+    const data = img.data;
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const i = y * MAP_W + x;
+        const t = terrain[i];
+        const h = heights[i];
+        // Simple north-west hillshade makes elevation readable.
+        const left = heights[y * MAP_W + Math.max(0, x - 1)];
+        const right = heights[y * MAP_W + Math.min(MAP_W - 1, x + 1)];
+        const up = heights[Math.max(0, y - 1) * MAP_W + x];
+        const down = heights[Math.min(MAP_H - 1, y + 1) * MAP_W + x];
+        const shade = clamp(1 + ((left - right) + (up - down)) * 1.8, 0.78, 1.22);
+        const jitter = (intHash(x, y) - 0.5) * 12;
+        const col = shadeColor(PALETTE[t], shade, jitter);
+        for (let sy = 0; sy < SCALE; sy++) {
+          for (let sx = 0; sx < SCALE; sx++) {
+            const p = (((y * SCALE + sy) * MAP_W * SCALE) + (x * SCALE + sx)) * 4;
+            data[p] = col[0]; data[p + 1] = col[1]; data[p + 2] = col[2]; data[p + 3] = 255;
+          }
+        }
+      }
+    }
+    mapCtx.putImageData(img, 0, 0);
+
+    // Texture symbols: forests, mountains, and occasional grass tufts.
+    mapCtx.save();
+    mapCtx.scale(SCALE, SCALE);
+    for (let y = 1; y < MAP_H - 1; y++) {
+      for (let x = 1; x < MAP_W - 1; x++) {
+        const i = y * MAP_W + x;
+        const t = terrain[i];
+        const r = intHash(x * 3 + 11, y * 5 + 7);
+        if (t === 4 && r > 0.78) {
+          const cx = x + 0.5, cy = y + 0.5;
+          mapCtx.fillStyle = "rgba(33, 73, 43, .78)";
+          mapCtx.beginPath();
+          mapCtx.moveTo(cx, cy - 1.15);
+          mapCtx.lineTo(cx - 0.85, cy + 0.55);
+          mapCtx.lineTo(cx + 0.85, cy + 0.55);
+          mapCtx.closePath();
+          mapCtx.fill();
+          mapCtx.fillStyle = "rgba(70, 51, 30, .8)";
+          mapCtx.fillRect(cx - 0.14, cy + 0.5, 0.28, 0.65);
+        } else if (t === 5 && r > 0.72) {
+          const cx = x + 0.5, cy = y + 0.6;
+          const size = 1.2 + intHash(x + 3, y + 9) * 1.4;
+          mapCtx.fillStyle = "rgba(75, 64, 51, .88)";
+          mapCtx.beginPath();
+          mapCtx.moveTo(cx, cy - size);
+          mapCtx.lineTo(cx - size * 0.95, cy + size * 0.7);
+          mapCtx.lineTo(cx + size * 0.95, cy + size * 0.7);
+          mapCtx.closePath();
+          mapCtx.fill();
+          if (heights[i] > seaLevel + 0.41) {
+            mapCtx.fillStyle = "rgba(242, 239, 231, .92)";
+            mapCtx.beginPath();
+            mapCtx.moveTo(cx, cy - size);
+            mapCtx.lineTo(cx - size * 0.34, cy - size * 0.28);
+            mapCtx.lineTo(cx + size * 0.34, cy - size * 0.28);
+            mapCtx.closePath();
+            mapCtx.fill();
+          }
+        } else if (t === 3 && r > 0.93) {
+          mapCtx.strokeStyle = "rgba(77, 104, 47, .55)";
+          mapCtx.lineWidth = 0.16;
+          mapCtx.beginPath();
+          mapCtx.moveTo(x + 0.35, y + 0.9);
+          mapCtx.lineTo(x + 0.45, y + 0.55);
+          mapCtx.moveTo(x + 0.6, y + 0.9);
+          mapCtx.lineTo(x + 0.58, y + 0.6);
+          mapCtx.stroke();
+        }
+      }
+    }
+    mapCtx.restore();
+  }
+
+  function placeTowns() {
+    const rng = mulberry32((seedNum ^ 0x51ed270b) >>> 0);
+    const prefixes = ["星", "月", "雾", "风", "霜", "银", "松", "溪", "石", "云", "白", "青", "龙", "鹰", "鹿", "海", "晨", "暮", "潮", "雪"];
+    const middles = ["", "", "", "之", "水", "岩", "林", "风"];
+    const suffixes = ["港", "镇", "堡", "村", "湾", "岭", "原", "城", "谷", "滩", "渡"];
+    const candidates = [];
+    for (let y = 6; y < MAP_H - 6; y++) {
+      for (let x = 6; x < MAP_W - 6; x++) {
+        const i = y * MAP_W + x;
+        if (heights[i] < seaLevel + 0.035 || heights[i] > seaLevel + 0.30) continue;
+        // Prefer relatively flat land near the coast or river valleys.
+        let rough = 0;
+        for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+          rough += Math.abs(heights[i] - heights[(y + dy) * MAP_W + (x + dx)]);
+        }
+        if (rough < 0.075) candidates.push({ x: x + 0.5, y: y + 0.5 });
+      }
+    }
+    // Deterministic shuffle.
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+    const picked = [];
+    const minDist = 16;
+    const used = new Set();
+    for (const c of candidates) {
+      if (picked.length >= 8) break;
+      if (picked.some((p) => Math.hypot(p.x - c.x, p.y - c.y) < minDist)) continue;
+      let name = "";
+      for (let attempt = 0; attempt < 20; attempt++) {
+        name = prefixes[Math.floor(rng() * prefixes.length)]
+          + middles[Math.floor(rng() * middles.length)]
+          + suffixes[Math.floor(rng() * suffixes.length)];
+        if (!used.has(name)) break;
+      }
+      if (used.has(name)) continue;
+      used.add(name);
+      picked.push({ x: c.x, y: c.y, name, capital: picked.length === 0 });
+    }
+    towns = picked;
+  }
+
+  /* ---------- rendering ---------- */
+
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    viewW = Math.max(1, rect.width);
+    viewH = Math.max(1, rect.height);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.2);
+    const bw = Math.round(viewW * dpr), bh = Math.round(viewH * dpr);
+    if (canvas.width !== bw || canvas.height !== bh) {
+      canvas.width = bw;
+      canvas.height = bh;
+    }
+    if (!viewAdjusted) fitCamera(false);
+    requestDraw();
+  }
+
+  function fitCamera(redraw = true) {
+    const zoom = Math.min(viewW / MAP_W, viewH / MAP_H) * 0.92;
+    camera = { x: MAP_W / 2, y: MAP_H / 2, zoom: Math.max(0.5, zoom) };
+    viewAdjusted = false;
+    if (redraw) requestDraw();
+  }
+
+  function worldToScreen(x, y) {
+    return {
+      x: (x - camera.x) * camera.zoom + viewW / 2,
+      y: (y - camera.y) * camera.zoom + viewH / 2
+    };
+  }
+  function screenToWorld(sx, sy) {
+    return {
+      x: (sx - viewW / 2) / camera.zoom + camera.x,
+      y: (sy - viewH / 2) / camera.zoom + camera.y
+    };
+  }
+
+  function requestDraw() {
+    if (drawQueued) return;
+    drawQueued = true;
+    requestAnimationFrame(() => {
+      drawQueued = false;
+      if (needsRebuild) {
+        needsRebuild = false;
+        recomputeDerived();
+      }
+      paintScene(ctx, viewW, viewH, camera, false);
+    });
+  }
+
+  function paintParchment(c, w, h) {
+    const g = c.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, "#efe4cd");
+    g.addColorStop(0.55, "#e5d8bd");
+    g.addColorStop(1, "#d9c9a8");
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+    // Fixed-seed speckles give a paper texture without external images.
+    const rng = mulberry32(0x5eed1234);
+    c.fillStyle = "rgba(109, 88, 57, .08)";
+    const count = Math.round((w * h) / 5200);
+    for (let i = 0; i < count; i++) {
+      const x = rng() * w, y = rng() * h, r = 0.4 + rng() * 1.1;
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    }
+  }
+
+  function paintScene(c, w, h, cam, exportMode) {
+    c.save();
+    c.clearRect(0, 0, w, h);
+    paintParchment(c, w, h);
+
+    c.save();
+    c.translate(w / 2, h / 2);
+    c.scale(cam.zoom, cam.zoom);
+    c.translate(-cam.x, -cam.y);
+    c.imageSmoothingEnabled = true;
+    c.drawImage(mapImage, 0, 0, MAP_W, MAP_H);
+
+    // Hand-drawn coastline.
+    c.strokeStyle = "rgba(94, 74, 45, .78)";
+    c.lineWidth = 0.75 / Math.max(0.7, cam.zoom * 0.55);
+    c.lineCap = "round";
+    c.beginPath();
+    for (const [a, b] of coastSegments) {
+      const j1 = (intHash(Math.round(a.x * 11), Math.round(a.y * 13)) - 0.5) * 0.22;
+      const j2 = (intHash(Math.round(b.x * 17), Math.round(b.y * 19)) - 0.5) * 0.22;
+      c.moveTo(a.x + j1, a.y + j2);
+      c.lineTo(b.x + j2, b.y + j1);
+    }
+    c.stroke();
+
+    // Rivers follow the precomputed downhill graph.
+    c.strokeStyle = "rgba(54, 119, 155, .9)";
+    c.lineCap = "round";
+    c.lineJoin = "round";
+    for (const s of riverSegments) {
+      c.lineWidth = clamp(0.34 + Math.log2(s.flow) * 0.17, 0.45, 2.6);
+      c.beginPath();
+      c.moveTo(s.x1, s.y1);
+      c.lineTo(s.x2, s.y2);
+      c.stroke();
+    }
+    for (const lake of lakes) {
+      c.fillStyle = "rgba(62, 126, 158, .92)";
+      c.beginPath();
+      c.ellipse(lake.x, lake.y, lake.r, lake.r * 0.72, 0.2, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = "rgba(42, 91, 116, .7)";
+      c.lineWidth = 0.3;
+      c.stroke();
+    }
+
+    if (brushWorld && !exportMode) {
+      c.strokeStyle = tool === "lower" ? "rgba(149, 60, 40, .9)" : "rgba(50, 96, 130, .9)";
+      c.lineWidth = 0.65 / Math.max(0.8, cam.zoom * 0.5);
+      c.setLineDash([1.2, 0.9]);
+      c.beginPath();
+      c.arc(brushWorld.x, brushWorld.y, brushRadius, 0, Math.PI * 2);
+      c.stroke();
+      c.setLineDash([]);
+    }
+    c.restore();
+
+    // Town labels in screen space, with simple collision avoidance.
+    if (showTowns.checked) drawTownLabels(c, w, h, cam, exportMode);
+
+    drawCompass(c, w, h, exportMode);
+    drawScaleBar(c, w, h, cam, exportMode);
+
+    if (exportMode) {
+      drawCartouche(c, w, h);
+      drawExportLegend(c, w, h);
+    }
+    c.restore();
+  }
+
+  function drawTownLabels(c, w, h, cam, exportMode) {
+    const fontScale = exportMode ? Math.max(1.4, w / 1100) : 1;
+    const rects = [];
+    c.textBaseline = "middle";
+    for (const town of towns) {
+      if (heights[Math.floor(town.y) * MAP_W + Math.floor(town.x)] < seaLevel) continue;
+      const p = worldToScreenFor(cam, w, h, town.x, town.y);
+      if (p.x < -60 || p.y < -30 || p.x > w + 60 || p.y > h + 30) continue;
+      const label = town.name;
+      c.font = `${town.capital ? "600 " : ""}${Math.round((town.capital ? 13 : 11.5) * fontScale)}px Georgia, "STSong", "SimSun", serif`;
+      const tw = c.measureText(label).width;
+      const padX = 6 * fontScale, padY = 4 * fontScale;
+      const bw = tw + padX * 2, bh = 18 * fontScale + padY;
+      let lx = p.x + 9 * fontScale, ly = p.y - bh - 5 * fontScale;
+      if (lx + bw > w - 6) lx = p.x - bw - 9 * fontScale;
+      if (ly < 6) ly = p.y + 9 * fontScale;
+      const rect = { x: lx, y: ly, w: bw, h: bh };
+      if (rects.some((r) => !(rect.x > r.x + r.w || rect.x + rect.w < r.x || rect.y > r.y + r.h || rect.y + rect.h < r.y))) {
+        // Keep the marker even if the label cannot be placed.
+        drawTownMarker(c, p, town, fontScale);
+        continue;
+      }
+      rects.push(rect);
+      drawTownMarker(c, p, town, fontScale);
+      c.fillStyle = "rgba(249, 241, 221, .92)";
+      c.strokeStyle = "rgba(117, 91, 55, .55)";
+      c.lineWidth = 1;
+      roundRect(c, lx, ly, bw, bh, 4 * fontScale);
+      c.fill(); c.stroke();
+      c.fillStyle = town.capital ? "#8b2f23" : "#4c3a25";
+      c.fillText(label, lx + padX, ly + bh / 2 + 0.5);
+    }
+  }
+  function worldToScreenFor(cam, w, h, x, y) {
+    return { x: (x - cam.x) * cam.zoom + w / 2, y: (y - cam.y) * cam.zoom + h / 2 };
+  }
+  function drawTownMarker(c, p, town, scale) {
+    c.beginPath();
+    c.arc(p.x, p.y, town.capital ? 4.2 * scale : 3.2 * scale, 0, Math.PI * 2);
+    c.fillStyle = town.capital ? "#8b2f23" : "#a64b38";
+    c.fill();
+    c.strokeStyle = "rgba(255, 245, 225, .9)";
+    c.lineWidth = 1.2 * scale;
+    c.stroke();
+  }
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
+  function drawCompass(c, w, h, exportMode) {
+    const scale = exportMode ? 1.5 : 1;
+    const cx = w - 44 * scale, cy = h - 78 * scale, r = 22 * scale;
+    c.save();
+    c.translate(cx, cy);
+    c.strokeStyle = "rgba(94, 74, 45, .75)";
+    c.fillStyle = "rgba(249, 241, 221, .62)";
+    c.lineWidth = 1.2 * scale;
+    c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.beginPath(); c.arc(0, 0, r * 0.62, 0, Math.PI * 2); c.stroke();
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2 - Math.PI / 2;
+      c.beginPath();
+      c.moveTo(Math.cos(a) * r * 0.2, Math.sin(a) * r * 0.2);
+      c.lineTo(Math.cos(a) * r * 0.92, Math.sin(a) * r * 0.92);
+      c.stroke();
+    }
+    c.fillStyle = "rgba(94, 74, 45, .9)";
+    c.beginPath();
+    c.moveTo(0, -r * 0.95);
+    c.lineTo(-r * 0.18, 0);
+    c.lineTo(r * 0.18, 0);
+    c.closePath();
+    c.fill();
+    c.font = `${Math.round(11 * scale)}px Georgia, serif`;
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.fillText("N", 0, -r - 9 * scale);
+    c.restore();
+  }
+
+  function drawScaleBar(c, w, h, cam, exportMode) {
+    const scale = exportMode ? 1.35 : 1;
+    const len = 10 * cam.zoom;
+    if (len < 18 || len > w * 0.5) return;
+    const x = 18 * scale, y = h - 22 * scale;
+    c.save();
+    c.strokeStyle = "rgba(94, 74, 45, .8)";
+    c.fillStyle = "rgba(249, 241, 221, .8)";
+    c.lineWidth = 1.2 * scale;
+    c.fillRect(x - 5 * scale, y - 16 * scale, len + 10 * scale, 22 * scale);
+    c.beginPath();
+    c.moveTo(x, y); c.lineTo(x + len, y);
+    c.moveTo(x, y - 4 * scale); c.lineTo(x, y + 4 * scale);
+    c.moveTo(x + len, y - 4 * scale); c.lineTo(x + len, y + 4 * scale);
+    c.stroke();
+    c.fillStyle = "rgba(94, 74, 45, .9)";
+    c.font = `${Math.round(10.5 * scale)}px Georgia, serif`;
+    c.textAlign = "left";
+    c.textBaseline = "bottom";
+    c.fillText("10 格", x, y - 7 * scale);
+    c.restore();
+  }
+
+  function drawCartouche(c, w, h) {
+    c.save();
+    const x = 26, y = 24, bw = Math.min(420, w - 52), bh = 92;
+    c.fillStyle = "rgba(249, 241, 221, .9)";
+    c.strokeStyle = "rgba(117, 91, 55, .65)";
+    c.lineWidth = 1.5;
+    roundRect(c, x, y, bw, bh, 8);
+    c.fill(); c.stroke();
+    c.fillStyle = "#5a4023";
+    c.font = "600 26px Georgia, \"STSong\", \"SimSun\", serif";
+    c.textAlign = "left";
+    c.textBaseline = "alphabetic";
+    c.fillText("奇幻地图", x + 18, y + 36);
+    c.font = "13px Georgia, \"STSong\", \"SimSun\", serif";
+    c.fillStyle = "#78603e";
+    c.fillText(`种子：${seedText}`, x + 18, y + 58);
+    c.fillText(`海平面 ${seaLevel.toFixed(3)} · 粗糙度 ${roughness.toFixed(2)}`, x + 18, y + 77);
+    c.restore();
+  }
+
+  function drawExportLegend(c, w, h) {
+    const items = [
+      ["#254b69", "深海"], ["#7aacc0", "浅海"], ["#e0ce9d", "海岸"],
+      ["#aec476", "平原"], ["#5c8552", "森林"], ["#8b7c69", "山脉"],
+      ["#3d7fa3", "河流"], ["#8b2f23", "城镇"]
+    ];
+    c.save();
+    const bw = 330, bh = 92, x = w - bw - 24, y = h - bh - 24;
+    c.fillStyle = "rgba(249, 241, 221, .9)";
+    c.strokeStyle = "rgba(117, 91, 55, .65)";
+    c.lineWidth = 1.4;
+    roundRect(c, x, y, bw, bh, 8);
+    c.fill(); c.stroke();
+    c.fillStyle = "#5a4023";
+    c.font = "600 14px Georgia, \"STSong\", \"SimSun\", serif";
+    c.textAlign = "left"; c.textBaseline = "middle";
+    c.fillText("图例", x + 14, y + 17);
+    c.font = "12px \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif";
+    items.forEach((it, i) => {
+      const col = i % 4, row = Math.floor(i / 4);
+      const ix = x + 14 + col * 78, iy = y + 38 + row * 24;
+      c.fillStyle = it[0];
+      roundRect(c, ix, iy - 6, 13, 13, 3);
+      c.fill();
+      c.fillStyle = "#5a4023";
+      c.fillText(it[1], ix + 18, iy + 0.5);
+    });
+    c.restore();
+  }
+
+  /* ---------- interaction ---------- */
+
+  function setHint(text, kind = "") {
+    hint.textContent = text;
+    hint.className = "hint" + (kind ? " " + kind : "");
+  }
+
+  function applyBrush(wx, wy, direction) {
+    const r = brushRadius;
+    const minX = Math.max(0, Math.floor(wx - r));
+    const maxX = Math.min(MAP_W - 1, Math.ceil(wx + r));
+    const minY = Math.max(0, Math.floor(wy - r));
+    const maxY = Math.min(MAP_H - 1, Math.ceil(wy + r));
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const d = Math.hypot(x + 0.5 - wx, y + 0.5 - wy);
+        if (d > r) continue;
+        const falloff = 1 - d / r;
+        const i = y * MAP_W + x;
+        heights[i] = clamp(heights[i] + direction * 0.045 * (0.35 + falloff * 0.65), 0, 1);
+      }
+    }
+    needsRebuild = true;
+    requestDraw();
+  }
+
+  function paintWorld(wx, wy) {
+    if (tool !== "raise" && tool !== "lower") return;
+    if (lastPaint) {
+      const dx = wx - lastPaint.x, dy = wy - lastPaint.y;
+      const dist = Math.hypot(dx, dy);
+      const steps = Math.max(1, Math.ceil(dist / (brushRadius * 0.45)));
+      for (let i = 1; i <= steps; i++) {
+        applyBrush(lastPaint.x + dx * (i / steps), lastPaint.y + dy * (i / steps), tool === "raise" ? 1 : -1);
+      }
+    } else {
+      applyBrush(wx, wy, tool === "raise" ? 1 : -1);
+    }
+    lastPaint = { x: wx, y: wy };
+  }
+
+  function pointerPos(event) {
+    const rect = canvas.getBoundingClientRect();
+    return { sx: event.clientX - rect.left, sy: event.clientY - rect.top };
+  }
+
+  canvas.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    const { sx, sy } = pointerPos(event);
+    pointerMap.set(event.pointerId, { sx, sy });
+    canvas.setPointerCapture(event.pointerId);
+    if (pointerMap.size === 2) {
+      // Start pinch zoom and cancel any single-pointer action.
+      painting = false; panning = false; lastPaint = null; lastPan = null;
+      const pts = [...pointerMap.values()];
+      const dist = Math.hypot(pts[0].sx - pts[1].sx, pts[0].sy - pts[1].sy);
+      const mid = { x: (pts[0].sx + pts[1].sx) / 2, y: (pts[0].sy + pts[1].sy) / 2 };
+      const world = screenToWorld(mid.x, mid.y);
+      pinch = { dist: Math.max(1, dist), zoom: camera.zoom, world };
+      return;
+    }
+    if (pinch) return;
+    const world = screenToWorld(sx, sy);
+    brushWorld = world;
+    if (tool === "pan") {
+      panning = true;
+      lastPan = { sx, sy };
+    } else {
+      painting = true;
+      lastPaint = null;
+      paintWorld(world.x, world.y);
+    }
+    requestDraw();
+  });
+
+  canvas.addEventListener("pointermove", (event) => {
+    const { sx, sy } = pointerPos(event);
+    if (pointerMap.has(event.pointerId)) pointerMap.set(event.pointerId, { sx, sy });
+    if (pinch && pointerMap.size >= 2) {
+      const pts = [...pointerMap.values()].slice(0, 2);
+      const dist = Math.hypot(pts[0].sx - pts[1].sx, pts[0].sy - pts[1].sy);
+      const mid = { x: (pts[0].sx + pts[1].sx) / 2, y: (pts[0].sy + pts[1].sy) / 2 };
+      const newZoom = clamp(pinch.zoom * (dist / pinch.dist), 0.5, 18);
+      camera.zoom = newZoom;
+      camera.x = pinch.world.x - (mid.x - viewW / 2) / newZoom;
+      camera.y = pinch.world.y - (mid.y - viewH / 2) / newZoom;
+      viewAdjusted = true;
+      clampCamera();
+      requestDraw();
+      return;
+    }
+    const world = screenToWorld(sx, sy);
+    brushWorld = world;
+    if (panning && lastPan) {
+      camera.x -= (sx - lastPan.sx) / camera.zoom;
+      camera.y -= (sy - lastPan.sy) / camera.zoom;
+      lastPan = { sx, sy };
+      viewAdjusted = true;
+      clampCamera();
+      requestDraw();
+      return;
+    }
+    if (painting) {
+      paintWorld(world.x, world.y);
+    } else {
+      requestDraw();
+    }
+  });
+
+  function endPointer(event) {
+    if (event) pointerMap.delete(event.pointerId);
+    if (pointerMap.size < 2) pinch = null;
+    if (painting && event) {
+      setHint(`笔刷已修改地形；海岸线与河流正在按新地势重新计算。${tool === "raise" ? "继续拖动可继续升高。" : "继续拖动可继续降低。"}`);
+    }
+    painting = false;
+    panning = false;
+    lastPaint = null;
+    lastPan = null;
+  }
+  canvas.addEventListener("pointerup", endPointer);
+  canvas.addEventListener("pointercancel", endPointer);
+  canvas.addEventListener("pointerleave", (event) => {
+    if (!painting && !panning) { brushWorld = null; requestDraw(); }
+    if (event.pointerType !== "mouse") endPointer(event);
+  });
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  canvas.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    const { sx, sy } = pointerPos(event);
+    const before = screenToWorld(sx, sy);
+    const factor = Math.exp(-event.deltaY * 0.0015);
+    camera.zoom = clamp(camera.zoom * factor, 0.5, 18);
+    camera.x = before.x - (sx - viewW / 2) / camera.zoom;
+    camera.y = before.y - (sy - viewH / 2) / camera.zoom;
+    viewAdjusted = true;
+    clampCamera();
+    requestDraw();
+  }, { passive: false });
+
+  function clampCamera() {
+    const marginX = Math.min(MAP_W * 0.45, 30 / Math.max(0.1, camera.zoom));
+    const marginY = Math.min(MAP_H * 0.45, 30 / Math.max(0.1, camera.zoom));
+    camera.x = clamp(camera.x, -marginX, MAP_W + marginX);
+    camera.y = clamp(camera.y, -marginY, MAP_H + marginY);
+  }
+
+  function zoomBy(factor) {
+    const before = { x: camera.x, y: camera.y };
+    camera.zoom = clamp(camera.zoom * factor, 0.5, 18);
+    camera.x = before.x;
+    camera.y = before.y;
+    viewAdjusted = true;
+    clampCamera();
+    requestDraw();
+  }
+
+  /* ---------- controls ---------- */
+
+  document.querySelectorAll("[data-tool]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      tool = btn.dataset.tool;
+      document.querySelectorAll("[data-tool]").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      canvas.style.cursor = tool === "pan" ? "grab" : "crosshair";
+      setHint(tool === "pan" ? "平移工具：拖动画布查看地图，滚轮或双指缩放。" : "笔刷工具：在地图上拖动以修改地形。");
+    });
+  });
+  document.getElementById("zoom-in").addEventListener("click", () => zoomBy(1.25));
+  document.getElementById("zoom-out").addEventListener("click", () => zoomBy(0.8));
+  document.getElementById("zoom-fit").addEventListener("click", () => { fitCamera(); requestDraw(); });
+
+  seaInput.addEventListener("input", () => {
+    seaLevel = Number(seaInput.value);
+    seaOut.textContent = seaLevel.toFixed(3);
+    needsRebuild = true;
+    requestDraw();
+    setHint("海平面已调整。地图的高度字段不变，海洋、海岸与河流按新海平面重新划分。");
+  });
+  roughInput.addEventListener("input", () => {
+    roughness = Number(roughInput.value);
+    roughOut.textContent = roughness.toFixed(2);
+    regenerate(false);
+    setHint("地形粗糙度已改变，已按当前种子重新生成地形。");
+  });
+  brushInput.addEventListener("input", () => {
+    brushRadius = Number(brushInput.value);
+    brushOut.textContent = `${brushRadius} 格`;
+    requestDraw();
+  });
+  showTowns.addEventListener("change", requestDraw);
+
+  seedInput.addEventListener("change", () => {
+    const value = seedInput.value.trim() || "未命名群岛";
+    seedInput.value = value;
+    seedText = value;
+    seedNum = hashSeed(seedText);
+    regenerate(true);
+  });
+  document.getElementById("random-seed").addEventListener("click", () => {
+    const parts = ["雾", "星", "霜", "银", "潮", "青", "龙", "月", "风", "雪", "松", "海"];
+    const tails = ["湾", "港", "岛", "岬", "礁", "原"];
+    const value = parts[Math.floor(Math.random() * parts.length)]
+      + tails[Math.floor(Math.random() * tails.length)]
+      + String(Math.floor(Math.random() * 900 + 100));
+    seedInput.value = value;
+    seedText = value;
+    seedNum = hashSeed(seedText);
+    regenerate(true);
+    setHint(`已使用新种子“${value}”生成地图。`);
+  });
+  document.getElementById("regenerate").addEventListener("click", () => {
+    const value = seedInput.value.trim() || "未命名群岛";
+    seedInput.value = value;
+    seedText = value;
+    seedNum = hashSeed(seedText);
+    regenerate(true);
+    setHint("已按当前种子与参数重新生成地图。");
+  });
+  document.getElementById("reset-params").addEventListener("click", () => {
+    seedInput.value = "星海湾";
+    seedText = "星海湾";
+    seedNum = hashSeed(seedText);
+    seaLevel = 0.44;
+    roughness = 0.55;
+    brushRadius = 4;
+    seaInput.value = "0.44"; roughInput.value = "0.55"; brushInput.value = "4";
+    seaOut.textContent = "0.440"; roughOut.textContent = "0.55"; brushOut.textContent = "4 格";
+    regenerate(true);
+    setHint("参数已恢复默认值，并重新生成地图。");
+  });
+  document.getElementById("reset-map").addEventListener("click", () => {
+    regenerate(true);
+    setHint("已重置为当前种子与参数对应的原始地图；笔刷修改已丢弃。");
+  });
+
+  document.getElementById("png").addEventListener("click", () => {
+    try {
+      const W = 1800, H = 1200;
+      const out = document.createElement("canvas");
+      out.width = W; out.height = H;
+      const c = out.getContext("2d");
+      const zoom = Math.min(W / MAP_W, H / MAP_H) * 0.84;
+      const expCam = { x: MAP_W / 2, y: MAP_H / 2 - 4, zoom };
+      paintScene(c, W, H, expCam, true);
+      out.toBlob((blob) => {
+        if (!blob) { setHint("导出失败：浏览器没有返回图片数据。", "err"); return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `fantasy-map-${seedText.replace(/[\\/:*?"<>|\s]+/g, "-")}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        setHint("PNG 已导出，包含当前地图、种子、参数与图例。", "ok");
+      }, "image/png");
+    } catch (error) {
+      setHint("导出失败：" + error.message, "err");
+    }
+  });
+
+  /* ---------- generation entry ---------- */
+
+  function regenerate(placeTownsToo) {
+    generateHeights();
+    recomputeDerived();
+    if (placeTownsToo) placeTowns();
+    requestDraw();
+  }
+
+  window.addEventListener("resize", resizeCanvas);
+  if (window.ResizeObserver) new ResizeObserver(resizeCanvas).observe(canvas);
+
+  // Boot: generate the default map once the canvas has a measurable size.
+  generateHeights();
+  recomputeDerived();
+  placeTowns();
+  resizeCanvas();
+  fitCamera();
+  requestDraw();
+  setHint("默认地图已生成。相同种子与参数会得到相同地图；拖动笔刷可修改地形。");
+})();
+</script>
+</body>
+</html>
