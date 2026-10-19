@@ -43,23 +43,18 @@
 
 ## 访问统计
 
-本站统一使用 Google Analytics 测量 ID `G-8E54P1HX3G`。公共页面、技术示例和生成的阅读页已接入；后续新增或导入的实验记录，其阅读页和本仓库可维护的网页入口都必须接入同一组代码。
+本站通过公共脚本 [assets/analytics.js](../assets/analytics.js) 接入 Google Analytics；测量 ID `G-8E54P1HX3G`、初始化及远程脚本加载逻辑只在该文件维护。公共页面、技术示例和生成的阅读页统一引用此文件；后续新增或导入的实验记录，其阅读页和本仓库可维护的网页入口也只需引用公共脚本，不再复制 Google tag 或初始化代码。公共脚本防止重复加载导致同一页面重复初始化。
 
-- 实验阅读页由 `scripts/site-output.mjs` 统一生成追踪代码，执行 `npm run generate` 后随站点提交，不手改生成文件。
-- 静态 HTML 和多页面实验在每个登记入口的 `<head>` 中添加下方代码。构建型实验在 HTML 入口或框架公共文档模板中添加，再执行 `npm run build:demo -- <id>`，源码与 previews 同步提交。已有同 ID 标签时不得重复添加或初始化。
+- 实验阅读页由 `scripts/site-output.mjs` 按页面位置生成公共脚本的相对引用，执行 `npm run generate` 后随站点提交，不手改生成文件。
+- 静态 HTML 和多页面实验在每个登记入口的 `<head>` 中添加一个带 `defer` 的引用。仓库根目录页面使用 `assets/analytics.js`，技术示例使用 `../../assets/analytics.js`，run 目录内的顶层 HTML 使用 `../../../../assets/analytics.js`；嵌套页面按实际目录深度调整。不要使用会破坏 Pages 子路径的 `/assets/analytics.js`。已有内联 Google tag 时用公共引用替换，避免同时保留两套初始化。
+- 构建型实验在 HTML 入口或框架公共文档模板中引用公共脚本，再执行 `npm run build:demo -- <id>`，源码与 previews 同步提交。源码和预览目录深度可能不同，需在构建配置中适配脚本 URL，并实际检查构建后的入口可加载站点公共脚本；不复制一份初始化实现进各个实验。独立部署需使用实际可访问的公共脚本地址，不能直接套用本站相对路径。
 - 维护者补加代码时，在该 run 的 `changes` 中记录人工修改；保留原始 prompt，不将追踪代码伪装成模型原始产物。不为补统计批量改写历史实验源码或预览。
 - 仅提示词或无网页入口的实验使用生成阅读页统计。外部部署能修改源码时按同一要求接入，发布仍由维护者人工操作，不修改外部部署设置或提前宣称线上生效。
 - 统计脚本异步加载，加载失败不能阻塞页面或离线功能；原有功能依赖网络时仍按实际情况登记。浏览器检查应拦截或模拟远程追踪脚本，核对请求 URL、初始化 ID 和每页一次，避免测试访问污染正式统计。
 
 ```html
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-8E54P1HX3G"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-8E54P1HX3G');
-</script>
+<!-- demos/{topic}/runs/{run}/index.html -->
+<script src="../../../../assets/analytics.js" defer></script>
 ```
 
 ## 主题页浏览

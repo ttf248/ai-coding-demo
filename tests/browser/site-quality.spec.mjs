@@ -36,6 +36,11 @@ for (const guide of catalog.guides)
       await page.route("**/*", (route) => {
         const request = route.request();
         const url = new URL(request.url());
+        if (
+          url.href ===
+          "https://www.googletagmanager.com/gtag/js?id=G-8E54P1HX3G"
+        )
+          return route.fulfill({ contentType: "text/javascript", body: "" });
         if (url.origin !== new URL(baseURL).origin) {
           if (
             guide.network === "offline" ||

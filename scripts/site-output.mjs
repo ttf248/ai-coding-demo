@@ -13,14 +13,6 @@ const escape = (value) =>
         c
       ],
   );
-const googleTag = `<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-8E54P1HX3G"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-8E54P1HX3G');
-</script>`;
 export const readerPath = (source) =>
   `assets/generated/readers/${source.replace(/\.md$/i, ".html")}`;
 export function screenshotMetadata(run) {
@@ -259,7 +251,7 @@ export function documentOutputs(catalog, generated) {
         : "");
     outputs.set(
       destination,
-      `<!doctype html>\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f7f9">${googleTag}<title>${escape(title)} · AI Coding Demo</title><meta name="description" content="${escape(description)}"><meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}"><meta property="og:type" content="article"><link rel="stylesheet" href="${relative("assets/site.css")}"><link rel="stylesheet" href="${relative("assets/document.css")}"><script src="${relative("assets/document.js")}" defer></script></head><body class="document-page"><a class="skip-link" href="#document-content">跳到正文</a><header class="site-header"><div class="container header-inner"><a class="brand" href="${relative("index.html")}"><span class="brand-mark">AI</span>CODING / DEMO</a><nav aria-label="主导航"><a href="${relative("index.html")}#projects">实验目录</a><a href="${relative("compare.html")}">模型对比</a><a href="${relative("index.html")}#guides">技术索引</a></nav></div></header><main class="container document-layout"><aside class="document-sidebar"><details open><summary>本页目录</summary><nav aria-label="文档目录">${toc}</nav></details></aside><div><div class="document-actions">${actions}</div>${run ? `<p class="document-context">${escape(catalog.models.find((model) => model.id === run.modelId)?.label)} · ${escape(run.effort)} · 实验日期 ${escape(run.date || "未记录")} · 归档日期 ${escape(run.archivedAt || "未记录")}</p>` : ""}<article id="document-content" class="document-content">${html}</article><p class="document-copy-status" role="status"></p></div></main><footer><div class="container">AI CODING DEMO / 实验记录与技术说明。</div></footer></body></html>\n`,
+      `<!doctype html>\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f7f9"><script src="${relative("assets/analytics.js")}" defer></script><title>${escape(title)} · AI Coding Demo</title><meta name="description" content="${escape(description)}"><meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}"><meta property="og:type" content="article"><link rel="stylesheet" href="${relative("assets/site.css")}"><link rel="stylesheet" href="${relative("assets/document.css")}"><script src="${relative("assets/document.js")}" defer></script></head><body class="document-page"><a class="skip-link" href="#document-content">跳到正文</a><header class="site-header"><div class="container header-inner"><a class="brand" href="${relative("index.html")}"><span class="brand-mark">AI</span>CODING / DEMO</a><nav aria-label="主导航"><a href="${relative("index.html")}#projects">实验目录</a><a href="${relative("compare.html")}">模型对比</a><a href="${relative("index.html")}#guides">技术索引</a></nav></div></header><main class="container document-layout"><aside class="document-sidebar"><details open><summary>本页目录</summary><nav aria-label="文档目录">${toc}</nav></details></aside><div><div class="document-actions">${actions}</div>${run ? `<p class="document-context">${escape(catalog.models.find((model) => model.id === run.modelId)?.label)} · ${escape(run.effort)} · 实验日期 ${escape(run.date || "未记录")} · 归档日期 ${escape(run.archivedAt || "未记录")}</p>` : ""}<article id="document-content" class="document-content">${html}</article><p class="document-copy-status" role="status"></p></div></main><footer><div class="container">AI CODING DEMO / 实验记录与技术说明。</div></footer></body></html>\n`,
     );
   }
   return outputs;

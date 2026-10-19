@@ -404,6 +404,7 @@ for (const file of [
   "404.html",
   "assets/site.css",
   "assets/core.js",
+  "assets/analytics.js",
   "index.js",
   "assets/topic.js",
   "assets/compare.js",
