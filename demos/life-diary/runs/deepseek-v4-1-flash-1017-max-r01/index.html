@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<script src="../../../../assets/analytics.js" defer></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e2a24">
+<title>沧禾 · AI 情绪日记与生活助手 · 原型</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          cream: "#f5f0e6",
+          paper: "#fffdf7",
+          ink: "#25322c",
+          mist: "#dfe8e3",
+          sage: { 100: "#e9eee6", 200: "#d4dfd0", 300: "#b9cbb4", 400: "#94ad90", 500: "#789573", 600: "#5f7c60", 700: "#4a624c" },
+          coral: "#dd8a73",
+          gold: "#d4ae6a"
+        },
+        fontFamily: {
+          serif: ["Songti SC", "Noto Serif SC", "SimSun", "Georgia", "serif"],
+          sans: ["-apple-system", "BlinkMacSystemFont", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "sans-serif"]
+        },
+        boxShadow: {
+          phone: "0 42px 90px -34px rgba(0,0,0,.72), 0 0 0 1px rgba(255,255,255,.07)",
+          soft: "0 10px 30px -18px rgba(37,50,44,.35)"
+        }
+      }
+    }
+  };
+</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style>
+  * { -webkit-tap-highlight-color: transparent; }
+  html { scroll-behavior: smooth; }
+  body {
+    background:
+      radial-gradient(900px 600px at 8% -6%, rgba(120, 149, 115, .26), transparent 60%),
+      radial-gradient(800px 600px at 96% 4%, rgba(221, 138, 115, .14), transparent 60%),
+      #1b2521;
+    overflow-x: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+  .board-grain::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .18; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E");
+    mix-blend-mode: soft-light;
+  }
+  .phone {
+    width: 375px; max-width: 100%; height: 812px; flex: none;
+    background: linear-gradient(150deg, #3a443e, #111714 55%, #2a332e);
+    border-radius: 3.35rem; padding: 10px; position: relative;
+    box-shadow: 0 42px 90px -34px rgba(0,0,0,.72), 0 0 0 1px rgba(255,255,255,.07);
+  }
+  .phone::after {
+    content: ""; position: absolute; inset: 4px; border-radius: 3rem; pointer-events: none;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.09);
+  }
+  .screen {
+    position: relative; height: 100%; border-radius: 2.65rem; overflow: hidden;
+    background: #f5f0e6; isolation: isolate;
+  }
+  .statusbar {
+    position: relative; z-index: 30; height: 50px; padding: 14px 24px 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    font-size: 11px; font-weight: 700; color: #25322c; letter-spacing: .01em;
+  }
+  .dynamic-island {
+    position: absolute; top: 9px; left: 50%; transform: translateX(-50%);
+    width: 96px; height: 26px; border-radius: 999px; background: #080b09; z-index: 40;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  .scroller {
+    height: calc(100% - 50px); overflow-y: auto; overscroll-behavior: contain;
+    scrollbar-width: none; -ms-overflow-style: none;
+  }
+  .scroller::-webkit-scrollbar { display: none; }
+  .tabbar {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 25;
+    padding: 9px 18px 21px; background: rgba(255,253,247,.92); backdrop-filter: blur(18px);
+    border-top: 1px solid rgba(37,50,44,.08);
+  }
+  .home-indicator {
+    position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%);
+    width: 126px; height: 4px; border-radius: 999px; background: rgba(37,50,44,.72); z-index: 35;
+  }
+  .mood-card { transition: transform .18s ease, border-color .18s ease, background .18s ease; }
+  .mood-card[aria-pressed="true"] { background: #eef2ea; border-color: #789573; transform: translateY(-2px); }
+  .mood-card[aria-pressed="true"] .mood-icon { background: #5f7c60; color: #fff; }
+  .mood-icon { transition: .18s; }
+  .tag-chip[aria-pressed="true"] { background: #5f7c60; color: #fff; border-color: #5f7c60; }
+  .heart[aria-pressed="true"] { color: #dd8a73; }
+  .phone-toast {
+    position: absolute; left: 50%; bottom: 103px; transform: translate(-50%, 10px); z-index: 45;
+    background: rgba(37,50,44,.94); color: #fffdf7; border-radius: 999px; padding: 8px 15px;
+    font-size: 10.5px; opacity: 0; transition: .24s ease; pointer-events: none; white-space: nowrap;
+  }
+  .phone-toast.show { opacity: 1; transform: translate(-50%, 0); }
+  input[type="range"].mood-range { -webkit-appearance: none; appearance: none; height: 5px; border-radius: 999px; background: linear-gradient(90deg,#b9cbb4,#789573,#dd8a73); }
+  input[type="range"].mood-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fffdf7; border: 3px solid #5f7c60; box-shadow: 0 2px 6px rgba(37,50,44,.25); }
+  .ai-orb {
+    background: radial-gradient(circle at 32% 28%, #f6dfc4, transparent 28%), radial-gradient(circle at 66% 68%, #8eac8a, transparent 40%), radial-gradient(circle at 50% 50%, #d8e4d3, #789573 58%, #4a624c 100%);
+    box-shadow: inset 0 0 24px rgba(255,255,255,.42), 0 18px 30px -18px rgba(74,98,76,.9);
+  }
+  .paper-line { background-image: repeating-linear-gradient(to bottom, transparent 0 27px, rgba(37,50,44,.08) 27px 28px); }
+  .chat-input::placeholder { color: #9aa8a0; }
+  .glass-nav { background: rgba(255,253,247,.86); backdrop-filter: blur(18px); }
+  .fade-in { animation: fadeIn .4s ease both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .typing-dots span { animation: blink 1.2s infinite; }
+  .typing-dots span:nth-child(2) { animation-delay: .18s; }
+  .typing-dots span:nth-child(3) { animation-delay: .36s; }
+  @keyframes blink { 0%, 70%, 100% { opacity: .25; } 35% { opacity: 1; } }
+  @media (max-width: 640px) {
+    section.fade-in { width: 100%; min-width: 0; }
+    .phone { min-width: 0; }
+    .phone { width: 100%; height: 812px; border-radius: 2.8rem; padding: 8px; }
+    .screen { border-radius: 2.25rem; }
+    .dynamic-island { width: 82px; height: 23px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+</head>
+<body class="board-grain min-h-screen text-cream">
+  <div class="relative z-10 mx-auto w-full max-w-[1560px] px-4 pb-20 pt-10 sm:px-7 lg:px-10">
+    <header class="mx-auto max-w-4xl text-center">
+      <div class="mb-5 flex items-center justify-center gap-3">
+        <span class="grid h-11 w-11 place-items-center rounded-2xl bg-sage-300/20 text-sage-200 ring-1 ring-sage-200/20">
+          <i class="fa-solid fa-seedling"></i>
+        </span>
+        <span class="text-[10px] font-semibold uppercase tracking-[.34em] text-sage-300">CANGHE · LIFE & FEELINGS</span>
+      </div>
+      <h1 class="font-serif text-4xl leading-tight tracking-tight text-cream sm:text-5xl">沧禾</h1>
+      <p class="mt-3 text-sm leading-7 text-sage-200/80 sm:text-[15px]">
+        AI 情绪日记与生活助手 · 把感受写下来，把日子慢慢过好
+      </p>
+      <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
+        <span class="rounded-full border border-sage-300/20 bg-white/[.04] px-3 py-1.5 text-[10px] text-sage-200/80">情绪识别与陪伴</span>
+        <span class="rounded-full border border-sage-300/20 bg-white/[.04] px-3 py-1.5 text-[10px] text-sage-200/80">日记与回顾</span>
+        <span class="rounded-full border border-sage-300/20 bg-white/[.04] px-3 py-1.5 text-[10px] text-sage-200/80">生活节奏</span>
+        <span class="rounded-full border border-sage-300/20 bg-white/[.04] px-3 py-1.5 text-[10px] text-sage-200/80">隐私优先</span>
+      </div>
+    </header>
+
+    <div class="mx-auto mt-12 grid max-w-[1300px] grid-cols-1 justify-items-center gap-x-8 gap-y-14 md:grid-cols-2 xl:grid-cols-3">
+      <!-- 01 HOME -->
+      <section class="fade-in">
+        <div class="mb-3 flex items-end justify-between px-1">
+          <div><p class="text-[9px] font-semibold tracking-[.28em] text-sage-300/70">01 · TODAY</p><h2 class="font-serif text-lg text-cream">今日</h2></div>
+          <p class="text-[10px] text-sage-200/50">情绪入口与温柔问候</p>
+        </div>
+        <div class="phone">
+          <div class="dynamic-island"></div>
+          <div class="screen">
+            <div class="statusbar"><span>9:41</span><span class="flex items-center gap-1.5 text-[10px]"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters text-[12px]"></i></span></div>
+            <div class="scroller">
+              <div class="px-6 pb-28 pt-3">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-[10px] tracking-[.16em] text-sage-600/60">WEDNESDAY · 10月21日</p>
+                    <h3 class="mt-1 font-serif text-[23px] leading-tight text-ink">晚上好，禾禾</h3>
+                    <p class="mt-1 text-[11px] text-ink/45">今天也辛苦了，先听听自己的心。</p>
+                  </div>
+                  <div class="relative">
+                    <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80" alt="头像" class="h-11 w-11 rounded-full object-cover ring-2 ring-white shadow-soft">
+                    <span class="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-paper bg-sage-500"></span>
+                  </div>
+                </div>
+
+                <div class="mt-5 rounded-[26px] bg-gradient-to-br from-sage-700 via-sage-600 to-[#7b9474] p-5 text-cream shadow-soft relative overflow-hidden">
+                  <div class="absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/10 blur-xl"></div>
+                  <div class="absolute -bottom-14 right-8 h-28 w-28 rounded-full border border-white/15"></div>
+                  <div class="relative">
+                    <p class="text-[10px] tracking-[.18em] text-cream/65">A QUIET MOMENT</p>
+                    <p class="mt-2 max-w-[215px] font-serif text-[22px] leading-[1.45]">让情绪，被温柔地看见。</p>
+                    <p class="mt-2 text-[11px] leading-5 text-cream/70">不用急着讲道理。先告诉我，此刻心里是什么天气？</p>
+                    <div class="mt-5 flex items-center gap-2">
+                      <button data-toast="已打开情绪打卡" class="rounded-full bg-cream px-4 py-2.5 text-[11px] font-semibold text-sage-700 shadow-sm active:scale-95 transition">开始记录</button>
+                      <button data-toast="沧禾正在听你说…" class="rounded-full border border-white/25 px-4 py-2.5 text-[11px] text-cream/90 active:scale-95 transition"><i class="fa-regular fa-comment-dots mr-1.5"></i>聊一聊</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-6 flex items-center justify-between">
+                  <h4 class="font-serif text-[15px] text-ink">此刻的心情</h4>
+                  <button class="text-[10px] text-sage-600">全部情绪 <i class="fa-solid fa-chevron-right text-[8px]"></i></button>
+                </div>
+                <div class="mt-3 flex items-center justify-between rounded-2xl bg-white/65 px-3 py-3 ring-1 ring-ink/[.04]">
+                  <button class="mood-quick flex flex-col items-center gap-1.5 text-ink/45" data-mood-quick="平静"><span class="grid h-10 w-10 place-items-center rounded-full bg-sage-100 text-sage-600"><i class="fa-regular fa-face-smile"></i></span><span class="text-[9px]">平静</span></button>
+                  <button class="mood-quick flex flex-col items-center gap-1.5 text-ink/45" data-mood-quick="开心"><span class="grid h-10 w-10 place-items-center rounded-full bg-[#f7e9d7] text-[#c28c4e]"><i class="fa-regular fa-face-laugh-beam"></i></span><span class="text-[9px]">开心</span></button>
+                  <button class="mood-quick flex flex-col items-center gap-1.5 text-ink/45" data-mood-quick="疲惫"><span class="grid h-10 w-10 place-items-center rounded-full bg-[#e9e4de] text-[#8b8177]"><i class="fa-regular fa-face-tired"></i></span><span class="text-[9px]">疲惫</span></button>
+                  <button class="mood-quick flex flex-col items-center gap-1.5 text-ink/45" data-mood-quick="焦虑"><span class="grid h-10 w-10 place-items-center rounded-full bg-[#f4e2da] text-[#bf735c]"><i class="fa-regular fa-face-frown-open"></i></span><span class="text-[9px]">焦虑</span></button>
+                  <button class="mood-quick flex flex-col items-center gap-1.5 text-ink/45" data-mood-quick="低落"><span class="grid h-10 w-10 place-items-center rounded-full bg-[#e1e7ec] text-[#708298]"><i class="fa-regular fa-face-sad-tear"></i></span><span class="text-[9px]">低落</span></button>
+                </div>
+
+                <div class="mt-5 rounded-2xl border border-ink/[.06] bg-[#fbf7ed] p-4">
+                  <p class="text-[9px] font-semibold tracking-[.18em] text-sage-600/60">今日的一句</p>
+                  <p class="mt-1.5 font-serif text-[15px] leading-7 text-ink/85">“你不需要每一天都很好，<br>只需要允许自己真实。”</p>
+                  <div class="mt-3 flex items-center justify-between text-[9px] text-ink/35"><span>— 沧禾收集的句子</span><i class="fa-solid fa-quote-right"></i></div>
+                </div>
+
+                <div class="mt-6 flex items-center justify-between">
+                  <h4 class="font-serif text-[15px] text-ink">最近的片段</h4>
+                  <button class="text-[10px] text-sage-600">全部 <i class="fa-solid fa-chevron-right text-[8px]"></i></button>
+                </div>
+                <div class="mt-3 grid grid-cols-2 gap-3">
+                  <div class="overflow-hidden rounded-2xl bg-white/70 ring-1 ring-ink/[.04]">
+                    <img src="https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?auto=format&fit=crop&w=500&q=80" alt="书桌" class="h-24 w-full object-cover">
+                    <div class="p-3"><p class="text-[10px] text-ink/40">10月19日 · 平静</p><p class="mt-1 font-serif text-[12px] leading-5 text-ink/80">在窗边读完了一本书，阳光很好。</p></div>
+                  </div>
+                  <div class="overflow-hidden rounded-2xl bg-white/70 ring-1 ring-ink/[.04]">
+                    <img src="https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=500&q=80" alt="森林" class="h-24 w-full object-cover">
+                    <div class="p-3"><p class="text-[10px] text-ink/40">10月17日 · 开心</p><p class="mt-1 font-serif text-[12px] leading-5 text-ink/80">去山里走了一段，叶子开始变黄。</p></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="flex items-end justify-between px-1 text-[9px]">
+                <button class="flex flex-col items-center gap-1 text-sage-700"><i class="fa-solid fa-house text-[15px]"></i><span>今日</span></button>
+                <button class="flex flex-col items-center gap-1 text-ink/35"><i class="fa-solid fa-chart-simple text-[15px]"></i><span>回顾</span></button>
+                <button class="relative -mt-6 flex flex-col items-center gap-1 text-ink/35"><span class="ai-orb grid h-12 w-12 place-items-center rounded-full text-cream"><i class="fa-solid fa-wand-magic-sparkles text-[15px]"></i></span><span>沧禾</span></button>
+                <button class="flex flex-col items-center gap-1 text-ink/35"><i class="fa-regular fa-compass text-[15px]"></i><span>生活</span></button>
+                <button class="flex flex-col items-center gap-1 text-ink/35"><i class="fa-regular fa-user text-[15px]"></i><span>我的</span></button>
+              </div>
+            </div>
+            <div class="home-indicator"></div>
+            <div class="phone-toast"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 02 CHECK-IN -->
+      <section class="fade-in">
+        <div class="mb-3 flex items-end justify-between px-1">
+          <div><p class="text-[9px] font-semibold tracking-[.28em] text-sage-300/70">02 · CHECK IN</p><h2 class="font-serif text-lg text-cream">情绪打卡</h2></div>
+          <p class="text-[10px] text-sage-200/50">命名情绪，降低它的重量</p>
+        </div>
+        <div class="phone">
+          <div class="dynamic-island"></div>
+          <div class="screen">
+            <div class="statusbar"><span>9:41</span><span class="flex items-center gap-1.5 text-[10px]"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters text-[12px]"></i></span></div>
+            <div class="scroller">
+              <div class="px-6 pb-10 pt-3">
+                <div class="flex items-center justify-between">
+                  <button class="grid h-9 w-9 place-items-center rounded-full bg-white/60 text-ink/55 ring-1 ring-ink/[.05]" data-toast="返回今日"><i class="fa-solid fa-arrow-left text-[12px]"></i></button>
+                  <p class="text-[11px] font-semibold text-ink/55">10月21日 · 周三</p>
+                  <button class="grid h-9 w-9 place-items-center rounded-full bg-white/60 text-ink/55 ring-1 ring-ink/[.05]" data-toast="已保存草稿"><i class="fa-regular fa-bookmark text-[12px]"></i></button>
+                </div>
+                <div class="mt-7">
+                  <p class="text-[10px] tracking-[.18em] text-sage-600/60">A CHECK-IN</p>
+                  <h3 class="mt-1.5 font-serif text-[26px] leading-tight text-ink">此刻，你感觉如何？</h3>
+                  <p class="mt-2 text-[11px] text-ink/45">不用判断对错，选一个最接近的就好。</p>
+                </div>
+
+                <div class="mt-5 grid grid-cols-3 gap-2.5" data-mood-group>
+                  <button class="mood-card flex flex-col items-center gap-2 rounded-2xl border border-ink/[.06] bg-white/60 px-2 py-4" aria-pressed="false" data-mood="平静">
+                    <span class="mood-icon grid h-11 w-11 place-items-center rounded-full bg-sage-100 text-sage-600"><i class="fa-regular fa-face-smile text-[19px]"></i></span>
+                    <span class="text-[11px] font-medium text-ink/70">平静</span>
+                  </button>
+                  <button class="mood-card flex flex-col items-center gap-2 rounded-2xl border border-ink/[.06] bg-white/60 px-2 py-4" aria-pressed="false" data-mood="开心">
+                    <span class="mood-icon grid h-11 w-11 place-items-center rounded-full bg-[#f8ead6] text-[#c28c4e]"><i class="fa-regular fa-face-laugh-beam text-[19px]"></i></span>
+                    <span class="text-[11px] font-medium text-ink/70">开心</span>
+                  </button>
+                  <button class="mood-card flex flex-col items-center gap-2 rounded-2xl border border-ink/[.06] bg-white/60 px-2 py-4" aria-pressed="false" data-mood="期待">
+                    <span class="mood-icon grid h-11 w-11 place-items-center rounded-full bg-[#e3ecdf] text-[#6e8b63]"><i class="fa-regular fa-star text-[18px]"></i></span>
+                    <span class="text-[11px] font-medium text-ink/70">期待</span>
+                  </button>
+                  <button class="mood-card flex flex-col items-center gap-2 rounded-2xl border border-ink/[.06] bg-white/60 px-2 py-4" aria-pressed="false" data-mood="疲惫">
+                    <span class="mood-icon grid h-11 w-11 place-items-center rounded-full bg-[#ebe6df] text-[#8b8177]"><i class="fa-regular fa-face-tired text-[19px]"></i></span>
+                    <span class="text-[11px] font-medium text-ink/70">疲惫</span>
+                  </button>
+                  <button class="mood-card flex flex-col items-center gap-2 rounded-2xl border border-ink/[.06] bg-white/60 px-2 py-4" aria-pressed="false" data-mood="焦虑">
+                    <span class="mood-icon grid h-11 w-11 place-items-center rounded-full bg-[#f5e3db] text-[#bf735c]"><i class="fa-regular fa-face-frown-open text-[19px]"></i></span>
+                    <span class="text-[11px] font-medium text-ink/70">焦虑</span>
+                  </button>
+                  <button class="mood-card flex flex-col items-center gap-2 rounded-2xl border border-ink/[.06] bg-white/60 px-2 py-4" aria-pressed="false" data-mood="低落">
+                    <span class="mood-icon grid h-11 w-11 place-items-center rounded-full bg-[#e3e9ee] text-[#708298]"><i class="fa-regular fa-face-sad-tear text-[19px]"></i></span>
+                    <span class="text-[11px] font-medium text-ink/70">低落</span>
+                  </button>
+                </div>
+
+                <div class="mt-6 rounded-2xl bg-white/60 p-4 ring-1 ring-ink/[.04]">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-semibold text-ink/70">情绪强度</span>
+                    <span class="rounded-full bg-sage-100 px-2.5 py-1 text-[10px] font-semibold text-sage-700"><span id="intensityValue">6</span> / 10</span>
+                  </div>
+                  <input id="intensity" type="range" min="1" max="10" value="6" class="mood-range mt-4 w-full">
+                  <div class="mt-2 flex justify-between text-[8px] text-ink/30"><span>轻轻掠过</span><span>非常强烈</span></div>
+                </div>
+
+                <div class="mt-5">
+                  <p class="text-[11px] font-semibold text-ink/60">和什么有关？</p>
+                  <div class="mt-2.5 flex flex-wrap gap-2" data-tag-group>
+                    <button class="tag-chip rounded-full border border-ink/10 bg-white/55 px-3 py-1.5 text-[10px] text-ink/55" aria-pressed="false">工作</button>
+                    <button class="tag-chip rounded-full border border-ink/10 bg-white/55 px-3 py-1.5 text-[10px] text-ink/55" aria-pressed="false">关系</button>
+                    <button class="tag-chip rounded-full border border-ink/10 bg-white/55 px-3 py-1.5 text-[10px] text-ink/55" aria-pressed="false">睡眠</button>
+                    <button class="tag-chip rounded-full border border-ink/10 bg-white/55 px-3 py-1.5 text-[10px] text-ink/55" aria-pressed="false">身体</button>
+                    <button class="tag-chip rounded-full border border-ink/10 bg-white/55 px-3 py-1.5 text-[10px] text-ink/55" aria-pressed="false">天气</button>
+                    <button class="tag-chip rounded-full border border-ink/10 bg-white/55 px-3 py-1.5 text-[10px] text-ink/55" aria-pressed="false">说不清</button>
+                  </div>
+                </div>
+
+                <div class="mt-5 rounded-2xl border border-ink/[.06] bg-paper p-4 shadow-soft">
+                  <textarea rows="4" class="w-full resize-none bg-transparent text-[12px] leading-6 text-ink/75 outline-none placeholder:text-ink/25" placeholder="发生了什么？可以只写一句话…"></textarea>
+                  <div class="mt-2 flex items-center justify-between border-t border-ink/[.05] pt-2.5">
+                    <div class="flex gap-3 text-ink/35"><i class="fa-solid fa-camera text-[13px]"></i><i class="fa-solid fa-microphone text-[13px]"></i><i class="fa-solid fa-location-dot text-[13px]"></i></div>
+                    <button class="flex items-center gap-1.5 rounded-full bg-sage-100 px-2.5 py-1.5 text-[9px] font-medium text-sage-700" data-toast="沧禾正在帮你整理语言…"><i class="fa-solid fa-wand-magic-sparkles"></i>帮我表达</button>
+                  </div>
+                </div>
+
+                <button class="mt-5 w-full rounded-full bg-sage-700 py-3.5 text-[12px] font-semibold text-cream shadow-soft active:scale-[.99] transition" data-toast="今天的情绪已记录 · 晚安">保存这次打卡</button>
+                <p class="mt-3 text-center text-[9px] text-ink/30">只保存在本机 · 随时可以删除</p>
+              </div>
+            </div>
+            <div class="home-indicator"></div>
+            <div class="phone-toast"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 03 EDITOR -->
+      <section class="fade-in">
+        <div class="mb-3 flex items-end justify-between px-1">
+          <div><p class="text-[9px] font-semibold tracking-[.28em] text-sage-300/70">03 · JOURNAL</p><h2 class="font-serif text-lg text-cream">写日记</h2></div>
+          <p class="text-[10px] text-sage-200/50">把一天写成可以回看的文字</p>
+        </div>
+        <div class="phone">
+          <div class="dynamic-island"></div>
+          <div class="screen">
+            <div class="statusbar"><span>9:41</span><span class="flex items-center gap-1.5 text-[10px]"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters text-[12px]"></i></span></div>
+            <div class="scroller">
+              <div class="px-6 pb-10 pt-3">
+                <div class="flex items-center justify-between">
+                  <button class="grid h-9 w-9 place-items-center rounded-full bg-white/60 text-ink/55 ring-1 ring-ink/[.05]" data-toast="已保存到草稿"><i class="fa-solid fa-xmark text-[13px]"></i></button>
+                  <div class="flex items-center gap-1.5 rounded-full bg-white/60 px-3 py-1.5 text-[9px] text-ink/45 ring-1 ring-ink/[.04]"><i class="fa-regular fa-calendar"></i> 10月21日 · 多云 22°</div>
+                  <button class="rounded-full bg-sage-700 px-3.5 py-2 text-[10px] font-semibold text-cream shadow-sm" data-toast="日记已保存">保存</button>
+                </div>
+
+                <div class="mt-7">
+                  <p class="text-[10px] tracking-[.18em] text-sage-600/60">EVENING PAGES</p>
+                  <h3 class="mt-2 font-serif text-[25px] leading-[1.35] text-ink">把今天，<br>轻轻放进文字里。</h3>
+                </div>
+
+                <div class="mt-5 grid grid-cols-5 gap-2">
+                  <img src="https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=400&q=80" alt="黄昏" class="col-span-3 h-36 w-full rounded-2xl object-cover shadow-soft">
+                  <div class="col-span-2 grid grid-rows-2 gap-2">
+                    <img src="https://images.unsplash.com/photo-1490730141103-6cac27aaab94?auto=format&fit=crop&w=300&q=80" alt="阳光" class="h-full w-full rounded-2xl object-cover">
+                    <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=300&q=80" alt="山" class="h-full w-full rounded-2xl object-cover">
+                  </div>
+                </div>
+
+                <div class="mt-5 rounded-2xl bg-white/60 p-4 ring-1 ring-ink/[.04]">
+                  <div class="flex items-center gap-2">
+                    <span class="flex items-center gap-1.5 rounded-full bg-sage-100 px-2.5 py-1 text-[9px] text-sage-700"><i class="fa-regular fa-face-smile"></i> 平静 · 强度 6</span>
+                    <span class="flex items-center gap-1.5 rounded-full bg-[#f6ead7] px-2.5 py-1 text-[9px] text-[#a9793e]"><i class="fa-solid fa-cloud-sun"></i> 多云</span>
+                  </div>
+                  <h4 class="mt-4 font-serif text-[18px] text-ink">黄昏把城市染成了蜂蜜色</h4>
+                  <div class="paper-line mt-3 space-y-0 text-[12px] leading-7 text-ink/70">
+                    <p>下班的时候，天边刚好烧起一层橘色的云。没有急着坐地铁，沿着河边走了很久。</p>
+                    <p>风吹过来的时候，突然觉得今天那些没做完的事，也没有那么重要。买了一杯热豆浆，坐在长椅上看灯一盏一盏亮起来。</p>
+                    <p class="text-ink/35">我想记住这个瞬间……</p>
+                  </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl border border-sage-600/15 bg-sage-100/70 p-3.5">
+                  <div class="flex items-start gap-2.5">
+                    <span class="ai-orb mt-0.5 grid h-8 w-8 flex-none place-items-center rounded-full text-cream"><i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i></span>
+                    <div class="min-w-0">
+                      <p class="text-[10px] font-semibold text-sage-700">沧禾的写作提示</p>
+                      <p class="mt-1 text-[10.5px] leading-5 text-ink/55">“要不要写写，那个让你慢下来的瞬间，身体是什么感觉？”</p>
+                      <button class="mt-2 rounded-full bg-white/70 px-2.5 py-1 text-[9px] text-sage-700" data-toast="已插入写作提示">接着写下去 <i class="fa-solid fa-arrow-right text-[8px]"></i></button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-4 flex items-center justify-between rounded-2xl bg-white/55 px-4 py-3 ring-1 ring-ink/[.04]">
+                  <div class="flex gap-4 text-ink/35"><i class="fa-solid fa-text-height text-[13px]"></i><i class="fa-solid fa-list text-[13px]"></i><i class="fa-solid fa-quote-left text-[13px]"></i><i class="fa-solid fa-image text-[13px]"></i></div>
+                  <span class="text-[9px] text-ink/30">已自动保存</span>
+                </div>
+              </div>
+            </div>
+            <div class="home-indicator"></div>
+            <div class="phone-toast"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04 AI CHAT -->
+      <section class="fade-in">
+        <div class="mb-3 flex items-end justify-between px-1">
+          <div><p class="text-[9px] font-semibold tracking-[.28em] text-sage-300/70">04 · COMPANION</p><h2 class="font-serif text-lg text-cream">沧禾 · AI 陪伴</h2></div>
+          <p class="text-[10px] text-sage-200/50">被听见，而不是被评判</p>
+        </div>
+        <div class="phone">
+          <div class="dynamic-island"></div>
+          <div class="screen">
+            <div class="statusbar"><span>9:41</span><span class="flex items-center gap-1.5 text-[10px]"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters text-[12px]"></i></span></div>
+            <div class="scroller">
+              <div class="px-5 pb-28 pt-3">
+                <div class="flex items-center justify-between">
+                  <button class="grid h-9 w-9 place-items-center rounded-full bg-white/60 text-ink/55 ring-1 ring-ink/[.05]" data-toast="返回今日"><i class="fa-solid fa-arrow-left text-[12px]"></i></button>
+                  <div class="flex items-center gap-2">
+                    <span class="ai-orb grid h-9 w-9 place-items-center rounded-full text-cream"><i class="fa-solid fa-wand-magic-sparkles text-[12px]"></i></span>
+                    <div><p class="text-[11px] font-semibold text-ink/75">沧禾</p><p class="text-[8px] text-sage-600/60"><span class="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-sage-500"></span>在这里陪你</p></div>
+                  </div>
+                  <button class="grid h-9 w-9 place-items-center rounded-full bg-white/60 text-ink/55 ring-1 ring-ink/[.05]" data-toast="更多设置"><i class="fa-solid fa-ellipsis text-[13px]"></i></button>
+                </div>
+
+                <div class="mt-5 text-center text-[9px] text-ink/30">今天 21:06</div>
+
+                <div class="mt-4 flex items-end gap-2">
+                  <span class="ai-orb grid h-7 w-7 flex-none place-items-center rounded-full text-cream"><i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i></span>
+                  <div class="max-w-[240px] rounded-[18px] rounded-bl-md bg-white/75 px-3.5 py-2.5 text-[11px] leading-5 text-ink/70 shadow-sm ring-1 ring-ink/[.03]">
+                    你来了。今天听起来有点累，要不要先不分析，只说说最想被理解的那一小部分？
+                  </div>
+                </div>
+
+                <div class="mt-3 flex justify-end">
+                  <div class="max-w-[235px] rounded-[18px] rounded-br-md bg-sage-700 px-3.5 py-2.5 text-[11px] leading-5 text-cream shadow-sm">
+                    感觉自己一直在赶路，但不知道要去哪里。
+                  </div>
+                </div>
+
+                <div class="mt-3 flex items-end gap-2">
+                  <span class="ai-orb grid h-7 w-7 flex-none place-items-center rounded-full text-cream"><i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i></span>
+                  <div class="max-w-[252px] rounded-[18px] rounded-bl-md bg-white/75 px-3.5 py-2.5 text-[11px] leading-5 text-ink/70 shadow-sm ring-1 ring-ink/[.03]">
+                    听起来不是“不够努力”，而是很久没有被允许停下来了。赶路本身没有错，只是你可能需要一个能坐一会儿的地方。
+                  </div>
+                </div>
+
+                <div class="mt-3 ml-9 max-w-[260px] rounded-2xl border border-sage-600/15 bg-sage-100/80 p-3">
+                  <p class="text-[9px] font-semibold tracking-[.12em] text-sage-700/70"><i class="fa-solid fa-lightbulb mr-1"></i>我注意到</p>
+                  <p class="mt-1.5 text-[10px] leading-5 text-ink/55">最近 7 天里，“赶路”“来不及”出现了 6 次。也许今天可以留 10 分钟，只做一件没有目的的事。</p>
+                </div>
+
+                <div class="mt-4 flex flex-wrap gap-2 pl-9">
+                  <button class="rounded-full border border-sage-600/20 bg-white/50 px-3 py-1.5 text-[9.5px] text-sage-700" data-toast="已记录：想散步">我想去散步</button>
+                  <button class="rounded-full border border-sage-600/20 bg-white/50 px-3 py-1.5 text-[9.5px] text-sage-700" data-toast="已记录：想休息">我想休息一下</button>
+                  <button class="rounded-full border border-sage-600/20 bg-white/50 px-3 py-1.5 text-[9.5px] text-sage-700" data-toast="正在打开情绪打卡">做一次情绪打卡</button>
+                </div>
+
+                <div class="mt-4 flex justify-end">
+                  <div class="max-w-[210px] rounded-[18px] rounded-br-md bg-sage-700 px-3.5 py-2.5 text-[11px] leading-5 text-cream shadow-sm">
+                    那我今晚早点关掉电脑，去楼下走走。
+                  </div>
+                </div>
+
+                <div class="mt-3 flex items-end gap-2">
+                  <span class="ai-orb grid h-7 w-7 flex-none place-items-center rounded-full text-cream"><i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i></span>
+                  <div class="max-w-[248px] rounded-[18px] rounded-bl-md bg-white/75 px-3.5 py-2.5 text-[11px] leading-5 text-ink/70 shadow-sm ring-1 ring-ink/[.03]">
+                    好。出门时不用带耳机，听听路边真实的声音。回来如果愿意，把看到的一件小事告诉我。
+                  </div>
+                </div>
+
+                <div class="mt-3 flex items-end gap-2">
+                  <span class="ai-orb grid h-7 w-7 flex-none place-items-center rounded-full text-cream"><i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i></span>
+                  <div class="flex items-center gap-1 rounded-[18px] rounded-bl-md bg-white/75 px-3.5 py-3 shadow-sm ring-1 ring-ink/[.03]">
+                    <span class="typing-dots flex gap-1"><span class="h-1.5 w-1.5 rounded-full bg-sage-600/60"></span><span class="h-1.5 w-1.5 rounded-full bg-sage-600/60"></span><span class="h-1.5 w-1.5 rounded-full bg-sage-600/60"></span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="absolute inset-x-0 bottom-0 z-30 bg-cream/95 px-4 pb-6 pt-3 backdrop-blur-xl">
+              <div class="flex items-center gap-2 rounded-full bg-white/80 py-1.5 pl-4 pr-1.5 ring-1 ring-ink/[.06]">
+                <i class="fa-solid fa-microphone text-[12px] text-ink/30"></i>
+                <input id="chatInput" class="chat-input min-w-0 flex-1 bg-transparent py-2 text-[11px] outline-none" placeholder="和沧禾说点什么…">
+                <button id="chatSend" class="grid h-8 w-8 place-items-center rounded-full bg-sage-700 text-cream active:scale-95 transition"><i class="fa-solid fa-arrow-up text-[11px]"></i></button>
+              </div>
+              <p class="mt-2 text-center text-[8px] text-ink/25">沧禾不是心理医生；如果持续感到痛苦，请寻求专业帮助。</p>
+            </div>
+            <div class="home-indicator"></div>
+            <div class="phone-toast"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 05 REVIEW -->
+      <section class="fade-in">
+        <div class="mb-3 flex items-end justify-between px-1">
+          <div><p class="text-[9px] font-semibold tracking-[.28em] text-sage-300/70">05 · REFLECTION</p><h2 class="font-serif text-lg text-cream">情绪回顾</h2></div>
+          <p class="text-[10px] text-sage-200/50">看见变化，而不是评判自己</p>
+        </div>
+        <div class="phone">
+          <div class="dynamic-island"></div>
+          <div class="screen">
+            <div class="statusbar"><span>9:41</span><span class="flex items-center gap-1.5 text-[10px]"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters text-[12px]"></i></span></div>
+            <div class="scroller">
+              <div class="px-6 pb-28 pt-3">
+                <div class="flex items-center justify-between">
+                  <div><p class="text-[10px] tracking-[.16em] text-sage-600/60">YOUR WEEK</p><h3 class="mt-1 font-serif text-[23px] text-ink">这一周的你</h3></div>
+                  <div class="flex rounded-full bg-white/60 p-1 text-[9px] ring-1 ring-ink/[.04]">
+                    <button class="rounded-full bg-sage-700 px-3 py-1.5 font-semibold text-cream">周</button>
+                    <button class="px-3 py-1.5 text-ink/40" data-toast="切换到月视图">月</button>
+                  </div>
+                </div>
+
+                <div class="mt-5 rounded-[24px] bg-gradient-to-br from-[#eef2e9] to-[#e1e9dd] p-5 ring-1 ring-ink/[.04]">
+                  <div class="flex items-start justify-between">
+                    <div>
+                      <p class="text-[9px] text-sage-700/55">本周情绪均值</p>
+                      <p class="mt-1 font-serif text-[30px] leading-none text-sage-700">7.2<span class="ml-1 text-[11px] font-sans text-sage-700/50">/ 10</span></p>
+                      <p class="mt-1.5 text-[10px] text-ink/45">平静而有力 · 比上周高 0.8</p>
+                    </div>
+                    <span class="grid h-11 w-11 place-items-center rounded-full bg-white/60 text-sage-600"><i class="fa-solid fa-arrow-trend-up"></i></span>
+                  </div>
+                  <svg viewBox="0 0 280 90" class="mt-5 w-full" aria-label="本周情绪曲线">
+                    <defs><linearGradient id="moodArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#789573" stop-opacity=".38"/><stop offset="1" stop-color="#789573" stop-opacity="0"/></linearGradient></defs>
+                    <path d="M6 65 C30 58, 40 40, 62 44 S95 58, 116 46 S148 26, 170 33 S204 50, 224 30 S256 18, 274 24 L274 88 L6 88 Z" fill="url(#moodArea)"/>
+                    <path d="M6 65 C30 58, 40 40, 62 44 S95 58, 116 46 S148 26, 170 33 S204 50, 224 30 S256 18, 274 24" fill="none" stroke="#5f7c60" stroke-width="2.4" stroke-linecap="round"/>
+                    <g fill="#fffdf7" stroke="#5f7c60" stroke-width="2">
+                      <circle cx="6" cy="65" r="3.2"/><circle cx="62" cy="44" r="3.2"/><circle cx="116" cy="46" r="3.2"/><circle cx="170" cy="33" r="3.2"/><circle cx="224" cy="30" r="3.2"/><circle cx="274" cy="24" r="3.2"/>
+                    </g>
+                  </svg>
+                  <div class="mt-1 flex justify-between text-[8px] text-ink/30"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+                </div>
+
+                <div class="mt-4 grid grid-cols-5 gap-3">
+                  <div class="col-span-2 rounded-[22px] bg-white/65 p-4 ring-1 ring-ink/[.04]">
+                    <p class="text-[9px] font-semibold text-ink/45">情绪分布</p>
+                    <div class="relative mx-auto mt-3 h-24 w-24 rounded-full" style="background:conic-gradient(#789573 0 38%, #dd8a73 38% 61%, #d4ae6a 61% 79%, #a9bcc4 79% 100%)">
+                      <div class="absolute inset-[13px] grid place-items-center rounded-full bg-[#fbf8f0]"><span class="font-serif text-[15px] text-sage-700">7 天</span></div>
+                    </div>
+                    <div class="mt-3 space-y-1.5 text-[8.5px] text-ink/50">
+                      <p class="flex items-center justify-between"><span class="flex items-center gap-1.5"><i class="h-1.5 w-1.5 rounded-full bg-sage-500"></i>平静</span><span>38%</span></p>
+                      <p class="flex items-center justify-between"><span class="flex items-center gap-1.5"><i class="h-1.5 w-1.5 rounded-full bg-coral"></i>疲惫</span><span>23%</span></p>
+                      <p class="flex items-center justify-between"><span class="flex items-center gap-1.5"><i class="h-1.5 w-1.5 rounded-full bg-gold"></i>开心</span><span>18%</span></p>
+                    </div>
+                  </div>
+                  <div class="col-span-3 rounded-[22px] bg-white/65 p-4 ring-1 ring-ink/[.04]">
+                    <div class="flex items-center justify-between"><p class="text-[9px] font-semibold text-ink/45">情绪日历</p><span class="text-[8px] text-ink/30">10 月</span></div>
+                    <div class="mt-3 grid grid-cols-7 gap-1.5">
+                      <span class="text-center text-[7px] text-ink/25">一</span><span class="text-center text-[7px] text-ink/25">二</span><span class="text-center text-[7px] text-ink/25">三</span><span class="text-center text-[7px] text-ink/25">四</span><span class="text-center text-[7px] text-ink/25">五</span><span class="text-center text-[7px] text-ink/25">六</span><span class="text-center text-[7px] text-ink/25">日</span>
+                      <i class="aspect-square rounded-[5px] bg-[#dce7d8]"></i><i class="aspect-square rounded-[5px] bg-[#a9c3a3]"></i><i class="aspect-square rounded-[5px] bg-[#789573]"></i><i class="aspect-square rounded-[5px] bg-[#4a624c]"></i><i class="aspect-square rounded-[5px] bg-[#c9d9c4]"></i><i class="aspect-square rounded-[5px] bg-[#e8dcc4]"></i><i class="aspect-square rounded-[5px] bg-[#ddb9a8]"></i>
+                      <i class="aspect-square rounded-[5px] bg-[#b9cbb4]"></i><i class="aspect-square rounded-[5px] bg-[#5f7c60]"></i><i class="aspect-square rounded-[5px] bg-[#8eac8a]"></i><i class="aspect-square rounded-[5px] bg-[#e2cfae]"></i><i class="aspect-square rounded-[5px] bg-[#789573]"></i><i class="aspect-square rounded-[5px] bg-[#dce7d8]"></i><i class="aspect-square rounded-[5px] bg-[#b9cbb4]"></i>
+                      <i class="aspect-square rounded-[5px] bg-[#4a624c]"></i><i class="aspect-square rounded-[5px] bg-[#8eac8a]"></i><i class="aspect-square rounded-[5px] bg-[#e6b6a3]"></i><i class="aspect-square rounded-[5px] bg-[#c9d9c4]"></i><i class="aspect-square rounded-[5px] bg-[#5f7c60]"></i><i class="aspect-square rounded-[5px] bg-[#dce7d8]"></i><i class="aspect-square rounded-[5px] bg-[#e8dcc4]"></i>
+                      <i class="aspect-square rounded-[5px] bg-[#b9cbb4]"></i><i class="aspect-square rounded-[5px] bg-[#789573]"></i><i class="aspect-square rounded-[5px] bg-[#dd8a73]"></i><i class="aspect-square rounded-[5px] bg-[#e8dcc4]"></i><i class="aspect-square rounded-[5px] bg-[#5f7c60]"></i><i class="aspect-square rounded-[5px] bg-[#8eac8a]"></i><i class="aspect-square rounded-[5px] bg-[#4a624c]"></i>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between text-[8px] text-ink/30"><span>低</span><span class="flex gap-1"><i class="h-2 w-2 rounded-[3px] bg-[#e8dcc4]"></i><i class="h-2 w-2 rounded-[3px] bg-[#b9cbb4]"></i><i class="h-2 w-2 rounded-[3px] bg-[#789573]"></i><i class="h-2 w-2 rounded-[3px] bg-[#4a624c]"></i></span><span>高</span></div>
+                  </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl border border-ink/[.05] bg-[#fbf7ed] p-4">
+                  <p class="text-[9px] font-semibold tracking-[.12em] text-sage-700/60"><i class="fa-solid fa-seedling mr-1"></i>本周小结</p>
+                  <p class="mt-1.5 font-serif text-[14px] leading-6 text-ink/70">“你在忙碌里为自己留出了几个安静的缝隙。那些散步、阅读和早睡的晚上，正在慢慢接住你。”</p>
+                  <button class="mt-3 text-[9px] font-medium text-sage-700" data-toast="已展开完整情绪报告">查看完整报告 <i class="fa-solid fa-arrow-right text-[8px]"></i></button>
+                </div>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="flex items-end justify-between px-1 text-[9px]">
+                <button class="flex flex-col items-center gap-1 text-ink/35"><i class="fa-solid fa-house text-[15px]"></i><span>今日</span></button>
+                <button class="flex flex-col items-center gap-1 text-sage-700"><i class="fa-solid fa-chart-simple text-[15px]"></i><span>回顾</span></button>
+                <button class="relative -mt-6 flex flex-col items-center gap-1 text-ink/35"><span class="ai-orb grid h-12 w-12 place-items-center rounded-full text-cream"><i class="fa-solid fa-wand-magic-sparkles text-[15px]"></i></span><span>沧禾</span></button>
+                <button class="flex flex-col items-center gap-1 text-ink/35"><i class="fa-regular fa-compass text-[15px]"></i><span>生活</span></button>
+                <button class="flex flex-col items-center gap-1 text-ink/35"><i class="fa-regular fa-user text-[15px]"></i><span>我的</span></button>
+              </div>
+            </div>
+            <div class="home-indicator"></div>
+            <div class="phone-toast"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 06 LIFE -->
+      <section class="fade-in">
+        <div class="mb-3 flex items-end justify-between px-1">
+          <div><p class="text-[9px] font-semibold tracking-[.28em] text-sage-300/70">06 · RHYTHM</p><h2 class="font-serif text-lg text-cream">生活节奏</h2></div>
+          <p class="text-[10px] text-sage-200/50">照顾身体，也是在照顾情绪</p>
+        </div>
+        <div class="phone">
+          <div class="dynamic-island"></div>
+          <div class="screen">
+            <div class="statusbar"><span>9:41</span><span class="flex items-center gap-1.5 text-[10px]"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters text-[12px]"></i></span></div>
+            <div class="scroller">
+              <div class="px-6 pb-28 pt-3">
+                <div class="flex items-start justify-between">
+                  <div><p class="text-[10px] tracking-[.16em] text-sage-600/60">A GENTLE ROUTINE</p><h3 class="mt-1 font-serif text-[23px] text-ink">今天，慢慢来</h3><p class="mt-1 text-[10px] text-ink/40">不必完成所有事，先照顾一件小事。</p></div>
+                  <div class="relative grid h-16 w-16 place-items-center rounded-full" style="background:conic-gradient(#5f7c60 0 68%, #e4eadf 68% 100%)">
+                    <div class="grid h-[52px] w-[52px] place-items-center rounded-full bg-cream"><span class="font-serif text-[16px] text-sage-700">68%</span></div>
+                  </div>
+                </div>
+
+                <div class="mt-5 grid grid-cols-3 gap-2.5">
+                  <div class="rounded-2xl bg-white/65 p-3 ring-1 ring-ink/[.04]">
+                    <span class="grid h-8 w-8 place-items-center rounded-full bg-[#e2e8f0] text-[#647b95]"><i class="fa-solid fa-moon text-[12px]"></i></span>
+                    <p class="mt-2.5 text-[9px] text-ink/40">昨夜睡眠</p>
+                    <p class="font-serif text-[16px] text-ink">7h 42m</p>
+                    <div class="mt-2 h-1 rounded-full bg-ink/[.06]"><div class="h-1 w-[82%] rounded-full bg-[#8ba3bd]"></div></div>
+                  </div>
+                  <div class="rounded-2xl bg-white/65 p-3 ring-1 ring-ink/[.04]">
+                    <span class="grid h-8 w-8 place-items-center rounded-full bg-[#dfeae9] text-[#5f8b86]"><i class="fa-solid fa-droplet text-[12px]"></i></span>
+                    <p class="mt-2.5 text-[9px] text-ink/40">今日饮水</p>
+                    <p class="font-serif text-[16px] text-ink">6 / 8</p>
+                    <div class="mt-2 flex gap-1"><i class="h-1 flex-1 rounded-full bg-[#7fa9a4]"></i><i class="h-1 flex-1 rounded-full bg-[#7fa9a4]"></i><i class="h-1 flex-1 rounded-full bg-[#7fa9a4]"></i><i class="h-1 flex-1 rounded-full bg-ink/[.06]"></i></div>
+                  </div>
+                  <div class="rounded-2xl bg-white/65 p-3 ring-1 ring-ink/[.04]">
+                    <span class="grid h-8 w-8 place-items-center rounded-full bg-[#e9e3d4] text-[#a2844f]"><i class="fa-solid fa-shoe-prints text-[12px]"></i></span>
+                    <p class="mt-2.5 text-[9px] text-ink/40">步行</p>
+                    <p class="font-serif text-[16px] text-ink">4,210</p>
+                    <div class="mt-2 flex items-end gap-[2px]"><i class="h-2 flex-1 rounded-sm bg-[#d4ae6a]"></i><i class="h-1 flex-1 rounded-sm bg-[#d4ae6a]/60"></i><i class="h-1.5 flex-1 rounded-sm bg-[#d4ae6a]/80"></i></div>
+                  </div>
+                </div>
+
+                <div class="mt-5 overflow-hidden rounded-[24px] bg-sage-700 text-cream shadow-soft">
+                  <div class="relative p-5">
+                    <div class="absolute -right-6 -top-8 h-28 w-28 rounded-full bg-white/10"></div>
+                    <p class="text-[9px] tracking-[.18em] text-cream/55">TODAY'S LITTLE PRACTICE</p>
+                    <p class="mt-2 font-serif text-[21px] leading-[1.5]">给身体十分钟，<br>不听任何声音。</p>
+                    <p class="mt-2 text-[10.5px] leading-5 text-cream/65">一段没有目的的散步，或只是把窗户打开，感受风的方向。</p>
+                    <button class="mt-4 rounded-full bg-cream px-4 py-2 text-[10px] font-semibold text-sage-700 active:scale-95 transition" data-toast="已开始 10 分钟练习">开始练习 · 10 min</button>
+                  </div>
+                </div>
+
+                <div class="mt-5">
+                  <div class="flex items-center justify-between"><h4 class="font-serif text-[15px] text-ink">今天的小事</h4><span class="text-[9px] text-ink/30">3 / 5</span></div>
+                  <div class="mt-3 space-y-2">
+                    <label class="flex items-center gap-3 rounded-2xl bg-white/60 p-3 ring-1 ring-ink/[.04]"><input type="checkbox" checked class="habit h-4 w-4 rounded accent-sage-600"><span class="flex-1 text-[11px] text-ink/70">起床后喝一杯温水</span><i class="fa-solid fa-check text-[9px] text-sage-500"></i></label>
+                    <label class="flex items-center gap-3 rounded-2xl bg-white/60 p-3 ring-1 ring-ink/[.04]"><input type="checkbox" checked class="habit h-4 w-4 rounded accent-sage-600"><span class="flex-1 text-[11px] text-ink/70">给自己做一顿早餐</span><i class="fa-solid fa-check text-[9px] text-sage-500"></i></label>
+                    <label class="flex items-center gap-3 rounded-2xl bg-white/60 p-3 ring-1 ring-ink/[.04]"><input type="checkbox" checked class="habit h-4 w-4 rounded accent-sage-600"><span class="flex-1 text-[11px] text-ink/70">午后离开屏幕 10 分钟</span><i class="fa-solid fa-check text-[9px] text-sage-500"></i></label>
+                    <label class="flex items-center gap-3 rounded-2xl bg-white/60 p-3 ring-1 ring-ink/[.04]"><input type="checkbox" class="habit h-4 w-4 rounded accent-sage-600"><span class="flex-1 text-[11px] text-ink/70">睡前写三句今天</span><i class="fa-regular fa-circle text-[9px] text-ink/20"></i></label>
+                  </div>
+                </div>
+
+                <div class="mt-4 flex items-start gap-2.5 rounded-2xl border border-sage-600/15 bg-sage-100/70 p-3.5">
+                  <span class="ai-orb grid h-8 w-8 flex-none place-items-center rounded-full text-cream"><i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i></span>
+                  <p class="text-[10px] leading-5 text-ink/55"><span class="font-semibold text-sage-700">沧禾说：</span>你今天已经做了不少。要不要把“睡前写三句”换成更轻的“关灯前伸个懒腰”？</p>
+                </div>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="flex items-end justify-between px-1 text-[9px]">
+                <button class="flex flex-col items-center gap-1 text-ink/35"><i class="fa-solid fa-house text-[15px]"></i><span>今日</span></button>
+                <button class="flex flex-col items-center gap-1 text-ink/35"><i class="fa-solid fa-chart-simple text-[15px]"></i><span>回顾</span></button>
+                <button class="relative -mt-6 flex flex-col items-center gap-1 text-ink/35"><span class="ai-orb grid h-12 w-12 place-items-center rounded-full text-cream"><i class="fa-solid fa-wand-magic-sparkles text-[15px]"></i></span><span>沧禾</span></button>
+                <button class="flex flex-col items-center gap-1 text-sage-700"><i class="fa-regular fa-compass text-[15px]"></i><span>生活</span></button>
+                <button class="flex flex-col items-center gap-1 text-ink/35"><i class="fa-regular fa-user text-[15px]"></i><span>我的</span></button>
+              </div>
+            </div>
+            <div class="home-indicator"></div>
+            <div class="phone-toast"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 07 PROFILE -->
+      <section class="fade-in">
+        <div class="mb-3 flex items-end justify-between px-1">
+          <div><p class="text-[9px] font-semibold tracking-[.28em] text-sage-300/70">07 · PROFILE</p><h2 class="font-serif text-lg text-cream">我的</h2></div>
+          <p class="text-[10px] text-sage-200/50">记录、成长与数据边界</p>
+        </div>
+        <div class="phone">
+          <div class="dynamic-island"></div>
+          <div class="screen">
+            <div class="statusbar"><span>9:41</span><span class="flex items-center gap-1.5 text-[10px]"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters text-[12px]"></i></span></div>
+            <div class="scroller">
+              <div class="pb-28">
+                <div class="relative bg-gradient-to-br from-sage-700 to-[#789573] px-6 pb-6 pt-3 text-cream">
+                  <div class="absolute -right-8 -top-12 h-40 w-40 rounded-full border border-white/10"></div>
+                  <div class="flex items-center justify-between">
+                    <p class="text-[10px] tracking-[.16em] text-cream/55">MY GARDEN</p>
+                    <button class="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-cream/80" data-toast="打开设置"><i class="fa-solid fa-gear text-[12px]"></i></button>
+                  </div>
+                  <div class="mt-4 flex items-center gap-3.5">
+                    <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80" alt="头像" class="h-16 w-16 rounded-full object-cover ring-2 ring-white/40">
+                    <div><h3 class="font-serif text-[21px]">禾禾</h3><p class="mt-1 text-[10px] text-cream/60">和沧禾一起记录的第 47 天</p><span class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[9px]"><i class="fa-solid fa-seedling"></i> 温柔的坚持者</span></div>
+                  </div>
+                </div>
+
+                <div class="-mt-3 px-6">
+                  <div class="grid grid-cols-3 gap-2 rounded-2xl bg-paper p-3 text-center shadow-soft ring-1 ring-ink/[.04]">
+                    <div><p class="font-serif text-[18px] text-ink">128</p><p class="text-[8.5px] text-ink/35">日记</p></div>
+                    <div class="border-x border-ink/[.05]"><p class="font-serif text-[18px] text-ink">47</p><p class="text-[8.5px] text-ink/35">连续记录</p></div>
+                    <div><p class="font-serif text-[18px] text-ink">6.8</p><p class="text-[8.5px] text-ink/35">平均心情</p></div>
+                  </div>
+                </div>
+
+                <div class="mt-5 px-6">
+                  <div class="flex items-center justify-between"><h4 class="font-serif text-[15px] text-ink">我的徽章</h4><span class="text-[9px] text-ink/30">4 / 12</span></div>
+                  <div class="mt-3 grid grid-cols-4 gap-2">
+                    <div class="flex flex-col items-center gap-1.5 rounded-2xl bg-white/60 py-3 ring-1 ring-ink/[.04]"><span class="grid h-10 w-10 place-items-center rounded-full bg-[#f5e6cb] text-[#b0833f]"><i class="fa-solid fa-sun text-[15px]"></i></span><span class="text-[8px] text-ink/45">晨间日记</span></div>
+                    <div class="flex flex-col items-center gap-1.5 rounded-2xl bg-white/60 py-3 ring-1 ring-ink/[.04]"><span class="grid h-10 w-10 place-items-center rounded-full bg-sage-100 text-sage-600"><i class="fa-solid fa-leaf text-[15px]"></i></span><span class="text-[8px] text-ink/45">连续 30 天</span></div>
+                    <div class="flex flex-col items-center gap-1.5 rounded-2xl bg-white/60 py-3 ring-1 ring-ink/[.04]"><span class="grid h-10 w-10 place-items-center rounded-full bg-[#e2e9f0] text-[#68819a]"><i class="fa-solid fa-moon text-[15px]"></i></span><span class="text-[8px] text-ink/45">好眠一周</span></div>
+                    <div class="flex flex-col items-center gap-1.5 rounded-2xl bg-white/40 py-3 ring-1 ring-ink/[.03] opacity-45"><span class="grid h-10 w-10 place-items-center rounded-full bg-ink/[.05] text-ink/30"><i class="fa-solid fa-lock text-[14px]"></i></span><span class="text-[8px] text-ink/30">未解锁</span></div>
+                  </div>
+                </div>
+
+                <div class="mt-5 px-6">
+                  <h4 class="font-serif text-[15px] text-ink">设置</h4>
+                  <div class="mt-3 overflow-hidden rounded-2xl bg-white/60 ring-1 ring-ink/[.04]">
+                    <button class="flex w-full items-center gap-3 border-b border-ink/[.05] px-4 py-3.5 text-left" data-toast="提醒设置"><span class="grid h-8 w-8 place-items-center rounded-full bg-sage-100 text-sage-600"><i class="fa-regular fa-bell text-[12px]"></i></span><span class="flex-1 text-[11px] text-ink/70">每日提醒</span><span class="text-[9px] text-ink/30">21:30</span><i class="fa-solid fa-chevron-right text-[9px] text-ink/20"></i></button>
+                    <button class="flex w-full items-center gap-3 border-b border-ink/[.05] px-4 py-3.5 text-left" data-toast="隐私与数据"><span class="grid h-8 w-8 place-items-center rounded-full bg-[#e2e9f0] text-[#68819a]"><i class="fa-solid fa-shield-halved text-[12px]"></i></span><span class="flex-1 text-[11px] text-ink/70">隐私与数据</span><span class="rounded-full bg-sage-100 px-2 py-0.5 text-[8px] text-sage-700">本机优先</span><i class="fa-solid fa-chevron-right text-[9px] text-ink/20"></i></button>
+                    <button class="flex w-full items-center gap-3 border-b border-ink/[.05] px-4 py-3.5 text-left" data-toast="正在导出日记"><span class="grid h-8 w-8 place-items-center rounded-full bg-[#f5e6cb] text-[#b0833f]"><i class="fa-solid fa-file-export text-[12px]"></i></span><span class="flex-1 text-[11px] text-ink/70">导出我的日记</span><i class="fa-solid fa-chevron-right text-[9px] text-ink/20"></i></button>
+                    <button class="flex w-full items-center gap-3 px-4 py-3.5 text-left" data-toast="帮助与反馈"><span class="grid h-8 w-8 place-items-center rounded-full bg-[#ebe6df] text-[#8b8177]"><i class="fa-regular fa-circle-question text-[12px]"></i></span><span class="flex-1 text-[11px] text-ink/70">帮助与反馈</span><i class="fa-solid fa-chevron-right text-[9px] text-ink/20"></i></button>
+                  </div>
+                  <p class="mt-5 text-center text-[8.5px] text-ink/25">沧禾 CANGHE · v1.0 原型<br>你的感受，只属于你。</p>
+                </div>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="flex items-end justify-between px-1 text-[9px]">
+                <button class="flex flex-col items-center gap-1 text-ink/35"><i class="fa-solid fa-house text-[15px]"></i><span>今日</span></button>
+                <button class="flex flex-col items-center gap-1 text-ink/35"><i class="fa-solid fa-chart-simple text-[15px]"></i><span>回顾</span></button>
+                <button class="relative -mt-6 flex flex-col items-center gap-1 text-ink/35"><span class="ai-orb grid h-12 w-12 place-items-center rounded-full text-cream"><i class="fa-solid fa-wand-magic-sparkles text-[15px]"></i></span><span>沧禾</span></button>
+                <button class="flex flex-col items-center gap-1 text-ink/35"><i class="fa-regular fa-compass text-[15px]"></i><span>生活</span></button>
+                <button class="flex flex-col items-center gap-1 text-sage-700"><i class="fa-solid fa-user text-[15px]"></i><span>我的</span></button>
+              </div>
+            </div>
+            <div class="home-indicator"></div>
+            <div class="phone-toast"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="mx-auto mt-16 max-w-4xl text-center text-[10px] leading-6 text-sage-200/40">
+      <p>沧禾 CANGHE · AI 情绪日记与生活助手 · iPhone 375 × 812 高清原型</p>
+      <p class="mt-1">Tailwind CSS · FontAwesome · Unsplash · 同页多屏交互演示</p>
+    </footer>
+  </div>
+
+<script>
+  function showPhoneToast(scope, message) {
+    const toast = scope.querySelector(".phone-toast");
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add("show");
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => toast.classList.remove("show"), 2100);
+  }
+
+  document.querySelectorAll("[data-mood-group]").forEach((group) => {
+    group.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-mood]");
+      if (!button) return;
+      group.querySelectorAll("[data-mood]").forEach((item) => item.setAttribute("aria-pressed", "false"));
+      button.setAttribute("aria-pressed", "true");
+      const phone = button.closest(".screen");
+      showPhoneToast(phone, `已选择「${button.dataset.mood}」`);
+    });
+  });
+
+  document.querySelectorAll("[data-tag-group]").forEach((group) => {
+    group.addEventListener("click", (event) => {
+      const button = event.target.closest(".tag-chip");
+      if (!button) return;
+      button.setAttribute("aria-pressed", button.getAttribute("aria-pressed") === "true" ? "false" : "true");
+    });
+  });
+
+  document.querySelectorAll(".mood-quick").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll(".mood-quick").forEach((item) => {
+        item.classList.remove("text-sage-700");
+        item.classList.add("text-ink/45");
+        item.querySelector("span")?.classList.remove("ring-2", "ring-sage-500");
+      });
+      button.classList.remove("text-ink/45");
+      button.classList.add("text-sage-700");
+      showPhoneToast(button.closest(".screen"), `已记录「${button.dataset.moodQuick}」，要写下来吗？`);
+    });
+  });
+
+  const intensity = document.getElementById("intensity");
+  if (intensity) {
+    intensity.addEventListener("input", () => {
+      document.getElementById("intensityValue").textContent = intensity.value;
+    });
+  }
+
+  document.querySelectorAll("[data-toast]").forEach((button) => {
+    button.addEventListener("click", () => {
+      showPhoneToast(button.closest(".screen"), button.dataset.toast);
+    });
+  });
+
+  document.querySelectorAll(".heart").forEach((button) => {
+    button.addEventListener("click", () => {
+      button.setAttribute("aria-pressed", button.getAttribute("aria-pressed") === "true" ? "false" : "true");
+    });
+  });
+
+  document.querySelectorAll(".habit").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      const icon = checkbox.closest("label")?.querySelector("i.fa-solid, i.fa-regular");
+      if (icon) {
+        icon.className = checkbox.checked ? "fa-solid fa-check text-[9px] text-sage-500" : "fa-regular fa-circle text-[9px] text-ink/20";
+      }
+    });
+  });
+
+  const chatInput = document.getElementById("chatInput");
+  const chatSend = document.getElementById("chatSend");
+  if (chatInput && chatSend) {
+    const send = () => {
+      const value = chatInput.value.trim();
+      if (!value) return;
+      const screen = chatSend.closest(".screen");
+      const scroller = screen.querySelector(".scroller");
+      const wrap = scroller.firstElementChild;
+      const typing = wrap.querySelector(".typing-dots")?.closest(".flex.items-end");
+      const message = document.createElement("div");
+      message.className = "mt-3 flex justify-end fade-in";
+      message.innerHTML = `<div class="max-w-[230px] rounded-[18px] rounded-br-md bg-sage-700 px-3.5 py-2.5 text-[11px] leading-5 text-cream shadow-sm">${value.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
+      typing?.before(message);
+      message.scrollIntoView({ block: "end", behavior: "smooth" });
+      chatInput.value = "";
+      setTimeout(() => {
+        const reply = document.createElement("div");
+        reply.className = "mt-3 flex items-end gap-2 fade-in";
+        reply.innerHTML = `<span class="ai-orb grid h-7 w-7 flex-none place-items-center rounded-full text-cream"><i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i></span><div class="max-w-[245px] rounded-[18px] rounded-bl-md bg-white/75 px-3.5 py-2.5 text-[11px] leading-5 text-ink/70 shadow-sm ring-1 ring-ink/[.03]">我听见了。先不急着解决它，你愿意再多说一点，此刻身体里最明显的感受吗？</div>`;
+        typing?.before(reply);
+        reply.scrollIntoView({ block: "end", behavior: "smooth" });
+      }, 900);
+      showPhoneToast(screen, "沧禾正在认真听");
+    };
+    chatSend.addEventListener("click", send);
+    chatInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") send();
+    });
+  }
+</script>
+</body>
+</html>
