@@ -41,11 +41,12 @@ test("homepage model dropdown has canonical names and vendor/version ordering", 
   expect(names).toEqual(["全部厂商", ...providers, "未记录 / 多轮混合"]);
   expect(
     await page
-      .locator("#model optgroup")
-      .evaluateAll((groups) => groups.map((group) => group.label)),
-  ).toEqual([...providers, "未记录 / 多轮混合"]);
+      .locator("#model option[data-provider]")
+      .evaluateAll((options) => options.map((option) => option.dataset.label)),
+  ).toEqual(providers);
+  await expect(page.locator("#model optgroup")).toHaveCount(0);
   const ids = await page
-    .locator("#model option")
+    .locator("#model option:not([data-provider])")
     .evaluateAll((options) => options.slice(1).map((option) => option.value));
   expect(ids).toHaveLength(data.models.length);
   for (const model of data.models)

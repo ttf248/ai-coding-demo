@@ -103,6 +103,41 @@
     }
     return html + (previous !== null ? "</optgroup>" : "");
   }
+  function modelFilterOptions(models) {
+    const groups = new Map();
+    for (const model of [...models].sort(compareModels)) {
+      const provider = model.provider || "";
+      if (!groups.has(provider)) groups.set(provider, []);
+      groups.get(provider).push(model);
+    }
+    return [...groups]
+      .map(
+        ([provider, items]) =>
+          (provider
+            ? '<option value="provider:' +
+              escape(provider) +
+              '" data-provider="' +
+              escape(provider) +
+              '">' +
+              escape(provider) +
+              "</option>"
+            : "") +
+          items
+            .map(
+              (model) =>
+                '<option value="' +
+                escape(model.id) +
+                '" data-label="' +
+                escape(model.label) +
+                '"' +
+                (provider ? " data-indent>　" : ">") +
+                escape(model.label) +
+                "</option>",
+            )
+            .join(""),
+      )
+      .join("");
+  }
   function compareModelRuns(data, a, b) {
     const order = compareModels(
       data.models.find((m) => m.id === a.modelId),
@@ -762,6 +797,7 @@
     effortOrder,
     compareEfforts,
     groupedOptions,
+    modelFilterOptions,
     promptFor,
     relation,
     compareComplexity,

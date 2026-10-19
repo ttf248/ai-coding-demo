@@ -45,6 +45,9 @@
   let modelId = models.some((m) => m.id === params.get("model"))
     ? params.get("model")
     : "";
+  let provider = models.some((m) => m.provider === params.get("provider"))
+    ? params.get("provider") || ""
+    : "";
   let effort = efforts.includes(params.get("effort"))
     ? params.get("effort")
     : "";
@@ -104,12 +107,8 @@
     '</select></label><div class="segments" aria-label="主题内容"><button data-topic-view="list">全部记录</button><button data-topic-view="models">按模型</button><button data-topic-view="matrix">档位覆盖</button></div></div>' +
     '<section class="topic-context" aria-label="当前任务范围"><h2 id="topic-context-title"></h2><button data-read-task>阅读任务正文 →</button></section>' +
     '<details class="pricing-context" id="pricing-context" aria-label="供应商与费用口径"><summary>费用口径 <span>厂商、接入供应商与计费说明</span></summary><h2>模型厂商、接入供应商与费用</h2><p>实验行分别标出模型厂商与实际接入/计费供应商。订阅展示套餐额度，API 按实际 token 和工具用量计费；批次金额不会拆算成单案例费用。</p><details><summary>公开价格示例（美元，查阅于 2026-10-14）</summary><div class="pricing-examples"><p><strong>OpenAI：</strong>ChatGPT Plus 为 $20/月，Codex 使用包含在计划额度内且受使用限制；GPT-6 Astra 标准 API 为输入 $10、输出 $50 / 百万 token。假设一次任务恰好使用 100 万输入 + 100 万输出 token，API 约 $60，是 Plus 月费的 3 倍。</p><p><strong>Anthropic：</strong>Claude Pro 为 $20/月，Max 5x / 20x 为 $100 / $200 每月；Claude Opus 5.5 标准 API 为输入 $4、输出 $20 / 百万 token。同样假设 100 万输入 + 100 万输出，API 约 $24，是 Pro 月费的 1.2 倍。</p><p>这些是不同产品的公开标价量级示例，不代表本项目任一案例的 token 用量或真实账单。订阅有额度与速率限制，和 API token 账单不是等价服务；第三方价格也由实际平台决定，不能套用统一加价倍数。例如 OpenCode 当前把 Nemotron 3 Ultra Free 列为免费模型。</p><ul><li><a href="https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus" target="_blank" rel="noopener">ChatGPT Plus 月费与 API 单独计费</a> · <a href="https://openai.com/codex/" target="_blank" rel="noopener">OpenAI Codex 计划说明</a> · <a href="https://developers.openai.com/api/docs/models/gpt-6-astra" target="_blank" rel="noopener">GPT-6 Astra API 价格</a></li><li><a href="https://support.anthropic.com/en/articles/11049762-choosing-a-claude-ai-plan" target="_blank" rel="noopener">Claude 计划价格</a> · <a href="https://www.anthropic.com/claude/opus" target="_blank" rel="noopener">Opus 5.5 API 价格</a></li><li><a href="https://opencode.ai/v2/docs/console/models/" target="_blank" rel="noopener">OpenCode 模型及免费档位</a></li></ul></div></details></details>' +
-    '<div class="topic-filters" id="topic-filters"><label class="topic-search">搜索实验<input id="topic-search" type="search" placeholder="模型、档位或实验描述" autocomplete="off"></label><label>模型<select id="topic-model"><option value="">全部模型</option>' +
-    U.groupedOptions(
-      models,
-      (m) => m.provider || "厂商未记录",
-      (m) => '<option value="' + e(m.id) + '">' + e(m.label) + "</option>",
-    ) +
+    '<div class="topic-filters" id="topic-filters"><label class="topic-search">搜索实验<input id="topic-search" type="search" placeholder="模型、档位或实验描述" autocomplete="off"></label><label>模型 / 厂商<select id="topic-model"><option value="">全部模型</option>' +
+    U.modelFilterOptions(models) +
     '</select></label><details id="topic-more-filters" class="topic-more-filters"><summary>更多筛选</summary><div><label>推理档位<select id="topic-effort"><option value="">全部档位</option>' +
     efforts
       .map(
@@ -485,6 +484,7 @@
         (r) =>
           (!promptId || r.promptId === promptId) &&
           (!modelId || r.modelId === modelId) &&
+          (!provider || U.modelProviderId(data, r) === provider) &&
           (!effort || r.effort === effort) &&
           (!query ||
             [
@@ -540,7 +540,8 @@
         openHistory.add(R.conditionKey(anchor));
     }
     document.getElementById("topic-prompt").value = promptId;
-    document.getElementById("topic-model").value = modelId;
+    document.getElementById("topic-model").value =
+      modelId || (provider ? "provider:" + provider : "");
     document.getElementById("topic-effort").value = effort;
     document.getElementById("topic-sort").value = sort;
     document.getElementById("topic-search").value = query;
@@ -549,7 +550,12 @@
     document.getElementById("topic-sort-field").hidden = view === "matrix";
     document.querySelector(".topic-context").hidden = view === "prompt";
     document.getElementById("topic-reset").disabled =
-      !modelId && !effort && !query && !promptId && sort === "model";
+      !modelId &&
+      !provider &&
+      !effort &&
+      !query &&
+      !promptId &&
+      sort === "model";
     const task = prompts.find((p) => p.id === promptId);
     document.getElementById("topic-context-title").textContent = task
       ? task.title + " · " + task.id
@@ -757,6 +763,7 @@
     const p = new URLSearchParams({ id: topic.id, view });
     if (promptId) p.set("prompt", promptId);
     if (modelId) p.set("model", modelId);
+    if (provider) p.set("provider", provider);
     if (effort) p.set("effort", effort);
     if (query) p.set("q", query);
     if (sort !== "model") p.set("sort", sort);
@@ -803,7 +810,8 @@
         promptId = event.target.value;
         break;
       case "topic-model":
-        modelId = event.target.value;
+        provider = event.target.selectedOptions[0]?.dataset.provider || "";
+        modelId = provider ? "" : event.target.value;
         break;
       case "topic-effort":
         effort = event.target.value;
@@ -857,7 +865,7 @@
       return;
     }
     if (event.target.closest("#topic-reset, [data-reset-filters]")) {
-      modelId = effort = query = "";
+      modelId = provider = effort = query = "";
       promptId = "";
       sort = "model";
       resetExpansion();
@@ -881,6 +889,9 @@
       ? p.get("view")
       : "list";
     modelId = models.some((m) => m.id === p.get("model")) ? p.get("model") : "";
+    provider = models.some((m) => m.provider === p.get("provider"))
+      ? p.get("provider") || ""
+      : "";
     effort = efforts.includes(p.get("effort")) ? p.get("effort") : "";
     query = p.get("q") || "";
     sort = ["recent", "score"].includes(p.get("sort"))

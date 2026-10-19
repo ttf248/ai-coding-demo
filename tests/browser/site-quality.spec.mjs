@@ -177,8 +177,18 @@ test("homepage loads thumbnails and separates vendors from tools", async ({
     /Anthropic · \d+/,
   );
   await page.locator('[data-recent="archive"]').click();
-  await expect(page.locator("#recent-list")).toContainText(
-    "LongCat 2.5 Preview Free",
+  const latestArchiveDate = catalog.runs
+    .filter(
+      (run) =>
+        run.archivedAt &&
+        catalog.topics.find((topic) => topic.id === run.topicId)
+          .testingStatus !== "archived",
+    )
+    .map((run) => run.archivedAt)
+    .sort()
+    .at(-1);
+  await expect(page.locator("#recent-list time").first()).toHaveText(
+    latestArchiveDate,
   );
 });
 

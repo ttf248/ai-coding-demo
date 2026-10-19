@@ -118,14 +118,7 @@
       provider === "unknown" ? "未记录 / 多轮混合" : provider,
     ]),
   );
-  $("model").insertAdjacentHTML(
-    "beforeend",
-    U.groupedOptions(
-      [...data.models].sort(U.compareModels),
-      (m) => m.provider || "未记录 / 多轮混合",
-      (m) => '<option value="' + e(m.id) + '">' + e(m.label) + "</option>",
-    ),
-  );
+  $("model").insertAdjacentHTML("beforeend", U.modelFilterOptions(data.models));
   options(
     "type",
     [...new Set(data.runs.map((r) => r.type))].map((t) => [t, t]),
@@ -500,6 +493,8 @@
       "sort",
     ])
       $(key).value = state[key];
+    if (!state.model && state.provider && state.provider !== "unknown")
+      $("model").value = "provider:" + state.provider;
     $("preview-only").setAttribute(
       "aria-pressed",
       String(state.preview === "yes"),
@@ -560,7 +555,7 @@
               ? { active: "参与测试", archived: "已归档", all: "全部案例" }[
                   state[key]
                 ]
-              : $(key).selectedOptions?.[0]?.textContent || state[key];
+              : $(key).selectedOptions?.[0]?.textContent.trim() || state[key];
         return (
           '<button data-remove-filter="' +
           key +
@@ -602,11 +597,18 @@
       "prompt",
       "preview",
     ]) {
-      const candidates = U.filterRuns(data, { ...state, [key]: "" });
+      const candidates = U.filterRuns(data, {
+        ...state,
+        ...(key === "model" || key === "provider"
+          ? { model: "", provider: "" }
+          : { [key]: "" }),
+      });
       for (const option of $(key).options) {
         option.dataset.label ||= option.textContent;
         const count = candidates.filter((run) => {
           if (!option.value) return true;
+          if (key === "model" && option.dataset.provider)
+            return U.modelProviderId(data, run) === option.dataset.provider;
           const topic = data.topics.find((topic) => topic.id === run.topicId);
           return (
             {
@@ -622,7 +624,11 @@
             }[key] === option.value
           );
         }).length;
-        option.textContent = option.dataset.label + " · " + count;
+        option.textContent =
+          (option.hasAttribute("data-indent") ? "　" : "") +
+          option.dataset.label +
+          " · " +
+          count;
       }
     }
   }
@@ -640,6 +646,25 @@
   ].forEach((key) =>
     $(key).addEventListener(key === "q" ? "input" : "change", (ev) => {
       state[key] = ev.target.value;
+      if (key === "model") {
+        const provider = ev.target.selectedOptions[0]?.dataset.provider;
+        if (provider) {
+          state.provider = provider;
+          state.model = "";
+        } else if (
+          !state.model ||
+          U.modelProviderId(data, { modelId: state.model }) !== state.provider
+        ) {
+          state.provider = "";
+        }
+      } else if (
+        key === "provider" &&
+        state.provider &&
+        state.model &&
+        U.modelProviderId(data, { modelId: state.model }) !== state.provider
+      ) {
+        state.model = "";
+      }
       render(true);
     }),
   );
