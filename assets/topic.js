@@ -355,7 +355,7 @@
                       encodeURIComponent(condition.latest.id) +
                       "&right=" +
                       encodeURIComponent(condition.runs[1].id) +
-                      '&tab=snapshot">比较最近两条 →</a>'
+                      '">比较最近两条 →</a>'
                     : "";
                 return (
                   '<tbody class="model-condition" data-condition="' +
@@ -690,7 +690,7 @@
                 items.length +
                 ' 条实验</span></div><a href="compare.html?group=' +
                 encodeURIComponent(topic.id + "/" + p.id) +
-                '&tab=snapshot">比较此版本 →</a></header><div class="topic-table-scroll" tabindex="0" aria-label="实验记录表，包含作品、模型、截图评分、费用与耗时"><table class="topic-runs-table"><caption class="sr-only">' +
+                '">比较此版本 →</a></header><div class="topic-table-scroll" tabindex="0" aria-label="实验记录表，包含作品、模型、截图评分、费用与耗时"><table class="topic-runs-table"><caption class="sr-only">' +
                 e(p.title) +
                 '的实验记录</caption><thead><tr><th scope="col">作品</th><th scope="col">模型 / 档位</th><th scope="col">截图评分</th><th scope="col">费用记录</th><th scope="col">执行耗时</th><th scope="col">操作</th></tr></thead><tbody>' +
                 items

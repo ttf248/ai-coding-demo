@@ -244,7 +244,7 @@ export function documentOutputs(catalog, generated) {
               ? `<a class="button primary" href="${escape(run.preview.kind === "external" ? href : relative(href))}" target="_blank" rel="noopener">运行作品 ↗</a>`
               : "";
           })() +
-          `<a class="button" href="${escape(relative("compare.html"))}?left=${encodeURIComponent(run.id)}&amp;tab=snapshot">对比此实验</a>`
+          `<a class="button" href="${escape(relative("compare.html"))}?left=${encodeURIComponent(run.id)}">对比此实验</a>`
         : "") +
       (guide
         ? `<a class="button primary" href="${escape(relative(guide.example))}">运行示例 ↗</a>`

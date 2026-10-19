@@ -71,16 +71,16 @@ test("explicit model view retains the complete overview and collapsed history", 
     ),
   ).toBeVisible();
   const group = modelGroup(page, "gpt-6-astra");
-  await expect(group.locator(".model-record-count")).toHaveText("3 条记录");
+  await expect(group.locator(".model-record-count")).toHaveText("4 条记录");
   await group.locator("[data-model-toggle]").click();
-  await expect(group.locator(".model-condition")).toHaveCount(3);
+  await expect(group.locator(".model-condition")).toHaveCount(4);
   await expect(group.locator("[data-history-toggle]")).toHaveCount(0);
   await expect(
     group.locator(".model-record-facts").filter({ hasText: "工具未记录" }),
   ).toHaveCount(2);
   await mockHistory(page);
   await page.reload();
-  await expect(group.locator(".model-condition")).toHaveCount(3);
+  await expect(group.locator(".model-condition")).toHaveCount(4);
   await expect(page.locator(`#run-${repeated[0].id}`)).toBeVisible();
   await expect(page.locator(`#run-${repeated[1].id}`)).toBeVisible();
   await expect(page.locator(`#run-${foldedRun.id}`)).toBeHidden();
@@ -166,7 +166,7 @@ test("historical anchors reveal the target and remain compatible with the full l
   );
 });
 
-test("history comparison opens the exact pair without executing previews", async ({
+test("history comparison opens the exact pair in live preview", async ({
   page,
 }) => {
   await mockHistory(page);
@@ -179,7 +179,7 @@ test("history comparison opens the exact pair without executing previews", async
   const url = new URL(await link.getAttribute("href"), page.url());
   expect(url.searchParams.get("left")).toBe(repeated[0].id);
   expect(url.searchParams.get("right")).toBe(repeated[1].id);
-  expect(url.searchParams.get("tab")).toBe("snapshot");
+  expect(url.searchParams.has("tab")).toBe(false);
   await modelGroup(page, "gpt-6-astra")
     .locator("[data-history-toggle]")
     .click();
@@ -195,7 +195,11 @@ test("history comparison opens the exact pair without executing previews", async
   await page.goto(url.href);
   await expect(page.locator("#run-left")).toHaveValue(repeated[0].id);
   await expect(page.locator("#run-right")).toHaveValue(repeated[1].id);
-  await expect(page.locator("iframe")).toHaveCount(0);
+  await expect(page.locator('[data-tab="preview"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator("iframe")).toHaveCount(2);
 });
 
 test("multiple task versions remain separate and task reading returns to the overview", async ({

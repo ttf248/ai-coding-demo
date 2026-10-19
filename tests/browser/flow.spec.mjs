@@ -412,8 +412,10 @@ test("four-slot selection persists across pages, replaces, removes and opens exa
       .locator("[data-run]")
       .evaluateAll((nodes) => nodes.map((n) => n.value)),
   ).toEqual(chosen);
-  await expect(page.locator("iframe")).toHaveCount(0);
-  await page.locator('[data-tab="preview"]').click();
+  await expect(page.locator('[data-tab="preview"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(page.locator("iframe")).toHaveCount(
     chosen.filter((id) => data.runs.find((r) => r.id === id).preview.embed)
       .length,

@@ -747,7 +747,7 @@
       : [];
     $("quick-selection").textContent = `已选 ${ids.length}/4 条实验`;
     $("quick-start").hidden = ids.length < 2;
-    const query = new URLSearchParams({ tab: "snapshot" });
+    const query = new URLSearchParams();
     ids.forEach((id, i) =>
       query.set(["left", "right", "third", "fourth"][i], id),
     );

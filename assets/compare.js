@@ -43,7 +43,7 @@
         p.get("tab"),
       )
         ? p.get("tab")
-        : "snapshot",
+        : "preview",
       source: p.get("source") === "raw" ? "raw" : "task",
       relatedOnly: p.get("related") !== "0",
       differencesOnly: p.get("differencesOnly") === "1",

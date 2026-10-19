@@ -31,7 +31,11 @@ test("reader actions preserve experiment identity and current section", async ({
   ).toBeLessThanOrEqual(820);
   await actions.getByRole("link", { name: "对比此实验" }).click();
   await expect(page.locator("#run-left")).toHaveValue(run.id);
-  await expect(page.locator("iframe")).toHaveCount(0);
+  await expect(page.locator('[data-tab="preview"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator("#panel-left iframe")).toHaveCount(1);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(readerPath(run.document));
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
