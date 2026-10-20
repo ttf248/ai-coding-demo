@@ -3,6 +3,7 @@ import path from "node:path";
 import Ajv from "ajv";
 import { isDeepStrictEqual } from "node:util";
 import { siteResourceOutputs } from "./site-assets.mjs";
+import { CSS_BASELINE, cssReport } from "./css-structure.mjs";
 import { rubricErrors, scoreErrors } from "./scoring.mjs";
 import {
   ROOT,
@@ -443,10 +444,33 @@ for (const file of [
   "assets/compare.js",
 ])
   check(exists(file), `Missing site file ${file}`);
+// 样式重复只做棘轮：允许逐步减少，不允许新增。
+const cssFiles = [
+  "assets/site.css",
+  "assets/polish.css",
+  "assets/home.css",
+  "assets/topic.css",
+  "assets/compare.css",
+  "assets/document.css",
+  "assets/guide.css",
+  "assets/topic-lifecycle.css",
+].filter(exists);
+const css = cssReport(cssFiles);
+check(
+  css.acrossFilesCount <= CSS_BASELINE.acrossFiles,
+  `Cross-file CSS duplication grew: ${css.acrossFilesCount} > ${CSS_BASELINE.acrossFiles}`,
+);
+check(
+  css.repeatedCount <= CSS_BASELINE.repeated,
+  `Repeated CSS selectors grew: ${css.repeatedCount} > ${CSS_BASELINE.repeated}`,
+);
 if (errors.length) {
   console.error(errors.join("\n"));
   process.exitCode = 1;
 } else
   console.log(
     `Valid: ${catalog.topics.length} topics, ${catalog.runs.length} runs, ${catalog.guides.length} guides; committed site is current.`,
+  );
+  console.log(
+    `CSS: ${css.acrossFilesCount} selectors shared across files (limit ${CSS_BASELINE.acrossFiles}), ${css.repeatedCount} repeated in one file (limit ${CSS_BASELINE.repeated}).`,
   );
