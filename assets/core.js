@@ -12,13 +12,29 @@
           "'": "&#39;",
         })[c],
     );
+  // 目录数据的查表缓存：过滤与分面计数会反复按 id 查主题、模型与工具。
+  const indexCache = new WeakMap();
+  function dataIndex(data) {
+    let index = indexCache.get(data);
+    if (!index) {
+      const byId = (list) =>
+        new Map((list || []).map((item) => [item.id, item]));
+      index = {
+        topics: byId(data.topics),
+        models: byId(data.models),
+        tools: byId(data.tools),
+        categories: byId(data.categories),
+      };
+      indexCache.set(data, index);
+    }
+    return index;
+  }
   const modelLabel = (data, run) =>
-    data.models.find((m) => m.id === run.modelId)?.label || "未记录";
+    dataIndex(data).models.get(run.modelId)?.label || "未记录";
   const modelProviderId = (data, run) =>
-    data.models.find((m) => m.id === run.modelId)?.provider || "unknown";
+    dataIndex(data).models.get(run.modelId)?.provider || "unknown";
   const modelProvider = (data, run) =>
-    data.models.find((m) => m.id === run.modelId)?.provider ||
-    "未记录 / 多轮混合";
+    dataIndex(data).models.get(run.modelId)?.provider || "未记录 / 多轮混合";
   const executionModeLabel = (mode) =>
     ({
       "design-enhanced": "自主设计授权",
@@ -299,8 +315,7 @@
     );
   }
   const toolLabel = (data, run) =>
-    data.tools?.find((tool) => tool.id === run.environment?.toolId)?.label ||
-    "工具未记录";
+    dataIndex(data).tools.get(run.environment?.toolId)?.label || "工具未记录";
   function relation(data, a, b) {
     if (!a || !b) return "请选择两个实验";
     if (a.topicId !== b.topicId) return "跨主题对比";
@@ -428,9 +443,10 @@
   }
   function filterRuns(data, state) {
     const query = (state.q || "").trim().toLocaleLowerCase();
+    const index = dataIndex(data);
     const filtered = data.runs
       .filter((r) => {
-        const t = data.topics.find((t) => t.id === r.topicId);
+        const t = index.topics.get(r.topicId);
         return (
           (!state.testing ||
             state.testing === "all" ||
@@ -469,8 +485,8 @@
             ? compareRunScores(a, b)
             : (state.sort === "complexity"
                 ? compareComplexity(
-                    data.topics.find((t) => t.id === a.topicId),
-                    data.topics.find((t) => t.id === b.topicId),
+                    index.topics.get(a.topicId),
+                    index.topics.get(b.topicId),
                   )
                 : 0) ||
               (b.date || "").localeCompare(a.date || "") ||

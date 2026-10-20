@@ -113,6 +113,57 @@ test("archive summaries retain execution mode notes for visible badges", () => {
     assert.match(ui.ArchiveUI.runCard(summary, summarized), /自我审查十轮/);
   }
 });
+test("filter results match a naive reference implementation", () => {
+  const naive = (state) => {
+    const query = (state.q || "").trim().toLowerCase();
+    return summary.runs
+      .filter((run) => {
+        const topic = summary.topics.find((item) => item.id === run.topicId);
+        const model = summary.models.find((item) => item.id === run.modelId);
+        return (
+          (!state.testing ||
+            state.testing === "all" ||
+            (state.testing === "archived") ===
+              (topic.testingStatus === "archived")) &&
+          (!state.provider || (model?.provider || "unknown") === state.provider) &&
+          (!state.tool ||
+            (run.environment?.toolId || "unknown") === state.tool) &&
+          (!state.type || run.type === state.type) &&
+          (!state.screenshot || Boolean(run.screenshot)) &&
+          (!query ||
+            [
+              topic.title,
+              run.title,
+              run.description,
+              model?.provider || "unknown",
+              model?.label || "未记录",
+              run.effort,
+              ...run.tags,
+              ...run.stack,
+            ]
+              .join(" ")
+              .toLowerCase()
+              .includes(query))
+        );
+      })
+      .map((run) => run.id)
+      .sort();
+  };
+  for (const state of [
+    { testing: "active" },
+    { testing: "all", q: "流体" },
+    { testing: "archived" },
+    { testing: "all", provider: "Anthropic", q: "opus" },
+    { testing: "all", tool: "claude-code" },
+    { testing: "all", type: "app" },
+  ]) {
+    const actual = ui.ArchiveUI
+      .filterRuns(summary, state)
+      .map((run) => run.id)
+      .sort();
+    assert.deepEqual(actual, naive(state));
+  }
+});
 test("run cards are assembled from options instead of markup surgery", () => {
   const run = summary.runs.find((item) => item.preview?.kind !== "none");
   assert.ok(run);

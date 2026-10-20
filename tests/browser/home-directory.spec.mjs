@@ -580,14 +580,21 @@ test("preview distinguishes missing screenshots, archive records and external en
 }) => {
   await page.goto("./?testing=all");
   // Exercise each declared preview state without loading an external service.
-  await page.evaluate(() => {
+  const mutatedId = await page.evaluate(() => {
     const run = window.ARCHIVE.runs.find(
       (r) => r.id === document.querySelector(".cover-preview").dataset.preview,
     );
     run.screenshot = null;
     run.preview = { kind: "none", pages: [], embed: false };
+    return run.id;
   });
   await page.locator("#q").fill(" ");
+  // 搜索输入有 150ms 防抖，等重渲染后封面换成同主题的另一条实验。
+  await expect
+    .poll(() =>
+      page.locator(".cover-preview").first().getAttribute("data-preview"),
+    )
+    .not.toBe(mutatedId);
   await page.locator(".cover-preview").first().click();
   const id = await page.locator("#preview-version").inputValue();
   const unavailable = await page.evaluate(

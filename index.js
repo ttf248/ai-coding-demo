@@ -643,6 +643,9 @@
             }[key] === option.value
           );
         }).length;
+        // 计数没变就不重写选项文字，避免每次输入都改动几十个节点。
+        if (option.dataset.count === String(count)) continue;
+        option.dataset.count = String(count);
         option.textContent =
           (option.hasAttribute("data-indent") ? "　" : "") +
           option.dataset.label +
@@ -651,6 +654,7 @@
       }
     }
   }
+  let searchTimer = 0;
   [
     "q",
     "category",
@@ -684,6 +688,13 @@
       ) {
         state.model = "";
       }
+      // 搜索输入加防抖：一次连打只渲染一次，其余控件仍然立即生效。
+      if (key === "q") {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => render(true), 150);
+        return;
+      }
+      clearTimeout(searchTimer);
       render(true);
     }),
   );
