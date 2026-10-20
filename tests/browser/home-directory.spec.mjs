@@ -35,6 +35,26 @@ test("insufficient screenshot evidence remains visible without a numeric score",
   expect(selected).toBe("rated");
 });
 
+test("homepage covers pick the variant that matches the displayed size", async ({
+  page,
+}) => {
+  // 紧凑视图在 1440px 下封面约 400px 宽，取 480w 即可；大图视图铺满两列取 960w。
+  await page.goto("./?view=compact");
+  const compact = page.locator("#project-grid .topic-cover img").first();
+  await expect(compact).toHaveAttribute("srcset", /240w.*480w.*960w/);
+  await expect(compact).toHaveAttribute("sizes", /400px/);
+  expect(await compact.evaluate((img) => img.currentSrc)).toMatch(/-480\.webp$/);
+
+  await page.goto("./?view=grid");
+  const grid = page.locator("#project-grid .topic-cover img").first();
+  await expect(grid).toHaveAttribute("sizes", /610px/);
+  expect(await grid.evaluate((img) => img.currentSrc)).toMatch(/-960\.webp$/);
+
+  await page.goto("./?group=runs&view=list");
+  const ledger = page.locator("#project-grid .run-card-screenshot img").first();
+  await expect(ledger).toHaveAttribute("sizes", /88px/);
+  expect(await ledger.evaluate((img) => img.currentSrc)).toMatch(/-240\.webp$/);
+});
 test("homepage covers use registered run screenshots and direct previews", async ({
   page,
 }) => {

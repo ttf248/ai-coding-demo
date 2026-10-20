@@ -136,11 +136,21 @@
   );
   const selection = U.setupSelection(data);
   const previewScopes = new Map();
+  // 封面实际显示宽度随视图变化，按视图声明 sizes，浏览器才不会多取大图。
+  const COVER_SIZES = {
+    compact: "(max-width: 700px) calc(100vw - 34px), (max-width: 1100px) 46vw, 400px",
+    grid: "(max-width: 700px) calc(100vw - 34px), (max-width: 1100px) 46vw, 610px",
+    list: "(max-width: 700px) 76px, (max-width: 1100px) 64px, 88px",
+  };
+  const coverSizes = () =>
+    COVER_SIZES[
+      state.group === "runs" && state.view === "list" ? "list" : state.view
+    ] || COVER_SIZES.compact;
   function galleryFigure(run, className, source = U.screenshotURL(run)) {
     if (!source) return "";
     const variants =
       source === U.screenshotURL(run) ? U.screenshotVariants(run) : [];
-    const thumbnail = variants.at(-1)?.path || source;
+    const thumbnail = variants[0]?.path || source;
     const responsive = variants.length
       ? '" srcset="' +
         e(
@@ -148,7 +158,9 @@
             .map((variant) => variant.path + " " + variant.width + "w")
             .join(", "),
         ) +
-        '" sizes="(max-width: 700px) calc(100vw - 40px), (max-width: 1100px) 46vw, 580px'
+        '" sizes="' +
+        e(coverSizes()) +
+        '"'
       : "";
     return (
       '<figure class="' +
