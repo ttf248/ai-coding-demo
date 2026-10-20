@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { ROOT } from "../scripts/lib.mjs";
+import { hash } from "../scripts/lib.mjs";
 
 // 导入案例时的机械字段同步：只处理草稿，已入库记录的输入不得被改写。
 function fixture() {
@@ -75,10 +76,7 @@ test("demo sync writes the input fingerprint of a draft and lists what is still 
       "demos/sample/runs/unknown-unknown-r01",
     );
     // 维护者填入真实输入后，脚手架里的占位指纹立刻失配。
-    fs.writeFileSync(
-      path.join(runDirectory, "prompt.md"),
-      "真实原始输入\n",
-    );
+    fs.writeFileSync(path.join(runDirectory, "prompt.md"), "真实原始输入\n");
     fs.writeFileSync(
       path.join(temporary, "demos/sample/prompts/v1/prompt.md"),
       "真实任务正文\n",
@@ -150,5 +148,141 @@ test("demo sync refuses to rewrite a registered record and refuses an incomplete
     );
   } finally {
     cleanup(temporary);
+  }
+});
+
+function preparedDraft() {
+  const f = fixture();
+  execFileSync(
+    process.execPath,
+    [
+      path.join(f.temporary, "scripts/new-demo.mjs"),
+      "--topic",
+      "sample",
+      "--title",
+      "Example",
+      "--type",
+      "prompt",
+    ],
+    { cwd: f.temporary, stdio: "pipe" },
+  );
+  const directory = "demos/sample/runs/unknown-unknown-r01";
+  const file = path.join(f.temporary, directory, "run.json");
+  const record = JSON.parse(fs.readFileSync(file, "utf8"));
+  f.write(`${directory}/prompt.md`, "真实输入");
+  f.write("demos/sample/prompts/v1/prompt.md", "真实正文");
+  f.write(
+    `${directory}/screenshot.png`,
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  );
+  record.description = "真实描述";
+  record.input.notes = "完整留存";
+  record.screenshot = "screenshot.png";
+  record.preview = {
+    kind: "external",
+    embed: true,
+    pages: [],
+    defaultPage: null,
+    externalUrl: "https://example.com/demo",
+    network: "required",
+  };
+  record.score = {
+    rubricVersion: 2,
+    status: "insufficient",
+    evidence:
+      "这是测试夹具的证据说明，截图未展示任务主体，因此不能给出数值评分。",
+  };
+  f.write(
+    "catalog/scoring-rubric.json",
+    JSON.stringify({
+      version: 2,
+      tasks: { "sample/v1": { promptHash: hash("真实正文"), checks: [] } },
+    }),
+  );
+  const save = () => fs.writeFileSync(file, JSON.stringify(record));
+  save();
+  return { ...f, file, record, save };
+}
+
+test("demo sync rejects conflicting flags without writes and accepts an external preview without local pages", () => {
+  const f = preparedDraft();
+  try {
+    const before = fs.readFileSync(f.file, "utf8");
+    assert.throws(
+      () =>
+        run(f.temporary, [
+          "sample--unknown-unknown-r01",
+          "--check",
+          "--finalize",
+        ]),
+      /不能同时使用/,
+    );
+    assert.equal(fs.readFileSync(f.file, "utf8"), before);
+    const output = run(f.temporary, ["sample--unknown-unknown-r01", "--check"]);
+    assert.match(output, /待同步/);
+    assert.equal(fs.readFileSync(f.file, "utf8"), before);
+    f.record.preview.externalUrl = "http://example.com/demo";
+    f.save();
+    assert.throws(
+      () => run(f.temporary, ["sample--unknown-unknown-r01", "--finalize"]),
+      /HTTPS/,
+    );
+    f.record.preview.externalUrl = "https://example.com/demo";
+    f.save();
+    run(f.temporary, ["sample--unknown-unknown-r01", "--finalize"]);
+    assert.equal(JSON.parse(fs.readFileSync(f.file)).status, "ready");
+  } finally {
+    cleanup(f.temporary);
+  }
+});
+
+test("demo sync blocks stale evidence for both rated and insufficient reviews", () => {
+  const f = preparedDraft();
+  try {
+    for (const status of ["rated", "insufficient"]) {
+      f.record.score.status = status;
+      f.record.score.inputHash = "outdated";
+      f.save();
+      assert.throws(
+        () => run(f.temporary, ["sample--unknown-unknown-r01", "--finalize"]),
+        /不一致/,
+      );
+      const result = JSON.parse(fs.readFileSync(f.file));
+      assert.equal(result.status, "draft");
+      assert.equal(result.score.inputHash, "outdated");
+    }
+  } finally {
+    cleanup(f.temporary);
+  }
+});
+
+test("demo sync cannot refresh a changed prompt referenced by a registered run", () => {
+  const f = preparedDraft();
+  try {
+    f.write(
+      "demos/sample/runs/unknown-unknown-r02/run.json",
+      JSON.stringify({
+        ...f.record,
+        id: "sample--unknown-unknown-r02",
+        status: "ready",
+        screenshot: null,
+      }),
+    );
+    f.write("demos/sample/runs/unknown-unknown-r02/prompt.md", "历史输入");
+    const promptFile = path.join(
+      f.temporary,
+      "demos/sample/prompts/v1/prompt.json",
+    );
+    const before = fs.readFileSync(promptFile, "utf8");
+    assert.throws(
+      () => run(f.temporary, ["sample--unknown-unknown-r01"]),
+      /新建提示词版本/,
+    );
+    assert.equal(fs.readFileSync(promptFile, "utf8"), before);
+  } finally {
+    cleanup(f.temporary);
   }
 });
