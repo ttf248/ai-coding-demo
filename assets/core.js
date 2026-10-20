@@ -751,6 +751,7 @@
       tagsBadge = executionModeBadge(r),
       articleAttributes = "",
       previewLinkClass = "",
+      topicTitle = "",
       footer = "",
     } = options;
     const href = previewURL(r);
@@ -777,7 +778,11 @@
       (badges ? '<div class="card-badges">' + badges + pill + "</div>" : pill) +
       "</div><h3>" +
       escape(r.title) +
-      "</h3><p>" +
+      "</h3>" +
+      (topicTitle
+        ? '<small class="run-topic">' + escape(topicTitle) + "</small>"
+        : "") +
+      "<p>" +
       escape(r.description) +
       '</p><div class="tags"><span>' +
       escape(modelLabel(data, r)) +

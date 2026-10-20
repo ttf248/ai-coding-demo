@@ -35,6 +35,40 @@ test("insufficient screenshot evidence remains visible without a numeric score",
   expect(selected).toBe("rated");
 });
 
+test("experiment list defaults to screenshot score and keeps actions on one line", async ({
+  page,
+}) => {
+  await page.goto("./?group=runs&view=list&testing=all");
+  await expect(page.locator("#sort")).toHaveValue("score");
+  // 默认按截图评分降序，与主题页口径一致。
+  const scores = await page
+    .locator("#project-grid .run-list-score")
+    .evaluateAll((nodes) =>
+      nodes.map((node) => Number(node.textContent.replace(/[^\d]/g, ""))),
+    );
+  expect(scores.length).toBeGreaterThan(3);
+  expect([...scores].sort((a, b) => b - a)).toEqual(scores);
+  // 三个操作按钮在同一行（按垂直中心判断，避免按钮高度不同造成误判）。
+  const centers = await page
+    .locator("#project-grid .run-card")
+    .first()
+    .locator(".card-actions :is(a, button)")
+    .evaluateAll((nodes) =>
+      nodes.map((n) => {
+        const r = n.getBoundingClientRect();
+        return Math.round(r.top + r.height / 2);
+      }),
+    );
+  expect(centers.length).toBe(3);
+  expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(8);
+  // 列表头与实际列对应：缩略图单独成列，作品列带主题名。
+  await expect(page.locator(".run-list-heading span").first()).toHaveText(
+    "截图",
+  );
+  await expect(
+    page.locator("#project-grid .run-card .run-topic").first(),
+  ).not.toBeEmpty();
+});
 test("homepage exposes grouped semantics, a valid heading order and no chatty live regions", async ({
   page,
 }) => {

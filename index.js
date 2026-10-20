@@ -21,7 +21,7 @@
       params.get("sort"),
     )
       ? params.get("sort")
-      : "complexity",
+      : "",
     group: ["topics", "runs"].includes(params.get("group"))
       ? params.get("group")
       : "topics",
@@ -36,7 +36,10 @@
     pickSort: params.get("pickSort") === "recent" ? "recent" : "score",
     pickAnchor: params.get("pickAnchor") || "",
   };
-  if (state.group === "topics") state.sort = "complexity";
+  // 排序默认值随分组变化：主题按复杂度，实验按截图评分（与主题页口径一致）。
+  const defaultSort = () => (state.group === "runs" ? "score" : "complexity");
+  const effectiveSort = () =>
+    state.group === "topics" ? "complexity" : state.sort || defaultSort();
   let visible = 9;
   let restoredScroll = 0;
   let lastViewed = "";
@@ -259,9 +262,9 @@
       });
   }
   function render(reset = false) {
-    if (state.group === "topics") state.sort = "complexity";
+    const sort = effectiveSort();
     if (reset) visible = 9;
-    const matched = U.filterRuns(data, state);
+    const matched = U.filterRuns(data, { ...state, sort });
     previewScopes.clear();
     let items;
     if (state.group === "runs")
@@ -279,6 +282,7 @@
           articleAttributes:
             'data-item="' + e(r.id) + '" data-topic="' + e(r.topicId) + '"',
           previewLinkClass: "preview-link",
+          topicTitle: data.topics.find((t) => t.id === r.topicId)?.title || "",
           footer:
             '<div class="run-list-score">' +
             U.scoreBadge(r).replaceAll("score-chip", "list-score") +
@@ -316,7 +320,7 @@
           ),
         );
       }
-      topics.sort((a, b) => U.compareTopics(a, b, matched, state.sort));
+      topics.sort((a, b) => U.compareTopics(a, b, matched, sort));
       items = topics.map((t) => {
         const runs = matched.filter((r) => r.topicId === t.id),
           all = data.runs.filter((r) => r.topicId === t.id),
@@ -461,7 +465,7 @@
     }
     $("project-grid").innerHTML =
       (ledger
-        ? '<div class="run-list-heading" aria-hidden="true"><span>作品</span><span>主题 / 实验</span><span>模型 / 档位</span><span>截图评分</span><span>日期</span><span>操作</span></div>'
+        ? '<div class="run-list-heading" aria-hidden="true"><span>截图</span><span>作品 / 主题</span><span>模型 / 档位</span><span>截图评分</span><span>日期</span><span>操作</span></div>'
         : "") + displayed.join("");
     $("run-grouping-control").hidden = !ledger;
     $("run-grouping").checked = state.runGrouping === "topic";
@@ -486,6 +490,7 @@
         b.setAttribute("aria-pressed", String(b.dataset.group === state.group)),
       );
     $("sort").closest("label").hidden = state.group !== "runs";
+    $("sort").value = sort;
     document
       .querySelectorAll("[data-view]")
       .forEach((b) =>
@@ -501,9 +506,9 @@
       "prompt",
       "preview",
       "testing",
-      "sort",
     ])
       $(key).value = state[key];
+    $("sort").value = sort;
     if (!state.model && state.provider && state.provider !== "unknown")
       $("model").value = "provider:" + state.provider;
     $("preview-only").setAttribute(
@@ -554,7 +559,7 @@
       .filter(
         (key) =>
           state[key] &&
-          !(key === "sort" && state[key] === "complexity") &&
+          !(key === "sort" && state[key] === defaultSort()) &&
           !(key === "testing" && state[key] === "active"),
       )
       .map((key) => {
@@ -592,8 +597,11 @@
     });
     const search = new URLSearchParams();
     Object.entries(state).forEach(([k, v]) => {
-      if (v) search.set(k, v);
+      if (!v || k === "sort") return;
+      search.set(k, v);
     });
+    // 排序始终按当前口径写进地址：主题视图固定复杂度，实验视图记录实际选择。
+    search.set("sort", effectiveSort());
     history.replaceState(null, "", "?" + search.toString() + location.hash);
     updateFacetCounts();
     selection();
@@ -682,7 +690,6 @@
   document.querySelectorAll("[data-group]").forEach((b) =>
     b.addEventListener("click", () => {
       state.group = b.dataset.group;
-      if (state.group === "topics") state.sort = "complexity";
       render(true);
     }),
   );
@@ -738,7 +745,7 @@
         screenshot: "",
         comparable: "",
         testing: "active",
-        sort: "complexity",
+        sort: "",
       });
       render(true);
     }),
@@ -747,8 +754,7 @@
     const button = event.target.closest("[data-remove-filter]");
     if (!button) return;
     const key = button.dataset.removeFilter;
-    state[key] =
-      key === "sort" ? "complexity" : key === "testing" ? "active" : "";
+    state[key] = key === "testing" ? "active" : "";
     render(true);
   });
   $("advanced-filters").open = !!(
