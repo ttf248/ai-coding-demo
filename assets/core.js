@@ -743,22 +743,39 @@
     render();
     return render;
   }
-  function runCard(data, r) {
+  // 实验卡片：调用方通过选项包指定图区、徽章与附加内容，页面不再对标记做字符串替换。
+  function runCard(data, r, options = {}) {
+    const {
+      figure,
+      badges = "",
+      tagsBadge = executionModeBadge(r),
+      articleAttributes = "",
+      previewLinkClass = "",
+      footer = "",
+    } = options;
     const href = previewURL(r);
+    const topic = data.topics.find((t) => t.id === r.topicId);
+    const pill =
+      '<span class="pill">' +
+      escape(
+        (isTopicArchived(topic) ? "已归档 · " : "") +
+          (r.preview.kind === "none" ? "档案" : "可预览"),
+      ) +
+      "</span>";
     return (
-      '<article class="card run-card">' +
-      screenshotFigure(data, r, "run-card-screenshot") +
-      '<div class="card-top"><span class="eyebrow">' +
+      '<article class="card run-card"' +
+      (articleAttributes ? " " + articleAttributes : "") +
+      ">" +
+      (figure !== undefined
+        ? figure
+        : screenshotFigure(data, r, "run-card-screenshot")) +
+      '<div class="run-body"><div class="card-top"><span class="eyebrow">' +
       escape(r.type) +
       " / " +
       escape(r.date || "未记录") +
-      '</span><span class="pill">' +
-      escape(
-        (isTopicArchived(data.topics.find((t) => t.id === r.topicId))
-          ? "已归档 · "
-          : "") + (r.preview.kind === "none" ? "档案" : "可预览"),
-      ) +
-      "</span></div><h3>" +
+      "</span>" +
+      (badges ? '<div class="card-badges">' + badges + pill + "</div>" : pill) +
+      "</div><h3>" +
       escape(r.title) +
       "</h3><p>" +
       escape(r.description) +
@@ -769,10 +786,14 @@
       "</span><span>提示词 " +
       escape(r.promptId) +
       "</span>" +
-      executionModeBadge(r) +
+      tagsBadge +
       '</div><div class="card-actions">' +
       (href
-        ? '<a href="' +
+        ? '<a' +
+          (previewLinkClass
+            ? ' class="' + escape(previewLinkClass) + '"'
+            : "") +
+          ' href="' +
           escape(href) +
           '" target="_blank" rel="noopener">打开预览 ↗</a>'
         : "") +
@@ -780,7 +801,9 @@
       escape(documentURL(r)) +
       '">记录</a><button data-compare="' +
       escape(r.id) +
-      '" aria-pressed="false">加入对比</button></div></article>'
+      '" aria-pressed="false">加入对比</button></div>' +
+      footer +
+      "</div></article>"
     );
   }
   // Scores describe the recorded screenshot, never unobserved functionality.

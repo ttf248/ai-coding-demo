@@ -267,50 +267,25 @@
     if (state.group === "runs")
       items = matched.map((r) => {
         previewScopes.set(r.id, { runs: [r], source: U.screenshotURL(r) });
-        const html = U.runCard(data, r)
-          .replace(U.executionModeBadge(r), "")
-          .replace(
-            /(<div class="card-top"><span class="eyebrow">[\s\S]*?<\/span>)([\s\S]*?)(<\/div><h3>)/,
-            '$1<div class="card-badges">' +
-              U.executionModeBadge(r) +
-              U.scoreBadge(r).replace(">评分 ", ">截图评分 ") +
-              U.complexityBadge(data.topics.find((t) => t.id === r.topicId)) +
-              "$2</div>$3",
-          )
-          .replace(
-            U.screenshotFigure(data, r, "run-card-screenshot"),
-            galleryFigure(r, "run-card-screenshot"),
-          )
-          .replace(
-            '<div class="card-top">',
-            '<div class="run-body"><div class="card-top">',
-          )
-          .replace(
-            '<a href="' + e(U.previewURL(r)) + '"',
-            '<a class="preview-link" href="' + e(U.previewURL(r)) + '"',
-          )
-          .replace(
-            '<article class="card run-card">',
-            '<article class="card run-card" data-item="' +
-              e(r.id) +
-              '" data-topic="' +
-              e(r.topicId) +
-              '">',
-          )
-          .replace(
-            "</article>",
+        return U.runCard(data, r, {
+          figure: r.screenshot
+            ? galleryFigure(r, "run-card-screenshot")
+            : placeholder(r.title),
+          badges:
+            U.executionModeBadge(r) +
+            U.scoreBadge(r).replace(">评分 ", ">截图评分 ") +
+            U.complexityBadge(data.topics.find((t) => t.id === r.topicId)),
+          tagsBadge: "",
+          articleAttributes:
+            'data-item="' + e(r.id) + '" data-topic="' + e(r.topicId) + '"',
+          previewLinkClass: "preview-link",
+          footer:
             '<div class="run-list-score">' +
-              U.scoreBadge(r).replaceAll("score-chip", "list-score") +
-              '</div><time class="run-list-date">' +
-              e(r.date || "日期未记录") +
-              "</time></div></article>",
-          );
-        return r.screenshot
-          ? html
-          : html.replace(
-              '<div class="run-body">',
-              placeholder(r.title) + '<div class="run-body">',
-            );
+            U.scoreBadge(r).replaceAll("score-chip", "list-score") +
+            '</div><time class="run-list-date">' +
+            e(r.date || "日期未记录") +
+            "</time>",
+        });
       });
     else {
       const topics = [...new Set(matched.map((r) => r.topicId))].map((id) =>

@@ -103,6 +103,31 @@ test("archive summaries retain execution mode notes for visible badges", () => {
     assert.match(ui.ArchiveUI.runCard(summary, summarized), /自我审查十轮/);
   }
 });
+test("run cards are assembled from options instead of markup surgery", () => {
+  const run = summary.runs.find((item) => item.preview?.kind !== "none");
+  assert.ok(run);
+  const plain = ui.ArchiveUI.runCard(summary, run);
+  assert.ok(plain.includes('class="card run-card"'));
+  assert.ok(plain.includes('class="run-body"'));
+  assert.ok(plain.includes('class="card-actions"'));
+  const custom = ui.ArchiveUI.runCard(summary, run, {
+    figure: "<figure class=\"run-card-screenshot\"></figure>",
+    badges: "<span class=\"score-chip\">94</span>",
+    tagsBadge: "",
+    articleAttributes: 'data-item="x"',
+    previewLinkClass: "preview-link",
+    footer: '<time class="run-list-date">2026-01-01</time>',
+  });
+  assert.ok(custom.includes('class="card-badges"'));
+  assert.ok(custom.includes("94"));
+  assert.ok(custom.includes('data-item="x"'));
+  assert.ok(custom.includes('class="preview-link"'));
+  assert.ok(custom.includes('class="run-list-date"'));
+  // 首页不再对标记做字符串替换，core.js 改动不会静默破坏实验列表。
+  const home = read("index.js");
+  assert.doesNotMatch(home, /\.replace\(\s*["']</);
+  assert.doesNotMatch(home, /\.replace\(\s*\/</);
+});
 test("topic details reference canonical billing batches and retain tool provenance", () => {
   for (const topic of catalog.topics)
     for (const run of JSON.parse(
