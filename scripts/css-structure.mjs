@@ -4,8 +4,8 @@ import path from "node:path";
 // 样式结构检查：统计同一选择器在多个文件或同一文件里被重复声明的情况。
 // 目标不是消灭重复，而是让重复可量化、并且不再继续增加。
 export const CSS_BASELINE = {
-  // 跨文件重复的选择器数量上限
-  acrossFiles: 14,
+  // 跨文件重复的选择器数量上限：样式已按页面拆分，共享规则集中在 polish.css
+  acrossFiles: 0,
   // 同一文件里出现两次以上、且声明值完全相同的重复声明数量上限
   repeated: 0,
 };
