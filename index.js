@@ -1211,18 +1211,7 @@
     .addEventListener("click", () => {
       $("guides").open = true;
     });
-  const mobileNav = matchMedia("(max-width: 700px)");
-  const navMore = document.querySelector(".nav-more");
-  const updateNav = () => {
-    navMore.open = !mobileNav.matches;
-  };
-  mobileNav.addEventListener("change", updateNav);
-  updateNav();
-  document.querySelectorAll(".nav-more a").forEach((link) =>
-    link.addEventListener("click", () => {
-      if (mobileNav.matches) navMore.open = false;
-    }),
-  );
+  U.initNavMore();
   if (location.hash === "#guides") $("guides").open = true;
   guides();
   render();

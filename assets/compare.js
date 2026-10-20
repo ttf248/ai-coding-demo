@@ -1096,4 +1096,5 @@
   );
   fromURL();
   render();
+  U.initNavMore();
 })();

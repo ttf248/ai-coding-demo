@@ -14,6 +14,32 @@ const right = catalog.runs.find(
     run.screenshot,
 );
 const pair = "compare.html?left=" + left.id + "&right=" + right.id;
+test("topic and compare pages reach the guide index and archived topics", async ({
+  page,
+}) => {
+  for (const target of [
+    "topic.html?id=circuit-lab",
+    "compare.html?group=circuit-lab/v1",
+  ]) {
+    await page.goto(target);
+    const guides = page.locator('a[href="index.html#guides"]');
+    const archived = page.locator('a[href="index.html?testing=archived#projects"]');
+    await expect(guides).toHaveCount(1);
+    await expect(archived).toHaveCount(1);
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.setViewportSize({ width: 1440, height: 960 });
+  }
+  // 技术索引深链回到首页后自动展开折叠块。
+  await page.goto("topic.html?id=circuit-lab");
+  await page.locator('a[href="index.html#guides"]').click();
+  await expect(page).toHaveURL(/#guides$/);
+  await expect(page.locator("#guides")).toHaveAttribute("open", "");
+});
 test("guide examples remain directly openable", async ({ page }) => {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));

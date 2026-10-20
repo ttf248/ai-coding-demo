@@ -845,7 +845,24 @@
       "<small>仅评价截图可见成果；同任务、同规则下参考，不能证明功能或性能。</small></div></details>"
     );
   }
+  // 导航里的「更多」在桌面展开成一行链接，手机收成可点开的菜单。
+  function initNavMore() {
+    const navMore = document.querySelector(".nav-more");
+    if (!navMore) return;
+    const mobile = matchMedia("(max-width: 700px)");
+    const update = () => {
+      navMore.open = !mobile.matches;
+    };
+    mobile.addEventListener("change", update);
+    update();
+    navMore.querySelectorAll("a").forEach((link) =>
+      link.addEventListener("click", () => {
+        if (mobile.matches) navMore.open = false;
+      }),
+    );
+  }
   global.ArchiveUI = {
+    initNavMore,
     scoreDetails,
     completenessLabel,
     hasRecordedInput,

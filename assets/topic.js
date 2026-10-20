@@ -916,6 +916,7 @@
     if (anchorRun()) render().then(scrollToAnchor);
   });
   await render();
+  U.initNavMore();
   root.dispatchEvent(new Event("archive:topic-ready", { bubbles: true }));
   scrollToAnchor();
 })();
