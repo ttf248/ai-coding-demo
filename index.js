@@ -1167,19 +1167,19 @@
             e(r.promptId) +
             "&view=list#run-" +
             e(r.id) +
-            '"><span>' +
+            '"><span class="recent-topic">' +
             e(data.topics.find((t) => t.id === r.topicId).title) +
-            '</span><strong class="recent-model">' +
+            '</span><span class="recent-meta"><strong class="recent-model">' +
             e(U.modelLabel(data, r)) +
-            "</strong><small><span>" +
+            "</strong><span>" +
             e(U.effortLabel(r.effort)) +
             " · " +
             e(U.roundLabel(r)) +
             "</span>" +
             (U.executionMode(r) === "unknown" ? "" : U.executionModeBadge(r)) +
-            "<time>" +
+            '</span><time class="recent-date">' +
             e(r[dateField]) +
-            "</time></small></a>",
+            "</time></a>",
         )
         .join("") ||
       '<p class="muted">归档日期尚未留存；新增记录可登记归档日期。</p>';

@@ -219,12 +219,37 @@ test("recent update cards keep text within their bounds on desktop and mobile", 
       }),
     );
   expect(textOverflows).toBe(false);
+  // 两列排布：每条记录不再横跨整个容器，日期紧贴条目右缘。
+  const layout = await page.evaluate(() => {
+    const list = document.querySelector("#recent-list");
+    const items = [...list.querySelectorAll("a")];
+    const first = items[0].getBoundingClientRect();
+    const time = items[0].querySelector("time").getBoundingClientRect();
+    return {
+      columns: getComputedStyle(list).gridTemplateColumns.split(" ").length,
+      count: items.length,
+      itemWidth: Math.round(first.width),
+      dateGap: Math.round(first.right - time.right),
+    };
+  });
+  expect(layout.columns).toBe(2);
+  expect(layout.count).toBe(5);
+  expect(layout.itemWidth).toBeLessThan(700);
+  expect(Math.abs(layout.dateGap)).toBeLessThan(24);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  expect(
+    await page.evaluate(
+      () =>
+        getComputedStyle(document.querySelector("#recent-list"))
+          .gridTemplateColumns.split(" ")
+          .length,
+    ),
+  ).toBe(1);
 });
 
 test("active topic grouping shows a screenshot for every active topic", async ({
