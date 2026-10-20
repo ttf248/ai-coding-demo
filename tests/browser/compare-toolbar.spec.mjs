@@ -94,6 +94,16 @@ test("wide toolbar centers task navigation and controls, keeps actions on the ri
     if (width === 390) {
       expect(rects.actions.top).toBeGreaterThanOrEqual(rects.topic.bottom);
       await expect(page.locator("iframe")).toHaveCount(1);
+      // 次级设置收进折叠块，关系状态与内容页签常驻。
+      const settings = page.locator(".compare-settings");
+      await expect(settings).not.toHaveAttribute("open", "");
+      await expect(page.locator("#relation")).toBeVisible();
+      await expect(page.locator(".compare-controls .segments")).toBeVisible();
+      const panel = await page.locator("#panel-left").boundingBox();
+      expect(panel.y).toBeLessThan(420);
+      await page.locator(".compare-settings > summary").click();
+      await expect(settings).toHaveAttribute("open", "");
+      await expect(page.locator("#viewport")).toBeVisible();
       await page.locator(".workspace-help > summary").click();
       const notice = await page.locator(".compare-notice").boundingBox();
       expect(notice.x).toBeGreaterThanOrEqual(0);

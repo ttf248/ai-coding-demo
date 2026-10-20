@@ -1057,6 +1057,15 @@
     render();
   });
   narrow.addEventListener("change", render);
+  // 次级设置在桌面常驻展开，手机收成折叠块。
+  const settings = document.querySelector(".compare-settings");
+  if (settings) {
+    const syncSettings = () => {
+      settings.open = !narrow.matches;
+    };
+    narrow.addEventListener("change", syncSettings);
+    syncSettings();
+  }
   document.addEventListener(
     "toggle",
     (event) => {
