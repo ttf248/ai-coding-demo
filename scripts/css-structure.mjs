@@ -5,7 +5,7 @@ import path from "node:path";
 // 目标不是消灭重复，而是让重复可量化、并且不再继续增加。
 export const CSS_BASELINE = {
   // 跨文件重复的选择器数量上限
-  acrossFiles: 41,
+  acrossFiles: 14,
   // 同一文件里出现两次以上、且声明值完全相同的重复声明数量上限
   repeated: 0,
 };
