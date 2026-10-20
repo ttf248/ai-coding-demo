@@ -148,20 +148,32 @@
     ] || COVER_SIZES.compact;
   function galleryFigure(run, className, source = U.screenshotURL(run)) {
     if (!source) return "";
-    const variants =
-      source === U.screenshotURL(run) ? U.screenshotVariants(run) : [];
-    const thumbnail = variants[0]?.path || source;
-    const responsive = variants.length
-      ? '" srcset="' +
-        e(
-          variants
-            .map((variant) => variant.path + " " + variant.width + "w")
-            .join(", "),
-        ) +
-        '" sizes="' +
-        e(coverSizes()) +
-        '"'
-      : "";
+    const isShot = source === U.screenshotURL(run);
+    // 竖版整页截图用派生的 16:10 顶部裁剪封面，原始长图仍可放大查看。
+    const covers = isShot ? U.screenshotCoverVariants(run) : [];
+    const variants = isShot && !covers.length ? U.screenshotVariants(run) : [];
+    const thumbnail =
+      (covers.length ? U.screenshotCoverURL(run, 240) : variants[0]?.path) ||
+      source;
+    const responsive = covers.length
+      ? '"' + U.screenshotCoverSrcset(run) + ' sizes="' + e(coverSizes()) + '"'
+      : variants.length
+        ? '" srcset="' +
+          e(
+            variants
+              .map((variant) => variant.path + " " + variant.width + "w")
+              .join(", "),
+          ) +
+          '" sizes="' +
+          e(coverSizes()) +
+          '"'
+        : "";
+    const dims = covers.length
+      ? covers[0]
+      : {
+          width: run.screenshotInfo?.width || 1440,
+          height: run.screenshotInfo?.height || 1050,
+        };
     return (
       '<figure class="' +
       className +
@@ -178,14 +190,18 @@
       e(source) +
       '" alt="' +
       e(run.title + " 实际运行截图") +
-      '" loading="lazy" decoding="async" width="' +
-      (run.screenshotInfo?.width || 1440) +
+      '" loading="lazy" decoding="async"' +
+      (covers.length ? ' class="cover-image"' : "") +
+      ' width="' +
+      dims.width +
       '" height="' +
-      (run.screenshotInfo?.height || 1050) +
+      dims.height +
       '">' +
       '<span class="cover-hint" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="m8 8-5-5m13 5 5-5M8 16l-5 5m13-5 5 5"/></svg></span></button>' +
       '<div class="image-feedback" role="status"><span>截图加载中…</span><button data-retry-image hidden>重试</button></div>' +
-      "<figcaption><span>实际截图</span><strong>" +
+      "<figcaption><span>" +
+      (covers.length ? "实际截图 · 首屏" : "实际截图") +
+      "</span><strong>" +
       e(U.modelLabel(data, run) + " · " + U.effortLabel(run.effort)) +
       "</strong></figcaption></figure>"
     );
@@ -838,10 +854,15 @@
       candidates
         .slice(0, quickVisible)
         .map((run) => {
-          const image =
-              U.screenshotThumbnailURL(run, 96) || U.screenshotURL(run),
-            srcset = U.screenshotSrcset(run),
-            info = run.screenshotInfo || {};
+          const cover = U.screenshotCoverVariants(run),
+            image =
+              (cover.length
+                ? U.screenshotCoverURL(run, 96)
+                : U.screenshotThumbnailURL(run, 96)) || U.screenshotURL(run),
+            srcset = cover.length
+              ? U.screenshotCoverSrcset(run)
+              : U.screenshotSrcset(run),
+            info = cover.length ? cover[0] : run.screenshotInfo || {};
           return (
             '<article class="quick-candidate"><div class="quick-image">' +
             (image

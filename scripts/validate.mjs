@@ -231,6 +231,11 @@ for (const r of catalog.runs) {
       exists(variant.path),
       `Missing generated thumbnail ${r.id}: ${variant.path}`,
     );
+  for (const cover of r.screenshotInfo?.cover || [])
+    check(
+      exists(cover.path),
+      `Missing generated cover thumbnail ${r.id}: ${cover.path}`,
+    );
   check(
     r.id === `${r.topicId}--${r.runId}` &&
       r.directory === `demos/${r.topicId}/runs/${r.runId}`,

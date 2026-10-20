@@ -149,6 +149,18 @@ test("generated thumbnail dimensions and provenance match original PNGs", () => 
     }
     // 缩略图槽位需要更小的变体，避免为 118px 的缩略图拉取 960w。
     assert.ok(run.screenshotInfo.variants.some((v) => v.width === 240));
+    // 竖版整页截图才有派生封面，横版截图不需要。
+    const portrait = run.screenshotInfo.height / run.screenshotInfo.width > 1.15;
+    if (portrait) {
+      assert.ok(run.screenshotInfo.cover?.length);
+      for (const cover of run.screenshotInfo.cover) {
+        assert.ok(fs.existsSync(resolveLocal(cover.path)));
+        assert.ok(cover.path.includes("-cover-v1-"));
+        assert.equal(cover.height, Math.round((cover.width * 10) / 16));
+      }
+    } else {
+      assert.equal(run.screenshotInfo.cover, null);
+    }
   }
 });
 test("thumbnail variants follow the requested slot width", () => {

@@ -211,6 +211,28 @@
       '"'
     );
   };
+  // 竖版整页截图的派生封面（16:10 顶部裁剪），原始截图仍然是完整长图。
+  const screenshotCoverVariants = (run) => run?.screenshotInfo?.cover || [];
+  const screenshotCoverURL = (run, targetWidth) => {
+    const covers = [...screenshotCoverVariants(run)].sort(
+      (a, b) => a.width - b.width,
+    );
+    if (!covers.length) return null;
+    return (
+      covers.find((cover) => cover.width >= targetWidth) || covers[0]
+    ).path;
+  };
+  const screenshotCoverSrcset = (run) => {
+    const covers = [...screenshotCoverVariants(run)].sort(
+      (a, b) => a.width - b.width,
+    );
+    if (!covers.length) return "";
+    return (
+      ' srcset="' +
+      covers.map((cover) => `${cover.path} ${cover.width}w`).join(", ") +
+      '"'
+    );
+  };
   const requests = new Map();
   function fetchJSON(href) {
     if (!requests.has(href))
@@ -831,6 +853,9 @@
     screenshotVariants,
     screenshotVariantFor,
     screenshotSrcset,
+    screenshotCoverVariants,
+    screenshotCoverURL,
+    screenshotCoverSrcset,
     screenshotThumbnailURL,
     ensureDetails,
     ensureTexts,

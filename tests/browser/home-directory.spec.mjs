@@ -378,6 +378,24 @@ test("gallery prioritizes artwork and reveals metadata and navigation on demand"
   ).toBeLessThanOrEqual(390);
 });
 
+test("portrait captures use a derived cover while the full capture stays reachable", async ({
+  page,
+}) => {
+  await page.goto("./");
+  const card = page.locator(".topic-card:has(img.cover-image)").first();
+  await expect(card).toHaveCount(1);
+  const cover = card.locator(".topic-cover img");
+  await expect(cover).toHaveAttribute("src", /-cover-v1-\d+\.webp$/);
+  await expect(card.locator(".topic-cover figcaption")).toContainText("首屏");
+  // 原始长图仍然是封面点击后的目标。
+  const original = await cover.getAttribute("data-original");
+  expect(original).toMatch(/\.png$/);
+  await card.locator(".cover-preview").click();
+  await expect(page.locator("#preview-stage img")).toHaveAttribute("src", original);
+  expect(
+    await page.locator("#preview-stage img").evaluate((img) => img.naturalHeight),
+  ).toBeGreaterThan(1500);
+});
 test("cover preview keeps screenshot, selected version and direct entry aligned", async ({
   page,
 }) => {

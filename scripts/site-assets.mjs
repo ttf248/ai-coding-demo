@@ -7,20 +7,39 @@ import { transformSync } from "@babel/core";
 import presetReact from "@babel/preset-react";
 import { ROOT, resolveLocal, write } from "./lib.mjs";
 export async function prepareSiteAssets(catalog) {
-  const queue = catalog.runs.flatMap(
-    (run) =>
-      run.screenshotInfo?.variants.map((variant) => ({ run, variant })) || [],
-  );
+  const queue = catalog.runs.flatMap((run) => [
+    ...(run.screenshotInfo?.variants || []).map((variant) => ({
+      run,
+      variant,
+    })),
+    // 竖版整页截图的派生封面：按顶部裁剪到 16:10，原始 PNG 不受影响。
+    ...(run.screenshotInfo?.cover
+      ? run.screenshotInfo.cover.map((variant) => ({
+          run,
+          variant,
+          cover: true,
+        }))
+      : []),
+  ]);
   let cursor = 0;
   await Promise.all(
     Array.from({ length: 4 }, async () => {
       while (cursor < queue.length) {
-        const { run, variant } = queue[cursor++];
+        const { run, variant, cover } = queue[cursor++];
         const destination = resolveLocal(variant.path);
         if (fs.existsSync(destination)) continue;
         fs.mkdirSync(path.dirname(destination), { recursive: true });
         await sharp(resolveLocal(`${run.directory}/${run.screenshot}`))
-          .resize({ width: variant.width, withoutEnlargement: true })
+          .resize(
+            cover
+              ? {
+                  width: variant.width,
+                  height: variant.height,
+                  fit: "cover",
+                  position: "top",
+                }
+              : { width: variant.width, withoutEnlargement: true },
+          )
           .webp({ quality: 82 })
           .toFile(destination);
       }

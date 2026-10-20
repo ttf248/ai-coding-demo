@@ -62,6 +62,19 @@ export function screenshotMetadata(run) {
         width: size,
         path: `assets/generated/screenshots/${run.id}/${digest.slice(0, 12)}-${size}.webp`,
       })),
+    // 竖版整页截图在 16:10 封面里会缩成细条，另外派生一份顶部裁剪的封面图。
+    // 原始 PNG 不被修改，完整长图仍在放大预览、查看原图与阅读页中呈现。
+    // cover-v1 是配方版本号：裁剪参数变化时改版本号即可重新生成新文件。
+    cover:
+      height / width > 1.15
+        ? [480, 960]
+            .filter((size) => size <= width)
+            .map((size) => ({
+              width: size,
+              height: Math.round((size * 10) / 16),
+              path: `assets/generated/screenshots/${run.id}/${digest.slice(0, 12)}-cover-v1-${size}.webp`,
+            }))
+        : null,
   };
 }
 export function browserOutputs(catalog) {
