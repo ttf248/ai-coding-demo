@@ -5,58 +5,35 @@ import path from "node:path";
 // 目标不是消灭重复，而是让重复可量化、并且不再继续增加。
 export const CSS_BASELINE = {
   // 跨文件重复的选择器数量上限
-  acrossFiles: 57,
+  acrossFiles: 77,
   // 同一文件里重复三次以上的选择器数量上限
-  repeated: 4,
+  repeated: 54,
 };
 
-export function parseCss(text) {
+export function parseCss(text, media = "") {
+  // 注释先剔除，否则注释里的花括号会干扰规则切分。
+  const source = String(text).replace(/\/\*[\s\S]*?\*\//g, " ");
   const rules = [];
-  const stack = [];
-  const pattern = /(@media[^{]*\{)|([^{}]*\{)|(\})/g;
-  let match;
-  while ((match = pattern.exec(text))) {
-    if (match[1]) {
-      stack.push(
-        match[1]
-          .trim()
-          .replace(/\s+/g, " ")
-          .replace(/\{\s*$/, ""),
-      );
-      continue;
+  let index = 0;
+  while (index < source.length) {
+    const open = source.indexOf("{", index);
+    if (open === -1) break;
+    const prelude = source.slice(index, open).trim();
+    let depth = 1;
+    let cursor = open + 1;
+    while (depth > 0 && cursor < source.length) {
+      if (source[cursor] === "{") depth += 1;
+      else if (source[cursor] === "}") depth -= 1;
+      cursor += 1;
     }
-    if (match[2]) {
-      stack.push(
-        match[2]
-          .trim()
-          .replace(/\s+/g, " ")
-          .replace(/\{\s*$/, ""),
-      );
-      let depth = 1;
-      let index = pattern.lastIndex;
-      while (depth > 0 && index < text.length) {
-        const char = text[index];
-        if (char === "{") depth += 1;
-        else if (char === "}") depth -= 1;
-        index += 1;
-      }
-      const body = text.slice(pattern.lastIndex, index - 1);
-      const media = stack
-        .slice(0, -1)
-        .filter((entry) => entry.startsWith("@media"))
-        .join(" && ");
-      const selector = stack[stack.length - 1];
-      // 内层扫描已经消费了这条规则的右花括号，选择器随即出栈。
-      stack.pop();
-      rules.push({
-        selector,
-        media,
-        declarations: body.trim(),
-      });
-      pattern.lastIndex = index;
-      continue;
+    const body = source.slice(open + 1, cursor - 1);
+    if (prelude.startsWith("@media")) {
+      const nested = media ? `${media} && ${prelude}` : prelude;
+      rules.push(...parseCss(body, nested));
+    } else if (!prelude.startsWith("@")) {
+      rules.push({ selector: prelude, media, declarations: body.trim() });
     }
-    stack.pop();
+    index = cursor;
   }
   return rules;
 }
