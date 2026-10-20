@@ -185,7 +185,7 @@ test("run cards are assembled from options instead of markup surgery", () => {
   assert.ok(custom.includes('class="preview-link"'));
   assert.ok(custom.includes('class="run-list-date"'));
   // 首页不再对标记做字符串替换，core.js 改动不会静默破坏实验列表。
-  const home = read("index.js");
+  const home = read("assets/home.js");
   assert.doesNotMatch(home, /\.replace\(\s*["']</);
   assert.doesNotMatch(home, /\.replace\(\s*\/</);
 });

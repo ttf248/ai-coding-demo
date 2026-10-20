@@ -67,7 +67,7 @@
 ## 提交前检查
 
 1. 若修改构建型实验源码或构建配置，先 `npm run build:demo -- <id>`；文档修改不要求重建。
-2. 执行 `npm run generate`、`npm run validate`、`npm test`、`node --check index.js` 和 `git diff --check`。
+2. 执行 `npm run generate`、`npm run validate`、`npm test`、`node --check assets/home.js` 和 `git diff --check`。
 3. 首页或对比交互变更执行 `npm run test:browser`，覆盖目录计数、筛选、搜索、排序、视图和加载更多；同输入、异输入、无预览、分享恢复、移动端与子路径。
 4. 用本地静态服务器检查新增入口、原始输入、已登记的预览图和首页生成的链接；390px 移动端无页面水平溢出。单 HTML 额外验证直接打开。
 5. 目录迁移核对完整性、旧目录消失及有效链接更新。迁移清单和原始历史输入中的旧路径作为证据保留，不做机械替换。

@@ -439,7 +439,7 @@ for (const file of [
   "assets/site.css",
   "assets/core.js",
   "assets/analytics.js",
-  "index.js",
+  "assets/home.js",
   "assets/topic.js",
   "assets/compare.js",
 ])
