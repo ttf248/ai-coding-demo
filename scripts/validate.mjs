@@ -472,5 +472,5 @@ if (errors.length) {
     `Valid: ${catalog.topics.length} topics, ${catalog.runs.length} runs, ${catalog.guides.length} guides; committed site is current.`,
   );
   console.log(
-    `CSS: ${css.acrossFilesCount} selectors shared across files (limit ${CSS_BASELINE.acrossFiles}), ${css.repeatedCount} repeated in one file (limit ${CSS_BASELINE.repeated}).`,
+    `CSS: ${css.acrossFilesCount} selectors shared across files (limit ${CSS_BASELINE.acrossFiles}), ${css.repeatedCount} identical declarations repeated in one file (limit ${CSS_BASELINE.repeated}).`,
   );

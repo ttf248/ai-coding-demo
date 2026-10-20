@@ -5,9 +5,9 @@ import path from "node:path";
 // 目标不是消灭重复，而是让重复可量化、并且不再继续增加。
 export const CSS_BASELINE = {
   // 跨文件重复的选择器数量上限
-  acrossFiles: 77,
-  // 同一文件里重复三次以上的选择器数量上限
-  repeated: 54,
+  acrossFiles: 41,
+  // 同一文件里出现两次以上、且声明值完全相同的重复声明数量上限
+  repeated: 0,
 };
 
 export function parseCss(text, media = "") {
@@ -59,15 +59,45 @@ export function cssReport(files) {
       });
   }
   for (const file of files) {
-    const counts = new Map();
-    for (const rule of parseCss(fs.readFileSync(file, "utf8")))
-      counts.set(rule.selector, (counts.get(rule.selector) || 0) + 1);
-    for (const [selector, count] of counts)
-      if (count >= 3)
-        repeated.push({ selector, count, file: path.basename(file) });
+    // 同一文件里「选择器 + 媒体条件 + 属性 + 取值」完全重复才算真重复；
+    // 同选择器的渐进覆盖（取值不同）不算，避免把有意的层叠当成冗余。
+    const seen = new Map();
+    for (const rule of parseCss(fs.readFileSync(file, "utf8"))) {
+      for (const declaration of rule.declarations.split(";")) {
+        const text = declaration.trim();
+        if (!text) continue;
+        const colon = text.indexOf(":");
+        if (colon === -1) continue;
+        const property = text.slice(0, colon).trim();
+        const value = text.slice(colon + 1).trim();
+        if (!property || !value) continue;
+        const key = `${rule.selector}\n${rule.media}\n${property}`;
+        if (!seen.has(key)) seen.set(key, new Map());
+        const values = seen.get(key);
+        values.set(value, (values.get(value) || 0) + 1);
+      }
+    }
+    for (const [key, values] of seen) {
+      const [selector, media, property] = key.split("\n");
+      for (const [value, count] of values)
+        if (count > 1)
+          repeated.push({
+            selector,
+            media,
+            property,
+            value,
+            count,
+            file: path.basename(file),
+          });
+    }
   }
   acrossFiles.sort((a, b) => a.selector.localeCompare(b.selector));
-  repeated.sort((a, b) => a.selector.localeCompare(b.selector));
+  repeated.sort((a, b) =>
+    a.file.localeCompare(b.file) ||
+    a.selector.localeCompare(b.selector) ||
+    a.media.localeCompare(b.media) ||
+    a.property.localeCompare(b.property),
+  );
   return {
     acrossFiles,
     repeated,
