@@ -110,6 +110,15 @@ test("homepage covers pick the variant that matches the displayed size", async (
   const ledger = page.locator("#project-grid .run-card-screenshot img").first();
   await expect(ledger).toHaveAttribute("sizes", /88px/);
   expect(await ledger.evaluate((img) => img.currentSrc)).toMatch(/-240\.webp$/);
+
+  // 主题列表与实验账本是两套槽位：主题列表在桌面上铺到 224px，
+  // 声明成账位的 88px 会让浏览器按更窄的宽度选图。
+  await page.goto("./?view=list");
+  const list = page.locator("#project-grid .topic-cover img").first();
+  await expect(list).toHaveAttribute("sizes", /224px/);
+  const listWidth = await list.evaluate((img) => img.getBoundingClientRect().width);
+  expect(Math.round(listWidth)).toBe(224);
+  expect(await list.evaluate((img) => img.currentSrc)).toMatch(/-240\.webp$/);
 });
 test("homepage covers use registered run screenshots and direct previews", async ({
   page,

@@ -144,14 +144,17 @@
   const selection = U.setupSelection(data);
   const previewScopes = new Map();
   // 封面实际显示宽度随视图变化，按视图声明 sizes，浏览器才不会多取大图。
+  // 封面槽位宽度必须与实际渲染宽度一致：声明偏小会让浏览器取到过窄的变体。
+  // 主题列表与实验账本是两套不同的槽位，不能共用一份声明。
   const COVER_SIZES = {
     compact: "(max-width: 700px) calc(100vw - 34px), (max-width: 1100px) 46vw, 400px",
     grid: "(max-width: 700px) calc(100vw - 34px), (max-width: 1100px) 46vw, 610px",
-    list: "(max-width: 700px) 76px, (max-width: 1100px) 64px, 88px",
+    list: "(max-width: 700px) 88px, 224px",
+    ledger: "(max-width: 700px) 76px, (max-width: 1100px) 64px, 88px",
   };
   const coverSizes = () =>
     COVER_SIZES[
-      state.group === "runs" && state.view === "list" ? "list" : state.view
+      state.group === "runs" && state.view === "list" ? "ledger" : state.view
     ] || COVER_SIZES.compact;
   function galleryFigure(run, className, source = U.screenshotURL(run)) {
     if (!source) return "";
