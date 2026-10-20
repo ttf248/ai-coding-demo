@@ -56,7 +56,7 @@ export function screenshotMetadata(run) {
     height,
     hash: digest,
     capturedAt: run.screenshotCapturedAt || null,
-    variants: [480, 960]
+    variants: [240, 480, 960]
       .filter((size) => size <= width)
       .map((size) => ({
         width: size,

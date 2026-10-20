@@ -826,7 +826,10 @@
       candidates
         .slice(0, quickVisible)
         .map((run) => {
-          const image = U.screenshotThumbnailURL(run) || U.screenshotURL(run);
+          const image =
+              U.screenshotThumbnailURL(run, 96) || U.screenshotURL(run),
+            srcset = U.screenshotSrcset(run),
+            info = run.screenshotInfo || {};
           return (
             '<article class="quick-candidate"><div class="quick-image">' +
             (image
@@ -836,9 +839,15 @@
                 e(U.runSummary(data, run)) +
                 ' 截图"><img src="' +
                 e(image) +
+                '"' +
+                srcset +
+                ' sizes="96px" width="' +
+                (info.width || 1440) +
+                '" height="' +
+                (info.height || 1050) +
                 '" alt="' +
                 e(run.title) +
-                ' 实际截图" loading="lazy"></a>'
+                ' 实际截图" loading="lazy" decoding="async"></a>'
               : "<span>无截图</span>") +
             '</div><div class="quick-identity"><strong>' +
             e(U.modelLabel(data, run)) +

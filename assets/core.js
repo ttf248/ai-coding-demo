@@ -186,8 +186,31 @@
     run.input.completeness !== "unknown";
   const documentURL = (run) => run?.reader || run?.document;
   const screenshotVariants = (run) => run?.screenshotInfo?.variants || [];
-  const screenshotThumbnailURL = (run) =>
-    screenshotVariants(run).at(-1)?.path || screenshotURL(run);
+  // 选不小于目标宽度的最小变体；没有合适变体时退回最小的一个。
+  const screenshotVariantFor = (run, targetWidth) => {
+    const variants = screenshotVariants(run);
+    if (!variants.length) return null;
+    const sorted = [...variants].sort((a, b) => a.width - b.width);
+    return (
+      sorted.find((variant) => variant.width >= targetWidth) || sorted[0]
+    );
+  };
+  const screenshotThumbnailURL = (run, targetWidth) =>
+    (targetWidth
+      ? screenshotVariantFor(run, targetWidth)?.path
+      : screenshotVariants(run).at(-1)?.path) || screenshotURL(run);
+  // 缩略图的 srcset：按变体宽度声明，浏览器结合 sizes 自行挑选。
+  const screenshotSrcset = (run) => {
+    const variants = [...screenshotVariants(run)].sort(
+      (a, b) => a.width - b.width,
+    );
+    if (!variants.length) return "";
+    return (
+      ' srcset="' +
+      variants.map((variant) => `${variant.path} ${variant.width}w`).join(", ") +
+      '"'
+    );
+  };
   const requests = new Map();
   function fetchJSON(href) {
     if (!requests.has(href))
@@ -806,6 +829,8 @@
     hasRecordedInput,
     documentURL,
     screenshotVariants,
+    screenshotVariantFor,
+    screenshotSrcset,
     screenshotThumbnailURL,
     ensureDetails,
     ensureTexts,

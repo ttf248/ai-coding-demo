@@ -40,6 +40,15 @@ test("topic opens the complete compact list with recorded batch durations", asyn
   expect(eighth.y + eighth.height - first.y).toBeLessThan(1200);
   await expect(page.locator("iframe")).toHaveCount(0);
 
+  // 118px 的记录缩略图使用 240w 变体，不拉取 960w。
+  const art = page.locator(".topic-run-art img").first();
+  await expect(art).toHaveAttribute("srcset", /240w.*480w.*960w/);
+  await expect(art).toHaveAttribute("sizes", "118px");
+  expect(await art.evaluate((image) => image.currentSrc)).toMatch(/-240\.webp$/);
+  const artBox = await art.boundingBox();
+  expect(artBox.width).toBeLessThanOrEqual(120);
+  expect(artBox.height).toBeLessThanOrEqual(100);
+
   for (const run of runs.filter((run) => run.billing?.duration)) {
     const row = page.locator("#run-" + run.id);
     await expect(row.locator(".topic-run-duration")).toContainText(

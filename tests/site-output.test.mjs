@@ -52,9 +52,10 @@ test("summary omits large bodies and deduplicated inputs preserve normalized tex
     new Set(catalog.runs.map((run) => run.rawHash)).size,
   );
   assert.ok(
-    // Keep the summary budget proportional to the growing archive.
+    // Keep the summary budget proportional to the growing archive. 每条实验除了
+    // 元数据还要登记三档截图变体路径（240/480/960），因此预算相应上调。
     Buffer.byteLength(outputs.get("assets/generated/catalog.js")) <
-      catalog.runs.length * 2400,
+      catalog.runs.length * 2500,
   );
 });
 test("input relationships and completeness work before lazy body loading", () => {
@@ -146,7 +147,24 @@ test("generated thumbnail dimensions and provenance match original PNGs", () => 
       assert.ok(fs.existsSync(resolveLocal(variant.path)));
       assert.ok(variant.path.includes(run.screenshotInfo.hash.slice(0, 12)));
     }
+    // 缩略图槽位需要更小的变体，避免为 118px 的缩略图拉取 960w。
+    assert.ok(run.screenshotInfo.variants.some((v) => v.width === 240));
   }
+});
+test("thumbnail variants follow the requested slot width", () => {
+  const run = summary.runs.find((item) => item.screenshotInfo?.variants.length);
+  assert.ok(run);
+  const widths = run.screenshotInfo.variants.map((variant) => variant.width);
+  assert.ok(widths.includes(240));
+  assert.equal(ui.ArchiveUI.screenshotVariantFor(run, 96).width, 240);
+  assert.equal(ui.ArchiveUI.screenshotVariantFor(run, 385).width, 480);
+  assert.equal(ui.ArchiveUI.screenshotVariantFor(run, 596).width, 960);
+  assert.equal(
+    ui.ArchiveUI.screenshotThumbnailURL(run, 96),
+    ui.ArchiveUI.screenshotVariantFor(run, 96).path,
+  );
+  assert.ok(ui.ArchiveUI.screenshotSrcset(run).includes("240w"));
+  assert.ok(ui.ArchiveUI.screenshotSrcset(run).includes("960w"));
 });
 test("billing never turns missing amounts into zero or batch totals into run costs", () => {
   assert.match(

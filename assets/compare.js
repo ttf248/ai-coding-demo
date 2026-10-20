@@ -596,8 +596,10 @@
           ? '<a class="snapshot-preview" href="' +
             e(screenshot) +
             '" target="_blank" rel="noopener" aria-label="查看实际截图原图"><img src="' +
-            e(U.screenshotThumbnailURL(run)) +
-            '" alt="' +
+            e(U.screenshotThumbnailURL(run, 640)) +
+            '"' +
+            U.screenshotSrcset(run) +
+            ' sizes="(max-width: 700px) 100vw, 600px" alt="' +
             e(run.title + " · " + runLabel(run) + " 实际截图") +
             '"><span>已登记实际截图 · 打开原图 ↗</span></a>'
           : '<div class="frame-placeholder">此实验未登记截图，可查看记录或切换实时预览。</div>';
