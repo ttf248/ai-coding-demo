@@ -102,6 +102,10 @@ test("390px list exposes facts and duration without disclosures or page overflow
     .first()
     .boundingBox();
   expect(firstAction.y + firstAction.height).toBeLessThanOrEqual(844);
+  // 首屏控件收紧后，第一条记录整条出现在首屏内。
+  const firstRow = await page.locator(".topic-run-row").first().boundingBox();
+  expect(firstRow.y).toBeLessThan(520);
+  expect(firstRow.y + firstRow.height).toBeLessThanOrEqual(844);
   await page.goto(
     "topic.html?id=circuit-lab&model=deepseek-v4-pro-0813&effort=high",
   );
