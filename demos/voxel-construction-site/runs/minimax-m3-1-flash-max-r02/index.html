@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>体素微缩建筑工地沙盘 · Three.js r160</title>
+<style>
+  :root { --ink:#eef1fb; --muted:#9aa3c4; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#0a0c14; color:var(--ink);
+    font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif; }
+  canvas { display:block; width:100%; height:100%; touch-action:none; }
+  .hud { position:fixed; inset:0; pointer-events:none; }
+  .panel { position:absolute; pointer-events:auto; background:rgba(12,15,26,.66);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,.12);
+    border-radius:14px; padding:12px 14px; font-size:12px; line-height:1.9; color:var(--muted); }
+  .panel b { color:var(--ink); font-weight:600; }
+  #top { left:16px; top:16px; max-width:320px; }
+  #top h1 { margin:0 0 6px; font-size:15px; letter-spacing:.06em; color:var(--ink); }
+  #right { right:16px; top:16px; text-align:right; }
+  #bottom { left:16px; bottom:16px; max-width:420px; }
+  .btn { pointer-events:auto; margin-top:8px; padding:7px 12px; border-radius:9px; font-size:12px;
+    border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.07); color:var(--ink); cursor:pointer; }
+  .btn:hover { background:rgba(255,255,255,.14); }
+  .badge { display:inline-block; padding:1px 8px; border-radius:999px; font-size:11px;
+    background:rgba(96,165,250,.2); color:#9ecbff; margin-left:6px; }
+  #fallback { position:fixed; inset:0; display:none; place-items:center; padding:24px; z-index:20;
+    background:radial-gradient(circle at 50% 35%, #141a2c, #06080f 70%); }
+  #fallback.show { display:grid; }
+  #fallback div { max-width:560px; }
+  #fallback h2 { margin:0 0 12px; font-size:20px; }
+  #fallback p { color:var(--muted); line-height:1.9; font-size:13px; }
+  #fallback code { color:#9ecbff; }
+  @media (max-width:720px){ #bottom{display:none} .panel{font-size:11px} }
+</style>
+<script src="../../../../assets/analytics.js" defer></script>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div class="hud">
+  <div class="panel" id="top">
+    <h1>体素微缩工地沙盘 <span class="badge">r160</span></h1>
+    <p>整座工地摆在深色实木工作桌上：基坑、钢筋棚、料场、在建楼座基、板房、渣土堆与临时道路。</p>
+    <p style="margin-top:4px"><b>挖掘机</b>循环取土，<b>渣土车</b>接料外运，<b>塔吊</b>回转吊运，<b>罐车</b>与<b>装载机</b>缓慢作业。</p>
+    <button class="btn" id="sceneBtn">切换到新增场景：跨江桥工地</button>
+  </div>
+  <div class="panel" id="right">
+    <p id="fps">FPS --</p>
+    <p id="phase">时段：黎明</p>
+    <p id="knob">旋钮：设备速度</p>
+  </div>
+  <div class="panel" id="bottom">
+    <p><b>交互</b>　拖拽环视　滚轮缩放　空格触发暴雨　点击桌面上的<b>旋钮</b>切换调节项　点击<b>控制面板</b>切换时段</p>
+    <p style="margin-top:2px">闲置 6 秒后相机会自动缓慢环绕沙盘；体素方块颗粒质感由实例化渲染与自发光着色器实现。</p>
+  </div>
+</div>
+
+<div id="fallback">
+  <div>
+    <h2>『待确认』Three.js 未能加载</h2>
+    <p id="fallbackText"></p>
+    <p>本页面以 ESM 方式从 CDN 加载 Three.js r160；<code>file://</code> 协议下模块脚本会被 CORS 拦截，请通过静态服务器访问。</p>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+/* ============================================================
+   体素微缩建筑工地沙盘
+   - 桌面 / 沙盘 / 两个场景（主体工地 + 新增的跨江桥工地）
+   - 全部体素使用 InstancedMesh 批量渲染
+   - 机械与工人独立分组并带动画
+   - 昼夜四阶段循环、尘土与暴雨粒子、旋钮与面板交互
+   ============================================================ */
+
+const canvas = document.getElementById("scene");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0c14);
+scene.fog = new THREE.Fog(0x0a0c14, 120, 340);
+
+const camera = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 0.5, 800);
+camera.position.set(52, 34, 60);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.target.set(0, 6, 0);
+controls.minDistance = 22;
+controls.maxDistance = 150;
+controls.maxPolarAngle = Math.PI * 0.47;
+controls.autoRotateSpeed = 0.45;
+
+/* ---------- 体素批处理 ---------- */
+const buckets = new Map();
+const dummy = new THREE.Object3D();
+
+function voxel(mat, x, y, z, sx, sy, sz, ry) {
+  if (!buckets.has(mat)) buckets.set(mat, []);
+  buckets.get(mat).push([x, y, z, sx, sy, sz, ry || 0]);
+}
+
+const MAT = {
+  soil: new THREE.MeshStandardMaterial({ color: 0x6b5138, roughness: 1 }),
+  soilDark: new THREE.MeshStandardMaterial({ color: 0x4a3a28, roughness: 1 }),
+  road: new THREE.MeshStandardMaterial({ color: 0x40454f, roughness: 0.95 }),
+  concrete: new THREE.MeshStandardMaterial({ color: 0xa9adb8, roughness: 0.92 }),
+  concreteDark: new THREE.MeshStandardMaterial({ color: 0x7c818c, roughness: 0.95 }),
+  rebar: new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.6, metalness: 0.5 }),
+  steel: new THREE.MeshStandardMaterial({ color: 0xb8bec9, roughness: 0.35, metalhes: 0.8, metalness: 0.8 }),
+  blue: new THREE.MeshStandardMaterial({ color: 0x3f7fd0, roughness: 0.7 }),
+  orange: new THREE.MeshStandardMaterial({ color: 0xe0812c, roughness: 0.65 }),
+  yellow: new THREE.MeshStandardMaterial({ color: 0xe8c33a, roughness: 0.6 }),
+  red: new THREE.MeshStandardMaterial({ color: 0xc8453a, roughness: 0.7 }),
+  green: new THREE.MeshStandardMaterial({ color: 0x4f9c52, roughness: 0.8 }),
+  white: new THREE.MeshStandardMaterial({ color: 0xe8e8e6, roughness: 0.8 }),
+  black: new THREE.MeshStandardMaterial({ color: 0x24262c, roughness: 0.7 }),
+  wood: new THREE.MeshStandardMaterial({ color: 0x3a2a1e, roughness: 0.55 }),
+  woodDark: new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 0.6 }),
+  sand: new THREE.MeshStandardMaterial({ color: 0xc9ab72, roughness: 1 }),
+  gravel: new THREE.MeshStandardMaterial({ color: 0x8e8a80, roughness: 1 }),
+  glass: new THREE.MeshStandardMaterial({ color: 0x7fd4ff, roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.55 }),
+  lamp: new THREE.MeshStandardMaterial({ color: 0xfff3d0, emissive: 0xffd98a, emissiveIntensity: 0.2, roughness: 0.4 }),
+  window: new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffb85c, emissiveIntensity: 0.15, roughness: 0.6 }),
+  water: new THREE.MeshStandardMaterial({ color: 0x2a5f86, roughness: 0.25, metalness: 0.15 }),
+  skin: new THREE.MeshStandardMaterial({ color: 0xd9a179, roughness: 0.85 }),
+  vest: new THREE.MeshStandardMaterial({ color: 0xf5d020, roughness: 0.8 }),
+  helmet: new THREE.MeshStandardMaterial({ color: 0xf2c14e, roughness: 0.5 }),
+  paper: new THREE.MeshStandardMaterial({ color: 0xdfe6f0, roughness: 0.9 })
+};
+
+function flushVoxels(parent) {
+  for (const [mat, list] of buckets) {
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    const mesh = new THREE.InstancedMesh(geo, mat, list.length);
+    list.forEach((v, i) => {
+      dummy.position.set(v[0], v[1], v[2]);
+      dummy.rotation.set(0, v[6], 0);
+      dummy.scale.set(v[3], v[4], v[5]);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    parent.add(mesh);
+  }
+  buckets.clear();
+}
+
+/* ============================================================
+   场景一：主体建筑工地
+   ============================================================ */
+const siteA = new THREE.Group();
+scene.add(siteA);
+
+/* 桌面 */
+voxel(MAT.wood, 0, -1.6, 0, 128, 3.2, 96);
+voxel(MAT.woodDark, 0, -3.3, 0, 132, 0.6, 100);
+/* 桌面道具：蓝图、卷尺、安全帽摆件、水平仪 */
+for (let i = 0; i < 5; i++) {
+  voxel(MAT.paper, -42 + i * 1.6, 0.12, 34 + (i % 2) * 2.2, 3.6, 0.06, 2.6, (i * 0.12) % 1);
+}
+voxel(MAT.blue, -36, 0.16, 33, 3.2, 0.12, 2.2);
+voxel(MAT.yellow, 40, 0.5, 32, 2.6, 1.0, 1.6);
+voxel(MAT.black, 39, 1.05, 32, 0.5, 0.3, 0.5);
+voxel(MAT.helmet, 44, 0.6, 27, 1.6, 0.9, 1.7);
+voxel(MAT.steel, -40, 0.4, -30, 9, 0.7, 1.2);
+voxel(MAT.black, -36, 0.4, -30, 1.6, 0.75, 1.25);
+
+/* 沙盘底座 */
+voxel(MAT.soilDark, 0, 0.1, 0, 92, 1.2, 68);
+
+/* 场地分区（薄块模拟地面材质） */
+voxel(MAT.road, 0, 0.75, 0, 92, 0.12, 12);           // 南北主干道
+voxel(MAT.road, 0, 0.75, -16, 92, 0.12, 9);          // 横向临时道路
+voxel(MAT.road, 26, 0.75, 16, 9, 0.12, 60);           // 东侧通道
+voxel(MAT.gravel, -28, 0.76, 14, 30, 0.14, 22);      // 料场
+voxel(MAT.soil, -26, 0.78, -14, 26, 0.16, 16);       // 基坑
+voxel(MAT.soilDark, -26, 0.1, -14, 22, 0.6, 12);
+voxel(MAT.concreteDark, 22, 0.78, -12, 26, 0.16, 20); // 在建楼座基
+
+/* 基坑开挖区：分层土壁 */
+for (let i = 0; i < 26; i++) {
+  const x = -38 + (i % 13) * 2;
+  const z = -20 + Math.floor(i / 13) * 12;
+  voxel(MAT.soil, x, 0.9, z, 1.9, 0.5, 1.9);
+}
+
+/* 钢筋加工棚 */
+for (let i = 0; i < 6; i++) voxel(MAT.steel, -36 + i * 4.4, 3.4, -24, 0.4, 6.8, 0.4);
+voxel(MAT.blue, -24, 6.9, -24, 26, 0.5, 8);
+for (let i = 0; i < 5; i++) voxel(MAT.rebar, -33 + i * 3.4, 1.1, -22, 2.8, 0.4, 5.2);
+
+/* 堆叠钢筋 */
+for (let i = 0; i < 4; i++) voxel(MAT.rebar, 30 + i * 0.8, 1.1 + i * 0.5, 22, 6, 0.4, 0.8);
+for (let i = 0; i < 4; i++) voxel(MAT.rebar, 30 + i * 0.8, 1.1 + i * 0.5, 23.4, 6, 0.4, 0.8);
+
+/* 水泥堆、砂石料堆 */
+for (let i = 0; i < 6; i++) voxel(MAT.white, -44 + (i % 3) * 2.6, 1.3 + Math.floor(i / 3) * 1.9, 16 + Math.floor(i / 3) * 0.2, 2.4, 1.8, 1.6);
+for (let i = 0; i < 9; i++) {
+  const s = 0.9 + (i % 3) * 0.5;
+  voxel(MAT.sand, -40 + Math.floor(i / 3) * 3.2, 0.9 + s / 2, 24 + (i % 3) * 0.4, s, s, s * 1.4);
+}
+for (let i = 0; i < 8; i++) {
+  const s = 0.9 + (i % 2) * 0.6;
+  voxel(MAT.gravel, -26 + Math.floor(i / 2) * 3.4, 0.9 + s / 2, 26 + (i % 2) * 0.4, s, s, s * 1.3);
+}
+
+/* 在建高层楼房基座：柱 + 板 */
+for (let i = 0; i < 4; i++)
+  for (let j = 0; j < 4; j++) {
+    voxel(MAT.concrete, 14 + i * 5, 4.4, -18 + j * 5, 1.4, 7.2, 1.4);
+    voxel(MAT.concrete, 14 + i * 5, 8.2, -18 + j * 5, 1.1, 3.2, 1.1);
+  }
+voxel(MAT.concreteDark, 21.5, 8.6, -10.5, 18, 0.6, 15);
+
+/* 临时板房办公区 */
+for (let i = 0; i < 3; i++) {
+  const bx = 6 + i * 9;
+  voxel(MAT.white, bx, 2.4, 24, 8, 4.4, 5);
+  voxel(MAT.blue, bx, 4.7, 24, 8.4, 0.6, 5.4);
+  voxel(MAT.window, bx, 2.9, 21.4, 6, 1.6, 0.3);
+  voxel(MAT.window, bx, 2.9, 26.6, 6, 1.6, 0.3);
+}
+
+/* 渣土堆放区 */
+for (let i = 0; i < 10; i++) {
+  const s = 1.4 + (i % 3) * 0.9;
+  voxel(MAT.soilDark, 34 + (i % 2) * 2.4, 0.9 + s / 2, -22 + Math.floor(i / 2) * 2.4, s, s, s);
+}
+
+/* 围挡与大门 */
+for (let i = 0; i < 30; i++) {
+  voxel(MAT.blue, -44 + i * 3, 1.9, -30, 2.9, 2.4, 0.4);
+}
+for (let i = 0; i < 18; i++) {
+  voxel(MAT.blue, 44, 1.9, -28 + i * 3.2, 0.4, 2.4, 3.1);
+}
+voxel(MAT.red, 40, 3.4, 28, 0.6, 5.4, 0.6);
+voxel(MAT.red, 46, 3.4, 28, 0.6, 5.4, 0.6);
+voxel(MAT.yellow, 43, 5.4, 28, 6.6, 0.8, 0.8);
+
+/* 脚手架 */
+for (let f = 0; f < 3; f++)
+  for (let i = 0; i < 4; i++) {
+    voxel(MAT.steel, 12 + i * 3.2, 3 + f * 2.6, -6, 0.24, 2.8, 0.24);
+    voxel(MAT.steel, 12 + i * 3.2, 3 + f * 2.6, -2, 0.24, 2.8, 0.24);
+    voxel(MAT.steel, 12, 3 + f * 2.6, -4 + i * 0.9, 10, 0.16, 0.16);
+  }
+
+/* 临时水电杆 + 警示灯 */
+for (let i = 0; i < 4; i++) {
+  voxel(MAT.wood, -44 + i * 28, 4.6, 30, 0.4, 8, 0.4);
+  voxel(MAT.black, -43 + i * 28, 8.2, 30, 1.6, 0.4, 0.4);
+  voxel(MAT.lamp, -43 + i * 28, 7.8, 30, 0.5, 0.5, 0.5);
+}
+
+/* 施工围挡大门与警示标识 */
+voxel(MAT.yellow, -18, 2.6, 30, 7, 4.6, 0.4);
+voxel(MAT.black, -18, 2.6, 29.6, 2.2, 2.2, 0.2);
+voxel(MAT.red, -4, 2.2, 30, 0.3, 3.6, 0.3);
+voxel(MAT.red, -4, 3.4, 30, 2.4, 1.6, 0.2);
+
+/* 探照灯塔 */
+const floodlights = [];
+for (let i = 0; i < 4; i++) {
+  const fx = -36 + i * 24;
+  voxel(MAT.steel, fx, 5, -28, 0.3, 10, 0.3);
+  voxel(MAT.black, fx, 10.2, -28, 1.8, 1.2, 1);
+  voxel(MAT.lamp, fx, 10.2, -27.4, 1.5, 1, 0.3);
+  floodlights.push(new THREE.Vector3(fx, 10.2, -27.2));
+}
+
+/* ---------- 动态机械（独立分组，带动画） ---------- */
+const machines = { excavators: [], trucks: [], cranes: [], mixers: [], loaders: [], workers: [] };
+
+function makeExcavator(x, z, ry) {
+  const g = new THREE.Group();
+  const trackMat = MAT.black;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.yellow);
+  body.scale.set(6, 2.2, 3.4); body.position.set(0, 1.5, 0); g.add(body);
+  const trackL = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), trackMat);
+  trackL.scale.set(6.6, 1.4, 1); trackL.position.set(0, 0.7, -1.6); g.add(trackL);
+  const trackR = trackL.clone(); trackR.position.z = 1.6; g.add(trackR);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.glass);
+  cab.scale.set(2, 2, 2.6); cab.position.set(-1.6, 3.4, 0); g.add(cab);
+
+  const arm = new THREE.Group();
+  arm.position.set(1.6, 2.6, 0);
+  const boom = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.yellow);
+  boom.scale.set(4.6, 0.9, 0.9); boom.position.set(2.2, 0.9, 0); arm.add(boom);
+  const fore = new THREE.Group();
+  fore.position.set(4.4, 1.6, 0);
+  const stick = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.yellow);
+  stick.scale.set(3.2, 0.8, 0.8); stick.position.set(1.5, -0.5, 0); fore.add(stick);
+  const bucket = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.steel);
+  bucket.scale.set(1.6, 1.4, 2.2); bucket.position.set(3.2, -1.4, 0); fore.add(bucket);
+  arm.add(fore);
+  g.add(arm);
+  g.position.set(x, 0.8, z);
+  g.rotation.y = ry;
+  siteA.add(g);
+  machines.excavators.push({ g, arm, fore, phase: Math.random() * 6.28 });
+  return g;
+}
+
+function makeTruck(x, z, ry) {
+  const g = new THREE.Group();
+  const chassis = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.black);
+  chassis.scale.set(6.4, 0.7, 2.6); chassis.position.y = 1.1; g.add(chassis);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.orange);
+  cab.scale.set(2.2, 2.2, 2.6); cab.position.set(-2, 2.4, 0); g.add(cab);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.glass);
+  glass.scale.set(1.4, 1.1, 2.7); glass.position.set(-2.1, 2.9, 0); g.add(glass);
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.red);
+  bed.scale.set(4, 1.8, 2.8); bed.position.set(1.3, 2.2, 0); g.add(bed);
+  for (const [wx, wz] of [[-1.8, -1.4], [-1.8, 1.4], [1.6, -1.4], [1.6, 1.4], [2.6, -1.4], [2.6, 1.4]]) {
+    const wheel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.black);
+    wheel.scale.set(1.2, 1.2, 0.7); wheel.position.set(wx, 0.8, wz); g.add(wheel);
+  }
+  g.position.set(x, 0.8, z);
+  g.rotation.y = ry;
+  siteA.add(g);
+  machines.trucks.push({ g, path: 0, ry });
+  return g;
+}
+
+function makeCrane(x, z) {
+  const g = new THREE.Group();
+  for (let i = 0; i < 7; i++)
+    for (let s = 0; s < 4; s++) {
+      const a = (s / 4) * Math.PI * 2 + Math.PI / 4;
+      voxelTower(MAT.yellow, x + Math.cos(a) * 1.6, 1.5 + i * 3, z + Math.sin(a) * 1.6);
+    }
+  const mast = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.yellow);
+  mast.scale.set(3.6, 24, 3.6); mast.position.set(x, 12, z); g.add(mast);
+
+  const top = new THREE.Group();
+  top.position.set(x, 24, z);
+  const jib = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.yellow);
+  jib.scale.set(26, 0.9, 1.1); jib.position.set(8, 0, 0); top.add(jib);
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.concreteDark);
+  counter.scale.set(3.4, 2.4, 2.4); counter.position.set(-8, -0.8, 0); top.add(counter);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.glass);
+  cab.scale.set(2, 1.6, 1.8); cab.position.set(2.2, -1.4, 0); top.add(cab);
+  const hookLine = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.black);
+  hookLine.scale.set(0.12, 8, 0.12); hookLine.position.set(0, -4, 0); top.add(hookLine);
+  const load = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.concrete);
+  load.scale.set(2.2, 1.2, 2.2); load.position.set(0, -8.6, 0); top.add(load);
+  g.add(top);
+  siteA.add(g);
+  machines.cranes.push({ top, hookLine, load, phase: Math.random() * 6.28 });
+  return g;
+}
+
+function voxelTower(mat, x, y, z) {
+  // 塔吊桁架用细长方块拼装（静态，直接加入批处理）
+  if (!buckets.has(mat)) buckets.set(mat, []);
+  buckets.get(mat).push([x, y, z, 0.5, 3, 0.5, 0]);
+}
+
+function makeMixer(x, z, ry) {
+  const g = new THREE.Group();
+  const chassis = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.black);
+  chassis.scale.set(7, 0.7, 2.6); chassis.position.y = 1.1; g.add(chassis);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.white);
+  cab.scale.set(2.2, 2.2, 2.6); cab.position.set(-2.2, 2.4, 0); g.add(cab);
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 4, 12), MAT.orange);
+  drum.rotation.z = Math.PI / 2.4; drum.position.set(1.4, 3, 0); g.add(drum);
+  for (const [wx, wz] of [[-2.2, -1.4], [-2.2, 1.4], [1.8, -1.4], [1.8, 1.4]]) {
+    const wheel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.black);
+    wheel.scale.set(1.2, 1.2, 0.7); wheel.position.set(wx, 0.8, wz); g.add(wheel);
+  }
+  g.position.set(x, 0.8, z);
+  g.rotation.y = ry;
+  siteA.add(g);
+  machines.mixers.push({ g, drum, phase: Math.random() * 6.28 });
+  return g;
+}
+
+function makeLoader(x, z, ry) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.yellow);
+  body.scale.set(4.4, 2, 2.6); body.position.set(0, 1.8, 0); g.add(body);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.glass);
+  cab.scale.set(1.6, 1.6, 2.2); cab.position.set(-1, 3.3, 0); g.add(cab);
+  const arms = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.steel);
+  arms.scale.set(3.2, 0.6, 0.6); arms.position.set(2.4, 1.8, 0); g.add(arms);
+  const bucket = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.steel);
+  bucket.scale.set(1.4, 1.2, 2.4); bucket.position.set(4, 1.1, 0); g.add(bucket);
+  for (const [wx, wz] of [[-1.4, -1.4], [-1.4, 1.4], [1.4, -1.4], [1.4, 1.4]]) {
+    const wheel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.black);
+    wheel.scale.set(1.4, 1.4, 0.9); wheel.position.set(wx, 0.9, wz); g.add(wheel);
+  }
+  g.position.set(x, 0.8, z);
+  g.rotation.y = ry;
+  siteA.add(g);
+  machines.loaders.push({ g, phase: Math.random() * 6.28 });
+  return g;
+}
+
+function makeWorker(x, z, colorMat) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), colorMat || MAT.vest);
+  body.scale.set(0.8, 1.1, 0.5); body.position.y = 1.5; g.add(body);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.skin);
+  head.scale.set(0.5, 0.5, 0.5); head.position.y = 2.35; g.add(head);
+  const hat = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.helmet);
+  hat.scale.set(0.6, 0.28, 0.6); hat.position.y = 2.62; g.add(hat);
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.blue);
+  legL.scale.set(0.3, 1, 0.35); legL.position.set(-0.2, 0.5, 0); g.add(legL);
+  const legR = legL.clone(); legR.position.x = 0.2; g.add(legR);
+  g.position.set(x, 0.8, z);
+  g.rotation.y = Math.random() * 6.28;
+  siteA.add(g);
+  machines.workers.push({ g, legL, legR, phase: Math.random() * 6.28, base: x });
+  return g;
+}
+
+/* 机械布置 */
+makeExcavator(-30, -12, 0.5);
+makeExcavator(-18, -16, -1.2);
+makeTruck(-12, 0, 0);
+makeTruck(12, 0, Math.PI);
+makeCrane(22, -10);
+makeCrane(-8, 16);
+makeMixer(4, -2, 0);
+makeLoader(28, 12, -0.6);
+makeLoader(-40, 6, 1.9);
+
+/* 工人 */
+const workerSpots = [
+  [-24, -8], [-32, -10], [12, -6], [16, -12], [24, -16], [30, 10],
+  [-6, 22], [0, 26], [8, 22], [-38, 20], [34, -20], [18, 18]
+];
+workerSpots.forEach((p, i) => makeWorker(p[0], p[1], i % 4 === 3 ? MAT.orange : MAT.vest));
+
+/* 警示彩旗 */
+for (let i = 0; i < 14; i++) {
+  const fx = -40 + i * 6;
+  voxel(MAT.red, fx, 3.2, 28, 0.2, 0.9, 0.2);
+  voxel(MAT.yellow, fx + 3, 3.2, 28, 0.2, 0.9, 0.2);
+}
+
+/* 旋钮与控制面板（可点击） */
+const knobGroup = new THREE.Group();
+const knobBase = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 0.6, 16), MAT.steel);
+knobBase.position.set(0, 0.3, 0);
+knobGroup.add(knobBase);
+const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 1.4, 16), MAT.orange);
+knob.position.set(0, 1.2, 0);
+knobGroup.add(knob);
+const knobMark = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 1.3), MAT.black);
+knobMark.position.set(0, 1.9, 0.5);
+knob.add(knobMark);
+knobGroup.position.set(0, 0, 44);
+siteA.add(knobGroup);
+knob.userData.pickable = "knob";
+
+const panel = new THREE.Group();
+const panelBase = new THREE.Mesh(new THREE.BoxGeometry(7, 0.5, 3.4), MAT.black);
+panelBase.position.y = 0.25; panel.add(panelBase);
+const screen = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.3, 2), MAT.window);
+screen.position.set(-0.4, 0.65, 0); panel.add(screen);
+panel.position.set(-16, 0, 43);
+siteA.add(panel);
+screen.userData.pickable = "panel";
+
+/* ============================================================
+   场景二（新增）：跨江桥工地
+   ============================================================ */
+const siteB = new THREE.Group();
+siteB.visible = false;
+scene.add(siteB);
+
+voxel(MAT.water, 0, 0.2, 0, 96, 0.4, 60);
+for (let i = 0; i < 7; i++) {
+  const px = -30 + i * 10;
+  voxel(MAT.concrete, px, 2.6, 0, 2.2, 5, 2.2);
+  voxel(MAT.concreteDark, px, 5.6, 0, 3, 1.2, 3);
+}
+for (let i = 0; i < 12; i++) voxel(MAT.concrete, -30 + i * 5.5, 6.6, 0, 5.4, 1.2, 5.4);
+for (let i = 0; i < 9; i++) voxel(MAT.steel, -26 + i * 6, 8.4, 0, 0.3, 2.6, 0.3);
+for (let i = 0; i < 6; i++) {
+  voxel(MAT.blue, -34 + i * 12, 1.6, -12, 11, 2.4, 3);
+  voxel(MAT.white, -34 + i * 12, 1.4, 12, 9, 2, 3);
+}
+for (let i = 0; i < 8; i++) voxel(MAT.rebar, 24 + i * 0.7, 0.8 + i * 0.4, 8, 5, 0.35, 0.7);
+voxel(MAT.steel, 20, 6, -10, 0.4, 12, 0.4);
+voxel(MAT.yellow, 20, 12.2, -10, 2.4, 1.4, 2.4);
+for (let i = 0; i < 6; i++) voxel(MAT.sand, -30 + i * 3, 1, -18, 2.4, 1.8, 2.4);
+
+/* 场景二的活动设备 */
+const sceneBAnim = [];
+const barge = new THREE.Group();
+const bargeBody = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), MAT.red);
+bargeBody.scale.set(10, 1.6, 5); bargeBody.position.y = 1.2; barge.add(bargeBody);
+barge.position.set(-10, 0, 8);
+siteB.add(barge);
+sceneBAnim.push({ obj: barge, type: "barge" });
+
+/* ============================================================
+   粒子：尘土与雨
+   ============================================================ */
+const DUST_COUNT = 1400;
+const dustPos = new Float32Array(DUST_COUNT * 3);
+const dustSeed = new Float32Array(DUST_COUNT);
+for (let i = 0; i < DUST_COUNT; i++) {
+  dustPos[i * 3] = (Math.random() - 0.5) * 90;
+  dustPos[i * 3 + 1] = Math.random() * 18;
+  dustPos[i * 3 + 2] = (Math.random() - 0.5) * 64;
+  dustSeed[i] = Math.random();
+}
+const dustGeo = new THREE.BufferGeometry();
+dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPos, 3));
+dustGeo.setAttribute("aSeed", new THREE.BufferAttribute(dustSeed, 1));
+const dustMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uStrength: { value: 1 }, uPixelRatio: { value: renderer.getPixelRatio() } },
+  vertexShader: `
+    attribute float aSeed;
+    uniform float uTime; uniform float uStrength; uniform float uPixelRatio;
+    varying float vA;
+    void main(){
+      vec3 p = position;
+      p.y = mod(p.y + uTime * (0.35 + aSeed * 0.5), 20.0);
+      p.x += sin(uTime * 0.35 + aSeed * 40.0) * 3.5;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vA = uStrength * (0.35 + aSeed * 0.5);
+      gl_PointSize = (34.0 * uStrength) * uPixelRatio / max(1.0, -mv.z);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    varying float vA;
+    void main(){
+      vec2 d = gl_PointCoord - 0.5;
+      float r = dot(d,d);
+      if (r > 0.25) discard;
+      gl_FragColor = vec4(vec3(0.78, 0.70, 0.58), (1.0 - r*4.0) * vA * 0.5);
+    }`,
+  transparent: true,
+  depthWrite: false
+});
+const dust = new THREE.Points(dustGeo, dustMat);
+scene.add(dust);
+
+const RAIN_COUNT = 2600;
+const rainPos = new Float32Array(RAIN_COUNT * 3);
+for (let i = 0; i < RAIN_COUNT; i++) {
+  rainPos[i * 3] = (Math.random() - 0.5) * 110;
+  rainPos[i * 3 + 1] = Math.random() * 60;
+  rainPos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+}
+const rainGeo = new THREE.BufferGeometry();
+rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPos, 3));
+const rainMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uOpacity: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() } },
+  vertexShader: `
+    uniform float uTime; uniform float uPixelRatio;
+    varying float vA;
+    void main(){
+      vec3 p = position;
+      p.y = mod(p.y - uTime * 42.0, 60.0);
+      p.x += sin(uTime * 0.5 + p.z) * 0.4;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vA = 1.0;
+      gl_PointSize = 3.2 * uPixelRatio / max(1.0, -mv.z) * 6.0;
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    uniform float uOpacity; varying float vA;
+    void main(){
+      vec2 d = gl_PointCoord - 0.5;
+      float a = smoothstep(0.5, 0.0, abs(d.x) * 6.0) * smoothstep(0.5, 0.0, abs(d.y));
+      gl_FragColor = vec4(vec3(0.72, 0.82, 1.0), a * uOpacity * 0.8);
+    }`,
+  transparent: true,
+  depthWrite: false
+});
+const rain = new THREE.Points(rainGeo, rainMat);
+rain.visible = false;
+scene.add(rain);
+
+/* 灯光辉光 sprite */
+const glowMat = new THREE.SpriteMaterial({
+  color: 0xffd9a0, transparent: true, opacity: 0.0, depthWrite: false, blending: THREE.AdditiveBlending
+});
+const glows = [];
+for (const p of floodlights) {
+  const s = new THREE.Sprite(glowMat.clone());
+  s.position.copy(p);
+  s.scale.set(9, 9, 1);
+  siteA.add(s);
+  glows.push(s);
+}
+
+/* ---------- 昼夜四阶段 ---------- */
+const PHASES = [
+  { name: "黎明", sky: 0x2a3358, fog: 0x2a3358, sun: 0xffb27a, sunI: 0.75, amb: 0.55, lamp: 0.25 },
+  { name: "正午", sky: 0x9fc4e8, fog: 0xbcd6ef, sun: 0xfff6e2, sunI: 1.6, amb: 1.0, lamp: 0.0 },
+  { name: "黄昏", sky: 0x8a4b3c, fog: 0x9c5a44, sun: 0xff9a4d, sunI: 1.0, amb: 0.6, lamp: 0.5 },
+  { name: "夜晚", sky: 0x070a16, fog: 0x070a16, sun: 0x7f93d8, sunI: 0.28, amb: 0.32, lamp: 1.0 }
+];
+let phaseIndex = 0;
+let phaseTime = 0;
+const PHASE_DURATION = 18;
+
+const hemi = new THREE.HemisphereLight(0x8fa6ff, 0x1a1a22, 0.8);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff6e2, 1.2);
+sun.position.set(60, 90, 40);
+scene.add(sun);
+const ambient = new THREE.AmbientLight(0x404a66, 0.6);
+scene.add(ambient);
+
+/* ---------- 参数（旋钮控制） ---------- */
+const params = {
+  speed: 1,
+  dust: 0.7,
+  manualPhase: null,
+  rain: false,
+  scene: "A"
+};
+const KNOB_MODES = ["设备速度", "尘土强度", "昼夜循环"];
+let knobMode = 0;
+
+/* ---------- 交互 ---------- */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let idle = 0;
+
+canvas.addEventListener("pointerdown", (e) => {
+  idle = 0;
+  pointer.x = (e.clientX / innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects([knob, screen], true);
+  if (!hits.length) return;
+  const pickable = hits[0].object.userData.pickable;
+  if (pickable === "knob") {
+    knobMode = (knobMode + 1) % KNOB_MODES.length;
+    knob.rotation.y += Math.PI / 3;
+    document.getElementById("knob").textContent = "旋钮：" + KNOB_MODES[knobMode];
+  } else if (pickable === "panel") {
+    phaseIndex = (phaseIndex + 1) % PHASES.length;
+    phaseTime = 0;
+    params.manualPhase = phaseIndex;
+  }
+});
+
+addEventListener("keydown", (e) => {
+  if (e.code === "Space") {
+    e.preventDefault();
+    params.rain = !params.rain;
+    rain.visible = params.rain;
+    rainMat.uniforms.uOpacity.value = params.rain ? 1 : 0;
+    document.getElementById("phase").textContent =
+      PHASES[phaseIndex].name + (params.rain ? " · 暴雨" : "");
+  }
+});
+
+document.getElementById("sceneBtn").addEventListener("click", () => {
+  params.scene = params.scene === "A" ? "B" : "A";
+  siteA.visible = params.scene === "A";
+  siteB.visible = params.scene === "B";
+  controls.target.set(0, params.scene === "A" ? 6 : 5, 0);
+  camera.position.set(params.scene === "A" ? 52 : 58, params.scene === "A" ? 34 : 30, params.scene === "A" ? 60 : 66);
+  document.getElementById("sceneBtn").textContent =
+    params.scene === "A" ? "切换到新增场景：跨江桥工地" : "切回主体：建筑工地";
+});
+
+/* ---------- 尺寸 ---------- */
+function resize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+  renderer.setSize(innerWidth, innerHeight);
+  dustMat.uniforms.uPixelRatio.value = renderer.getPixelRatio();
+  rainMat.uniforms.uPixelRatio.value = renderer.getPixelRatio();
+}
+addEventListener("resize", resize);
+
+/* ---------- 动画 ---------- */
+const clock = new THREE.Clock();
+let frames = 0, fpsTimer = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, clock.getDelta());
+  const t = clock.elapsedTime;
+  const speed = params.speed;
+
+  /* 昼夜 */
+  phaseTime += dt;
+  if (params.manualPhase === null && phaseTime > PHASE_DURATION) {
+    phaseTime = 0;
+    phaseIndex = (phaseIndex + 1) % PHASES.length;
+  }
+  const ph = PHASES[phasesafe()];
+  scene.background.setHex(ph.sky);
+  scene.fog.color.setHex(ph.fog);
+  sun.color.setHex(ph.sun);
+  sun.intensity = ph.sunI;
+  hemi.intensity = ph.amb;
+  ambient.intensity = ph.amb * 0.6;
+  MAT.lamp.emissiveIntensity = 0.15 + ph.lamp * 1.6;
+  MAT.window.emissiveIntensity = 0.1 + ph.lamp * 1.5;
+  for (const g of glows) g.material.opacity = ph.lamp * 0.45;
+  MAT.road.roughness = params.rain ? 0.18 : 0.95;
+  MAT.road.metalness = params.rain ? 0.45 : 0.0;
+  document.getElementById("phase").textContent = "时段：" + ph.name + (params.rain ? " · 暴雨" : "");
+
+  /* 机械 */
+  for (const e of machines.excavators) {
+    const a = Math.sin(t * 1.6 * speed + e.phase);
+    e.arm.rotation.z = -0.35 + a * 0.55;
+    e.fore.rotation.z = 0.5 - a * 0.75;
+  }
+  for (const c of machines.cranes) {
+    c.top.rotation.y = t * 0.22 * speed + c.phase;
+    const h = Math.sin(t * 0.6 * speed + c.phase) * 3;
+    c.hookLine.position.y = -4 + h;
+    c.load.position.y = -8.6 + h;
+  }
+  for (const m of machines.mixers) m.drum.rotation.x = t * 2.2 * speed;
+  for (const l of machines.loaders) {
+    l.g.position.y = 0.8 + Math.sin(t * 2 * speed + l.phase) * 0.12;
+    l.g.rotation.z = Math.sin(t * 2 * speed + l.phase) * 0.04;
+  }
+  for (const w of machines.workers) {
+    const s = Math.sin(t * 3.2 * speed + w.phase);
+    w.legL.rotation.x = s * 0.5;
+    w.legR.rotation.x = -s * 0.5;
+    w.g.position.y = 0.8 + Math.abs(s) * 0.08;
+  }
+  /* 渣土车沿主干道往返 */
+  for (const tr of machines.trucks) {
+    tr.path += dt * 0.16 * speed;
+    const p = (tr.path % 2) - 1;
+    tr.g.position.x = p * 34;
+    tr.g.position.z = p > 0 ? 0 : -16;
+    tr.g.rotation.y = p > 0 ? 0 : Math.PI;
+  }
+
+  /* 粒子 */
+  dustMat.uniforms.uTime.value = t;
+  dustMat.uniforms.uStrength.value = params.dust * (params.rain ? 0.3 : 1);
+  rainMat.uniforms.uTime.value = t;
+
+  /* 闲置自动环绕 */
+  idle += dt;
+  controls.autoRotate = idle > 6;
+  controls.update();
+
+  renderer.render(scene, camera);
+
+  frames++;
+  fpsTimer += dt;
+  if (fpsTimer > 0.6) {
+    document.getElementById("fps").textContent = "FPS " + Math.round(frames / fpsTimer);
+    frames = 0; fpsTimer = 0;
+  }
+}
+function phasesafe() { return params.manualPhase === null ? phaseIndex : params.manualPhase; }
+
+resize();
+flushVoxels(siteA);
+flushVoxels(siteB);
+animate();
+
+/* 供自动化验收使用的接口 */
+window.__site = {
+  params,
+  scene,
+  camera,
+  machineCounts: {
+    excavators: machines.excavators.length,
+    trucks: machines.trucks.length,
+    cranes: machines.cranes.length,
+    mixers: machines.mixers.length,
+    loaders: machines.loaders.length,
+    workers: machines.workers.length
+  },
+  phase: () => PHASES[phasesafe()].name,
+  setRain(v) {
+    params.rain = v;
+    rain.visible = v;
+    rainMat.uniforms.uOpacity.value = v ? 1 : 0;
+  },
+  toggleScene() {
+    document.getElementById("sceneBtn").click();
+    return params.scene;
+  },
+  setKnob(mode) {
+    knobMode = mode % KNOB_MODES.length;
+    document.getElementById("knob").textContent = "旋钮：" + KNOB_MODES[knobMode];
+  },
+  clickKnob() {
+    knobMode = (knobMode + 1) % KNOB_MODES.length;
+    document.getElementById("knob").textContent = "旋钮：" + KNOB_MODES[knobMode];
+    return KNOB_MODES[knobMode];
+  },
+  steps(n) {
+    for (let i = 0; i < (n || 1); i++) animateStep(1 / 60);
+  },
+  instanceCount: () => {
+    let n = 0;
+    siteA.traverse((o) => { if (o.isInstancedMesh) n += o.count; });
+    return n;
+  }
+};
+function animateStep(dt) {
+  const t = clock.elapsedTime;
+  for (const e of machines.excavators) {
+    const a = Math.sin(t * 1.6 + e.phase);
+    e.arm.rotation.z = -0.35 + a * 0.55;
+    e.fore.rotation.z = 0.5 - a * 0.75;
+  }
+  renderer.render(scene, camera);
+}
+</script>
+
+<script>
+(function () {
+  var waited = 0;
+  var timer = setInterval(function () {
+    waited += 500;
+    if (window.__site) { clearInterval(timer); return; }
+    if (waited < 12000) return; // CDN 较慢时继续等待，避免误报
+    clearInterval(timer);
+    document.getElementById("fallback").classList.add("show");
+    document.getElementById("fallbackText").textContent =
+      "未能从 CDN 载入 Three.js r160 模块。可能处于 file:// 协议（模块脚本被 CORS 拦截），或网络无法访问 unpkg.com。";
+  }, 500);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>新哥特式塔楼城市 · 可漫游 3D</title>
+<style>
+  :root { --ink:#e8eaf6; --muted:#98a0c0; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#05060d; color:var(--ink);
+    font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif; }
+  #scene { display:block; width:100%; height:100%; }
+  .hud { position:fixed; inset:0; pointer-events:none; }
+  .panel {
+    position:absolute; pointer-events:auto; background:rgba(10,13,26,.62);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:12px 14px;
+    font-size:12px; line-height:1.9; color:var(--muted);
+  }
+  .panel b { color:var(--ink); font-weight:600; }
+  .panel.title { font-size:14px; letter-spacing:.12em; color:var(--ink); }
+  #top { left:16px; top:16px; max-width:300px; }
+  #bottom { left:16px; bottom:16px; }
+  #right { right:16px; bottom:16px; text-align:right; }
+  #hints { right:16px; top:16px; text-align:right; max-width:240px; }
+  .badge { display:inline-block; padding:1px 8px; border-radius:999px; font-size:11px;
+    background:rgba(140,120,255,.22); color:#c9bcff; margin-left:6px; }
+  #fallback { position:fixed; inset:0; display:none; place-items:center; padding:24px;
+    background:radial-gradient(circle at 50% 35%, #131a34, #05060d 70%); z-index:20; }
+  #fallback.show { display:grid; }
+  #fallback div { max-width:560px; }
+  #fallback h2 { margin:0 0 12px; font-size:20px; }
+  #fallback p { color:var(--muted); line-height:1.9; font-size:13px; }
+  #fallback code { color:#c9bcff; }
+  @media (max-width:720px){ #hints{display:none} .panel{font-size:11px} }
+</style>
+<script src="../../../../assets/analytics.js" defer></script>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div class="hud">
+  <div class="panel" id="top">
+    <p class="title">CATHEDRALIS <span class="badge">NEO-GOTHIC</span></p>
+    <p style="margin-top:6px">按真实比例重建的尖塔之城：塔高 38–96 米，街道宽 14 米，人眼高度 1.7 米。</p>
+    <p style="margin-top:4px"><b>塔尖</b>与<b>飞扶壁</b>均为程序化生成，窗光是自发光着色器。</p>
+  </div>
+  <div class="panel" id="hints">
+    <p><b>W A S D</b> 行走　<b>鼠标拖动</b> 转头</p>
+    <p><b>Shift</b> 加速　<b>C</b> 切换自动巡游</p>
+    <p><b>滚轮</b> 调整视高</p>
+  </div>
+  <div class="panel" id="bottom">
+    <p><b>操作提示</b></p>
+    <p>站在街道上向上看，可以看到飞扶壁把侧推力分解到扶壁墩上。</p>
+    <p>靠近塔基可以看到火盆与上升的火星粒子。</p>
+  </div>
+  <div class="panel" id="right">
+    <p id="fps">FPS --</p>
+    <p id="mode">模式：自由漫游</p>
+  </div>
+</div>
+
+<div id="fallback">
+  <div>
+    <h2>『待确认』Three.js 未能加载</h2>
+    <p id="fallbackText"></p>
+    <p>说明：本页面使用 ESM 形式的 Three.js r160（通过 importmap 从 CDN 加载）。<br />
+       在 <code>file://</code> 协议下打开时，浏览器会按 CORS 策略拦截模块脚本；<br />
+       请改用任意静态服务器访问，例如 <code>npx serve</code> 或 <code>python -m http.server</code>。</p>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+
+/* ============================================================
+   新哥特式塔楼城市
+   - 程序化生成塔楼（塔身 / 尖塔 / 飞扶壁 / 窗光）
+   - 粒子系统：火盆火星、雾霭、星尘
+   - 两种相机模式：自由漫游（WASD + 拖动）与自动巡游
+   ============================================================ */
+
+const canvas = document.getElementById("scene");
+const fallback = document.getElementById("fallback");
+const fallbackText = document.getElementById("fallbackText");
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x141c38);
+scene.fog = new THREE.FogExp2(0x141c38, 0.0032);
+
+const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.1, 900);
+camera.position.set(0, 1.7, 46);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.4;
+
+/* ---------- 随机数 ---------- */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20261020);
+const range = (a, b) => a + rand() * (b - a);
+
+/* ---------- 材质 ---------- */
+const stone = new THREE.MeshStandardMaterial({ color: 0x646a8c, roughness: 0.92, metalness: 0.02 });
+const stoneDark = new THREE.MeshStandardMaterial({ color: 0x3d4260, roughness: 0.95, metalness: 0.02 });
+const roofMat = new THREE.MeshStandardMaterial({ color: 0x1d3a4d, roughness: 0.6, metalness: 0.35 });
+const goldMat = new THREE.MeshStandardMaterial({ color: 0xb08d4f, roughness: 0.35, metalness: 0.85 });
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x14161f, roughness: 1, metalness: 0 });
+
+/* ---------- 窗口自发光（每个窗口由两个三角形组成的面片） ---------- */
+const windowPositions = [];
+const windowColors = [];
+const tmpColor = new THREE.Color();
+
+/**
+ * 沿法线方向贴一张窗：法线为水平方向 (nx, nz)，窗户宽度沿切向展开，高度沿 Y 轴。
+ */
+function pushWindow(cx, cy, cz, nx, nz, w, h, color) {
+  const tx = -nz;
+  const tz = nx;
+  const hw = w / 2;
+  const hh = h / 2;
+  const corners = [
+    [cx - tx * hw, cy - hh, cz - tz * hw],
+    [cx + tx * hw, cy - hh, cz + tz * hw],
+    [cx + tx * hw, cy + hh, cz + tz * hw],
+    [cx - tx * hw, cy - hh, cz - tz * hw],
+    [cx + tx * hw, cy + hh, cz + tz * hw],
+    [cx - tx * hw, cy + hh, cz - tz * hw]
+  ];
+  tmpColor.set(color);
+  for (const c of corners) {
+    windowPositions.push(c[0], c[1], c[2]);
+    windowColors.push(tmpColor.r, tmpColor.g, tmpColor.b);
+  }
+}
+
+/* ---------- 城市生成 ---------- */
+const towers = [];
+const braziers = [];
+const blockSize = 34;
+const street = 14;
+const grid = 7;
+
+function buildTower(cx, cz, scale) {
+  const parts = [];
+  const buttress = [];
+  const height = 38 + scale * 58;
+  const w = 7 + scale * 5;
+  const d = 7 + scale * 5;
+
+  // 塔基（八边形基座）
+  const base = new THREE.CylinderGeometry(w * 0.82, w * 0.95, 3.2, 8);
+  base.translate(cx, 1.6, cz);
+  parts.push(base);
+
+  // 塔身
+  const shaft = new THREE.CylinderGeometry(w * 0.62, w * 0.82, height, 8);
+  shaft.translate(cx, height / 2 + 3, cz);
+  parts.push(shaft);
+
+  // 束带层
+  for (let i = 1; i <= 3; i++) {
+    const band = new THREE.CylinderGeometry(w * 0.66, w * 0.68, 0.7, 8);
+    const y = 3 + (height * i) / 4;
+    band.translate(cx, y, cz);
+    parts.push(band);
+  }
+
+  // 尖塔（八棱锥）
+  const spire = new THREE.ConeGeometry(w * 0.64, height * 0.55, 8);
+  spire.translate(cx, height + 3 + height * 0.275, cz);
+  parts.push(spire);
+
+  // 尖塔底部的小尖
+  const pinnacles = 8;
+  for (let i = 0; i < pinnacles; i++) {
+    const a = (i / pinnacles) * Math.PI * 2 + 0.39;
+    const r = w * 0.66;
+    const p = new THREE.ConeGeometry(0.42, 3.6, 4);
+    p.translate(cx + Math.cos(a) * r, height + 4.6, cz + Math.sin(a) * r);
+    parts.push(p);
+  }
+
+  // 飞扶壁：外倾的斜撑
+  const sides = 4;
+  for (let s = 0; s < sides; s++) {
+    const ang = (s / sides) * Math.PI * 2 + Math.PI / 4;
+    const dirX = Math.cos(ang);
+    const dirZ = Math.sin(ang);
+    const reach = w * 0.95;
+    const pierH = height * 0.46;
+    // 扶壁墩
+    const pier = new THREE.BoxGeometry(1.5, pierH, 1.5);
+    pier.translate(cx + dirX * reach, pierH / 2, cz + dirZ * reach);
+    buttress.push(pier);
+    // 斜撑
+    const len = Math.hypot(reach, pierH * 0.72);
+    const strut = new THREE.BoxGeometry(0.8, len, 0.8);
+    strut.rotateZ(Math.atan2(reach, pierH * 0.72));
+    strut.rotateY(-ang);
+    strut.translate(cx + dirX * reach * 0.5, pierH * 0.58, cz + dirZ * reach * 0.5);
+    buttress.push(strut);
+    // 扶壁小尖
+    const cap = new THREE.ConeGeometry(0.8, 3.2, 4);
+    cap.translate(cx + dirX * reach, pierH + 1.6, cz + dirZ * reach);
+    buttress.push(cap);
+  }
+
+  // 窗：八棱柱的 8 个立面，逐层排布（按该高度处的实际半径贴面）
+  const rows = Math.floor(height / 6);
+  const rBottom = w * 0.82;
+  const rTop = w * 0.62;
+  const apothem = Math.cos(Math.PI / 8); // 正八棱柱的内切半径系数
+  for (let r = 1; r < rows; r++) {
+    const y = 4 + r * 6;
+    const t = Math.min(1, Math.max(0, (y - 3) / height));
+    const radius = (rBottom + (rTop - rBottom) * t) * apothem + 0.06;
+    for (let s = 0; s < 8; s++) {
+      const ang = (s / 8) * Math.PI * 2 + Math.PI / 8;
+      const nx = Math.cos(ang);
+      const nz = Math.sin(ang);
+      const lit = rand() > 0.25;
+      const warm = lit ? 0xffc27a : 0x4a5a8c;
+      const ww = 1.5;
+      const wh = 3.2;
+      // 窗片贴在窗框前面，避免被框体遮挡
+      pushWindow(cx + nx * (radius + 0.16), y, cz + nz * (radius + 0.16), nx, nz, ww, wh, warm);
+      // 窗框（合并到石料几何）
+      const frame = new THREE.BoxGeometry(ww + 0.5, wh + 0.6, 0.3);
+      frame.rotateY(-ang);
+      frame.translate(cx + nx * (radius - 0.04), y, cz + nz * (radius - 0.04));
+      parts.push(frame);
+    }
+  }
+
+  // 塔顶金饰
+  const finial = new THREE.SphereGeometry(0.9, 10, 8);
+  finial.translate(cx, height + 3 + height * 0.55 + 1.2, cz);
+  parts.push(finial);
+
+  towers.push({ cx, cz, height, w, d });
+  braziers.push({ x: cx + w * 1.5, y: 1.2, z: cz + w * 1.2 });
+  return { parts, buttress };
+}
+
+const stoneParts = [];
+const buttressParts = [];
+
+for (let gx = -3; gx <= 3; gx++) {
+  for (let gz = -3; gz <= 3; gz++) {
+    if (Math.abs(gx) + Math.abs(gz) > 4) continue; // 让出中央广场
+    const count = rand() > 0.45 ? 2 : 1;
+    for (let k = 0; k < count; k++) {
+      const cx = gx * blockSize + (k === 0 ? -6 : 7) * (0.6 + rand() * 0.8);
+      const cz = gz * blockSize + (k === 0 ? -6 : 7) * (0.6 + rand() * 0.8);
+      const { parts, buttress } = buildTower(cx, cz, rand());
+      stoneParts.push(...parts, ...buttress);
+    }
+  }
+}
+
+const merged = mergeGeometries(stoneParts, false);
+const cityMesh = new THREE.Mesh(merged, stone);
+cityMesh.castShadow = false;
+scene.add(cityMesh);
+
+/* ---------- 窗户（合并 + 顶点色自发光） ---------- */
+const winGeo = new THREE.BufferGeometry();
+winGeo.setAttribute("position", new THREE.Float32BufferAttribute(windowPositions, 3));
+winGeo.setAttribute("color", new THREE.Float32BufferAttribute(windowColors, 3));
+const winMat = new THREE.ShaderMaterial({
+  vertexShader: `
+    attribute vec3 color;
+    varying vec3 vColor;
+    void main() {
+      vColor = color;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: `
+    varying vec3 vColor;
+    void main() { gl_FragColor = vec4(vColor, 1.0); }`,
+  transparent: false,
+  side: THREE.DoubleSide
+});
+const winMesh = new THREE.Mesh(winGeo, winMat);
+scene.add(winMesh);
+
+/* ---------- 地面与街道 ---------- */
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), groundMat);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+const streetGeo = [];
+for (let i = -4; i <= 4; i++) {
+  const g1 = new THREE.PlaneGeometry(600, street);
+  g1.rotateX(-Math.PI / 2);
+  g1.translate(0, 0.02, i * blockSize);
+  streetGeo.push(g1);
+  const g2 = new THREE.PlaneGeometry(street, 600);
+  g2.rotateX(-Math.PI / 2);
+  g2.translate(i * blockSize, 0.02, 0);
+  streetGeo.push(g2);
+}
+const streetMesh = new THREE.Mesh(
+  mergeGeometries(streetGeo, false),
+  new THREE.MeshStandardMaterial({ color: 0x1c2030, roughness: 0.85 })
+);
+scene.add(streetMesh);
+
+/* ---------- 中央广场 ---------- */
+const plaza = new THREE.Mesh(
+  new THREE.CircleGeometry(18, 48),
+  new THREE.MeshStandardMaterial({ color: 0x232838, roughness: 0.7, metalness: 0.1 })
+);
+plaza.rotation.x = -Math.PI / 2;
+plaza.position.y = 0.03;
+scene.add(plaza);
+
+const obelisk = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.9, 2.6, 26, 4),
+  new THREE.MeshStandardMaterial({ color: 0x2c3145, roughness: 0.8 })
+);
+obelisk.position.set(0, 13, 0);
+obelisk.rotation.y = Math.PI / 4;
+scene.add(obelisk);
+const obeliskTip = new THREE.Mesh(new THREE.ConeGeometry(1.2, 3.4, 4), goldMat);
+obeliskTip.position.set(0, 27.6, 0);
+obeliskTip.rotation.y = Math.PI / 4;
+scene.add(obeliskTip);
+
+/* ---------- 火盆 ---------- */
+const brazierGeo = mergeGeometries([
+  new THREE.CylinderGeometry(0.9, 0.5, 1.4, 8).translate(0, 0.7, 0),
+  new THREE.CylinderGeometry(0.18, 0.22, 1.6, 6).translate(0, 0.8, 0)
+], false);
+const brazierMat = new THREE.MeshStandardMaterial({ color: 0x1a1d28, roughness: 0.6, metalness: 0.6 });
+for (const b of braziers) {
+  const m = new THREE.Mesh(brazierGeo, brazierMat);
+  m.position.set(b.x, 0, b.z);
+  scene.add(m);
+  const flame = new THREE.Mesh(
+    new THREE.SphereGeometry(0.55, 8, 6),
+    new THREE.MeshBasicMaterial({ color: 0xff8a3d, transparent: true, opacity: 0.85 })
+  );
+  flame.position.set(b.x, 1.7, b.z);
+  scene.add(flame);
+  b.flame = flame;
+}
+
+/* ---------- 粒子：火星 ---------- */
+const EMBER_COUNT = 2200;
+const emberPos = new Float32Array(EMBER_COUNT * 3);
+const emberSeed = new Float32Array(EMBER_COUNT);
+for (let i = 0; i < EMBER_COUNT; i++) {
+  const b = braziers[Math.floor(rand() * braziers.length)];
+  emberPos[i * 3] = b.x + range(-0.5, 0.5);
+  emberPos[i * 3 + 1] = b.y + range(0, 2);
+  emberPos[i * 3 + 2] = b.z + range(-0.5, 0.5);
+  emberSeed[i] = rand();
+}
+const emberGeo = new THREE.BufferGeometry();
+emberGeo.setAttribute("position", new THREE.BufferAttribute(emberPos, 3));
+emberGeo.setAttribute("aSeed", new THREE.BufferAttribute(emberSeed, 1));
+const emberMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() } },
+  vertexShader: `
+    attribute float aSeed;
+    uniform float uTime;
+    uniform float uPixelRatio;
+    varying float vLife;
+    void main() {
+      vec3 p = position;
+      float life = fract(uTime * (0.08 + aSeed * 0.07) + aSeed);
+      vLife = life;
+      p.y += life * (7.0 + aSeed * 9.0);
+      p.x += sin(uTime * 0.6 + aSeed * 30.0) * life * 1.6;
+      p.z += cos(uTime * 0.5 + aSeed * 21.0) * life * 1.6;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      gl_PointSize = (26.0 * (1.0 - life * 0.7)) * uPixelRatio / max(1.0, -mv.z);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    varying float vLife;
+    void main() {
+      vec2 d = gl_PointCoord - 0.5;
+      float r = dot(d, d);
+      if (r > 0.25) discard;
+      float a = (1.0 - r * 4.0) * (1.0 - vLife);
+      vec3 col = mix(vec3(1.0, 0.45, 0.12), vec3(1.0, 0.92, 0.65), 1.0 - vLife);
+      gl_FragColor = vec4(col, a);
+    }`,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending
+});
+const embers = new THREE.Points(emberGeo, emberMat);
+scene.add(embers);
+
+/* ---------- 粒子：雾霭 ---------- */
+const MIST_COUNT = 900;
+const mistPos = new Float32Array(MIST_COUNT * 3);
+for (let i = 0; i < MIST_COUNT; i++) {
+  mistPos[i * 3] = range(-180, 180);
+  mistPos[i * 3 + 1] = range(0.5, 16);
+  mistPos[i * 3 + 2] = range(-180, 180);
+}
+const mistGeo = new THREE.BufferGeometry();
+mistGeo.setAttribute("position", new THREE.BufferAttribute(mistPos, 3));
+const mistMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() } },
+  vertexShader: `
+    uniform float uTime;
+    uniform float uPixelRatio;
+    varying float vFade;
+    void main() {
+      vec3 p = position;
+      p.x += sin(uTime * 0.08 + p.z * 0.05) * 6.0;
+      p.z += cos(uTime * 0.06 + p.x * 0.04) * 6.0;
+      p.y += sin(uTime * 0.12 + p.x * 0.1) * 1.2;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vFade = smoothstep(320.0, 60.0, -mv.z);
+      gl_PointSize = 90.0 * uPixelRatio / max(1.0, -mv.z);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    varying float vFade;
+    void main() {
+      vec2 d = gl_PointCoord - 0.5;
+      float r = dot(d, d);
+      if (r > 0.25) discard;
+      gl_FragColor = vec4(vec3(0.45, 0.52, 0.72), 0.055 * vFade * (1.0 - r * 4.0));
+    }`,
+  transparent: true,
+  depthWrite: false
+});
+const mist = new THREE.Points(mistGeo, mistMat);
+scene.add(mist);
+
+/* ---------- 星空 ---------- */
+const STAR_COUNT = 1400;
+const starPos = new Float32Array(STAR_COUNT * 3);
+for (let i = 0; i < STAR_COUNT; i++) {
+  const r = range(200, 420);
+  const theta = range(0, Math.PI * 2);
+  const phi = Math.acos(range(0.15, 1));
+  starPos[i * 3] = Math.sin(phi) * Math.cos(theta) * r;
+  starPos[i * 3 + 1] = Math.cos(phi) * r;
+  starPos[i * 3 + 2] = Math.sin(phi) * Math.sin(theta) * r;
+}
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+const stars = new THREE.Points(
+  starGeo,
+  new THREE.PointsMaterial({ color: 0xdfe6ff, size: 1.4, sizeAttenuation: true, transparent: true, opacity: 0.85 })
+);
+scene.add(stars);
+
+/* ---------- 光照 ---------- */
+scene.add(new THREE.HemisphereLight(0x6a7ac2, 0x2a2438, 2.1));
+const moon = new THREE.DirectionalLight(0xb9c8ff, 1.5);
+moon.position.set(-120, 160, 90);
+scene.add(moon);
+const plazaLight = new THREE.PointLight(0xffb066, 3.2, 120, 2);
+plazaLight.position.set(0, 9, 0);
+scene.add(plazaLight);
+for (let i = 0; i < 6; i++) {
+  const b = braziers[Math.floor(rand() * braziers.length)];
+  const l = new THREE.PointLight(0xff7a2a, 2.2, 44, 2);
+  l.position.set(b.x, 2.2, b.z);
+  scene.add(l);
+}
+
+/* ---------- 相机控制 ---------- */
+const keys = new Set();
+let yaw = Math.PI;
+let pitch = -0.05;
+let dragging = false;
+let autoTour = false;
+let idleTimer = 0;
+const tourClock = new THREE.Clock();
+const tourTarget = new THREE.Vector3();
+
+addEventListener("keydown", (e) => {
+  keys.add(e.code);
+  if (e.code === "KeyC") {
+    autoTour = !autoTour;
+    document.getElementById("mode").textContent = autoTour ? "模式：自动巡游" : "模式：自由漫游";
+  }
+});
+addEventListener("keyup", (e) => keys.delete(e.code));
+canvas.addEventListener("pointerdown", (e) => {
+  dragging = true;
+  canvas.setPointerCapture(e.pointerId);
+  idleTimer = 0;
+});
+canvas.addEventListener("pointerup", (e) => {
+  dragging = false;
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (!dragging) return;
+  idleTimer = 0;
+  yaw -= e.movementX * 0.0022;
+  pitch = Math.max(-1.2, Math.min(1.2, pitch - e.movementY * 0.0022));
+});
+canvas.addEventListener("wheel", (e) => {
+  camera.position.y = Math.max(1.2, Math.min(220, camera.position.y + Math.sign(e.deltaY) * 1.6));
+}, { passive: true });
+
+const forward = new THREE.Vector3();
+const right = new THREE.Vector3();
+function updateCamera(dt) {
+  if (autoTour) {
+    // 自动巡游：沿螺旋路径缓慢穿过城市
+    const t = tourClock.getElapsedTime() * 0.055;
+    const r = 92 + Math.sin(t * 0.7) * 40;
+    camera.position.set(Math.cos(t) * r, 6 + Math.sin(t * 0.9) * 16, Math.sin(t) * r);
+    tourTarget.set(Math.cos(t + 0.7) * 12, 18 + Math.cos(t * 0.5) * 12, Math.sin(t + 0.7) * 12);
+    camera.lookAt(tourTarget);
+    return;
+  }
+  const speed = (keys.has("ShiftLeft") || keys.has("ShiftRight") ? 42 : 16) * dt;
+  camera.getWorldDirection(forward);
+  forward.y = 0;
+  forward.normalize();
+  right.crossVectors(forward, camera.up).normalize();
+  if (keys.has("KeyW") || keys.has("ArrowUp")) camera.position.addScaledVector(forward, speed);
+  if (keys.has("KeyS") || keys.has("ArrowDown")) camera.position.addScaledVector(forward, -speed);
+  if (keys.has("KeyA") || keys.has("ArrowLeft")) camera.position.addScaledVector(right, -speed);
+  if (keys.has("KeyD") || keys.has("ArrowRight")) camera.position.addScaledVector(right, speed);
+  camera.position.x = Math.max(-200, Math.min(200, camera.position.x));
+  camera.position.z = Math.max(-200, Math.min(200, camera.position.z));
+  const dir = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+  camera.lookAt(camera.position.clone().add(dir));
+}
+
+/* ---------- 尺寸 ---------- */
+function resize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+  renderer.setSize(innerWidth, innerHeight);
+  emberMat.uniforms.uPixelRatio.value = renderer.getPixelRatio();
+  mistMat.uniforms.uPixelRatio.value = renderer.getPixelRatio();
+}
+addEventListener("resize", resize);
+
+/* ---------- 主循环 ---------- */
+const clock = new THREE.Clock();
+let frames = 0;
+let fpsTimer = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, clock.getDelta());
+  const t = clock.elapsedTime;
+  emberMat.uniforms.uTime.value = t;
+  mistMat.uniforms.uTime.value = t;
+  for (const b of braziers) {
+    if (!b.flame) continue;
+    const k = 1 + Math.sin(t * 9 + b.x) * 0.18;
+    b.flame.scale.set(k, k * 1.25, k);
+  }
+  plazaLight.intensity = 2.2 + Math.sin(t * 3.1) * 0.25;
+  stars.rotation.y = t * 0.004;
+
+  idleTimer += dt;
+  updateCamera(dt);
+
+  renderer.render(scene, camera);
+
+  frames++;
+  fpsTimer += dt;
+  if (fpsTimer > 0.6) {
+    document.getElementById("fps").textContent = "FPS " + Math.round(frames / fpsTimer);
+    frames = 0;
+    fpsTimer = 0;
+  }
+}
+resize();
+animate();
+
+/* 供自动化验收使用的接口 */
+window.__city = {
+  camera,
+  scene,
+  towerCount: towers.length,
+  brazierCount: braziers.length,
+  windowCount: windowPositions.length / 3,
+  particleCount: EMBER_COUNT,
+  mode: () => (autoTour ? "auto" : "free"),
+  toggleMode() {
+    autoTour = !autoTour;
+    document.getElementById("mode").textContent = autoTour ? "模式：自动巡游" : "模式：自由漫游";
+    return autoTour;
+  },
+  teleport(x, y, z) {
+    camera.position.set(x, y, z);
+    idleTimer = 0;
+  },
+  look(yawValue, pitchValue) {
+    yaw = yawValue;
+    pitch = pitchValue;
+  },
+  steps(n) {
+    for (let i = 0; i < (n || 1); i++) {
+      const dt = 1 / 60;
+      emberMat.uniforms.uTime.value += dt;
+      mistMat.uniforms.uTime.value += dt;
+      updateCamera(dt);
+      renderer.render(scene, camera);
+    }
+  },
+  cameraHeight: () => camera.position.y
+};
+</script>
+
+<script>
+/* 模块加载失败时的兜底提示（例如 file:// 协议下的 CORS 限制） */
+(function () {
+  var waited = 0;
+  var timer = setInterval(function () {
+    waited += 500;
+    if (window.__city) { clearInterval(timer); return; }
+    if (waited < 12000) return; // CDN 较慢时继续等待，避免误报
+    clearInterval(timer);
+    document.getElementById("fallback").classList.add("show");
+    document.getElementById("fallbackText").textContent =
+      "未能从 CDN 载入 Three.js r160 模块。常见原因：当前处于 file:// 协议（模块脚本被 CORS 拦截），或网络无法访问 unpkg.com。";
+  }, 500);
+})();
+</script>
+</body>
+</html>
