@@ -5,6 +5,8 @@
     R = window.ArchiveTopicRecords,
     e = U.escape;
   const root = document.getElementById("topic-content");
+  // Records open on their screenshot ranking; other orders stay opt-in.
+  const DEFAULT_SORT = "score";
   const params = new URLSearchParams(location.search);
   const topic = data.topics.find((t) => t.id === params.get("id"));
   if (!topic) {
@@ -52,9 +54,9 @@
     ? params.get("effort")
     : "";
   let query = params.get("q") || "";
-  let sort = ["recent", "score"].includes(params.get("sort"))
+  let sort = ["model", "recent", "score"].includes(params.get("sort"))
     ? params.get("sort")
-    : "model";
+    : DEFAULT_SORT;
   const allGroups = R.group(data, runs);
   const groupKeys = new Set(allGroups.map((group) => group.key));
   const conditionKeys = new Set(
@@ -116,7 +118,7 @@
           '<option value="' + e(v) + '">' + e(U.effortLabel(v)) + "</option>",
       )
       .join("") +
-    '</select></label><label id="topic-sort-field">排序<select id="topic-sort"><option value="model">模型代际 / 能力 / 发布日期</option><option value="recent">实验日期从新到旧</option><option value="score">截图评分（同任务内）</option></select></label></div></details><button id="topic-reset">清除筛选</button></div>' +
+    '</select></label><label id="topic-sort-field">排序<select id="topic-sort"><option value="score">截图评分（同任务内）</option><option value="model">模型代际 / 能力 / 发布日期</option><option value="recent">实验日期从新到旧</option></select></label></div></details><button id="topic-reset">清除筛选</button></div>' +
     '<div class="topic-results-heading"><p id="topic-count" role="status"></p><p id="topic-results-help"></p></div><section id="topic-matrix" aria-label="模型与档位实验矩阵" hidden></section><section id="topic-models" aria-label="按模型浏览实验"></section><section id="topic-list" hidden><div class="topic-run-groups"></div></section><section id="topic-prompts" class="prompt-library" hidden><h2>任务与版本</h2><div></div></section>';
   root.append(document.getElementById("pricing-context"));
   const refreshSelection = U.setupSelection(data);
@@ -417,7 +419,7 @@
   const mobileFilters = matchMedia("(max-width: 700px)");
   function syncAdvancedFilters() {
     document.getElementById("topic-more-filters").open =
-      !mobileFilters.matches || !!effort || sort !== "model";
+      !mobileFilters.matches || !!effort || sort !== DEFAULT_SORT;
   }
   mobileFilters.addEventListener("change", syncAdvancedFilters);
   syncAdvancedFilters();
@@ -508,14 +510,7 @@
               .toLowerCase()
               .includes(query.trim().toLowerCase())),
       )
-      .sort(
-        (a, b) =>
-          (sort === "score" ? U.compareRunScores(a, b) : 0) ||
-          (sort === "recent"
-            ? (b.date || "").localeCompare(a.date || "")
-            : 0) ||
-          U.compareModelRuns(data, a, b),
-      );
+      .sort((a, b) => U.compareRunsBySort(data, a, b, sort));
     const visibleModels = models.filter((m) =>
       matched.some((r) => r.modelId === m.id),
     );
@@ -555,7 +550,7 @@
       !effort &&
       !query &&
       !promptId &&
-      sort === "model";
+      sort === DEFAULT_SORT;
     const task = prompts.find((p) => p.id === promptId);
     document.getElementById("topic-context-title").textContent = task
       ? task.title + " · " + task.id
@@ -766,7 +761,7 @@
     if (provider) p.set("provider", provider);
     if (effort) p.set("effort", effort);
     if (query) p.set("q", query);
-    if (sort !== "model") p.set("sort", sort);
+    if (sort !== DEFAULT_SORT) p.set("sort", sort);
     if (explicitExpansion) p.set("expanded", "1");
     for (const key of openGroups) p.append("open", key);
     for (const key of openHistory) p.append("history", key);
@@ -867,7 +862,7 @@
     if (event.target.closest("#topic-reset, [data-reset-filters]")) {
       modelId = provider = effort = query = "";
       promptId = "";
-      sort = "model";
+      sort = DEFAULT_SORT;
       resetExpansion();
       syncAdvancedFilters();
       updateURL(false, true);
@@ -894,9 +889,9 @@
       : "";
     effort = efforts.includes(p.get("effort")) ? p.get("effort") : "";
     query = p.get("q") || "";
-    sort = ["recent", "score"].includes(p.get("sort"))
+    sort = ["model", "recent", "score"].includes(p.get("sort"))
       ? p.get("sort")
-      : "model";
+      : DEFAULT_SORT;
     openGroups = new Set(p.getAll("open").filter((key) => groupKeys.has(key)));
     openHistory = new Set(
       p.getAll("history").filter((key) => conditionKeys.has(key)),

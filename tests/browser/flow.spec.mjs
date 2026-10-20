@@ -13,7 +13,8 @@ test("topic effort order matches comparison selectors and date sorting remains e
   page,
 }) => {
   await page.goto("topic.html?id=bluebook&prompt=v2&view=list");
-  await expect(page.locator("#topic-sort")).toHaveValue("model");
+  await expect(page.locator("#topic-sort")).toHaveValue("score");
+  await page.locator("#topic-sort").selectOption("model");
   const solRows = page.locator(".topic-run-row").filter({
     has: page.locator(".topic-run-model", { hasText: /^GPT-6\.1 Sol/ }),
   });

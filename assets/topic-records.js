@@ -46,6 +46,10 @@
       .map((model) => {
         model.runs.sort(recent);
         model.latest = model.runs[0];
+        model.bestScore = model.runs.reduce(
+          (best, run) => Math.max(best, U.scoreValue(run) ?? -1),
+          -1,
+        );
         model.latestPreview = model.runs.find(
           (run) =>
             run.status === "ready" &&
@@ -76,6 +80,7 @@
       .sort(
         (a, b) =>
           b.promptId.localeCompare(a.promptId, undefined, { numeric: true }) ||
+          (sort === "score" ? b.bestScore - a.bestScore : 0) ||
           (sort === "recent" ? recent(a.latest, b.latest) : 0) ||
           U.compareModels(
             data.models.find((m) => m.id === a.modelId),

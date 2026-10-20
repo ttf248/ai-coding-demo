@@ -8,6 +8,7 @@ const context = {};
 vm.runInNewContext(read("assets/core.js"), context);
 vm.runInNewContext(read("assets/topic-records.js"), context);
 const R = context.ArchiveTopicRecords;
+const U = context.ArchiveUI;
 
 test("duration display preserves recorded scope, approximate text and unknown values", () => {
   assert.equal(R.durationSummary({}), "耗时未记录");
@@ -133,6 +134,58 @@ test("history grouping separates efforts, tools and execution modes", () => {
       condition.runs.some((run) => run.id === "baseline"),
     ).runs.length,
     2,
+  );
+});
+
+test("score ranking is independent from the model ordering", () => {
+  const rated = data.runs.filter((run) => U.scoreValue(run) !== null);
+  const best = rated.reduce((top, run) =>
+    (run.score.total ?? -1) > (top?.score.total ?? -1) ? run : top,
+  );
+  const worse = rated.reduce((low, run) =>
+    (run.score.total ?? 101) < (low?.score.total ?? 101) ? run : low,
+  );
+  assert.ok(U.compareRunsBySort(data, best, worse, "score") < 0);
+  assert.ok(U.compareRunsBySort(data, worse, best, "score") > 0);
+  // Equal scores and dates fall back to the run id, not to the model ordering.
+  const twin = rated.find(
+    (run) =>
+      run.id !== best.id &&
+      run.score.total === best.score.total &&
+      run.date === best.date,
+  );
+  if (twin)
+    assert.equal(
+      Math.sign(U.compareRunsBySort(data, best, twin, "score")),
+      Math.sign(best.id.localeCompare(twin.id, "en")),
+    );
+  // Records without a numeric score rank after rated records.
+  const unscored = data.runs.find((run) => U.scoreValue(run) === null);
+  assert.ok(unscored, "the archive keeps records without a screenshot score");
+  assert.ok(U.compareRunsBySort(data, unscored, best, "score") > 0);
+});
+
+test("model groups rank by their best screenshot score", () => {
+  const runs = data.runs.filter(
+    (run) => run.topicId === "voxel-construction-site",
+  );
+  const groups = R.group(data, runs, "score");
+  const bestScores = groups.map((group) =>
+    group.runs.reduce((best, run) => Math.max(best, U.scoreValue(run) ?? -1), -1),
+  );
+  for (let i = 1; i < bestScores.length; i++)
+    assert.ok(
+      bestScores[i - 1] >= bestScores[i],
+      "groups follow the recorded screenshot score",
+    );
+  const modelGroups = R.group(data, runs, "model");
+  assert.deepEqual(
+    modelGroups.map((group) => group.key).sort(),
+    groups.map((group) => group.key).sort(),
+  );
+  assert.notDeepEqual(
+    modelGroups.map((group) => group.key),
+    groups.map((group) => group.key),
   );
 });
 

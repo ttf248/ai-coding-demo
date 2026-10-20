@@ -137,11 +137,17 @@ test("390px list exposes facts and duration without disclosures or page overflow
 test("screenshot ranking restores from URL and expands real evidence", async ({
   page,
 }) => {
-  await page.goto("topic.html?id=circuit-lab&sort=score");
-  const first = page.locator(".topic-run-row").first();
   const expected = [...runs]
     .filter((r) => r.score.status === "rated")
     .sort((a, b) => b.score.total - a.score.total)[0];
+  await page.goto("topic.html?id=circuit-lab");
+  await expect(page.locator("#topic-sort")).toHaveValue("score");
+  expect(new URL(page.url()).searchParams.has("sort")).toBe(false);
+  const first = page.locator(".topic-run-row").first();
+  await expect(first.locator(".score-details summary")).toContainText(
+    `${expected.score.total}/100`,
+  );
+  await page.goto("topic.html?id=circuit-lab&sort=score");
   await expect(first.locator(".score-details summary")).toContainText(
     `${expected.score.total}/100`,
   );
@@ -150,4 +156,27 @@ test("screenshot ranking restores from URL and expands real evidence", async ({
   await expect(first.locator(".score-evidence")).toContainText("规则 v2");
   await page.reload();
   await expect(page.locator("#topic-sort")).toHaveValue("score");
+});
+
+test("default ranking orders every rated record by screenshot score", async ({
+  page,
+}) => {
+  await page.goto("topic.html?id=circuit-lab");
+  const scored = await page.locator(".topic-run-score .score-chip").allTextContents();
+  const totals = scored
+    .map((text) => Number(text.match(/(\d+)/)?.[1]))
+    .filter((value) => Number.isInteger(value));
+  expect(totals).toEqual([...totals].sort((a, b) => b - a));
+  const rows = await page
+    .locator(".topic-run-row")
+    .evaluateAll((nodes) => nodes.map((node) => node.id.slice(4)));
+  const expected = [...runs]
+    .sort(
+      (a, b) =>
+        (b.score?.total ?? -1) - (a.score?.total ?? -1) ||
+        (b.date || "").localeCompare(a.date || "") ||
+        a.id.localeCompare(b.id, "en"),
+    )
+    .map((run) => run.id);
+  expect(rows).toEqual(expected);
 });

@@ -50,7 +50,7 @@ test("model filters and all topic record views use generations and same-generati
   await page.goto("./");
   for (const ids of Object.values(expected))
     expect(await optionIds(page, "#model", ids)).toEqual(ids);
-  await page.goto("topic.html?id=bluebook&prompt=v2");
+  await page.goto("topic.html?id=bluebook&prompt=v2&sort=model");
   for (const [provider, ids] of Object.entries(expected)) {
     const registered = new Set(
       data.runs

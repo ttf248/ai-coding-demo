@@ -1,4 +1,12 @@
 import { test, expect } from "@playwright/test";
+import { loadCatalog } from "../../scripts/lib.mjs";
+
+const data = loadCatalog();
+const batchRun = data.runs
+  .filter(
+    (run) => run.topicId === "fluid-simulation" && run.billing?.type === "batch",
+  )
+  .sort((a, b) => (b.score?.total ?? -1) - (a.score?.total ?? -1))[0];
 
 test("mobile directory exposes filters and the first card action within the first screen", async ({
   page,
@@ -27,7 +35,7 @@ test("mobile experiment cards show actions without horizontal scrolling and expa
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("topic.html?id=fluid-simulation&view=list");
-  const row = page.locator(".topic-run-row").first();
+  const row = page.locator("#run-" + batchRun.id);
   await expect(row.locator(".topic-run-date")).toBeHidden();
   await row.locator(".run-context summary").click();
   await expect(row.locator(".topic-run-date")).toBeVisible();

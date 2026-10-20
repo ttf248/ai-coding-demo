@@ -37,6 +37,7 @@
 ## 首页与文档
 
 - 首页卡片、筛选、统计、主题版本和对比候选均从生成数据读取，禁止手写卡片或人工维护项目计数。
+- 主题页实验记录默认按截图评分排序，这是一套独立于模型排序的顺序；模型代际排序只在用户显式选择 `sort=model` 时使用。评分排序的并列规则与无评分记录的位置见[维护指南](docs/maintenance.md#主题页浏览)。
 - assets/generated/catalog.js、主题 Readme、根 README 的 catalog 区块和实验 README 的 archive 区块由 generate 维护，禁止手改。
 - 根 README 的开发时间线和实验复盘为人工内容，生成器不得覆盖。
 - 新技术主题在 docs/{slug}/ 保留 Readme.md 与可运行示例，同时登记 catalog/guides.json。

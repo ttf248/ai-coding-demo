@@ -336,6 +336,16 @@
       a.id.localeCompare(b.id, "en")
     );
   }
+  // Score ranking is an independent order: it never falls back to model ordering.
+  function compareRunsBySort(data, a, b, sort) {
+    if (sort === "score") return compareRunScores(a, b);
+    if (sort === "recent")
+      return (
+        (b.date || "").localeCompare(a.date || "") ||
+        compareModelRuns(data, a, b)
+      );
+    return compareModelRuns(data, a, b);
+  }
   function bestScoredRun(runs) {
     return [...runs]
       .filter((run) => scoreValue(run) !== null)
@@ -822,6 +832,7 @@
     scoreValue,
     scoreBadge,
     compareRunScores,
+    compareRunsBySort,
     bestScoredRun,
     compareTopics,
     complexityBadge,
