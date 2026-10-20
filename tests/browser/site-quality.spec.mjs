@@ -243,6 +243,13 @@ test("reading pages have formatted documents, navigation and mobile layout", asy
       "href",
       /\.md$/,
     );
+    // Generator block markers stay in the Markdown but never reach the reader.
+    await expect(page.locator(".document-content")).not.toContainText(
+      "<!-- archive:",
+    );
+    await expect(page.locator(".document-content")).not.toContainText(
+      "<!-- catalog:",
+    );
     await page.setViewportSize({ width: 390, height: 844 });
     expect(
       await page.evaluate(
