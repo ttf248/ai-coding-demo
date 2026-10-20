@@ -84,7 +84,11 @@
   ]
     .map(
       ([n, label]) =>
-        "<div><strong>" + n + "</strong><span>" + label + "</span></div>",
+        '<div role="listitem"><strong>' +
+        n +
+        "</strong><span>" +
+        label +
+        "</span></div>",
     )
     .join("");
   $("guide-count").textContent =
@@ -198,7 +202,7 @@
       dims.height +
       '">' +
       '<span class="cover-hint" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="m8 8-5-5m13 5 5-5M8 16l-5 5m13-5 5 5"/></svg></span></button>' +
-      '<div class="image-feedback" role="status"><span>截图加载中…</span><button data-retry-image hidden>重试</button></div>' +
+      '<div class="image-feedback"><span>截图加载中…</span><button data-retry-image hidden>重试</button></div>' +
       "<figcaption><span>" +
       (covers.length ? "实际截图 · 首屏" : "实际截图") +
       "</span><strong>" +
@@ -227,6 +231,9 @@
           feedback.querySelector("span").textContent = failed
             ? "截图加载失败"
             : "截图加载中…";
+          // 只有加载失败才播报，正常路径不创建实时区域。
+          if (failed) feedback.setAttribute("role", "alert");
+          else feedback.removeAttribute("role");
           retry.hidden = !failed;
           figure.classList.toggle("image-failed", failed);
         };
@@ -234,6 +241,7 @@
         img.addEventListener("error", update);
         retry.addEventListener("click", () => {
           feedback.querySelector("span").textContent = "截图加载中…";
+          feedback.removeAttribute("role");
           retry.hidden = true;
           figure.classList.remove("image-failed");
           const source = img.getAttribute("src");

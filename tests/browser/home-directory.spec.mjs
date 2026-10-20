@@ -35,6 +35,28 @@ test("insufficient screenshot evidence remains visible without a numeric score",
   expect(selected).toBe("rated");
 });
 
+test("homepage exposes grouped semantics, a valid heading order and no chatty live regions", async ({
+  page,
+}) => {
+  await page.goto("./");
+  // 分组容器带可访问名称，aria-label 不再落在 role=generic 上。
+  await expect(page.getByRole("list", { name: "实验统计" })).toHaveCount(1);
+  await expect(page.getByRole("group", { name: "快捷筛选" })).toHaveCount(1);
+  await expect(page.getByRole("group", { name: "目录视图" })).toHaveCount(1);
+  // 标题层级不跳级。
+  const levels = await page.evaluate(() =>
+    [...document.querySelectorAll("h1,h2,h3,h4,h5,h6")].map((heading) =>
+      Number(heading.tagName.slice(1)),
+    ),
+  );
+  expect(levels[0]).toBe(1);
+  for (let i = 1; i < levels.length; i += 1) {
+    expect(levels[i] - levels[i - 1]).toBeLessThanOrEqual(1);
+  }
+  // 正常渲染不产生实时区域。
+  await expect(page.locator('#project-grid [role="status"]')).toHaveCount(0);
+  await expect(page.locator("#result-count")).toHaveAttribute("role", "status");
+});
 test("homepage covers pick the variant that matches the displayed size", async ({
   page,
 }) => {
