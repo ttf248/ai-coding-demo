@@ -207,9 +207,7 @@
     const variants = screenshotVariants(run);
     if (!variants.length) return null;
     const sorted = [...variants].sort((a, b) => a.width - b.width);
-    return (
-      sorted.find((variant) => variant.width >= targetWidth) || sorted[0]
-    );
+    return sorted.find((variant) => variant.width >= targetWidth) || sorted[0];
   };
   const screenshotThumbnailURL = (run, targetWidth) =>
     (targetWidth
@@ -223,7 +221,9 @@
     if (!variants.length) return "";
     return (
       ' srcset="' +
-      variants.map((variant) => `${variant.path} ${variant.width}w`).join(", ") +
+      variants
+        .map((variant) => `${variant.path} ${variant.width}w`)
+        .join(", ") +
       '"'
     );
   };
@@ -234,9 +234,8 @@
       (a, b) => a.width - b.width,
     );
     if (!covers.length) return null;
-    return (
-      covers.find((cover) => cover.width >= targetWidth) || covers[0]
-    ).path;
+    return (covers.find((cover) => cover.width >= targetWidth) || covers[0])
+      .path;
   };
   const screenshotCoverSrcset = (run) => {
     const covers = [...screenshotCoverVariants(run)].sort(
@@ -680,7 +679,7 @@
       document.querySelectorAll("[data-compare]").forEach((b) => {
         const on = selected.includes(b.dataset.compare);
         b.setAttribute("aria-pressed", String(on));
-        b.textContent = on ? "移出对比" : "加入对比";
+        b.textContent = on ? "移出对比" : b.dataset.compareLabel || "加入对比";
       });
     }
     document.addEventListener("click", (event) => {
@@ -810,7 +809,7 @@
       tagsBadge +
       '</div><div class="card-actions">' +
       (href
-        ? '<a' +
+        ? "<a" +
           (previewLinkClass
             ? ' class="' + escape(previewLinkClass) + '"'
             : "") +

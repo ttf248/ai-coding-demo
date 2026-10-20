@@ -152,7 +152,7 @@ test("homepage covers use registered run screenshots and direct previews", async
   await expect(card.locator(".topic-cover figcaption")).toContainText(
     source.label,
   );
-  await expect(card.locator(".latest-run")).toContainText("最高评分");
+  await expect(card.locator(".latest-run")).toContainText("当前筛选代表截图");
   const previewHref = await card.locator(".preview-link").getAttribute("href");
   expect(previewHref).toBeTruthy();
   const response = await page.request.get(previewHref);

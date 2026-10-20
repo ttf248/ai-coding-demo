@@ -147,7 +147,8 @@
   // 封面槽位宽度必须与实际渲染宽度一致：声明偏小会让浏览器取到过窄的变体。
   // 主题列表与实验账本是两套不同的槽位，不能共用一份声明。
   const COVER_SIZES = {
-    compact: "(max-width: 700px) calc(100vw - 34px), (max-width: 1100px) 46vw, 400px",
+    compact:
+      "(max-width: 700px) calc(100vw - 34px), (max-width: 1100px) 46vw, 400px",
     grid: "(max-width: 700px) calc(100vw - 34px), (max-width: 1100px) 46vw, 610px",
     list: "(max-width: 700px) 88px, 224px",
     ledger: "(max-width: 700px) 76px, (max-width: 1100px) 64px, 88px",
@@ -212,7 +213,13 @@
       "<figcaption><span>" +
       (covers.length ? "实际截图 · 首屏" : "实际截图") +
       "</span><strong>" +
-      e(U.modelLabel(data, run) + " · " + U.effortLabel(run.effort)) +
+      e(
+        U.modelLabel(data, run) +
+          " · " +
+          U.effortLabel(run.effort) +
+          " · " +
+          run.promptId,
+      ) +
       "</strong></figcaption></figure>"
     );
   }
@@ -337,7 +344,7 @@
         const summaryRun = topRated || latest;
         const summaryLabel =
           U.scoreValue(summaryRun) !== null
-            ? "最高评分截图 · 当前筛选范围"
+            ? "当前筛选代表截图 · 按截图评分选取，不代表模型排名"
             : "最新实验 · " + (summaryRun?.date || "日期未记录");
         let previewRun =
           latest && U.previewURL(latest)
@@ -443,7 +450,9 @@
           (inspectRun
             ? '<button data-compare="' +
               e(inspectRun.id) +
-              '" aria-pressed="false">加入对比</button>'
+              '" data-compare-label="对比此实验" title="' +
+              e(U.runSummary(data, inspectRun) + " · " + inspectRun.promptId) +
+              '" aria-pressed="false">对比此实验</button>'
             : "") +
           "</div></div></article>"
         );
@@ -494,6 +503,7 @@
       );
     $("sort").closest("label").hidden = state.group !== "runs";
     $("sort").value = sort;
+    $("sort-context").hidden = state.group !== "topics";
     document
       .querySelectorAll("[data-view]")
       .forEach((b) =>
@@ -512,6 +522,7 @@
     ])
       $(key).value = state[key];
     $("sort").value = sort;
+    $("sort-context").hidden = state.group !== "topics";
     if (!state.model && state.provider && state.provider !== "unknown")
       $("model").value = "provider:" + state.provider;
     $("preview-only").setAttribute(
@@ -653,7 +664,8 @@
           (option.hasAttribute("data-indent") ? "　" : "") +
           option.dataset.label +
           " · " +
-          count;
+          count +
+          " 条实验";
       }
     }
   }

@@ -247,6 +247,9 @@ const BASELINE = {
   },
 };
 
+// 新增排序说明继承结果区字号，不能压缩成难读的辅助标签。
+BASELINE["home@1440"]["#sort-context"] = { "font-size": "13px" };
+
 for (const [width, sizes] of [
   [1440, "desktop"],
   [390, "mobile"],

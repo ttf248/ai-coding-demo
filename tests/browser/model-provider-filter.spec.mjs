@@ -27,7 +27,7 @@ test("homepage selects entire providers, switches models and restores filter cou
     await expect(
       page.locator(`#model option[value="provider:${provider}"]`),
     ).toHaveText(
-      `${provider} · ${activeRuns.filter((run) => providerOf(run) === provider).length}`,
+      `${provider} · ${activeRuns.filter((run) => providerOf(run) === provider).length} 条实验`,
     );
   }
   await page.locator("#model").selectOption("provider:Anthropic");
