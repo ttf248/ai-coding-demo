@@ -53,6 +53,55 @@ if (
   );
 if (!catalog.models.some((m) => m.id === model))
   throw Error("Register model in catalog/models.json first.");
+// 查重：主题、提示词和模型都不重复登记。提示词正文相同是允许的
+// （同一任务正文可以对应不同原始输入），这里只提示可以复用的版本。
+const notes = [];
+const slugOf = (text) =>
+  String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+for (const existing of catalog.topics) {
+  if (existing.id === topic) continue;
+  if (existing.title === title)
+    notes.push(
+      `主题「${existing.title}」（${existing.id}）与本次标题相同，确认不是重复登记。`,
+    );
+  else {
+    // 中文标题规范化后为空，只能按标题原文比对，不能按空 slug 匹配。
+    const slug = slugOf(title);
+    if (slug && slugOf(existing.title) === slug)
+      notes.push(
+        `主题「${existing.title}」（${existing.id}）与本次标题的规范化形式相同，确认不是重复登记。`,
+      );
+  }
+}
+for (const existing of catalog.models) {
+  if (existing.id === model) continue;
+  if (existing.label === model)
+    notes.push(
+      `模型「${existing.label}」（${existing.id}）与本次 ${model} 指向同一型号，确认模型字典没有重复条目。`,
+    );
+  else {
+    const slug = slugOf(existing.label);
+    if (slug && slug === model)
+      notes.push(
+        `模型「${existing.label}」（${existing.id}）与本次 ${model} 指向同一型号，确认模型字典没有重复条目。`,
+      );
+  }
+}
+if (prompt) {
+  const target = catalog.prompts.find(
+    (p) => p.topicId === topic && p.id === prompt,
+  );
+  const same = catalog.prompts.filter(
+    (p) => p.topicId === topic && p.id !== prompt && p.hash === target?.hash,
+  );
+  if (same.length)
+    notes.push(
+      `提示词 ${prompt} 与 ${same.map((p) => p.id).join("、")} 正文相同，属于同一任务正文的不同版本，不需要重复登记。`,
+    );
+}
 const base = `demos/${topic}`;
 if (
   prompt &&
@@ -163,5 +212,6 @@ writeJSON(`${dir}/run.json`, {
   links: [],
 });
 console.log(
-  `Created ${dir}. Fill prompt and metadata, calculate input hash with node, then generate and validate. Drafts have no preview by default.`,
+  `Created ${dir}. Fill prompt and metadata, then run npm run demo:sync -- ${id} to write the input fingerprint and list what is still missing. Drafts have no preview by default.`,
 );
+for (const note of notes) console.log(`注意：${note}`);

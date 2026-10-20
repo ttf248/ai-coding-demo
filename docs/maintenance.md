@@ -44,9 +44,28 @@
 - `assets/generated/catalog.js`：列表使用的轻量摘要，不包含原始输入和任务正文。
 - `assets/generated/topics/*.json`：按主题读取的详情，批次费用引用共享字典。
 - `assets/generated/inputs/*.json` 与 `tasks/*.json`：按指纹去重的输入和任务正文；仅统一 BOM 与换行，原始 Markdown 不变。查看正文时按需读取，失败可重试。
-- `assets/generated/readers/`：实验、主题、技术说明与维护文档的静态 HTML 阅读页，保留原文下载、目录、代码复制及相对链接。缺失的历史附件显示“文件未留存”，原文路径继续保留。
-- `assets/generated/screenshots/`：480 / 960 像素 WebP 缩略图；文件名含原图指纹，列表使用 `srcset`，放大预览保留原始 PNG。
+- `assets/generated/readers/`：实验、主题、技术说明与维护文档的静态 HTML 阅读页，保留原文下载、目录、代码复制及相对链接。生成区块标记留在 Markdown 源文档中供生成器更新，但渲染为阅读页时会自动剔除；不要手改生成阅读页或从源文档删除这些标记。缺失的历史附件显示“文件未留存”，原文路径继续保留。
+- `assets/generated/screenshots/`：从 run 登记的原始 PNG 派生 WebP 资源。按原图宽度生成不超过原图尺寸的 240、480、960 像素缩略图；高宽比大于 1.15 的竖图另生成顶部裁剪的 16:10 封面，宽度为 480 / 960 像素（不超过原图宽度）。文件名含原图指纹，首页按展示槽位和断点选择资源；放大预览和阅读页仍使用完整原始 PNG。
 - `assets/generated/vendor/`、`guide-demos.css` 和 `guide-react.js`：技术示例的本地运行资源、许可证及预编译脚本。技术示例修改后运行 generate 即可；已归档 demo 不统一升级依赖。
+
+导入者只需把实际运行截图 PNG 放入 run 目录并登记 `run.json.screenshot`，随后执行 `npm run generate`。截图尺寸、指纹、缩略图及竖图封面均由脚本派生，不能手工制作、登记或修改 `assets/generated/screenshots/` 中的文件；派生资源需要和其他生成站点文件一起提交。截图证据本身仍须人工按评分规则复核，缩略图生成不会代替截图评分。
+
+`assets/generated/catalog.js` 由生成器逐条输出目录记录，每条记录单独一行，便于审阅新增案例只影响哪些条目；不要手工调整输出格式或编辑生成文件。`npm run validate` 会核对截图派生文件是否存在、生成阅读页是否泄漏区块标记，并执行本站样式文件的重复规则闸门。
+
+### 新案例导入中的脚本职责
+
+| 命令 | 自动完成 | 仍需维护者完成 |
+| --- | --- | --- |
+| `npm run new:demo -- ...` | 检查模型和指定提示词是否已登记、拒绝默认追加归档主题、选择下一个 `rNN` 并创建 draft 文件结构；提示同名主题、同型号模型和同一任务正文的重复登记风险。未指定提示词时会建一个待填写的新版本。 | 确认脚本提示的重复项；填入真实输入、来源、运行信息、复盘、预览和评分。脚手架不会推断或补齐缺失事实。 |
+| `npm run demo:sync -- <id>` | 按实际文件重算草稿的输入指纹与提示词指纹，在指纹尚未记录时补写评分指纹，并打印导入清单（占位文字、截图、预览入口、`embed`、评分状态、访问统计引用）。`--check` 只报告，`--finalize` 在清单全部通过后把 `status` 置为 `ready`。 | 填写真实输入、来源、运行信息、复盘和评分；把预览入口登记为可嵌入对比页。只处理 `status: "draft"` 的记录，已入库记录的输入不会被脚本改写。 |
+| `npm run build:demo -- <id>` | 仅对 `kind: "build"` 的实验安装其独立依赖、运行登记命令、复制预览并记录构建指纹。 | 确认默认入口、Pages 子路径和 iframe 中的真实页面表现。静态 HTML 与外部部署不走这个构建脚本。 |
+| `npm run review:scores` | 生成本机临时盲审图集和匿名原图，隐藏模型、档位、日期、费用与旧分。 | 按[案例评分规则](case-scoring.md)逐图看图、写入分数与评语；图集只帮助检查，不自动识图或打分。 |
+| `npm run generate` | 更新目录、阅读页、截图指纹和派生图片；生成文件按既定格式写入。 | 保留源数据和原始 PNG，检查生成 diff 并提交生成站点文件；不手改 `assets/generated/`。 |
+| `npm run validate` | 检查 schema、ID、路径、输入/评分指纹、构建产物、生成文件新鲜度、截图派生资源、阅读页标记，以及本站 CSS 重复闸门。 | 它不替代实际打开对比页确认主体可见、按截图规则人工评分或核实外部 HTTPS / iframe 状态。 |
+
+样式按页面归属放置：跨页面共用的规则放 `assets/polish.css`，共用组件（如对比栏）放 `assets/site.css`，页面专属规则只放该页的样式表 `home.css`、`topic.css` / `topic-lifecycle.css`、`compare.css`。同一选择器不写在多个文件里；`validate` 的样式重复闸门保持跨文件重复选择器和同文件完全相同声明都不增加。案例自身的样式仍归对应 run，不需要为导入案例调整本站样式表。
+
+改动首页、主题页或对比页的渲染结果时，`tests/browser/style-baseline.spec.mjs` 里的计算样式钉子要同步更新：钉子值变化等于页面外观变化，提交信息里写明改了什么。图片槽位宽度变化时，另外核对 `sizes` 声明与实际渲染宽度一致，声明偏小会让浏览器取到过窄的变体。新增或收紧规则时，同时补一条能自动判定违反的检查（`validate` 闸门或测试），只有文档没有检查的规则会在下一次改动时失效。
 
 技术索引在 `catalog/guides.json` 登记 `status` 与 `network`。当前示例的脚本、样式无需远程 CDN；Unsplash 与 Skeleton 示例仍需联网加载外部图片，不能标为离线。新增技术示例保持本站导航和 390px 布局，禁止占位 JSX 作为可运行入口。
 
@@ -113,14 +132,16 @@ npm run new:demo -- --topic voxel-construction-site --title "新的工地实验"
 
 1. 写入真实任务正文和完整原始输入。相同正文复用已有 prompt ID，不覆盖已有正文。
 2. 放入产物，填写说明、日期、技术栈、工具、网络要求以及 preview 配置。
-3. 首次定稿时计算输入 hash，并填入 `input.hash`；新任务正文的 hash 同样写入 prompt.json。已归档输入变化必须新建实验或提示词版本，不能用更新 hash 掩盖改写。
-4. 保留原始提示词或在 README 中链接本目录的 `prompt.md`；补充运行与验证记录。
-
-计算输入指纹（替换文件路径）：
+3. 保留原始提示词或在 README 中链接本目录的 `prompt.md`；补充运行与验证记录。
+4. 运行 `npm run demo:sync -- <实验 ID>`：脚本按实际文件重算输入指纹与提示词指纹，在指纹尚未记录时补写评分指纹，并列出尚未完成的导入项。确认清单全部通过后加 `--finalize`，脚本把 `status` 置为 `ready`；还有缺项时它会拒绝并列出原因。
 
 ```sh
-node --input-type=module -e "import {read,hash} from './scripts/lib.mjs'; console.log(hash(read('demos/TOPIC/runs/RUN/prompt.md')))"
+npm run demo:sync -- topic--model-effort-r01 --check
+npm run demo:sync -- topic--model-effort-r01
+npm run demo:sync -- topic--model-effort-r01 --finalize
 ```
+
+输入指纹由脚本写入，不手工计算。已入库记录（`status` 不是 `draft`）的输入属于历史证据，脚本拒绝改写；已归档输入发生变化必须新建实验或提示词版本，不能用更新指纹掩盖改写。评分指纹只在尚未记录时补写；指纹已存在且与当前文件不一致时说明证据变了，必须重新看图复核，不能只刷新指纹绕过复核。
 
 ### 预览配置
 
@@ -158,6 +179,7 @@ npm run build:demo -- bluebook--minimax-m2-unknown-r01
 外部部署设置 `kind: "external"`、HTTPS `externalUrl`、空 `pages`、null `defaultPage`、null `build`；新导入的外部案例经 iframe 验证后设置 `embed: true`，未验证或被站点策略阻止时暂缓导入。历史上的无预览记录可设置 `kind: "none"`、`embed: false`，新案例不得以此状态入库，也不提供伪预览。外部备用地址放在 `links` 中。
 
 ```sh
+npm run demo:sync -- <实验 ID>
 npm run generate
 npm run validate
 npm test
@@ -177,7 +199,7 @@ npm run preview
 
 ## 校验和浏览器回归
 
-`npm run validate` 检查 schema、唯一 ID、引用、大小写敏感的文件路径、默认入口、输入指纹、构建新鲜度、产物完整性及生成区块；生成器重复执行应无差异。
+`npm run validate` 检查 schema、唯一 ID、引用、大小写敏感的文件路径、默认入口、输入指纹、构建新鲜度、产物完整性、截图缩略图与封面文件、阅读页生成标记及本站 CSS 重复规则；生成器重复执行应无差异。CSS 闸门只覆盖本站 `assets/*.css`，不替代案例入口、iframe、截图证据或评分的人工检查。
 
 ```sh
 npx playwright install chromium

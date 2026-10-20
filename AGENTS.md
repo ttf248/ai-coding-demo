@@ -11,7 +11,7 @@
 
 ## 目录与数据
 
-1. 新增前查询已有主题、提示词及模型，避免重复登记。
+1. 新增前查询已有主题、提示词及模型，避免重复登记。`npm run new:demo` 会提示同名主题、同型号模型和同一任务正文的重复登记风险，按提示逐项确认后再继续。
 2. 统一放入 `demos/{topic}/runs/{model-slug}-{effort}-rNN/`，小写 kebab-case。实验 ID 为 `{topic}--{run}`，不会因显示标题变化而改变。
 3. 每条实验必须包含 run.json、prompt.md 和 Readme.md。保留完整输入、模型、档位、日期、类型、运行方式及复盘。缺失信息用 unknown/null，不补造。
 4. 共用任务正文放在主题 prompts 下，按版本归档。相同正文可关联不同原始输入；完整输入指纹只统一 BOM 与换行，不删改内容。
@@ -33,13 +33,15 @@
 - 全栈或独立部署：保留源码及运行说明；必须有已知可访问且允许 iframe 的 HTTPS 外部地址才可导入并登记 `external`、`embed: true`；地址尚未就绪时暂缓导入，不制造静态预览。
 - 仅提示词：保留输入及来源；导入前须提供能在对比页中嵌入的记录展示入口，并明确标识为提示词记录、没有可运行产物。展示能力尚未实现时暂缓导入，不把阅读页或空白页冒充模型产物。
 - 不为归档统一升级历史项目依赖或重写 demo。必要部署修复必须在 changes 中登记。
+- 导入案例的机械字段由脚本写入，不手工计算：输入指纹、提示词指纹和首次评分指纹用 `npm run demo:sync -- <run-id>` 补写，脚本只处理 `status: "draft"` 的记录，已入库记录的输入属于历史证据，脚本拒绝改写。补写评分指纹只在指纹尚未记录时进行；指纹已存在且与当前文件不一致时说明证据变了，必须重新看图复核，不能只刷新指纹。`npm run demo:sync -- <run-id> --check` 只报告不写入，`--finalize` 在导入清单全部通过后才把 `status` 置为 `ready`。
 
 ## 首页与文档
 
 - 首页卡片、筛选、统计、主题版本和对比候选均从生成数据读取，禁止手写卡片或人工维护项目计数。
 - 主题页实验记录默认按截图评分排序，这是一套独立于模型排序的顺序；模型代际排序只在用户显式选择 `sort=model` 时使用。评分排序的并列规则与无评分记录的位置见[维护指南](docs/maintenance.md#主题页浏览)。
-- assets/generated/catalog.js、主题 Readme、根 README 的 catalog 区块和实验 README 的 archive 区块由 generate 维护，禁止手改。
+- assets/generated/catalog.js、阅读页、截图缩略图与竖图封面、主题 Readme、根 README 的 catalog 区块和实验 README 的 archive 区块由 generate 维护，禁止手改。导入截图时只登记真实 PNG；派生图由生成器创建，细节见[维护指南](docs/maintenance.md#生成的站点资料)。
 - 根 README 的开发时间线和实验复盘为人工内容，生成器不得覆盖。
+- 站点样式按页面归属放置：跨页面共用的规则放 `assets/polish.css`，页面专属规则只放该页的样式表（`home.css`、`topic.css` / `topic-lifecycle.css`、`compare.css`），共用组件放 `assets/site.css`。同一选择器不写在多个文件里，`npm run validate` 的样式重复闸门保持跨文件重复选择器与同文件完全相同声明都不增加。案例自身的样式仍归对应 run，导入案例不需要调整本站样式表。
 - 新技术主题在 docs/{slug}/ 保留 Readme.md 与可运行示例，同时登记 catalog/guides.json。
 - Google Analytics 统一通过公共脚本 `assets/analytics.js` 接入，测量 ID `G-8E54P1HX3G` 和初始化逻辑只在该脚本维护，不在页面复制 Google tag。后续新增或导入实验记录时，生成的实验阅读页及本仓库可维护的网页入口（静态 HTML 各页面、构建型项目入口与 previews 产物）都必须用带 `defer` 的 script 标签引用公共脚本，并按入口位置设置可用路径，兼容根路径与 Pages 子路径。阅读页由生成器统一添加引用；预览入口在源码中添加，构建型实验须重建预览。维护者追加引用须在 run.json 的 changes 登记，不修改原始输入，也不为补统计批量改写历史实验产物。仅提示词或无网页入口的记录由阅读页承载统计；外部部署继续遵循既有人工部署约束。代码和检查方式见[维护指南的访问统计要求](docs/maintenance.md#访问统计)。
 - CLAUDE.md 只引用本文件，不复制第二套规则。
@@ -67,12 +69,14 @@
 ## 提交前检查
 
 1. 若修改构建型实验源码或构建配置，先 `npm run build:demo -- <id>`；文档修改不要求重建。
-2. 执行 `npm run generate`、`npm run validate`、`npm test`、`node --check assets/home.js` 和 `git diff --check`。
+2. 执行 `npm run generate`、`npm run validate`（包括截图派生资源、阅读页标记及本站 CSS 重复闸门）、`npm test`、`node --check assets/home.js` 和 `git diff --check`。
 3. 首页或对比交互变更执行 `npm run test:browser`，覆盖目录计数、筛选、搜索、排序、视图和加载更多；同输入、异输入、无预览、分享恢复、移动端与子路径。
 4. 用本地静态服务器检查新增入口、原始输入、已登记的预览图和首页生成的链接；390px 移动端无页面水平溢出。单 HTML 额外验证直接打开。
 5. 目录迁移核对完整性、旧目录消失及有效链接更新。迁移清单和原始历史输入中的旧路径作为证据保留，不做机械替换。
 6. 确保 previews 和 assets/generated 不被忽略；无 node_modules、缓存或中间 dist 误提交。干净检出无需构建即可预览站点。
 7. 新增或导入实验时，核对阅读页和可维护的网页入口均引用 `assets/analytics.js`，路径在根路径和 Pages 子路径下可用；页面不重复内联 Google tag，公共脚本使用 `G-8E54P1HX3G` 异步加载且每页仅初始化一次。统计服务不可用不能阻止页面功能或离线预览。验证脚本加载与初始化时使用拦截或模拟，避免向正式统计发送测试访问。
+8. 新增或收紧规则时，同时补一条能自动判定违反的检查（`npm run validate` 的闸门或一条测试）；只有文档没有检查的规则会在下一次改动时失效。
+9. 改动首页、主题页或对比页的渲染结果时，同步更新 `tests/browser/style-baseline.spec.mjs` 里的计算样式钉子；钉子值变化等于页面外观变化，要在提交信息里说明改了什么。图片槽位宽度变化时一并核对 `sizes` 声明与实际渲染宽度一致。
 
 ## 对比边界
 

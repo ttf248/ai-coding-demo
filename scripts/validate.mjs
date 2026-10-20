@@ -160,9 +160,18 @@ for (const p of catalog.prompts) {
     `Prompt directory mismatch ${p.id}`,
   );
   check(!!p.text.trim(), `Empty task ${p.id}`);
+  // 提示词正文被改动时指纹会失配。只被草稿引用的版本属于未入库的导入，
+  // 可以用 demo:sync 补写指纹；已入库记录引用的版本只能新建版本，不能改写。
+  const promptRuns = catalog.runs.filter(
+    (r) => r.topicId === p.topicId && r.promptId === p.id,
+  );
+  const promptIsDraftOnly =
+    promptRuns.length > 0 && promptRuns.every((r) => r.status === "draft");
   check(
     p.hash === readJSON(`${p.directory}/prompt.json`).hash,
-    `Task input changed: ${p.topicId}/${p.id}; create a new prompt version.`,
+    promptIsDraftOnly
+      ? `Task fingerprint is stale: ${p.topicId}/${p.id}. Run npm run demo:sync -- <draft run id> to update it.`
+      : `Task input changed: ${p.topicId}/${p.id}; create a new prompt version.`,
   );
   check(exists(p.source), `Missing prompt source ${p.source}`);
   check(
@@ -252,7 +261,9 @@ for (const r of catalog.runs) {
   );
   check(
     r.rawHash === r.input.hash,
-    `Original input changed: ${r.id}. Preserve history; create a new run for changed input.`,
+    r.status === "draft"
+      ? `Draft input fingerprint is stale: ${r.id}. Run npm run demo:sync -- ${r.id} to update it.`
+      : `Original input changed: ${r.id}. Preserve history; create a new run for changed input.`,
   );
   check(exists(r.document), `Missing Readme ${r.id}`);
   if (r.screenshot)

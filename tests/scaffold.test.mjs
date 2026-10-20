@@ -76,3 +76,91 @@ test("new demo scaffolding reuses prompts, allocates repeat runs and refuses unk
     fs.rmSync(temporary, { recursive: true, force: true });
   }
 });
+
+test("new demo scaffolding reports possible duplicate topics and models", () => {
+  const temporary = fs.mkdtempSync(
+    path.join(os.tmpdir(), "ai-archive-scaffold-"),
+  );
+  const write = (p, value) => {
+    const file = path.join(temporary, p);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, value);
+  };
+  try {
+    for (const name of [
+      "lib.mjs",
+      "site-output.mjs",
+      "model-ordering.mjs",
+      "new-demo.mjs",
+    ])
+      write(
+        "scripts/" + name,
+        fs.readFileSync(path.join(ROOT, "scripts", name)),
+      );
+    fs.mkdirSync(path.join(temporary, "demos"));
+    write(
+      "catalog/models.json",
+      '[{"id":"unknown","label":"未记录"},{"id":"gpt-6-1-sol","label":"GPT-6.1 Sol"}]',
+    );
+    write("catalog/categories.json", "[]");
+    write("catalog/guides.json", "[]");
+    const command = (args) =>
+      execFileSync(
+        process.execPath,
+        [
+          path.join(temporary, "scripts/new-demo.mjs"),
+          "--topic",
+          "sample",
+          "--title",
+          "Example",
+          ...args,
+        ],
+        { cwd: temporary, stdio: "pipe", encoding: "utf8" },
+      );
+    // 首次登记不产生提示。
+    const first = command(["--model", "gpt-6-1-sol", "--effort", "high"]);
+    assert.doesNotMatch(first, /与本次标题相同/);
+    // 同名主题再次登记时给出提示。
+    const output = execFileSync(
+      process.execPath,
+      [
+        path.join(temporary, "scripts/new-demo.mjs"),
+        "--topic",
+        "sample-again",
+        "--title",
+        "Example",
+        "--model",
+        "gpt-6-1-sol",
+        "--effort",
+        "high",
+      ],
+      { cwd: temporary, stdio: "pipe", encoding: "utf8" },
+    );
+    assert.match(output, /与本次标题相同/);
+    // 不同标题不产生误报。
+    const other = execFileSync(
+      process.execPath,
+      [
+        path.join(temporary, "scripts/new-demo.mjs"),
+        "--topic",
+        "other",
+        "--title",
+        "另一个主题",
+        "--model",
+        "gpt-6-1-sol",
+        "--effort",
+        "high",
+      ],
+      { cwd: temporary, stdio: "pipe", encoding: "utf8" },
+    );
+    assert.doesNotMatch(other, /与本次标题相同/);
+  } finally {
+    // Verify the exact temporary root before recursive cleanup.
+    if (
+      path.dirname(temporary) !== path.resolve(os.tmpdir()) ||
+      !path.basename(temporary).startsWith("ai-archive-scaffold-")
+    )
+      throw Error("Unsafe test cleanup path");
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+});
