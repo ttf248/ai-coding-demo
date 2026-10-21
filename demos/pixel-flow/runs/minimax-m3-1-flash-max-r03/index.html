@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <script src="../../../../assets/analytics.js" defer></script>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Pixel Flow · 图片粒子化与手势还原</title>
+    <style>
+      :root {
+        --bg: #05070d;
+        --panel: rgba(14, 18, 30, 0.86);
+        --line: rgba(120, 200, 255, 0.22);
+        --text: #e6f0ff;
+        --muted: #8fa4c0;
+        --accent: #57d2ff;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+        overflow-x: hidden;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 14px;
+        height: 100vh;
+        padding: 14px;
+        align-items: stretch;
+      }
+      .stage {
+        position: relative;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        background: #03050a;
+        min-height: 420px;
+      }
+      #scene {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px;
+      }
+      .side {
+        overflow-y: auto;
+        scrollbar-width: none;
+      }
+      .side::-webkit-scrollbar {
+        display: none;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 18px;
+      }
+      h2 {
+        margin: 0 0 10px;
+        font-size: 12px;
+        letter-spacing: 1.4px;
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .group {
+        margin-bottom: 18px;
+      }
+      p.note {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.8;
+        color: var(--muted);
+      }
+      button,
+      .filebtn {
+        font: inherit;
+        font-size: 13px;
+        color: var(--text);
+        background: rgba(87, 210, 255, 0.1);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 9px 12px;
+        cursor: pointer;
+        transition: 0.15s;
+        width: 100%;
+        text-align: center;
+      }
+      button:hover,
+      .filebtn:hover {
+        background: rgba(87, 210, 255, 0.2);
+      }
+      input[type="file"] {
+        display: none;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .field {
+        margin-bottom: 12px;
+      }
+      .field label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent);
+      }
+      #video {
+        width: 100%;
+        border-radius: 12px;
+        background: #000;
+        transform: scaleX(-1);
+        display: block;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+      }
+      #status {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-size: 12.5px;
+        line-height: 1.7;
+        background: rgba(87, 210, 255, 0.08);
+        border: 1px solid var(--line);
+        color: var(--text);
+      }
+      .gesture {
+        display: flex;
+        gap: 9px;
+        align-items: flex-start;
+        margin-bottom: 10px;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .gesture b {
+        display: block;
+        color: var(--text);
+        font-weight: 600;
+        font-size: 12.5px;
+      }
+      .tag {
+        flex: none;
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        font-size: 15px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .progress {
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.1);
+        overflow: hidden;
+        margin-top: 8px;
+      }
+      .progress i {
+        display: block;
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #57d2ff, #b98cff);
+        transition: width 0.2s linear;
+      }
+      #hud {
+        position: absolute;
+        left: 12px;
+        top: 12px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        background: rgba(6, 10, 18, 0.75);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px 11px;
+        font-size: 11.5px;
+        color: var(--text);
+      }
+      @media (max-width: 900px) {
+        .layout {
+          grid-template-columns: minmax(0, 1fr);
+          height: auto;
+        }
+        .stage {
+          min-height: 62vh;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <div class="stage">
+        <canvas id="scene"></canvas>
+        <div id="hud">
+          <span class="chip" id="chip-count">粒子 0</span>
+          <span class="chip" id="chip-gesture">手势：未检测</span>
+          <span class="chip" id="chip-mode">模式：等待图片</span>
+        </div>
+      </div>
+
+      <aside class="panel side">
+        <h1>Pixel Flow</h1>
+        <p class="note">
+          上传一张本地图片，图像会被拆解为粒子流；使用摄像头手势即可让粒子重新汇聚成原图。
+        </p>
+
+        <div class="group" style="margin-top: 16px">
+          <h2>1 · 选择图片</h2>
+          <label class="filebtn" for="file">选择本地图片</label>
+          <input id="file" type="file" accept="image/*" />
+          <div class="row">
+            <button id="sample">使用示例图像</button>
+            <button id="reset">重置粒子</button>
+          </div>
+          <div class="field" style="margin-top: 12px">
+            <label for="sampling"><span>采样率</span><span id="sampling-value">8 px</span></label>
+            <input id="sampling" type="range" min="3" max="16" step="1" value="8" />
+          </div>
+        </div>
+
+        <div class="group">
+          <h2>2 · 摄像头与手势</h2>
+          <video id="video" playsinline muted></video>
+          <div class="row">
+            <button id="camera">开启摄像头</button>
+            <button id="stopcam">关闭</button>
+          </div>
+          <div class="progress"><i id="bar"></i></div>
+          <div id="status">等待加载图片。摄像头未开启时，可直接用鼠标在画布上移动来牵引粒子。</div>
+        </div>
+
+        <div class="group">
+          <h2>手势说明</h2>
+          <div class="gesture">
+            <span class="tag">🖐</span>
+            <span><b>张开手掌</b>激活吸引，粒子跟随手部力场向原图位置靠拢。</span>
+          </div>
+          <div class="gesture">
+            <span class="tag">✊</span>
+            <span><b>握拳</b>暂停吸引，粒子保持当前状态，便于观察流线。</span>
+          </div>
+          <div class="gesture">
+            <span class="tag">☝️</span>
+            <span><b>竖起食指</b>直接完成还原，所有粒子立刻回到原图位置。</span>
+          </div>
+          <div class="gesture">
+            <span class="tag">🖱</span>
+            <span><b>鼠标 / 触摸</b>在未开启摄像头时作为力场中心，滚轮可缩放视图。</span>
+          </div>
+        </div>
+
+        <div class="group">
+          <h2>实现说明</h2>
+          <p class="note">
+            Three.js 负责粒子渲染与自定义 Shader，MediaPipe Hands
+            提供手部关键点；手势识别基于指尖伸开数量与指尖距离阈值判定，力场半径跟随手掌中心。
+          </p>
+        </div>
+      </aside>
+    </div>
+
+    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script>
+      (function () {
+        "use strict";
+        const canvas = document.getElementById("scene");
+        const video = document.getElementById("video");
+        const statusBox = document.getElementById("status");
+        const bar = document.getElementById("bar");
+        const chipCount = document.getElementById("chip-count");
+        const chipGesture = document.getElementById("chip-gesture");
+        const chipMode = document.getElementById("chip-mode");
+
+        if (typeof THREE === "undefined") {
+          statusBox.textContent = "Three.js 未能加载，请检查网络后刷新页面。";
+          return;
+        }
+
+        const renderer = new THREE.WebGLRenderer({
+          canvas,
+          antialias: true,
+          alpha: false,
+        });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x03050a);
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          1,
+          0.1,
+          200,
+        );
+        camera.position.set(0, 0, 14);
+
+        let points = null;
+        let geometry = null;
+        let material = null;
+        let targetPositions = null;
+        let currentPositions = null;
+        let colors = null;
+        let basePositions = null;
+        let particleCount = 0;
+        let aspect = 1;
+
+        const state = {
+          mode: "idle", // idle | scattered | attracting | paused | restored
+          progress: 0,
+          force: new THREE.Vector3(0, 0, 0),
+          forceActive: false,
+          hand: { x: 0, y: 0, has: false },
+          gesture: "none",
+          mouse: { x: 0, y: 0, active: false },
+          time: 0,
+        };
+
+        const uniforms = {
+          uSize: { value: 46 },
+          uTime: { value: 0 },
+          uProgress: { value: 0 },
+          uForce: { value: new THREE.Vector3() },
+          uForceStrength: { value: 0 },
+        };
+
+        const vertexShader = `
+          attribute float aSize;
+          attribute vec3 aColor;
+          uniform float uSize;
+          uniform float uTime;
+          uniform float uProgress;
+          uniform vec3 uForce;
+          uniform float uForceStrength;
+          varying vec3 vColor;
+          varying float vGlow;
+          void main() {
+            vColor = aColor;
+            vec3 p = position;
+            float d = distance(p, uForce);
+            float pull = uForceStrength * exp(-d * d * 0.09);
+            p = mix(p, position, 1.0);
+            p += uForce * pull * 0.08;
+            float wave = sin(uTime * 1.6 + position.x * 0.35 + position.y * 0.2);
+            p.z += wave * (1.0 - uProgress) * 0.16;
+            vGlow = 0.55 + 0.45 * clamp(1.0 - d / 7.0, 0.0, 1.0) * uForceStrength;
+            vec4 mv = modelViewMatrix * vec4(p, 1.0);
+            gl_PointSize = uSize * aSize / max(-mv.z, 0.5);
+            gl_Position = projectionMatrix * mv;
+          }
+        `;
+
+        const fragmentShader = `
+          varying vec3 vColor;
+          varying float vGlow;
+          void main() {
+            vec2 uv = gl_PointCoord - vec2(0.5);
+            float d = length(uv);
+            if (d > 0.5) discard;
+            float alpha = smoothstep(0.5, 0.05, d);
+            vec3 color = vColor * (0.85 + vGlow * 0.6);
+            gl_FragColor = vec4(color, alpha * (0.55 + vGlow * 0.45));
+          }
+        `;
+
+        function resize() {
+          const rect = canvas.getBoundingClientRect();
+          const width = Math.max(320, Math.round(rect.width));
+          const height = Math.max(320, Math.round(rect.height));
+          renderer.setSize(width, height, false);
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
+        }
+        window.addEventListener("resize", resize);
+
+        /* ---------------- 粒子构建 ---------------- */
+        function buildParticles(image) {
+          const sample = Number(document.getElementById("sampling").value);
+          const width = 160;
+          const height = Math.max(
+            40,
+            Math.round((image.height / image.width) * width),
+          );
+          const scratch = document.createElement("canvas");
+          scratch.width = width;
+          scratch.height = height;
+          const ctx = scratch.getContext("2d");
+          ctx.drawImage(image, 0, 0, width, height);
+          const data = ctx.getImageData(0, 0, width, height).data;
+
+          const positions = [];
+          const colorsArray = [];
+          for (let y = 0; y < height; y += 1) {
+            for (let x = 0; x < width; x += 1) {
+              if ((x + y) % sample !== 0) continue;
+              const index = (y * width + x) * 4;
+              const r = data[index] / 255;
+              const g = data[index + 1] / 255;
+              const b = data[index + 2] / 255;
+              if (r + g + b < 0.12) continue;
+              positions.push(
+                (x / width - 0.5) * 10 * aspect,
+                -(y / height - 0.5) * 10,
+                0,
+              );
+              colorsArray.push(r, g, b);
+            }
+          }
+
+          particleCount = positions.length / 3;
+          targetPositions = new Float32Array(positions);
+          colors = new Float32Array(colorsArray);
+          basePositions = new Float32Array(positions.length);
+          currentPositions = new Float32Array(positions.length);
+          for (let i = 0; i < positions.length; i += 3) {
+            const radius = 4 + Math.random() * 8;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            basePositions[i] = radius * Math.sin(phi) * Math.cos(theta);
+            basePositions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
+            basePositions[i + 2] = radius * Math.cos(phi);
+            currentPositions[i] = basePositions[i];
+            currentPositions[i + 1] = basePositions[i + 1];
+            currentPositions[i + 2] = basePositions[i + 2];
+          }
+
+          if (geometry) geometry.dispose();
+          geometry = new THREE.BufferGeometry();
+          geometry.setAttribute(
+            "position",
+            new THREE.BufferAttribute(currentPositions, 3),
+          );
+          geometry.setAttribute("aColor", new THREE.BufferAttribute(colors, 3));
+          const sizes = new Float32Array(particleCount);
+          for (let i = 0; i < particleCount; i++)
+            sizes[i] = 0.7 + Math.random() * 0.8;
+          geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+
+          if (material) material.dispose();
+          material = new THREE.ShaderMaterial({
+            uniforms,
+            vertexShader,
+            fragmentShader,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          });
+          if (points) scene.remove(points);
+          points = new THREE.Points(geometry, material);
+          scene.add(points);
+
+          state.mode = "scattered";
+          state.progress = 0;
+          chipCount.textContent = "粒子 " + particleCount;
+          chipMode.textContent = "模式：粒子流";
+          statusBox.textContent =
+            "已载入 " +
+            particleCount +
+            " 个粒子。开启摄像头后张开手掌即可开始还原；未开启时可用鼠标牵引。";
+        }
+
+        function readImage(source) {
+          const image = new Image();
+          image.onload = () => {
+            aspect = Math.min(1.9, Math.max(0.5, image.width / image.height));
+            buildParticles(image);
+          };
+          image.onerror = () => {
+            statusBox.textContent = "图片读取失败，请换一张本地图片。";
+          };
+          image.src = source;
+        }
+
+        document.getElementById("file").addEventListener("change", (event) => {
+          const file = event.target.files && event.target.files[0];
+          if (!file) return;
+          const url = URL.createObjectURL(file);
+          readImage(url);
+        });
+
+        document.getElementById("sample").addEventListener("click", () => {
+          const c = document.createElement("canvas");
+          c.width = 640;
+          c.height = 480;
+          const ctx = c.getContext("2d");
+          const gradient = ctx.createLinearGradient(0, 0, 640, 480);
+          gradient.addColorStop(0, "#12263f");
+          gradient.addColorStop(0.45, "#57d2ff");
+          gradient.addColorStop(0.75, "#b98cff");
+          gradient.addColorStop(1, "#ff7ac6");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, 640, 480);
+          ctx.fillStyle = "rgba(255,255,255,0.92)";
+          ctx.beginPath();
+          ctx.arc(320, 210, 110, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(10,16,28,0.9)";
+          ctx.beginPath();
+          ctx.arc(320, 210, 58, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#fff";
+          ctx.font = "600 42px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("Pixel Flow", 320, 400);
+          readImage(c.toDataURL("image/png"));
+        });
+
+        document.getElementById("reset").addEventListener("click", () => {
+          if (!basePositions) return;
+          for (let i = 0; i < basePositions.length; i += 3) {
+            const radius = 5 + Math.random() * 9;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            basePositions[i] = radius * Math.sin(phi) * Math.cos(theta);
+            basePositions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
+            basePositions[i + 2] = radius * Math.cos(phi);
+            currentPositions[i] = basePositions[i];
+            currentPositions[i + 1] = basePositions[i + 1];
+            currentPositions[i + 2] = basePositions[i + 2];
+          }
+          state.mode = "scattered";
+          state.progress = 0;
+          chipMode.textContent = "模式：粒子流";
+        });
+
+        document.getElementById("sampling").addEventListener("input", (event) => {
+          document.getElementById("sampling-value").textContent =
+            event.target.value + " px";
+        });
+
+        /* ---------------- 摄像头与手势 ---------------- */
+        let hands = null;
+        let cameraStream = null;
+        let handLoop = false;
+
+        function classify(landmarks) {
+          const tips = [8, 12, 16, 20];
+          const pips = [6, 10, 14, 18];
+          let extended = 0;
+          for (let i = 0; i < tips.length; i++) {
+            const tip = landmarks[tips[i]];
+            const pip = landmarks[pips[i]];
+            const wrist = landmarks[0];
+            const tipDist = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+            const pipDist = Math.hypot(pip.x - wrist.x, pip.y - wrist.y);
+            if (tipDist > pipDist * 1.12) extended++;
+          }
+          if (extended === 0) return "fist";
+          if (extended === 1) return "point";
+          if (extended >= 3) return "open";
+          return "neutral";
+        }
+
+        function onHands(results) {
+          const landmarks = results.multiHandLandmarks;
+          if (!landmarks || !landmarks.length) {
+            state.hand.has = false;
+            state.gesture = "none";
+            chipGesture.textContent = "手势：未检测";
+            return;
+          }
+          const lm = landmarks[0];
+          state.hand.has = true;
+          const palm = lm[9] || lm[0];
+          state.hand.x = (0.5 - palm.x) * 12;
+          state.hand.y = -(palm.y - 0.5) * 8;
+          state.gesture = classify(lm);
+          const names = {
+            open: "张开手掌",
+            fist: "握拳",
+            point: "竖起食指",
+            neutral: "手势保持",
+          };
+          chipGesture.textContent = "手势：" + (names[state.gesture] || state.gesture);
+        }
+
+        document.getElementById("camera").addEventListener("click", async () => {
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            statusBox.textContent = "当前环境不支持摄像头访问，可继续使用鼠标控制粒子。";
+            return;
+          }
+          statusBox.textContent = "正在请求摄像头权限…";
+          try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+              video: { width: 640, height: 480 },
+              audio: false,
+            });
+            video.srcObject = cameraStream;
+            await video.play();
+          } catch (error) {
+            statusBox.textContent =
+              "无法访问摄像头（" + (error.name || "error") + "），可继续使用鼠标控制粒子。";
+            return;
+          }
+          if (typeof Hands === "undefined") {
+            statusBox.textContent =
+              "MediaPipe Hands 未能加载，手势识别不可用，可继续使用鼠标控制粒子。";
+            return;
+          }
+          hands = new Hands({
+            locateFile: (file) =>
+              "https://cdn.jsdelivr.net/npm/@mediapipe/hands/" + file,
+          });
+          hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.5,
+          });
+          hands.onResults(onHands);
+          handLoop = true;
+          statusBox.textContent = "摄像头已开启：张开手掌吸引粒子，握拳暂停，竖起食指直接完成还原。";
+          const pump = async () => {
+            if (!handLoop) return;
+            if (video.readyState >= 2) {
+              try {
+                await hands.send({ image: video });
+              } catch (error) {
+                /* 忽略单帧错误 */
+              }
+            }
+            requestAnimationFrame(pump);
+          };
+          pump();
+        });
+
+        document.getElementById("stopcam").addEventListener("click", () => {
+          handLoop = false;
+          if (cameraStream) {
+            cameraStream.getTracks().forEach((track) => track.stop());
+            cameraStream = null;
+          }
+          video.srcObject = null;
+          state.hand.has = false;
+          chipGesture.textContent = "手势：未检测";
+          statusBox.textContent = "摄像头已关闭，可使用鼠标控制粒子。";
+        });
+
+        /* ---------------- 鼠标控制 ---------------- */
+        canvas.addEventListener("pointermove", (event) => {
+          const rect = canvas.getBoundingClientRect();
+          state.mouse.x = ((event.clientX - rect.left) / rect.width - 0.5) * 12;
+          state.mouse.y = -((event.clientY - rect.top) / rect.height - 0.5) * 8;
+          state.mouse.active = true;
+        });
+        canvas.addEventListener("pointerleave", () => {
+          state.mouse.active = false;
+        });
+        canvas.addEventListener(
+          "wheel",
+          (event) => {
+            event.preventDefault();
+            camera.position.z = Math.max(
+              4,
+              Math.min(40, camera.position.z + Math.sign(event.deltaY) * 1.4),
+            );
+          },
+          { passive: false },
+        );
+
+        /* ---------------- 主循环 ---------------- */
+        const clock = new THREE.Clock();
+        function animate() {
+          requestAnimationFrame(animate);
+          const dt = Math.min(0.05, clock.getDelta());
+          state.time += dt;
+          uniforms.uTime.value = state.time;
+
+          const useHand = state.hand.has;
+          const source = useHand ? state.hand : state.mouse;
+          const active = useHand ? state.gesture === "open" : state.mouse.active;
+
+          if (state.gesture === "point" && state.mode !== "restored") {
+            state.mode = "attracting";
+            state.progress = 1;
+            state.gesture = "point-done";
+            chipMode.textContent = "模式：已还原";
+          }
+
+          let strength = 0;
+          if (state.mode !== "restored") {
+            if (state.gesture === "fist") {
+              strength = 0;
+              state.mode = "paused";
+              chipMode.textContent = "模式：暂停";
+            } else if (active) {
+              strength = 1;
+              state.mode = "attracting";
+              chipMode.textContent = "模式：还原中";
+            }
+          }
+          uniforms.uForceStrength.value +=
+            (strength - uniforms.uForceStrength.value) * Math.min(1, dt * 6);
+          uniforms.uForce.value.set(source.x, source.y, 0);
+          uniforms.uProgress.value = state.progress;
+          bar.style.width = Math.round(state.progress * 100) + "%";
+
+          if (points && targetPositions) {
+            const positions = geometry.attributes.position.array;
+            const spring = state.mode === "restored" ? 4.2 : 1.5;
+            const pull = state.mode === "restored" ? 1.6 : 0.8;
+            let settled = 0;
+            for (let i = 0; i < positions.length; i += 3) {
+              const tx = targetPositions[i];
+              const ty = targetPositions[i + 1];
+              const tz = targetPositions[i + 2];
+              let px = positions[i];
+              let py = positions[i + 1];
+              let pz = positions[i + 2];
+              // 手部力场：靠近手的粒子被更强地拉向目标位置
+              const dx = source.x - px;
+              const dy = source.y - py;
+              const d2 = dx * dx + dy * dy;
+              const field = Math.exp(-d2 * 0.12) * uniforms.uForceStrength.value;
+              const k = spring * (0.25 + field * 1.8);
+              px += (tx - px) * Math.min(1, dt * k);
+              py += (ty - py) * Math.min(1, dt * k);
+              pz += (tz - pz) * Math.min(1, dt * pull * (0.4 + field));
+              // 轻微的随机游动，保持粒子流动感
+              px += Math.sin(state.time * 1.3 + i) * 0.0025 * (1 - state.progress);
+              py += Math.cos(state.time * 1.1 + i * 0.5) * 0.0025 * (1 - state.progress);
+              positions[i] = px;
+              positions[i + 1] = py;
+              positions[i + 2] = pz;
+              const dxr = tx - px;
+              const dyr = ty - py;
+              const dzr = tz - pz;
+              if (dxr * dxr + dyr * dyr + dzr * dzr < 0.02) settled++;
+            }
+            geometry.attributes.position.needsUpdate = true;
+            const ratio = particleCount ? settled / particleCount : 0;
+            if (state.mode === "attracting") {
+              state.progress = Math.min(1, Math.max(state.progress, ratio * 0.98));
+              if (state.progress > 0.99) {
+                state.mode = "restored";
+                chipMode.textContent = "模式：已还原";
+                statusBox.textContent = "还原完成：粒子已重新组成原图。";
+              }
+            }
+          }
+
+          renderer.render(scene, camera);
+        }
+
+        resize();
+        animate();
+      })();
+    </script>
+  </body>
+</html>
