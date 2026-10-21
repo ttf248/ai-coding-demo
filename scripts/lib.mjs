@@ -102,6 +102,10 @@ export function sourceHash(run) {
     if (
       /\.(md)$/i.test(f) ||
       f.endsWith("/run.json") ||
+      (f.startsWith(`${run.directory}/captures/`) &&
+        /^captures\/\d{4}-\d{2}-\d{2}(?:-[a-z0-9]+)?\/[^/]+\.png$/.test(
+          f.slice(run.directory.length + 1),
+        )) ||
       isIgnoredArchiveFile(f)
     )
       continue;
