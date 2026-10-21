@@ -247,6 +247,18 @@ const BASELINE = {
   },
 };
 
+BASELINE["compare@1440"]["#pick-models"] = {
+  "background-color": "rgb(255, 255, 255)",
+};
+BASELINE["compare@390"]["#pick-models"] = {
+  "background-color": "rgb(255, 255, 255)",
+};
+BASELINE["compare@390"][".panel-identity"] = {
+  position: "static",
+  "font-size": "14px",
+};
+BASELINE["topic@390"][".run-context > summary"] = { "min-height": "44px" };
+
 // 新增排序说明继承结果区字号，不能压缩成难读的辅助标签。
 BASELINE["home@1440"]["#sort-context"] = { "font-size": "13px" };
 

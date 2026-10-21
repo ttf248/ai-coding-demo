@@ -711,6 +711,7 @@
                     <th scope="row" class="topic-run-model">${e(U.modelLabel(data, r))}
                       <small class="topic-run-condition"><span class="topic-run-effort">${e(U.effortLabel(r.effort))}</span> · <span class="topic-run-round">${e(U.roundLabel(r))}</span></small>
                       <span class="topic-run-input"><span>${e(U.completenessLabel(r.input?.completeness))}</span><small>${U.executionModeBadge(r)}</small></span>
+                      <span class="topic-selection-relation" data-relation-run="${e(r.id)}" hidden></span>
                       <details class="run-context"><summary>执行条件</summary><dl>
                         <dt>模型厂商</dt><dd class="topic-run-model-maker">${e(U.modelProvider(data, r))}</dd>
                         <dt>接入/付费供应商</dt><dd class="topic-run-provider">${e(r.billing?.provider || "未记录")}</dd>

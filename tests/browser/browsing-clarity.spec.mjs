@@ -42,3 +42,79 @@ test("conditions distinguish missing information from equal known conditions", a
   await page.locator("#differences-only").check();
   await expect(page).toHaveURL(/differencesOnly=1/);
 });
+
+test("mobile conditions show A and B by field and preserve the quad table", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(
+    "compare.html?left=bluebook--claude-opus-5-5-max-r01&right=bluebook--gpt-6-astra-max-r01&tab=conditions",
+  );
+  await expect(page.locator("#conditions-mobile")).toBeVisible();
+  await expect(page.locator("#conditions-table")).toBeHidden();
+  await expect(page.locator(".condition-section")).toHaveCount(3);
+  const identity = page
+    .locator(".condition-field")
+    .filter({ has: page.locator("h3", { hasText: /^模型$/ }) });
+  await expect(identity).toContainText("Claude Opus 5.5");
+  await expect(identity).toContainText("GPT-6 Astra");
+  await expect(page.locator(".condition-section").last()).not.toHaveAttribute(
+    "open",
+  );
+  await page.locator("#differences-only").check();
+  await expect(
+    page.locator(".condition-field h3", { hasText: /^主题$/ }),
+  ).toHaveCount(0);
+  await page.goto(
+    "compare.html?left=bluebook--claude-opus-5-5-max-r01&right=bluebook--gpt-6-astra-max-r01&tab=conditions&layout=quad",
+  );
+  await expect(page.locator("#conditions-mobile")).toBeHidden();
+  await expect(page.locator("#conditions-table")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    390,
+  );
+});
+
+test("topic selection shows the relation to the selected baseline", async ({
+  page,
+}) => {
+  await page.goto("topic.html?id=bluebook&prompt=v2");
+  const row = page.locator(".topic-run-row").first();
+  await expect(row.locator("[data-relation-run]")).toBeHidden();
+  await row.locator("[data-compare]").click();
+  await expect(row.locator("[data-relation-run]")).toHaveText("当前比较基准");
+  await expect(
+    page.locator(".topic-run-row").nth(1).locator("[data-relation-run]"),
+  ).toContainText("与已选基准");
+  await row.locator("[data-compare]").click();
+  await expect(row.locator("[data-relation-run]")).toBeHidden();
+});
+
+test("reader summary precedes the historical text and returns to its mobile contents", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(
+    "assets/generated/readers/demos/bluebook/runs/claude-opus-5-5-max-r01/Readme.html",
+  );
+  const summary = page.locator(".document-summary");
+  await expect(summary).toContainText("Claude Opus 5.5");
+  await expect(summary).toContainText("输入留存不完整");
+  await expect(summary.locator("a")).toHaveAttribute("href", /prompt\.md$/);
+  expect(
+    await summary.evaluate(
+      (el) =>
+        el.compareDocumentPosition(
+          document.querySelector(".document-content"),
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ),
+  ).toBeTruthy();
+  await page.locator(".document-toc-return").click();
+  await expect(page.locator(".document-sidebar details")).toHaveAttribute(
+    "open",
+    "",
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    390,
+  );
+});

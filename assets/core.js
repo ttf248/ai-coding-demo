@@ -681,6 +681,19 @@
         b.setAttribute("aria-pressed", String(on));
         b.textContent = on ? "移出对比" : b.dataset.compareLabel || "加入对比";
       });
+      const base = data.runs.find((run) => run.id === selected[0]);
+      document.querySelectorAll("[data-relation-run]").forEach((node) => {
+        const run = data.runs.find(
+          (run) => run.id === node.dataset.relationRun,
+        );
+        node.hidden = !base || !run;
+        node.textContent =
+          !base || !run
+            ? ""
+            : run.id === base.id
+              ? "当前比较基准"
+              : "与已选基准：" + relation(data, base, run);
+      });
     }
     document.addEventListener("click", (event) => {
       const related = event.target.closest("[data-find-related]");

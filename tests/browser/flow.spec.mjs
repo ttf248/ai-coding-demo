@@ -164,17 +164,18 @@ test("design-enhanced authorization is visible on home, topic and comparison pag
   );
   await expect(page.locator("#relation")).toContainText("任务正文一致");
   await expect(page.locator("#relation")).toContainText("执行模式不同");
-  const modeRow = page
-    .locator("#conditions-table tr")
-    .filter({ has: page.getByRole("rowheader", { name: "执行模式" }) });
-  await expect(modeRow.locator("td")).toHaveText([
+  const modeRow = page.locator(".condition-field").filter({
+    has: page.locator("h3", { hasText: /^执行模式$/ }),
+  });
+  await expect(modeRow.locator("dd")).toHaveText([
     "执行模式未记录",
     "自主设计授权",
   ]);
-  const authorizationRow = page.locator("#conditions-table tr").filter({
-    has: page.getByRole("rowheader", { name: "自主优化授权原文" }),
+  await page.locator(".condition-section").last().locator("summary").click();
+  const authorizationRow = page.locator(".condition-field").filter({
+    has: page.locator("h3", { hasText: /^自主优化授权原文$/ }),
   });
-  await expect(authorizationRow.locator("td")).toHaveText([
+  await expect(authorizationRow.locator("dd")).toHaveText([
     "未记录",
     designRun.input.authorization,
   ]);

@@ -308,6 +308,7 @@
     document.body.dataset.contentMode = state.tab;
     document.body.classList.toggle("comparison-empty", empty);
     $("compare-start").hidden = !empty;
+    $("pick-models").textContent = empty ? "选择对比实验" : "更换对比实验";
     $("viewport-control").hidden = state.tab !== "preview";
     document.querySelector(".mobile-layout-note").textContent =
       state.tab === "preview"
@@ -337,7 +338,7 @@
       const run = getRun(btn.dataset.mobile);
       const model = state[btn.dataset.mobile + "Model"];
       const name = run
-        ? U.modelLabel(data, run)
+        ? U.modelLabel(data, run) + " · " + run.effort
         : model
           ? U.modelLabel(data, { modelId: model }) + "（暂无实验）"
           : "未选择";
@@ -896,6 +897,55 @@
       state.differencesOnly && valid.length >= 2
         ? rows.filter((row) => new Set(row.values).size > 1)
         : rows;
+    const summaryFields = new Set([
+      "主题",
+      "模型",
+      "推理档位",
+      "轮次",
+      "提示词版本",
+      "输入关系（与 A）",
+      "输入留存",
+      "执行模式",
+      "平台与工具",
+      "人工修改与部署适配",
+    ]);
+    const resultFields = new Set(["截图评分", "费用", "耗时"]);
+    const groups = [
+      ["比较摘要", filtered.filter((row) => summaryFields.has(row.label))],
+      ["结果与消耗", filtered.filter((row) => resultFields.has(row.label))],
+      [
+        "完整证据",
+        filtered.filter(
+          (row) =>
+            !summaryFields.has(row.label) && !resultFields.has(row.label),
+        ),
+      ],
+    ];
+    $("conditions-mobile").innerHTML = groups
+      .map(
+        ([
+          title,
+          items,
+        ]) => `<details class="condition-section"${title === "完整证据" ? "" : " open"}>
+        <summary>${title} · ${items.length} 项</summary>
+        ${
+          items.length
+            ? items
+                .map(
+                  (row) =>
+                    `<section class="condition-field"><h3>${e(row.label)}</h3><dl>${row.values
+                      .map(
+                        (value, i) =>
+                          `<dt>${labels[columns[i]]}${columns[i] === "left" ? " · 基准" : ""}</dt><dd>${e(value).replaceAll("\n", "<br>")}</dd>`,
+                      )
+                      .join("")}</dl></section>`,
+                )
+                .join("")
+            : "<p>当前范围没有不同的已记录值。</p>"
+        }
+      </details>`,
+      )
+      .join("");
     $("conditions-table").innerHTML = columns.length
       ? '<table class="archive-table conditions-table"><caption>所选实验的已知运行条件</caption><thead><tr><th scope="col">条件</th>' +
         columns
@@ -910,19 +960,25 @@
           )
           .join("") +
         "</tr></thead><tbody>" +
-        filtered
+        groups
           .map(
-            (row) =>
-              '<tr><th scope="row">' +
-              e(row.label) +
-              "</th>" +
-              row.values
+            ([title, items]) =>
+              `<tr class="conditions-group"><th colspan="${columns.length + 1}">${title}</th></tr>` +
+              items
                 .map(
-                  (value) =>
-                    "<td>" + e(value).replaceAll("\n", "<br>") + "</td>",
+                  (row) =>
+                    '<tr><th scope="row">' +
+                    e(row.label) +
+                    "</th>" +
+                    row.values
+                      .map(
+                        (value) =>
+                          "<td>" + e(value).replaceAll("\n", "<br>") + "</td>",
+                      )
+                      .join("") +
+                    "</tr>",
                 )
-                .join("") +
-              "</tr>",
+                .join(""),
           )
           .join("") +
         "</tbody></table>"

@@ -9,6 +9,13 @@
       heading: document.getElementById(decodeURIComponent(link.hash.slice(1))),
     }))
     .filter((item) => item.heading);
+  document
+    .querySelector(".document-toc-return")
+    ?.addEventListener("click", () => {
+      const toc = document.querySelector(".document-sidebar details");
+      toc.open = true;
+      toc.querySelector("summary").focus();
+    });
   let scheduled = false;
   function updateSection() {
     scheduled = false;
