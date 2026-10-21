@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import sharp from "sharp";
 import { chromium } from "playwright";
 import { ROOT, loadCatalog } from "./lib.mjs";
+import { pressReviewKey, settleReviewState } from "./capture-state-timing.mjs";
 
 // Explicit reviewer-selected navigation only; original artifacts and captures stay intact.
 const plan = JSON.parse(fs.readFileSync(0, "utf8").replace(/^\uFEFF/, ""));
@@ -145,13 +146,17 @@ try {
             requested: action,
             observed,
           });
+        } else if (action.kind === "press") {
+          await pressReviewKey(locator, action.key);
         } else throw Error("Unsupported action");
         await page.waitForTimeout(700);
       }
+      await settleReviewState(page, state.settleMs);
       record.actions.push({
         kind: "review-state-navigation",
         state: state.id,
         viewport,
+        settleMs: state.settleMs || 0,
         actions: state.actions || [],
         result: "completed",
       });

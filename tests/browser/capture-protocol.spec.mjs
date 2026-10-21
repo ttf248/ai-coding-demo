@@ -1,5 +1,27 @@
 import { test, expect } from "@playwright/test";
 import {
+  pressReviewKey,
+  settleReviewState,
+} from "../../scripts/capture-state-timing.mjs";
+
+test("review capture uses real range keyboard events and waits for delayed results", async ({
+  page,
+}) => {
+  await page.setContent(
+    `<input id="speed" type="range" min="1" max="120" value="35"><output>waiting</output><script>document.querySelector('input').addEventListener('input',e=>{setTimeout(()=>document.querySelector('output').textContent='delay '+e.target.value,60)});</script>`,
+  );
+  await pressReviewKey(page.locator("#speed"), "Home");
+  await settleReviewState(page, 120);
+  await expect(page.locator("#speed")).toHaveValue("1");
+  await expect(page.locator("output")).toHaveText("delay 1");
+  await expect(
+    pressReviewKey(page.locator("#speed"), "Delete"),
+  ).rejects.toThrow("Unsupported review key");
+  await expect(settleReviewState(page, 30001)).rejects.toThrow(
+    "Invalid review settling duration",
+  );
+});
+import {
   scrollExistingDocument,
   restoreScrollTop,
   discoverHorizontalContainers,
