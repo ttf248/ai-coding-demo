@@ -626,6 +626,16 @@
     const tray = document.getElementById("compare-tray"),
       dialog = document.getElementById("replace-dialog");
     let pending = null;
+    let selectionExpanded = false;
+    const resizeSelection = () => {
+      document.body.style.setProperty(
+        "--selection-height",
+        tray.hidden
+          ? "0px"
+          : `${Math.ceil(tray.getBoundingClientRect().height)}px`,
+      );
+    };
+    new ResizeObserver(resizeSelection).observe(tray);
     function save() {
       try {
         sessionStorage.setItem("archive-selection", JSON.stringify(selected));
@@ -635,6 +645,7 @@
     function render() {
       tray.hidden = !selected.length;
       tray.dataset.count = String(selected.length);
+      tray.dataset.expanded = String(selectionExpanded);
       document.body.classList.toggle("has-selection", !!selected.length);
       const params = new URLSearchParams();
       selected.forEach((id, i) =>
@@ -642,17 +653,25 @@
       );
       if (selected.length > 2) params.set("layout", "quad");
       tray.innerHTML =
-        '<div class="selection-content"><div class="selection-header"><strong>对比栏 · ' +
+        '<div class="selection-content"><div class="selection-header"><strong>已选 ' +
         selected.length +
-        '/4</strong><div class="actions"><button data-clear>清空</button>' +
+        '/4</strong><button class="selection-toggle" data-selection-toggle aria-controls="selection-details" aria-expanded="' +
+        selectionExpanded +
+        '">' +
+        (selectionExpanded ? "收起" : "展开") +
+        '</button><div class="actions">' +
         (selected.length >= 2
           ? '<a class="button primary" href="compare.html?' +
             escape(params.toString()) +
             '">开始对比 ↗</a>'
-          : '<span role="status">再选一个实验开始对比</span><button data-find-related="' +
+          : '<button class="primary" data-find-related="' +
             escape(selected[0]) +
-            '">寻找同任务实验</button>') +
-        '</div></div><div class="selection-items">' +
+            '">选择同任务实验 →</button>') +
+        '</div></div><div id="selection-details" class="selection-details"><div class="selection-tools"><span role="status">' +
+        (selected.length < 2
+          ? "再选一个实验开始对比"
+          : "以 A 为比较基准，可选择最多四个实验") +
+        '</span><button data-clear>清空</button></div><div class="selection-items">' +
         selected
           .map((id, i) => {
             const run = data.runs.find((r) => r.id === id);
@@ -676,7 +695,7 @@
             );
           })
           .join("") +
-        "</div></div>";
+        "</div></div></div>";
       document.querySelectorAll("[data-compare]").forEach((b) => {
         const on = selected.includes(b.dataset.compare);
         b.setAttribute("aria-pressed", String(on));
@@ -697,6 +716,14 @@
       });
     }
     document.addEventListener("click", (event) => {
+      if (event.target.closest("[data-selection-toggle]")) {
+        selectionExpanded = !selectionExpanded;
+        render();
+        tray
+          .querySelector("[data-selection-toggle]")
+          .focus({ preventScroll: true });
+        return;
+      }
       const related = event.target.closest("[data-find-related]");
       if (related) {
         const run = data.runs.find((r) => r.id === related.dataset.findRelated);

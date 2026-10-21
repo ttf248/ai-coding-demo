@@ -272,6 +272,11 @@ for (const width of [1440, 390]) {
 
 // 新增排序说明继承结果区字号，不能压缩成难读的辅助标签。
 BASELINE["home@1440"]["#sort-context"] = { "font-size": "13px" };
+BASELINE["home@390"]["#display-options > summary"] = {
+  display: "flex",
+  "min-height": "44px",
+};
+BASELINE["home@390"][".compact-hero"] = { padding: "8px 0px" };
 
 for (const [width, sizes] of [
   [1440, "desktop"],

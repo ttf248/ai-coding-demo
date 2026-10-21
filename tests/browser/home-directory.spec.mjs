@@ -379,6 +379,7 @@ test("homepage grid and list keep preview controls within a mobile viewport", as
   }
   await page.reload();
   await expect(page.locator("#project-grid")).toHaveClass(/list/);
+  await page.locator("#display-options > summary").click();
   await page.locator('[data-group="runs"]').click();
   await page.locator("#sort").selectOption("title");
   await page.reload();
@@ -437,6 +438,12 @@ test("homepage exposes archived topics and keeps its directory compact", async (
 });
 
 async function openHomeControls(page) {
+  if (
+    (await page.locator("#display-options > summary").isVisible()) &&
+    !(await page.locator("#display-options").getAttribute("open"))
+  ) {
+    await page.locator("#display-options").evaluate((el) => (el.open = true));
+  }
   const toggle = page.locator("#mobile-filter-toggle");
   if (
     (await toggle.isVisible()) &&
@@ -554,6 +561,7 @@ test("quick controls and preview versions follow filters on mobile", async ({
   await page.goto("./?model=gpt-6-astra&testing=active");
   await page.locator("#mobile-filter-toggle").click();
   await page.locator("#advanced-filters > summary").click();
+  await page.locator("#display-options > summary").click();
   await expect(page.locator('[data-view="list"]')).toBeVisible();
   await page.locator("#preview-only").click();
   await expect(page.locator("#preview-only")).toHaveAttribute(
@@ -729,6 +737,7 @@ test("legacy latest links return to complexity sorting and card badges stay grou
   expect(new URL(page.url()).searchParams.get("sort")).toBe("complexity");
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 960 });
+    if (width === 390) await page.locator("#display-options > summary").click();
     for (const group of ["topics", "runs"]) {
       await page.locator('[data-group="' + group + '"]').click();
       await page.locator("#q").fill("自主设计版");

@@ -112,6 +112,7 @@ test("topic browsing groups versions, filters experiments and restores state", a
     });
   await page.locator("#topic-list [data-compare]").first().click();
   await expect(page.locator(".selection-item")).toHaveCount(1);
+  await page.locator("[data-selection-toggle]").click();
   await page.locator("[data-clear]").click();
   await page
     .locator(".topic-table-scroll")

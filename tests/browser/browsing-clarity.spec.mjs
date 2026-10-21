@@ -23,7 +23,7 @@ test("home states sorting, count units and the exact comparison target", async (
     .getAttribute("data-screenshot-run");
   const button = card.locator("[data-compare]");
   await expect(button).toHaveAttribute("data-compare", target);
-  await expect(button).toHaveText("对比此实验");
+  await expect(button).toHaveText("加入对比");
   await expect(button).toHaveAttribute("title", /v\d/);
   await button.click();
   await expect(button).toHaveText("移出对比");

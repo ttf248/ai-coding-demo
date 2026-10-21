@@ -5,6 +5,12 @@
     $ = (id) => document.getElementById(id),
     e = U.escape;
   const state = window.ArchiveState.homeFromURL(location.search);
+  const mobileDisplay = matchMedia("(max-width: 700px)");
+  const syncDisplayOptions = () => {
+    $("display-options").open = !mobileDisplay.matches;
+  };
+  syncDisplayOptions();
+  mobileDisplay.addEventListener("change", syncDisplayOptions);
   // 排序默认值随分组变化：主题按复杂度，实验按截图评分（与主题页口径一致）。
   const defaultSort = () => (state.group === "runs" ? "score" : "complexity");
   const effectiveSort = () =>
@@ -371,7 +377,7 @@
           e(t.description) +
           '</p><div class="topic-metadata"><button class="topic-metrics" data-pick-topic="' +
           e(t.id) +
-          '" aria-haspopup="dialog" title="快速挑选同主题实验">' +
+          '" aria-haspopup="dialog" title="快速挑选同主题实验">挑选模型 · ' +
           new Set(runs.map((r) => r.modelId)).size +
           " 个模型 · " +
           (runs.length !== all.length ? "匹配 " : "") +
@@ -420,9 +426,9 @@
           (inspectRun
             ? '<button data-compare="' +
               e(inspectRun.id) +
-              '" data-compare-label="对比此实验" title="' +
+              '" title="' +
               e(U.runSummary(data, inspectRun) + " · " + inspectRun.promptId) +
-              '" aria-pressed="false">对比此实验</button>'
+              '" aria-pressed="false">加入对比</button>'
             : "") +
           "</div></div></article>"
         );

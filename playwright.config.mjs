@@ -5,7 +5,11 @@ process.env.NO_PROXY = [process.env.NO_PROXY, "127.0.0.1", "localhost"]
   .join(",");
 process.env.no_proxy = process.env.NO_PROXY;
 const launchOptions = {
-  args: ["--enable-unsafe-swiftshader"],
+  // 所有浏览器验收屏蔽正式统计；analytics 测试继续通过 route 模拟。
+  args: [
+    "--enable-unsafe-swiftshader",
+    "--host-resolver-rules=MAP *.google-analytics.com ~NOTFOUND, MAP www.googletagmanager.com ~NOTFOUND",
+  ],
   ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
     ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE }
     : {}),
