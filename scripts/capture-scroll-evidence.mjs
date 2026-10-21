@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import sharp from "sharp";
 import { chromium } from "playwright";
 import { loadCatalog, ROOT } from "./lib.mjs";
+import { scrollExistingDocument, restoreScrollTop } from "./capture-scroll.mjs";
 
 const args = process.argv.slice(2),
   option = (key, fallback) =>
@@ -37,8 +38,11 @@ const queue = catalog.runs.filter((run) => {
   )
     return false;
   const source = JSON.parse(fs.readFileSync(file, "utf8"));
-  return source.frames.some(
-    (frame) => frame.fullPage || frame.id === "desktop-bottom",
+  return (
+    (run.topicId === "bluebook" && source.frames.length > 0) ||
+    source.frames.some(
+      (frame) => frame.fullPage || frame.id === "desktop-bottom",
+    )
   );
 });
 
@@ -119,35 +123,13 @@ async function capture(run) {
       timeout: 25000,
     });
     await page.waitForTimeout(1800);
-    const originalHeight = await page.evaluate(
-      () => document.documentElement.scrollHeight,
-    );
-    const positions = [];
-    // Bound scrolling to the initially rendered document; infinite feeds must not grow without limit.
-    for (
-      let position = 0;
-      position < Math.min(originalHeight, 5400);
-      position += 720
-    ) {
-      await page.evaluate((y) => scrollTo(0, y), position);
-      await page.waitForTimeout(450);
-      positions.push(position);
-    }
-    await page.waitForTimeout(1800);
-    record.actions.push({
-      action: "scroll-existing-document",
-      originalHeight,
-      positions,
-      waitMsPerStep: 450,
-      finalWaitMs: 1800,
-      limit: "只扫描最初文档的前 5400px，不声称穷尽无限列表",
-    });
+    record.actions.push(await scrollExistingDocument(page));
     const height = await page.evaluate(
       () => document.documentElement.scrollHeight,
     );
     if (height <= 6000) await save("desktop-scrolled-full", entry.id, true);
     else await save("desktop-scrolled-lower", entry.id, false);
-    await page.evaluate(() => scrollTo(0, 0));
+    await restoreScrollTop(page);
     await page.waitForTimeout(500);
     await save("desktop-scrolled-top", entry.id, false);
     record.status = "captured";

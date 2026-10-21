@@ -10,6 +10,8 @@ const args = process.argv.slice(2),
     args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
 const batch = option("--batch", "2026-10-21"),
   topicId = option("--topic", "");
+const fallbackBatch = option("--fallback-batch", "");
+const retryBatch = option("--retry-batch", "");
 const output = option(
   "--output",
   fs.mkdtempSync(path.join(os.tmpdir(), "ai-score-v3-")),
@@ -28,12 +30,10 @@ const runs = [...catalog.runs].sort(
 const manifest = [];
 for (const [index, run] of runs.entries()) {
   if (topicId && run.topicId !== topicId) continue;
-  const recordFile = path.join(
-    ROOT,
-    "catalog/screenshot-captures",
-    batch,
-    run.id + ".json",
-  );
+  const recordFile = [retryBatch, batch, fallbackBatch].filter(Boolean)
+    .map((candidate) => path.join(ROOT, "catalog/screenshot-captures", candidate, run.id + ".json"))
+    .find((candidate) => fs.existsSync(candidate));
+  if (!recordFile) continue;
   if (!fs.existsSync(recordFile)) continue;
   const capture = JSON.parse(fs.readFileSync(recordFile, "utf8"));
   const reviewId = "R" + String(index + 1).padStart(3, "0");

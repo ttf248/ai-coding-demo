@@ -15,6 +15,10 @@ const baseURL = value("--base-url", "http://127.0.0.1:43931/");
 const topicId = value("--topic", "");
 const runId = value("--run", "");
 const limit = Number(value("--limit", "0"));
+const navigation = value("--navigation", "domcontentloaded");
+if (!["commit", "domcontentloaded"].includes(navigation)) throw Error("Invalid navigation wait");
+const boundedFontWait = args.includes("--bounded-font-wait");
+if (boundedFontWait) process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
 const catalog = loadCatalog();
 const directory = path.join(ROOT, "catalog/screenshot-captures", batch);
 fs.mkdirSync(directory, { recursive: true });
@@ -215,6 +219,8 @@ async function captureRun(run) {
       camera: "未提供真实相机或手部，不模拟视频/关键点",
       analytics: "blocked",
       network: "真实网络资源，不替换 CDN、图片或应用脚本",
+      navigationWait: navigation,
+      fontWait: boundedFontWait ? "bounded 1800ms; screenshot does not await unresolved fonts" : "Playwright screenshot default",
     },
     previousScreenshot: run.screenshot
       ? {
@@ -301,7 +307,7 @@ async function captureRun(run) {
       run.preview.pages.find((p) => p.id === run.preview.defaultPage) ||
       run.preview.pages[0];
     const response = await page.goto(new URL(entry.href, baseURL).href, {
-      waitUntil: "domcontentloaded",
+      waitUntil: navigation,
       timeout: 25000,
     });
     record.pages.push({
@@ -340,7 +346,7 @@ async function captureRun(run) {
       .filter((p) => p.id !== run.preview.defaultPage)
       .entries()) {
       const response = await page.goto(new URL(entry.href, baseURL).href, {
-        waitUntil: "domcontentloaded",
+        waitUntil: navigation,
         timeout: 25000,
       });
       await ready(page);
@@ -359,7 +365,7 @@ async function captureRun(run) {
     }
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(new URL(entry.href, baseURL).href, {
-      waitUntil: "domcontentloaded",
+      waitUntil: navigation,
       timeout: 25000,
     });
     await ready(page);
