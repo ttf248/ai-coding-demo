@@ -3,6 +3,46 @@ import crypto from "node:crypto";
 export const evidenceSetHash = (capture) =>
   crypto.createHash("sha256").update(JSON.stringify(capture)).digest("hex");
 
+export function expandManualReview(entry, rubric, capture) {
+  const score = { ...entry, rubricVersion: 3, total: null };
+  if (entry.status !== "rated") return score;
+  for (const [field, size] of [
+    ["taskPoints", 8],
+    ["visualPoints", 12],
+  ]) {
+    if (
+      !Array.isArray(entry[field]) ||
+      entry[field].length !== size ||
+      entry[field].some((v) => !Number.isInteger(v) || v < 0 || v > 5)
+    )
+      throw Error("Invalid independent points: " + field);
+  }
+  const task = rubric.tasks[capture.topicId + "/" + capture.promptId];
+  score.taskChecks = Object.fromEntries(
+    task.checks.map((c, i) => [c.id, entry.taskPoints[i]]),
+  );
+  const visualIds = Object.values(rubric.visualChecks)
+    .flat()
+    .map(([id]) => id);
+  score.visualChecks = Object.fromEntries(
+    visualIds.map((id, i) => [id, entry.visualPoints[i]]),
+  );
+  score.dimensions = {
+    taskCoverage: entry.taskPoints.reduce((a, b) => a + b, 0),
+  };
+  for (const [dimension, checks] of Object.entries(rubric.visualChecks))
+    score.dimensions[dimension] = checks.reduce(
+      (sum, [id]) => sum + score.visualChecks[id],
+      0,
+    );
+  score.ceiling = rubric.stateCeilings[entry.captureState];
+  score.total = Math.min(
+    score.ceiling,
+    Object.values(score.dimensions).reduce((a, b) => a + b, 0),
+  );
+  return score;
+}
+
 export function v3RubricErrors(rubric, catalog) {
   const errors = [];
   if (
@@ -131,6 +171,19 @@ export function v3ReviewErrors(score, rubric, capture) {
   if (!["high", "medium", "low"].includes(score.confidence))
     errors.push("Record evidence confidence separately from points");
   if (score.status !== "rated") return errors;
+  if (
+    !(score.captureState in rubric.stateCeilings) ||
+    score.ceiling !== rubric.stateCeilings[score.captureState]
+  )
+    errors.push("Unknown capture state or ceiling");
+  if (
+    score.total !==
+    Math.min(
+      score.ceiling,
+      Object.values(score.dimensions || {}).reduce((a, b) => a + b, 0),
+    )
+  )
+    errors.push("Total differs from independently reviewed dimensions");
   const tasks =
     rubric.tasks[capture.topicId + "/" + capture.promptId]?.checks.map(
       (c) => c.id,

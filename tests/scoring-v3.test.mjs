@@ -8,6 +8,7 @@ import {
   captureErrors,
   evidenceSetHash,
   v3ReviewErrors,
+  expandManualReview,
 } from "../scripts/scoring-v3.mjs";
 const rubric = readJSON("catalog/scoring-rubric-v3.json"),
   catalog = loadCatalog();
@@ -45,6 +46,36 @@ test("capture PNGs do not invalidate builds, while source assets and code still 
     assert.ok(temporary.startsWith(path.join(ROOT, "tests") + path.sep));
     fs.rmSync(temporary, { recursive: true, force: true });
   }
+});
+
+test("manual review totals require independent task and visual points", () => {
+  const run = catalog.runs[0];
+  const capture = { topicId: run.topicId, promptId: run.promptId };
+  const entry = {
+    status: "rated",
+    taskPoints: [0, 1, 2, 3, 4, 5, 2, 3],
+    visualPoints: [1, 2, 3, 4, 5, 4, 3, 2, 1, 0, 3, 5],
+    captureState: "partial",
+  };
+  const score = expandManualReview(entry, rubric, capture);
+  assert.equal(score.dimensions.taskCoverage, 20);
+  assert.equal(score.dimensions.composition, 10);
+  assert.equal(score.dimensions.readability, 12);
+  assert.equal(score.total, 53);
+  assert.throws(() =>
+    expandManualReview({ ...entry, visualPoints: [5] }, rubric, capture),
+  );
+  const blocked = expandManualReview(
+    {
+      ...entry,
+      captureState: "blocked",
+      taskPoints: Array(8).fill(5),
+      visualPoints: Array(12).fill(5),
+    },
+    rubric,
+    capture,
+  );
+  assert.equal(blocked.total, 39);
 });
 
 test("v3 separates eight task checks and twelve visual observations", () => {

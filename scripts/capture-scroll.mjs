@@ -61,3 +61,70 @@ export async function restoreScrollTop(page) {
       if (el.scrollTop) el.scrollTop = 0;
   });
 }
+
+export async function discoverHorizontalContainers(page) {
+  return page.evaluate(() => {
+    const elements = [...document.querySelectorAll("body *")].filter((e) => {
+      const r = e.getBoundingClientRect();
+      return (
+        r.width >= 300 &&
+        r.height >= 200 &&
+        e.scrollWidth > e.clientWidth + 150 &&
+        /auto|scroll/.test(getComputedStyle(e).overflowX)
+      );
+    });
+    return elements
+      .filter(
+        (e) => !elements.some((parent) => parent !== e && parent.contains(e)),
+      )
+      .map((e) => {
+        const segments = [];
+        for (
+          let node = e;
+          node && node !== document.body;
+          node = node.parentElement
+        ) {
+          const tag = node.tagName.toLowerCase();
+          segments.unshift(
+            tag +
+              ":nth-of-type(" +
+              ([...node.parentElement.children]
+                .filter((s) => s.tagName === node.tagName)
+                .indexOf(node) +
+                1) +
+              ")",
+          );
+        }
+        return {
+          selector: "body > " + segments.join(" > "),
+          width: e.clientWidth,
+          maxLeft: e.scrollWidth - e.clientWidth,
+        };
+      });
+  });
+}
+
+export async function scrollHorizontalContainer(
+  page,
+  container,
+  left,
+  waitMs = 1000,
+) {
+  await page.evaluate(
+    ({ selector, left }) => {
+      scrollTo(0, 0);
+      document
+        .querySelector(selector)
+        .scrollTo({ left, top: 0, behavior: "instant" });
+    },
+    { ...container, left },
+  );
+  await page.waitForTimeout(waitMs);
+  return page
+    .locator(container.selector)
+    .evaluate((e) => ({
+      left: e.scrollLeft,
+      top: e.scrollTop,
+      maxLeft: e.scrollWidth - e.clientWidth,
+    }));
+}
