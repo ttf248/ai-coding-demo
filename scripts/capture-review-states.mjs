@@ -4,7 +4,12 @@ import crypto from "node:crypto";
 import sharp from "sharp";
 import { chromium } from "playwright";
 import { ROOT, loadCatalog } from "./lib.mjs";
-import { pressReviewKey, settleReviewState } from "./capture-state-timing.mjs";
+import {
+  pressReviewKey,
+  settleReviewState,
+  doubleClickReviewTarget,
+  uploadReviewFixture,
+} from "./capture-state-timing.mjs";
 
 // Explicit reviewer-selected navigation only; original artifacts and captures stay intact.
 const plan = JSON.parse(fs.readFileSync(0, "utf8").replace(/^\uFEFF/, ""));
@@ -110,9 +115,24 @@ try {
         page.evaluate(() => document.fonts.ready),
         page.waitForTimeout(1800),
       ]);
+      await settleReviewState(page, state.preActionWaitMs);
+      if (state.preActionWaitMs)
+        record.actions.push({
+          kind: "review-state-ready-wait",
+          state: state.id,
+          milliseconds: state.preActionWaitMs,
+        });
       for (const action of state.actions || []) {
         const locator = page.locator(action.selector).first();
         if (action.kind === "click") await locator.click({ timeout: 5000 });
+        else if (action.kind === "double-click")
+          await doubleClickReviewTarget(locator);
+        else if (action.kind === "upload-review-fixture")
+          record.actions.push({
+            kind: "review-fixture-upload",
+            state: state.id,
+            ...(await uploadReviewFixture(locator)),
+          });
         else if (action.kind === "pointer-click") {
           await locator.scrollIntoViewIfNeeded({ timeout: 10000 });
           await page.waitForTimeout(500);

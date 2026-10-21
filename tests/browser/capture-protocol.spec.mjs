@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import {
   pressReviewKey,
   settleReviewState,
+  doubleClickReviewTarget,
+  uploadReviewFixture,
 } from "../../scripts/capture-state-timing.mjs";
 
 test("review capture uses real range keyboard events and waits for delayed results", async ({
@@ -14,6 +16,19 @@ test("review capture uses real range keyboard events and waits for delayed resul
   await settleReviewState(page, 120);
   await expect(page.locator("#speed")).toHaveValue("1");
   await expect(page.locator("output")).toHaveText("delay 1");
+  await page.locator("output").evaluate((element) => {
+    element.addEventListener("dblclick", () => {
+      element.textContent = "double clicked";
+    });
+  });
+  await doubleClickReviewTarget(page.locator("output"));
+  await expect(page.locator("output")).toHaveText("double clicked");
+  await page.setContent(
+    `<input type="file"><output></output><script>document.querySelector('input').addEventListener('change',e=>document.querySelector('output').textContent=e.target.files[0].name);</script>`,
+  );
+  const upload = await uploadReviewFixture(page.locator("input"));
+  expect(upload.sha256).toMatch(/^[a-f0-9]{64}$/);
+  await expect(page.locator("output")).toHaveText("pixel-flow-review.png");
   await expect(
     pressReviewKey(page.locator("#speed"), "Delete"),
   ).rejects.toThrow("Unsupported review key");
