@@ -263,7 +263,11 @@
     document.body.dataset.contentMode = state.tab;
     document.body.classList.toggle("comparison-empty", empty);
     $("compare-start").hidden = !empty;
-    $("pick-models").textContent = empty ? "选择对比实验" : "更换对比实验";
+    $("pick-models").textContent = empty
+      ? "选择对比实验"
+      : narrow.matches
+        ? "更换当前实验"
+        : "更换对比实验";
     $("viewport-control").hidden = state.tab !== "preview";
     document.querySelector(".mobile-layout-note").textContent =
       state.tab === "preview"
@@ -475,6 +479,11 @@
             "</select>"
           : "") +
         '<div class="panel-actions">' +
+        (run && state.tab === "snapshot" && U.screenshotURL(run)
+          ? '<button class="snapshot-zoom-button" data-zoom-snapshot="' +
+            side +
+            '">放大截图</button>'
+          : "") +
         (href
           ? '<a class="button" href="' +
             e(href) +
@@ -904,6 +913,28 @@
     updateURL();
     render();
   });
+  let screenshotTrigger = null;
+  function setImageScale(scale) {
+    $("screenshot-zoom").dataset.scale = scale;
+    document.querySelectorAll("[data-image-scale]").forEach((button) => {
+      button.setAttribute(
+        "aria-pressed",
+        String(button.dataset.imageScale === scale),
+      );
+    });
+    document.querySelector(".screenshot-zoom-stage").scrollTo(0, 0);
+  }
+  $("screenshot-zoom").addEventListener("click", (event) => {
+    const scale = event.target.closest("[data-image-scale]");
+    if (scale) setImageScale(scale.dataset.imageScale);
+    if (event.target.closest("#screenshot-zoom-close"))
+      $("screenshot-zoom").close();
+  });
+  $("screenshot-zoom").addEventListener("close", () => {
+    $("screenshot-zoom-image").removeAttribute("src");
+    screenshotTrigger?.focus({ preventScroll: true });
+    screenshotTrigger = null;
+  });
   document.addEventListener("click", (event) => {
     const el = event.target.closest("button");
     if (!el) return;
@@ -916,6 +947,18 @@
       try {
         $("group").showPicker?.();
       } catch {}
+      return;
+    }
+    if (el.dataset.zoomSnapshot) {
+      const run = getRun(el.dataset.zoomSnapshot);
+      if (!run || !U.screenshotURL(run)) return;
+      screenshotTrigger = el;
+      $("screenshot-zoom-title").textContent = runLabel(run) + " · 实际截图";
+      $("screenshot-zoom-image").src = U.screenshotURL(run);
+      $("screenshot-zoom-image").alt = runLabel(run) + " 实际截图";
+      $("screenshot-original").href = U.screenshotURL(run);
+      setImageScale("fit");
+      $("screenshot-zoom").showModal();
       return;
     }
     if (el.id === "pick-models") {

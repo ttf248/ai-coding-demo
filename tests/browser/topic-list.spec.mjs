@@ -44,7 +44,9 @@ test("topic opens the complete compact list with recorded batch durations", asyn
   const art = page.locator(".topic-run-art img").first();
   await expect(art).toHaveAttribute("srcset", /240w.*480w.*960w/);
   await expect(art).toHaveAttribute("sizes", "118px");
-  expect(await art.evaluate((image) => image.currentSrc)).toMatch(/-240\.webp$/);
+  expect(await art.evaluate((image) => image.currentSrc)).toMatch(
+    /-240\.webp$/,
+  );
   const artBox = await art.boundingBox();
   expect(artBox.width).toBeLessThanOrEqual(120);
   expect(artBox.height).toBeLessThanOrEqual(100);
@@ -92,7 +94,7 @@ test("topic opens the complete compact list with recorded batch durations", asyn
   await expect(page.locator("#topic-list")).toBeVisible();
 });
 
-test("390px list exposes facts and duration without disclosures or page overflow", async ({
+test("390px list keeps works compact and expands recorded facts without page overflow", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -106,13 +108,15 @@ test("390px list exposes facts and duration without disclosures or page overflow
   const firstRow = await page.locator(".topic-run-row").first().boundingBox();
   expect(firstRow.y).toBeLessThan(520);
   expect(firstRow.y + firstRow.height).toBeLessThanOrEqual(844);
+  expect(firstRow.height).toBeLessThan(270);
+  await expect(page.locator(".topic-run-billing").first()).toBeHidden();
   await page.goto(
     "topic.html?id=circuit-lab&model=deepseek-v4-pro-0813&effort=high",
   );
   const row = page.locator(".topic-run-row");
   await expect(row).toHaveCount(1);
   await expect(row.locator(".run-context")).not.toHaveAttribute("open", "");
-  await row.locator(".run-context summary").click();
+  await row.locator(".run-context > summary").click();
   for (const selector of [
     ".topic-run-model-maker",
     ".topic-run-provider",
@@ -175,7 +179,9 @@ test("default ranking orders every rated record by screenshot score", async ({
   page,
 }) => {
   await page.goto("topic.html?id=circuit-lab");
-  const scored = await page.locator(".topic-run-score .score-chip").allTextContents();
+  const scored = await page
+    .locator(".topic-run-score .score-chip")
+    .allTextContents();
   const totals = scored
     .map((text) => Number(text.match(/(\d+)/)?.[1]))
     .filter((value) => Number.isInteger(value));

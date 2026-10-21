@@ -79,3 +79,76 @@ test("mobile selection stays compact and leads to a second same-task experiment"
   await tray.locator("[data-clear]").click();
   await expect(tray).toBeHidden();
 });
+
+test("mobile record details retain facts when switching to the desktop table", async ({
+  page,
+}) => {
+  await page.goto(
+    "topic.html?id=circuit-lab&model=deepseek-v4-pro-0813&effort=high",
+  );
+  const row = page.locator(".topic-run-row");
+  await expect(row.locator(".topic-run-billing")).toBeHidden();
+  await expect(row.locator(".topic-run-actions")).toBeVisible();
+  await row.locator(".run-context > summary").click();
+  await expect(row.locator(".topic-run-duration")).toContainText("31m 55s");
+  await expect(row.locator(".topic-run-billing")).toBeVisible();
+  await row.locator(".billing-summary > summary").click();
+  await expect(row.locator(".billing-summary p")).toContainText("批次耗时");
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await expect(row.locator(".topic-run-facts")).toHaveCount(0);
+  await expect(row.locator(".topic-run-billing")).toHaveCount(1);
+  await expect(row.locator(".topic-run-duration")).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(row.locator(".topic-run-facts")).toHaveCount(1);
+  await expect(row.locator(".topic-run-billing")).toHaveCount(1);
+});
+
+test("mobile comparison keeps switches available and zooms the selected original screenshot", async ({
+  page,
+}) => {
+  await page.goto(
+    "compare.html?group=circuit-lab/v1&left=circuit-lab--claude-opus-5-5-max-r01&right=circuit-lab--gpt-6-1-sol-max-r01&tab=snapshot",
+  );
+  await expect(page.locator("#run-left")).toBeHidden();
+  await page.locator('[data-mobile="right"]').click();
+  const panel = page.locator("#panel-right");
+  const original = await panel
+    .locator(".snapshot-preview")
+    .getAttribute("href");
+  await panel.locator("[data-zoom-snapshot]").click();
+  const dialog = page.locator("#screenshot-zoom");
+  await expect(dialog).toBeVisible();
+  await expect(page.locator("#screenshot-zoom-image")).toHaveAttribute(
+    "src",
+    original,
+  );
+  await page.locator('[data-image-scale="actual"]').click();
+  await expect(dialog).toHaveAttribute("data-scale", "actual");
+  await expect
+    .poll(() =>
+      page
+        .locator(".screenshot-zoom-stage")
+        .evaluate((el) => el.scrollWidth > el.clientWidth),
+    )
+    .toBe(true);
+  await page
+    .locator(".screenshot-zoom-stage")
+    .evaluate((el) => el.scrollTo(100, 100));
+  expect(
+    await page
+      .locator(".screenshot-zoom-stage")
+      .evaluate((el) => el.scrollLeft),
+  ).toBeGreaterThan(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(panel.locator("[data-zoom-snapshot]")).toBeFocused();
+  await page.evaluate(() => scrollTo(0, 250));
+  const switcher = await page.locator(".compare-switcher").boundingBox();
+  expect(switcher.y).toBeGreaterThanOrEqual(0);
+  expect(switcher.y).toBeLessThan(10);
+  await page.locator('[data-mobile="left"]').click();
+  await expect(page.locator("#panel-left")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    390,
+  );
+});

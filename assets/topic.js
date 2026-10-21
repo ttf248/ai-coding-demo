@@ -171,6 +171,16 @@
       "</p></details>"
     );
   }
+  function executionContext(run, mobile = false) {
+    return `<details class="run-context"><summary>${mobile ? "费用与执行条件" : "执行条件"}</summary><dl>
+      ${mobile ? `<dt>费用记录</dt><dd class="topic-run-billing" id="billing-${e(run.id)}">${billingMarkup(run)}${run.billing?.plan ? `<small class="topic-run-plan">${e(run.billing.plan)}</small>` : ""}</dd><dt>执行耗时</dt><dd class="topic-run-duration">${durationMarkup(run)}</dd>` : ""}
+      <dt>模型厂商</dt><dd class="topic-run-model-maker">${e(U.modelProvider(data, run))}</dd>
+      <dt>接入/付费供应商</dt><dd class="topic-run-provider">${e(run.billing?.provider || "未记录")}</dd>
+      <dt>运行工具</dt><dd class="topic-run-tool">${e(toolLabel(run))}</dd>
+      <dt>实验日期</dt><dd class="topic-run-date" id="date-${e(run.id)}">${e(run.date || "日期未记录")}</dd>
+      <dt>执行模式</dt><dd>${e(U.executionModeText(run))}</dd>
+    </dl></details>`;
+  }
   function compactBilling(run) {
     const b = run.billing;
     if (!b) return "费用未记录";
@@ -421,7 +431,10 @@
     document.getElementById("topic-more-filters").open =
       !mobileFilters.matches || !!effort || sort !== DEFAULT_SORT;
   }
-  mobileFilters.addEventListener("change", syncAdvancedFilters);
+  mobileFilters.addEventListener("change", () => {
+    syncAdvancedFilters();
+    render();
+  });
   syncAdvancedFilters();
   function entries(items) {
     return items
@@ -712,17 +725,15 @@
                       <small class="topic-run-condition"><span class="topic-run-effort">${e(U.effortLabel(r.effort))}</span> · <span class="topic-run-round">${e(U.roundLabel(r))}</span></small>
                       <span class="topic-run-input"><span>${e(U.completenessLabel(r.input?.completeness))}</span><small>${U.executionModeBadge(r)}</small></span>
                       <span class="topic-selection-relation" data-relation-run="${e(r.id)}" hidden></span>
-                      <details class="run-context"><summary>执行条件</summary><dl>
-                        <dt>模型厂商</dt><dd class="topic-run-model-maker">${e(U.modelProvider(data, r))}</dd>
-                        <dt>接入/付费供应商</dt><dd class="topic-run-provider">${e(r.billing?.provider || "未记录")}</dd>
-                        <dt>运行工具</dt><dd class="topic-run-tool">${e(toolLabel(r))}</dd>
-                        <dt>实验日期</dt><dd class="topic-run-date" id="date-${e(r.id)}">${e(r.date || "日期未记录")}</dd>
-                        <dt>执行模式</dt><dd>${e(U.executionModeText(r))}</dd>
-                      </dl></details>
+                      ${mobileFilters.matches ? "" : executionContext(r)}
                     </th>
                     <td class="topic-run-score">${U.scoreDetails(r)}</td>
-                    <td class="topic-run-billing" id="billing-${e(r.id)}">${billingMarkup(r)}${r.billing?.plan ? `<small class="topic-run-plan">${e(r.billing.plan)}</small>` : ""}</td>
-                    <td class="topic-run-duration">${durationMarkup(r)}</td>
+                    ${
+                      mobileFilters.matches
+                        ? `<td class="topic-run-facts" colspan="2">${executionContext(r, true)}</td>`
+                        : `<td class="topic-run-billing" id="billing-${e(r.id)}">${billingMarkup(r)}${r.billing?.plan ? `<small class="topic-run-plan">${e(r.billing.plan)}</small>` : ""}</td>
+                    <td class="topic-run-duration">${durationMarkup(r)}</td>`
+                    }
                     <td class="topic-run-actions"><div class="topic-row-actions">
                       <button data-compare="${e(r.id)}" aria-pressed="false">加入对比</button>
                       ${href ? `<a href="${e(href)}" target="_blank" rel="noopener">${r.preview.kind === "external" ? "外部预览 ↗" : "预览 ↗"}</a>` : '<span class="missing-record">无预览</span>'}

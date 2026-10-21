@@ -219,7 +219,7 @@ const BASELINE = {
   "compare@390": {
     ".compare-controls": {
       "justify-content": "center",
-      gap: "9px",
+      gap: "4px 8px",
       padding: "0px",
       "align-items": "center",
     },
@@ -277,6 +277,12 @@ BASELINE["home@390"]["#display-options > summary"] = {
   "min-height": "44px",
 };
 BASELINE["home@390"][".compact-hero"] = { padding: "8px 0px" };
+BASELINE["topic@390"][".topic-run-facts"] = { "grid-row-start": "4" };
+BASELINE["compare@390"][".compare-switcher"] = {
+  position: "sticky",
+  top: "0px",
+};
+BASELINE["compare@390"][".panel-header"]["grid-template-columns"] = "358px";
 
 for (const [width, sizes] of [
   [1440, "desktop"],
