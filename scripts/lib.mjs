@@ -245,11 +245,23 @@ export function generatedFiles(catalog) {
         (fs.existsSync(resolveLocal("catalog/migration-v2.json"))
           ? readJSON("catalog/migration-v2.json").records
           : []
-        ).map(({ oldPath, id }) => ({
-          oldPath,
-          id,
-          topicId: runs.find((run) => run.id === id)?.topicId,
-        })),
+        ).map(({ oldPath, id }) => {
+          const run = runs.find((run) => run.id === id);
+          return {
+            oldPath,
+            id,
+            topicId: run?.topicId,
+            label: run
+              ? (topics.find((topic) => topic.id === run.topicId)?.title ||
+                  run.topicId) +
+                " · " +
+                (catalog.models.find((model) => model.id === run.modelId)
+                  ?.label || run.modelId) +
+                " · " +
+                run.effort
+              : id,
+          };
+        }),
       ).replace(/</g, "\\u003c") +
       ";\n",
   );

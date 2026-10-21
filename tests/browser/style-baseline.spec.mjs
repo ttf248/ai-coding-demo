@@ -259,6 +259,17 @@ BASELINE["compare@390"][".panel-identity"] = {
 };
 BASELINE["topic@390"][".run-context > summary"] = { "min-height": "44px" };
 
+for (const width of [1440, 390]) {
+  BASELINE[`home@${width}`][".score-chip"] = {
+    "background-color": "rgb(246, 247, 249)",
+    color: "rgb(24, 34, 48)",
+  };
+  BASELINE[`compare@${width}`]["#relation"] = {
+    color: "rgb(121, 86, 0)",
+    "background-color": "rgb(255, 245, 221)",
+  };
+}
+
 // 新增排序说明继承结果区字号，不能压缩成难读的辅助标签。
 BASELINE["home@1440"]["#sort-context"] = { "font-size": "13px" };
 

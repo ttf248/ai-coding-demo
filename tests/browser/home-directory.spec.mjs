@@ -99,7 +99,9 @@ test("homepage covers pick the variant that matches the displayed size", async (
   const compact = page.locator("#project-grid .topic-cover img").first();
   await expect(compact).toHaveAttribute("srcset", /240w.*480w.*960w/);
   await expect(compact).toHaveAttribute("sizes", /400px/);
-  expect(await compact.evaluate((img) => img.currentSrc)).toMatch(/-480\.webp$/);
+  expect(await compact.evaluate((img) => img.currentSrc)).toMatch(
+    /-480\.webp$/,
+  );
 
   await page.goto("./?view=grid");
   const grid = page.locator("#project-grid .topic-cover img").first();
@@ -116,7 +118,9 @@ test("homepage covers pick the variant that matches the displayed size", async (
   await page.goto("./?view=list");
   const list = page.locator("#project-grid .topic-cover img").first();
   await expect(list).toHaveAttribute("sizes", /224px/);
-  const listWidth = await list.evaluate((img) => img.getBoundingClientRect().width);
+  const listWidth = await list.evaluate(
+    (img) => img.getBoundingClientRect().width,
+  );
   expect(Math.round(listWidth)).toBe(224);
   expect(await list.evaluate((img) => img.currentSrc)).toMatch(/-240\.webp$/);
 });
@@ -288,9 +292,9 @@ test("recent update cards keep text within their bounds on desktop and mobile", 
   expect(
     await page.evaluate(
       () =>
-        getComputedStyle(document.querySelector("#recent-list"))
-          .gridTemplateColumns.split(" ")
-          .length,
+        getComputedStyle(
+          document.querySelector("#recent-list"),
+        ).gridTemplateColumns.split(" ").length,
     ),
   ).toBe(1);
 });
@@ -481,9 +485,14 @@ test("portrait captures use a derived cover while the full capture stays reachab
   const original = await cover.getAttribute("data-original");
   expect(original).toMatch(/\.png$/);
   await card.locator(".cover-preview").click();
-  await expect(page.locator("#preview-stage img")).toHaveAttribute("src", original);
+  await expect(page.locator("#preview-stage img")).toHaveAttribute(
+    "src",
+    original,
+  );
   expect(
-    await page.locator("#preview-stage img").evaluate((img) => img.naturalHeight),
+    await page
+      .locator("#preview-stage img")
+      .evaluate((img) => img.naturalHeight),
   ).toBeGreaterThan(1500);
 });
 test("cover preview keeps screenshot, selected version and direct entry aligned", async ({
@@ -728,10 +737,12 @@ test("legacy latest links return to complexity sorting and card badges stay grou
           await page.locator(".card-badges .execution-mode-chip").count(),
         ).toBeGreaterThan(0);
       } else {
-        const details = page.locator(".experiment-info").first();
-        await expect(details.locator(".topic-secondary .pill")).toBeHidden();
-        await details.locator(":scope > summary").click();
-        await expect(details.locator(".topic-secondary .pill")).toBeVisible();
+        await expect(
+          page.locator(".topic-card .card-badges .pill").first(),
+        ).toBeVisible();
+        await expect(
+          page.locator(".topic-card .card-badges").first(),
+        ).toContainText("复杂度");
       }
       const aligned = await page
         .locator("#project-grid .card-top")

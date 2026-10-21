@@ -451,6 +451,8 @@ for (const file of [
   "assets/core.js",
   "assets/analytics.js",
   "assets/home.js",
+  "assets/workspace-state.js",
+  "assets/compare-records.js",
   "assets/topic.js",
   "assets/compare.js",
 ])
@@ -482,6 +484,6 @@ if (errors.length) {
   console.log(
     `Valid: ${catalog.topics.length} topics, ${catalog.runs.length} runs, ${catalog.guides.length} guides; committed site is current.`,
   );
-  console.log(
-    `CSS: ${css.acrossFilesCount} selectors shared across files (limit ${CSS_BASELINE.acrossFiles}), ${css.repeatedCount} identical declarations repeated in one file (limit ${CSS_BASELINE.repeated}).`,
-  );
+console.log(
+  `CSS: ${css.acrossFilesCount} selectors shared across files (limit ${CSS_BASELINE.acrossFiles}), ${css.repeatedCount} identical declarations repeated in one file (limit ${CSS_BASELINE.repeated}).`,
+);

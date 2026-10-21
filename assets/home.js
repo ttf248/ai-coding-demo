@@ -4,38 +4,7 @@
     U = window.ArchiveUI,
     $ = (id) => document.getElementById(id),
     e = U.escape;
-  const params = new URLSearchParams(location.search);
-  const state = {
-    q: params.get("q") || "",
-    category: params.get("category") || "",
-    provider: params.get("provider") || "",
-    tool: params.get("tool") || "",
-    model: params.get("model") || "",
-    type: params.get("type") || "",
-    prompt: params.get("prompt") || "",
-    preview: params.get("preview") || "",
-    testing: ["active", "archived", "all"].includes(params.get("testing"))
-      ? params.get("testing")
-      : "active",
-    sort: ["score", "complexity", "recent", "title"].includes(
-      params.get("sort"),
-    )
-      ? params.get("sort")
-      : "",
-    group: ["topics", "runs"].includes(params.get("group"))
-      ? params.get("group")
-      : "topics",
-    view: ["compact", "grid", "list"].includes(params.get("view"))
-      ? params.get("view")
-      : "compact",
-    screenshot: params.get("screenshot") === "yes" ? "yes" : "",
-    comparable: params.get("comparable") === "yes" ? "yes" : "",
-    runGrouping: params.get("runGrouping") === "topic" ? "topic" : "",
-    pick: params.get("pick") || "",
-    pickPrompt: params.get("pickPrompt") || "",
-    pickSort: params.get("pickSort") === "recent" ? "recent" : "score",
-    pickAnchor: params.get("pickAnchor") || "",
-  };
+  const state = window.ArchiveState.homeFromURL(location.search);
   // 排序默认值随分组变化：主题按复杂度，实验按截图评分（与主题页口径一致）。
   const defaultSort = () => (state.group === "runs" ? "score" : "complexity");
   const effectiveSort = () =>
@@ -277,8 +246,9 @@
     const matched = U.filterRuns(data, { ...state, sort });
     previewScopes.clear();
     let items;
+    let totalItems = matched.length;
     if (state.group === "runs")
-      items = matched.map((r) => {
+      items = matched.slice(0, visible).map((r) => {
         previewScopes.set(r.id, { runs: [r], source: U.screenshotURL(r) });
         return U.runCard(data, r, {
           figure: r.screenshot
@@ -331,7 +301,8 @@
         );
       }
       topics.sort((a, b) => U.compareTopics(a, b, matched, sort));
-      items = topics.map((t) => {
+      totalItems = topics.length;
+      items = topics.slice(0, visible).map((t) => {
         const runs = matched.filter((r) => r.topicId === t.id),
           all = data.runs.filter((r) => r.topicId === t.id),
           first = runs[0];
@@ -388,6 +359,7 @@
           '</span><div class="card-badges">' +
           (U.isTopicArchived(t) ? '<span class="pill">已归档</span>' : "") +
           U.executionModeBadge(previewRun) +
+          U.complexityBadge(t) +
           (displayedRun
             ? U.scoreBadge(displayedRun).replace(">评分 ", ">截图评分 ")
             : "") +
@@ -408,8 +380,6 @@
           (runs.length !== all.length ? " / 共 " + all.length + " 个" : "") +
           ' ▾</button><details class="experiment-info"><summary>实验信息</summary><p class="topic-secondary">' +
           e(data.categories.find((c) => c.id === t.category).label) +
-          " · " +
-          U.complexityBadge(t) +
           '</p><div class="latest-run"><span>' +
           e(summaryLabel) +
           "</span><strong>" +
@@ -462,7 +432,7 @@
       "cards " +
       state.view +
       (state.group === "runs" && state.view === "list" ? " run-ledger" : "");
-    let displayed = items.slice(0, visible);
+    let displayed = items;
     const ledger = state.group === "runs" && state.view === "list";
     if (ledger && state.runGrouping === "topic") {
       const groups = [
@@ -485,17 +455,17 @@
     setupGalleryImages();
     $("result-count").textContent =
       "当前范围：" +
-      items.length +
+      totalItems +
       " 个" +
       (state.group === "runs" ? "实验" : "主题") +
       " · " +
       matched.length +
       " 条匹配记录";
-    $("range").textContent = items.length
-      ? "显示 " + Math.min(visible, items.length) + " / " + items.length
+    $("range").textContent = totalItems
+      ? "显示 " + Math.min(visible, totalItems) + " / " + totalItems
       : "";
-    $("empty").hidden = !!items.length;
-    $("load-more").hidden = visible >= items.length;
+    $("empty").hidden = !!totalItems;
+    $("load-more").hidden = visible >= totalItems;
     document
       .querySelectorAll("[data-group]")
       .forEach((b) =>

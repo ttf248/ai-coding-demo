@@ -569,11 +569,11 @@
           " 个模型";
     document.getElementById("topic-results-help").textContent =
       view === "matrix"
-        ? "空白档位表示未归档实验，不代表能力评价。"
+        ? "查看模型与档位覆盖缺口；空白表示未归档实验，不代表能力评价。"
         : view === "list"
           ? "费用与耗时标明单次或批次口径；批次数据不拆算为单案例。"
           : view === "models"
-            ? "保留工具与执行模式差异；完整说明从明细入口查看。"
+            ? "按模型查看重跑历史，保留工具与执行模式差异；完整说明从明细入口查看。"
             : "保留历史任务版本，完整原始输入在各条实验记录中。";
     for (const key of ["models", "matrix", "list", "prompt"]) {
       document.getElementById(

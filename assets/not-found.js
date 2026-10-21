@@ -11,6 +11,7 @@
       requested.endsWith("/" + record.oldPath),
   );
   if (!candidates.length) return;
+  document.getElementById("missing-title").textContent = "已找到迁移后的实验。";
   const section = document.getElementById("migration-match");
   section.hidden = false;
   const heading = document.createElement("h2");
@@ -23,9 +24,12 @@
       encodeURIComponent(record.topicId) +
       "&view=list#run-" +
       encodeURIComponent(record.id);
-    link.textContent = record.id + " →";
+    link.textContent = (record.label || record.id) + " →";
     const paragraph = document.createElement("p");
-    paragraph.append(link);
+    const identity = document.createElement("small");
+    identity.textContent = record.id;
+    identity.style.display = "block";
+    paragraph.append(link, identity);
     section.append(paragraph);
   }
 })();

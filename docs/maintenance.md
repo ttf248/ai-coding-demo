@@ -16,7 +16,7 @@
 - 每次实验的 `prompt.md`：完整原始输入快照；`Readme.md` 保留原始说明、复盘与自动元信息区块。
 - `catalog/models.json`、`categories.json`、`guides.json`：共享字典和技术索引。
 - `assets/generated/catalog.js`：自动生成的浏览器数据，不手改。
-- `assets/core.js`：首页、主题页、对比页共用的组件与排序逻辑；`assets/home.js`、`assets/topic.js`、`assets/compare.js` 是各页自己的交互脚本。
+- `assets/core.js`：首页、主题页、对比页共用的组件、目录索引、详情加载与排序逻辑；`assets/workspace-state.js` 集中解析首页与对比页 URL，`assets/compare-records.js` 从同一条件集合生成桌面表格与手机字段视图；`assets/home.js`、`assets/topic.js`、`assets/compare.js` 是各页自己的交互脚本。
 - `catalog/tools.json`：运行工具及历史名称的明确别名。模型厂商由 `models.json` 登记，工具或接入平台不作为模型厂商；旧 `environment.tool` 保留原始名称，新记录可同时填写 `environment.toolId`。
 - `catalog/batches.json`：费用批次字典。新实验可使用 `billing: {"type":"batch","batchId":"已登记批次"}`。既有实验中的完整费用快照继续保留，校验器核对它与字典的一致性。
 - 根 README 的 catalog 区块、主题 README、实验 README 的 archive 区块由脚本维护。区块外的历史记录不会被生成器覆盖。

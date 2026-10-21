@@ -17,52 +17,7 @@
   let state = {},
     diffCache = null;
   function fromURL() {
-    const p = new URLSearchParams(location.search);
-    state = {
-      left: p.get("left") || "",
-      right: p.get("right") || "",
-      third: p.get("third") || "",
-      fourth: p.get("fourth") || "",
-      thirdPage: p.get("thirdPage") || "",
-      fourthPage: p.get("fourthPage") || "",
-      group: p.get("group") || "",
-      scope: ["task", "raw", "topic", "all"].includes(p.get("scope"))
-        ? p.get("scope")
-        : "task",
-      layout: ["dual", "quad", "single"].includes(p.get("layout"))
-        ? p.get("layout")
-        : "dual",
-      focus: sides.includes(p.get("focus")) ? p.get("focus") : "",
-
-      leftPage: p.get("leftPage") || "",
-      rightPage: p.get("rightPage") || "",
-      viewport: ["adaptive", ...Object.keys(sizes)].includes(p.get("viewport"))
-        ? p.get("viewport")
-        : "adaptive",
-      tab: ["preview", "snapshot", "prompt", "info", "conditions"].includes(
-        p.get("tab"),
-      )
-        ? p.get("tab")
-        : "preview",
-      source: p.get("source") === "raw" ? "raw" : "task",
-      relatedOnly: p.get("related") !== "0",
-      differencesOnly: p.get("differencesOnly") === "1",
-      mobile: sides.includes(p.get("mobile")) ? p.get("mobile") : "left",
-    };
-    for (const side of sides) {
-      const run = getRun(side);
-      const model = p.get(side + "Model") || run?.modelId || "";
-      state[side + "Model"] = run?.modelId || model;
-      state[side + "Effort"] =
-        (!run || model === run.modelId ? p.get(side + "Effort") : "") ||
-        run?.effort ||
-        "";
-    }
-    if (state.tab === "info") state.tab = "conditions";
-    if (!state.group) {
-      const initial = data.runs.find((r) => r.id === state.left);
-      if (initial) state.group = initial.topicId + "/" + initial.promptId;
-    }
+    state = window.ArchiveState.compareFromURL(location.search, data);
     if (
       !sides.some((side) => state[side] || state[side + "Model"]) &&
       groupPrompt()
@@ -351,6 +306,14 @@
       state.left && state.left === state.right
         ? "不能选择同一条实验，请更换一侧。"
         : U.relation(data, a, b);
+    $("relation").dataset.evidence =
+      a &&
+      b &&
+      (a.rawHash !== b.rawHash ||
+        a.input?.completeness !== "complete" ||
+        b.input?.completeness !== "complete")
+        ? "limited"
+        : "known";
     $("viewport").value = state.viewport;
     $("prompt-source").value = state.source;
     $("related-only").checked = state.relatedOnly;
@@ -889,100 +852,16 @@
       ["技术栈", (r) => r.stack.join(" / ") || "未记录"],
       ["人工修改与部署适配", (r) => r.changes.join("\n") || "未记录新增改动"],
     ];
-    const rows = fields.map(([label, value]) => ({
-      label,
-      values: selected.map((r) => (r ? value(r) : "实验不存在")),
-    }));
-    const filtered =
-      state.differencesOnly && valid.length >= 2
-        ? rows.filter((row) => new Set(row.values).size > 1)
-        : rows;
-    const summaryFields = new Set([
-      "主题",
-      "模型",
-      "推理档位",
-      "轮次",
-      "提示词版本",
-      "输入关系（与 A）",
-      "输入留存",
-      "执行模式",
-      "平台与工具",
-      "人工修改与部署适配",
-    ]);
-    const resultFields = new Set(["截图评分", "费用", "耗时"]);
-    const groups = [
-      ["比较摘要", filtered.filter((row) => summaryFields.has(row.label))],
-      ["结果与消耗", filtered.filter((row) => resultFields.has(row.label))],
-      [
-        "完整证据",
-        filtered.filter(
-          (row) =>
-            !summaryFields.has(row.label) && !resultFields.has(row.label),
-        ),
-      ],
-    ];
-    $("conditions-mobile").innerHTML = groups
-      .map(
-        ([
-          title,
-          items,
-        ]) => `<details class="condition-section"${title === "完整证据" ? "" : " open"}>
-        <summary>${title} · ${items.length} 项</summary>
-        ${
-          items.length
-            ? items
-                .map(
-                  (row) =>
-                    `<section class="condition-field"><h3>${e(row.label)}</h3><dl>${row.values
-                      .map(
-                        (value, i) =>
-                          `<dt>${labels[columns[i]]}${columns[i] === "left" ? " · 基准" : ""}</dt><dd>${e(value).replaceAll("\n", "<br>")}</dd>`,
-                      )
-                      .join("")}</dl></section>`,
-                )
-                .join("")
-            : "<p>当前范围没有不同的已记录值。</p>"
-        }
-      </details>`,
-      )
-      .join("");
-    $("conditions-table").innerHTML = columns.length
-      ? '<table class="archive-table conditions-table"><caption>所选实验的已知运行条件</caption><thead><tr><th scope="col">条件</th>' +
-        columns
-          .map(
-            (side, i) =>
-              '<th scope="col">' +
-              labels[side] +
-              (side === "left" ? " · 基准" : "") +
-              "<small>" +
-              e(selected[i] ? U.runSummary(data, selected[i]) : "实验不存在") +
-              "</small></th>",
-          )
-          .join("") +
-        "</tr></thead><tbody>" +
-        groups
-          .map(
-            ([title, items]) =>
-              `<tr class="conditions-group"><th colspan="${columns.length + 1}">${title}</th></tr>` +
-              items
-                .map(
-                  (row) =>
-                    '<tr><th scope="row">' +
-                    e(row.label) +
-                    "</th>" +
-                    row.values
-                      .map(
-                        (value) =>
-                          "<td>" + e(value).replaceAll("\n", "<br>") + "</td>",
-                      )
-                      .join("") +
-                    "</tr>",
-                )
-                .join(""),
-          )
-          .join("") +
-        "</tbody></table>"
-      : '<p class="frame-placeholder">请选择实验开始查看运行条件。</p>';
+    const output = window.ArchiveCompareRecords.conditions({
+      fields,
+      columns,
+      selected,
+      labels,
+      differencesOnly: state.differencesOnly,
+      data,
+    });
+    $("conditions-mobile").innerHTML = output.mobile;
+    $("conditions-table").innerHTML = output.table;
   }
   document.addEventListener("change", (event) => {
     const el = event.target;

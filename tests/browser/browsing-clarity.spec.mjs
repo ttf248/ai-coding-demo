@@ -17,6 +17,7 @@ test("home states sorting, count units and the exact comparison target", async (
     "条实验",
   );
   const card = page.locator(".topic-card").first();
+  await expect(card.locator(".card-badges")).toContainText("复杂度");
   const target = await card
     .locator("[data-screenshot-run]")
     .getAttribute("data-screenshot-run");
@@ -117,4 +118,78 @@ test("reader summary precedes the historical text and returns to its mobile cont
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
     390,
   );
+});
+
+test("home builds only the visible cards while keeping complete counts", async ({
+  page,
+}) => {
+  await page.route("**/assets/core.js", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      body:
+        (await response.text()) +
+        `;window.cardBuilds=0;const originalCard=window.ArchiveUI.runCard;window.ArchiveUI.runCard=(...args)=>{window.cardBuilds++;return originalCard(...args)};`,
+    });
+  });
+  await page.goto("index.html?group=runs&testing=all");
+  await expect(page.locator(".run-card")).toHaveCount(9);
+  expect(await page.evaluate(() => window.cardBuilds)).toBe(9);
+  const total = await page.evaluate(() => window.ARCHIVE.runs.length);
+  await expect(page.locator("#result-count")).toContainText(
+    `${total} 条匹配记录`,
+  );
+  await page.locator("#load-more").click();
+  await expect(page.locator(".run-card")).toHaveCount(18);
+  expect(await page.evaluate(() => window.cardBuilds)).toBe(27);
+});
+
+test("guide navigation uses catalog network data and reports metadata failures", async ({
+  page,
+}) => {
+  await page.goto("docs/tailwindcss/what-is-tailwindcss-demo.html");
+  await expect(page.locator(".guide-sitebar")).toContainText("可离线运行");
+  await page.route("**/assets/generated/guides.js", (route) =>
+    route.fulfill({
+      contentType: "application/javascript",
+      body: 'window.ARCHIVE_GUIDES=[{slug:"tailwindcss",network:"required"}];',
+    }),
+  );
+  await page.reload();
+  await expect(page.locator(".guide-sitebar")).toContainText(
+    "外部资源需要联网",
+  );
+  await page.unroute("**/assets/generated/guides.js");
+  await page.route("**/assets/generated/guides.js", (route) => route.abort());
+  await page.reload();
+  await expect(page.locator(".guide-sitebar")).toContainText("联网要求未载入");
+});
+
+test("404 migration results show readable identity and keep the stable target", async ({
+  page,
+  baseURL,
+}) => {
+  const migrations = await (
+    await page.request.get("assets/generated/migrations.js")
+  ).text();
+  const entry = JSON.parse(
+    migrations.split(" = ")[1].trim().replace(/;$/, ""),
+  )[0];
+  await page.route("**/old-missing/**", async (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: await (await page.request.get("404.html")).text(),
+    }),
+  );
+  await page.goto(
+    new URL(`old-missing/${entry.oldPath}/index.html`, baseURL).href,
+  );
+  await expect(page.locator("#migration-match")).toContainText(entry.label);
+  await expect(page.locator("#migration-match")).toContainText(entry.id);
+  await expect(page.locator("#migration-match a").first()).toHaveAttribute(
+    "href",
+    new RegExp(encodeURIComponent(entry.id)),
+  );
+  await page.goto("404.html");
+  await expect(page.locator("#missing-title")).toHaveText("未找到这个页面。");
 });

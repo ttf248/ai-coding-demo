@@ -20,6 +20,7 @@
       const byId = (list) =>
         new Map((list || []).map((item) => [item.id, item]));
       index = {
+        runs: byId(data.runs),
         topics: byId(data.topics),
         models: byId(data.models),
         tools: byId(data.tools),
@@ -278,7 +279,7 @@
       ].map(async (href) => {
         const details = await fetchJSON(href);
         for (const item of details.runs) {
-          const run = data.runs.find((run) => run.id === item.id);
+          const run = dataIndex(data).runs.get(item.id);
           if (run && !run.detailsLoaded) {
             Object.assign(run, item);
             if (run.billing?.type === "batch")
