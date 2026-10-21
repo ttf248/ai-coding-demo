@@ -43,7 +43,10 @@ test("topic opens the complete compact list with recorded batch durations", asyn
   // 118px 的记录缩略图使用 240w 变体，不拉取 960w。
   const art = page.locator(".topic-run-art img").first();
   await expect(art).toHaveAttribute("srcset", /240w.*480w.*960w/);
-  await expect(art).toHaveAttribute("sizes", "118px");
+  await expect(art).toHaveAttribute(
+    "sizes",
+    "(max-width: 700px) 88px, (min-width: 1288px) 118px, calc(11vw - 23.5px)",
+  );
   expect(await art.evaluate((image) => image.currentSrc)).toMatch(
     /-240\.webp$/,
   );

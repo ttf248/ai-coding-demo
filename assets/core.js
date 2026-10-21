@@ -645,6 +645,7 @@
     function render() {
       tray.hidden = !selected.length;
       tray.dataset.count = String(selected.length);
+      if (!selected.length) selectionExpanded = false;
       tray.dataset.expanded = String(selectionExpanded);
       document.body.classList.toggle("has-selection", !!selected.length);
       const params = new URLSearchParams();

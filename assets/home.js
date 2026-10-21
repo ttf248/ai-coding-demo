@@ -11,6 +11,22 @@
   };
   syncDisplayOptions();
   mobileDisplay.addEventListener("change", syncDisplayOptions);
+  document.addEventListener("click", (event) => {
+    if (mobileDisplay.matches && !event.target.closest("#display-options"))
+      $("display-options").open = false;
+  });
+  document.addEventListener("keydown", (event) => {
+    if (
+      event.key === "Escape" &&
+      mobileDisplay.matches &&
+      $("display-options").open &&
+      !document.querySelector("dialog[open]")
+    ) {
+      $("display-options").open = false;
+      $("display-options").querySelector("summary").focus();
+    }
+  });
+
   // 排序默认值随分组变化：主题按复杂度，实验按截图评分（与主题页口径一致）。
   const defaultSort = () => (state.group === "runs" ? "score" : "complexity");
   const effectiveSort = () =>
@@ -318,11 +334,6 @@
             U.compareModelRuns(data, a, b),
         )[0];
         const topRated = U.bestScoredRun(runs);
-        const summaryRun = topRated || latest;
-        const summaryLabel =
-          U.scoreValue(summaryRun) !== null
-            ? "当前筛选代表截图 · 按截图评分选取，不代表模型排名"
-            : "最新实验 · " + (summaryRun?.date || "日期未记录");
         let previewRun =
           latest && U.previewURL(latest)
             ? latest
@@ -353,6 +364,13 @@
           previewRun = U.previewURL(displayedRun) ? displayedRun : null;
         const inspectRun = displayedRun || previewRun || first;
         if (inspectRun) previewScopes.set(inspectRun.id, { runs, source });
+        const summaryRun = displayedRun || topRated || latest;
+        const summaryLabel = displayedRun
+          ? U.scoreValue(displayedRun) !== null
+            ? "封面优先选用当前筛选内截图评分最高的实验；分数仅对应本次实验，不代表主题总分或模型排名。"
+            : "封面使用当前筛选内的可用截图；该实验没有可用的数值评分。"
+          : "当前筛选内暂无截图；可查看实验记录与输入。";
+
         return (
           '<article class="card topic-card' +
           (cover ? " has-cover" : "") +
@@ -367,7 +385,7 @@
           U.executionModeBadge(previewRun) +
           U.complexityBadge(t) +
           (displayedRun
-            ? U.scoreBadge(displayedRun).replace(">评分 ", ">截图评分 ")
+            ? U.scoreBadge(displayedRun).replace(">评分 ", ">本次实验截图评分 ")
             : "") +
           '</div></div><h3><a href="topic.html?id=' +
           t.id +
@@ -384,7 +402,7 @@
           runs.length +
           " 条实验" +
           (runs.length !== all.length ? " / 共 " + all.length + " 个" : "") +
-          ' ▾</button><details class="experiment-info"><summary>实验信息</summary><p class="topic-secondary">' +
+          ' ▾</button><details class="experiment-info"><summary>封面与实验信息</summary><p class="topic-secondary">' +
           e(data.categories.find((c) => c.id === t.category).label) +
           '</p><div class="latest-run"><span>' +
           e(summaryLabel) +
@@ -1015,6 +1033,7 @@
         String(button.dataset.previewMode === previewMode),
       );
     });
+    previewDialog.dataset.previewMode = previewMode;
     const stage = $("preview-stage");
     stage.replaceChildren();
     $("preview-status").textContent = "";

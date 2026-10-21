@@ -156,7 +156,9 @@ test("homepage covers use registered run screenshots and direct previews", async
   await expect(card.locator(".topic-cover figcaption")).toContainText(
     source.label,
   );
-  await expect(card.locator(".latest-run")).toContainText("当前筛选代表截图");
+  await expect(card.locator(".latest-run")).toContainText(
+    "封面优先选用当前筛选内截图评分最高的实验",
+  );
   const previewHref = await card.locator(".preview-link").getAttribute("href");
   expect(previewHref).toBeTruthy();
   const response = await page.request.get(previewHref);
@@ -233,7 +235,7 @@ test("homepage sorts by task complexity and shows each topic's highest-rated rec
     top.id,
   );
   await expect(first.locator(".score-chip").first()).toHaveText(
-    `截图评分 ${top.score.total}`,
+    `本次实验截图评分 ${top.score.total}`,
   );
   await expect(first.locator(".topic-cover img")).toHaveAttribute(
     "data-original",
@@ -438,12 +440,6 @@ test("homepage exposes archived topics and keeps its directory compact", async (
 });
 
 async function openHomeControls(page) {
-  if (
-    (await page.locator("#display-options > summary").isVisible()) &&
-    !(await page.locator("#display-options").getAttribute("open"))
-  ) {
-    await page.locator("#display-options").evaluate((el) => (el.open = true));
-  }
   const toggle = page.locator("#mobile-filter-toggle");
   if (
     (await toggle.isVisible()) &&
@@ -452,6 +448,12 @@ async function openHomeControls(page) {
     await toggle.click();
   if ((await page.locator("#advanced-filters").getAttribute("open")) === null)
     await page.locator("#advanced-filters > summary").click();
+  if (
+    (await page.locator("#display-options > summary").isVisible()) &&
+    (await page.locator("#display-options").getAttribute("open")) === null
+  ) {
+    await page.locator("#display-options > summary").click();
+  }
 }
 
 test("gallery prioritizes artwork and reveals metadata and navigation on demand", async ({

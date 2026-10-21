@@ -152,3 +152,71 @@ test("mobile comparison keeps switches available and zooms the selected original
     390,
   );
 });
+
+test("mobile card scores identify their screenshot and preview keeps its original proportions", async ({
+  page,
+}) => {
+  await page.goto("index.html");
+  const card = page.locator(".topic-card").first();
+  await expect(card.locator(".score-chip")).toContainText("本次实验截图评分");
+  await card.locator(".experiment-info > summary").click();
+  await expect(card.locator(".latest-run")).toContainText(
+    "不代表主题总分或模型排名",
+  );
+  const id = await card
+    .locator("[data-screenshot-run]")
+    .getAttribute("data-screenshot-run");
+  const label = await page.evaluate((id) => {
+    const run = window.ARCHIVE.runs.find((r) => r.id === id);
+    return window.ArchiveUI.modelLabel(window.ARCHIVE, run);
+  }, id);
+  await expect(card.locator(".latest-run strong")).toContainText(label);
+  await card.locator(".experiment-info > summary").click();
+  for (const selector of ["[data-pick-topic]", ".experiment-info > summary"]) {
+    expect(
+      (await card.locator(selector).boundingBox()).height,
+    ).toBeGreaterThanOrEqual(44);
+  }
+  await card.locator(".cover-preview").click();
+  await expect
+    .poll(() =>
+      page.locator("#preview-stage img").evaluate((img) => img.naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  const stage = await page.locator("#preview-stage").boundingBox();
+  const image = await page.locator("#preview-stage img").boundingBox();
+  expect(Math.abs(stage.height - image.height)).toBeLessThan(4);
+  await expect(page.locator("#preview-original")).toHaveAttribute(
+    "href",
+    await page.locator("#preview-stage img").getAttribute("src"),
+  );
+  await page.keyboard.press("Escape");
+  await expect(card.locator(".cover-preview")).toBeFocused();
+});
+
+test("mobile display settings dismiss by keyboard and empty selections reset their expansion", async ({
+  page,
+}) => {
+  await page.goto("index.html");
+  await page.locator("#display-options > summary").click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#display-options")).not.toHaveAttribute("open");
+  await expect(page.locator("#display-options > summary")).toBeFocused();
+  await page.locator("#display-options > summary").click();
+  await page.locator("#q").click();
+  await expect(page.locator("#display-options")).not.toHaveAttribute("open");
+  await page.locator(".card [data-compare]").first().click();
+  await page.locator("[data-selection-toggle]").click();
+  await page.locator("[data-clear]").click();
+  await page.locator(".card [data-compare]").first().click();
+  await expect(page.locator("#compare-tray")).toHaveAttribute(
+    "data-expanded",
+    "false",
+  );
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width);
+  }
+});

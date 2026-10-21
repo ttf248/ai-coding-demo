@@ -138,13 +138,13 @@ const BASELINE = {
     ".topic-runs-table": {
       "table-layout": "fixed",
       "min-width": "0px",
-      "font-size": "12px",
+      "font-size": "13px",
     },
     ".topic-run-duration": {
       "font-variant-numeric": "tabular-nums",
     },
     ".topic-run-input": {
-      "font-size": "11px",
+      "font-size": "12px",
     },
     ".topic-run-row": {
       gap: "normal",
@@ -169,13 +169,13 @@ const BASELINE = {
     ".topic-runs-table": {
       "table-layout": "fixed",
       "min-width": "0px",
-      "font-size": "12px",
+      "font-size": "13px",
     },
     ".topic-run-duration": {
       "font-variant-numeric": "tabular-nums",
     },
     ".topic-run-input": {
-      "font-size": "11px",
+      "font-size": "12px",
     },
     ".topic-run-row": {
       gap: "8px",
@@ -261,6 +261,7 @@ BASELINE["topic@390"][".run-context > summary"] = { "min-height": "44px" };
 
 for (const width of [1440, 390]) {
   BASELINE[`home@${width}`][".score-chip"] = {
+    "font-size": "12px",
     "background-color": "rgb(246, 247, 249)",
     color: "rgb(24, 34, 48)",
   };
@@ -277,6 +278,17 @@ BASELINE["home@390"]["#display-options > summary"] = {
   "min-height": "44px",
 };
 BASELINE["home@390"][".compact-hero"] = { padding: "8px 0px" };
+BASELINE["topic@1440"][".topic-run-model"] = { "font-size": "14px" };
+BASELINE["topic@390"][".topic-run-model"] = { "font-size": "15px" };
+BASELINE["topic@390"][".topic-run-score .score-details > summary"] = {
+  "min-height": "44px",
+};
+BASELINE["home@390"][".topic-metrics"] = { "min-height": "44px" };
+BASELINE["home@390"][".experiment-info > summary"] = { "min-height": "44px" };
+BASELINE["home@390"][".quick-filters button"] = {
+  "min-height": "44px",
+  "font-size": "12px",
+};
 BASELINE["topic@390"][".topic-run-facts"] = { "grid-row-start": "4" };
 BASELINE["compare@390"][".compare-switcher"] = {
   position: "sticky",
