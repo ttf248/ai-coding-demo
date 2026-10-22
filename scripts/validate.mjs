@@ -418,6 +418,7 @@ for (const file of [
   "compare.html",
   "screenshots.html",
   "model.html",
+  "library.html",
   "404.html",
   ...catalog.guides.map((guide) => guide.example),
   ...[...generated.keys()].filter((file) => file.endsWith(".html")),
@@ -480,6 +481,9 @@ for (const file of [
   "model.html",
   "assets/model.js",
   "assets/model.css",
+  "library.html",
+  "assets/library.js",
+  "assets/notebook.js",
   "assets/core.js",
   "assets/analytics.js",
   "assets/home.js",
@@ -500,6 +504,7 @@ const cssFiles = [
   "assets/guide.css",
   "assets/topic-lifecycle.css",
   "assets/model.css",
+  "assets/library.css",
 ].filter(exists);
 const css = cssReport(cssFiles);
 check(

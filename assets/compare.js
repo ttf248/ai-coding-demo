@@ -195,12 +195,27 @@
       frames[0]
     );
   }
-  function updateURL() {
+  function stateParams() {
     const p = new URLSearchParams();
     for (const [k, v] of Object.entries(state))
       if (k !== "relatedOnly" && v) p.set(k, k === "differencesOnly" ? "1" : v);
     if (!state.relatedOnly) p.set("related", "0");
+    return p;
+  }
+  function updateURL() {
+    const p = stateParams();
     history.pushState(null, "", "?" + p.toString());
+  }
+  function savedSearch() {
+    const p = stateParams();
+    for (const side of slots()) {
+      const run = getRun(side);
+      if (run?.preview.defaultPage && !state[side + "Page"])
+        p.set(side + "Page", run.preview.defaultPage);
+      const capture = selectedCapture(side);
+      if (capture) p.set(side + "Capture", capture.id);
+    }
+    return p.toString();
   }
   function textFor(run) {
     return !run
@@ -255,6 +270,12 @@
         await U.ensureTexts(data, selected, state.source === "raw");
       if (generation !== renderGeneration) return;
       renderLoaded();
+      window.ArchiveNotebook?.visit({
+        type: "comparison",
+        search: savedSearch(),
+      });
+      $("save-comparison").dataset.search = savedSearch();
+      $("save-comparison").textContent = "收藏";
       const measurement = selected.map((run) => run.id).join("/");
       if (
         selected.length >= 2 &&

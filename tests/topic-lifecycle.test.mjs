@@ -19,6 +19,7 @@ function fixture() {
   for (const name of [
     "lib.mjs",
     "site-output.mjs",
+    "product-updates.mjs",
     "model-ordering.mjs",
     "new-demo.mjs",
     "topic-status.mjs",

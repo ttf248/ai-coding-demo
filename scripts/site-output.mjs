@@ -3,6 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { productUpdates } from "./product-updates.mjs";
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const escape = (value) =>
@@ -124,6 +125,10 @@ export function serializeArchive(summary) {
 }
 export function browserOutputs(catalog) {
   const outputs = new Map();
+  outputs.set(
+    "assets/generated/updates.json",
+    JSON.stringify(productUpdates(catalog, root)) + "\n",
+  );
   const rubric = JSON.parse(
     fs.readFileSync(path.join(root, "catalog/scoring-rubric.json"), "utf8"),
   );

@@ -5,6 +5,16 @@
     $ = (id) => document.getElementById(id),
     e = U.escape;
   const state = window.ArchiveState.homeFromURL(location.search);
+  function renderContinue() {
+    const notebook = window.ArchiveNotebook;
+    const latest = notebook.read().recent[0];
+    $("continue-browsing").hidden = !latest;
+    $("continue-browsing").innerHTML = latest
+      ? `<a href="${e(notebook.href(latest))}">继续上次浏览：${e(notebook.label(latest))}</a><a href="library.html">全部收藏与记录 →</a>`
+      : "";
+  }
+  renderContinue();
+  addEventListener("archive-notebook-change", renderContinue);
   $("open-recommendations").addEventListener("click", () =>
     $("recommended-start").showModal(),
   );
@@ -1020,6 +1030,8 @@
   let fallbackSource = null,
     fallbackRunId = null;
   function renderPreview() {
+    $("save-preview").textContent = "收藏当前实验";
+    $("notebook-status").hidden = true;
     const run = previewRuns.find(
       (item) => item.id === $("preview-version").value,
     );

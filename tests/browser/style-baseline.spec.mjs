@@ -6,6 +6,7 @@ const PAGES = {
   home: "index.html?testing=all",
   topic: "topic.html?id=bluebook&view=list",
   model: "model.html?id=minimax-m3-1-flash",
+  library: "library.html",
   captures: "screenshots.html?run=circuit-lab--claude-opus-5-5-max-r01",
   snapshot:
     "compare.html?group=circuit-lab/v1&left=circuit-lab--claude-opus-5-5-max-r01&right=circuit-lab--gpt-6-1-sol-max-r01&tab=snapshot",
@@ -266,6 +267,14 @@ BASELINE["compare@390"][".panel-identity"] = {
 BASELINE["topic@390"][".run-context > summary"] = { "min-height": "44px" };
 
 for (const width of [1440, 390]) {
+  BASELINE[`library@${width}`] = { "#update-kind": { "min-height": "44px" } };
+  BASELINE[`compare@${width}`]["#save-comparison"] = {
+    "min-height": width === 1440 ? "32px" : "44px",
+  };
+  BASELINE[`home@${width}`][".continue-browsing"] = {
+    padding: "8px 0px",
+    "font-size": "13px",
+  };
   BASELINE[`model@${width}`] = {
     ".model-topic": { padding: "12px 16px", "border-radius": "12px" },
     "#overview-model": { "min-height": "44px" },
