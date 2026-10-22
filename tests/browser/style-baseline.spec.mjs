@@ -14,6 +14,7 @@ const PAGES = {
 
 const BASELINE = {
   "home@1440": {
+    "#open-recommendations": { padding: "0px", "min-height": "44px" },
     ".hero h1": {
       "font-size": "46px",
       "line-height": "55.2px",
@@ -72,6 +73,7 @@ const BASELINE = {
     },
   },
   "home@390": {
+    "#open-recommendations": { padding: "0px", "min-height": "44px" },
     ".hero h1": {
       "font-size": "32px",
       "line-height": "38.4px",

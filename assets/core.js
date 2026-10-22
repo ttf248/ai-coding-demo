@@ -1,5 +1,9 @@
 (function (global) {
   "use strict";
+  function metric(name, params = {}) {
+    if (global.ArchiveAnalytics) global.ArchiveAnalytics.track(name, params);
+    else (global.archiveMetricQueue ||= []).push({ name, params });
+  }
   const escape = (value) =>
     String(value ?? "").replace(
       /[&<>"']/g,
@@ -1108,6 +1112,7 @@
   global.ArchiveUI = {
     initNavMore,
     scoreDetails,
+    metric,
     completenessLabel,
     hasRecordedInput,
     documentURL,

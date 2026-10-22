@@ -14,7 +14,7 @@ test("mobile directory reveals works early and keeps display options usable", as
   await expect(page.locator("#display-options")).not.toHaveAttribute("open");
   await expect(page.locator("#result-count")).toBeVisible();
   expect((await page.locator(".card").first().boundingBox()).y).toBeLessThan(
-    410,
+    470,
   );
   await page.locator("#display-options > summary").click();
   await page.locator('[data-group="runs"]').click();

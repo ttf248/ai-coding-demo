@@ -5,6 +5,16 @@
     $ = (id) => document.getElementById(id),
     e = U.escape;
   const state = window.ArchiveState.homeFromURL(location.search);
+  $("open-recommendations").addEventListener("click", () =>
+    $("recommended-start").showModal(),
+  );
+  $("recommended-pairs").innerHTML =
+    window.ArchiveDiscovery.recommendations(data)
+      .map(
+        (pair) =>
+          `<article class="recommended-pair"><h3>${e(pair.title)}</h3><p>${e(data.topics.find((topic) => topic.id === pair.a.topicId).title)} · ${e(U.runSummary(data, pair.a))} / ${e(U.runSummary(data, pair.b))}</p><small>${e(U.relation(data, pair.a, pair.b))}；两条均有已评分截图，其他运行条件仍需核对。</small><a data-recommendation="${pair.kind}" href="${e(pair.href)}">打开这组对比 →</a></article>`,
+      )
+      .join("") || "<p>暂时没有满足证据要求的推荐组合，请从目录挑选。</p>";
   const mobileDisplay = matchMedia("(max-width: 700px)");
   const syncDisplayOptions = () => {
     $("display-options").open = !mobileDisplay.matches;
@@ -700,11 +710,21 @@
       // 搜索输入加防抖：一次连打只渲染一次，其余控件仍然立即生效。
       if (key === "q") {
         clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => render(true), 150);
+        searchTimer = setTimeout(() => {
+          render(true);
+          U.metric("archive_search", {
+            query_length: state.q.length,
+            result_count: U.filterRuns(data, state).length,
+          });
+        }, 150);
         return;
       }
       clearTimeout(searchTimer);
       render(true);
+      U.metric("archive_filter", {
+        field: key,
+        result_count: U.filterRuns(data, state).length,
+      });
     }),
   );
   document.querySelectorAll("[data-group]").forEach((b) =>

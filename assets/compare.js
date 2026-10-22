@@ -245,6 +245,7 @@
     }
   }
   let renderGeneration = 0;
+  let measuredComparison = "";
   async function render() {
     const generation = ++renderGeneration;
     try {
@@ -254,6 +255,18 @@
         await U.ensureTexts(data, selected, state.source === "raw");
       if (generation !== renderGeneration) return;
       renderLoaded();
+      const measurement = selected.map((run) => run.id).join("/");
+      if (
+        selected.length >= 2 &&
+        new Set(selected.map((run) => run.id)).size >= 2 &&
+        measuredComparison !== measurement
+      ) {
+        measuredComparison = measurement;
+        U.metric("archive_compare_start", {
+          topic_id: selected[0].topicId,
+          mode: state.tab,
+        });
+      }
     } catch (error) {
       if (generation === renderGeneration) {
         $("relation").textContent = "资料加载失败：" + error.message;
@@ -1077,11 +1090,13 @@
       await navigator.clipboard.writeText(location.href);
       $("share-message").textContent = "分享链接已复制";
       $("share-fallback").hidden = true;
+      U.metric("archive_share", { outcome: "copied" });
     } catch {
       $("share-message").textContent = "请复制下方链接";
       $("share-fallback").hidden = false;
       $("share-fallback").value = location.href;
       $("share-fallback").select();
+      U.metric("archive_share", { outcome: "manual" });
     }
   });
   window.addEventListener("popstate", () => {
