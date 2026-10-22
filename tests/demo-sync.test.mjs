@@ -22,6 +22,7 @@ function fixture() {
     "lib.mjs",
     "site-output.mjs",
     "product-updates.mjs",
+    "record-details.mjs",
     "model-ordering.mjs",
     "scoring.mjs",
     "scoring-v3.mjs",

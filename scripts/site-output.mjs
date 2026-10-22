@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { productUpdates } from "./product-updates.mjs";
+import { recordDetailOutputs } from "./record-details.mjs";
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const escape = (value) =>
@@ -232,6 +233,13 @@ export function browserOutputs(catalog) {
         })),
       prompts: prompts.filter((prompt) => prompt.topicId === topic.id),
     });
+  for (const topic of catalog.topics) {
+    const details = JSON.parse(
+      outputs.get(`assets/generated/topics/${topic.id}.json`),
+    );
+    for (const [file, content] of recordDetailOutputs(details))
+      outputs.set(file, content);
+  }
   const summary = {
     ...catalog,
     runs,

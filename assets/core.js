@@ -333,13 +333,17 @@
       );
     return requests.get(href);
   }
-  async function ensureDetails(data, runs) {
+  async function ensureDetails(data, runs, { individual = false } = {}) {
     await Promise.all(
       [
         ...new Set(
           runs
-            .filter(Boolean)
-            .map((run) => run.detailsHref)
+            .filter((run) => run && !run.detailsLoaded)
+            .map((run) =>
+              individual
+                ? `assets/generated/records/${encodeURIComponent(run.id)}.json`
+                : run.detailsHref,
+            )
             .filter(Boolean),
         ),
       ].map(async (href) => {

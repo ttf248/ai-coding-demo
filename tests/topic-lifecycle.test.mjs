@@ -20,6 +20,7 @@ function fixture() {
     "lib.mjs",
     "site-output.mjs",
     "product-updates.mjs",
+    "record-details.mjs",
     "model-ordering.mjs",
     "new-demo.mjs",
     "topic-status.mjs",

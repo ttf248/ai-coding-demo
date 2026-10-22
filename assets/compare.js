@@ -265,7 +265,7 @@
     const generation = ++renderGeneration;
     try {
       const selected = slots().map(getRun).filter(Boolean);
-      await U.ensureDetails(data, selected);
+      await U.ensureDetails(data, selected, { individual: true });
       if (state.tab === "prompt")
         await U.ensureTexts(data, selected, state.source === "raw");
       if (generation !== renderGeneration) return;

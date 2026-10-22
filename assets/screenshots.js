@@ -152,7 +152,7 @@
     $("captures-record").href = U.documentURL(run);
     $("captures-status").textContent = "正在加载截图资料…";
     try {
-      await U.ensureDetails(data, [run]);
+      await U.ensureDetails(data, [run], { individual: true });
       if (token !== generation) return;
       frames = U.captureFrames(run);
       render();

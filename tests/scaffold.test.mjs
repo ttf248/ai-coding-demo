@@ -20,6 +20,7 @@ test("new demo scaffolding reuses prompts, allocates repeat runs and refuses unk
       "lib.mjs",
       "site-output.mjs",
       "product-updates.mjs",
+      "record-details.mjs",
       "model-ordering.mjs",
       "new-demo.mjs",
     ])
@@ -94,6 +95,7 @@ test("new demo scaffolding reports possible duplicate topics and models", () => 
       "lib.mjs",
       "site-output.mjs",
       "product-updates.mjs",
+      "record-details.mjs",
       "model-ordering.mjs",
       "new-demo.mjs",
     ])

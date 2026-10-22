@@ -307,6 +307,10 @@ test("module selection, sharing, missing HTTP preview and external fallback", as
     embed: false,
     externalUrl: "https://example.com/",
   };
+  await page.route(
+    `**/assets/generated/records/${external.id}.json`,
+    (route) => route.fulfill({ json: { runs: [external] } }),
+  );
   await page.route("**/assets/generated/catalog.js", (route) =>
     route.fulfill({
       contentType: "application/javascript",

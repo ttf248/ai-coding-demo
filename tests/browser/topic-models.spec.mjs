@@ -30,6 +30,11 @@ const repeated = historyRuns.slice(0, 2);
 const foldedRun = historySource;
 async function mockHistory(page) {
   // Future reruns are a fixture: existing Astra records have different tool provenance.
+  for (const run of historyRuns)
+    await page.route(
+      `**/assets/generated/records/${run.id}.json`,
+      (route) => route.fulfill({ json: { runs: [run] } }),
+    );
   await page.route("**/assets/generated/catalog.js", (route) =>
     route.fulfill({
       contentType: "text/javascript",
