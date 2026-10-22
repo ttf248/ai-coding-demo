@@ -29,7 +29,7 @@ const historyRuns = [
 const repeated = historyRuns.slice(0, 2);
 const foldedRun = historySource;
 async function mockHistory(page) {
-  // Future reruns are a fixture: existing Astra records have different tool provenance.
+  // Add a long xhigh history independently of real reruns in other effort groups.
   for (const run of historyRuns)
     await page.route(
       `**/assets/generated/records/${run.id}.json`,
@@ -76,7 +76,9 @@ test("explicit model view retains the complete overview and collapsed history", 
     ),
   ).toBeVisible();
   const group = modelGroup(page, "gpt-6-astra");
-  await expect(group.locator(".model-record-count")).toHaveText("4 条记录");
+  await expect(group.locator(".model-record-count")).toHaveText(
+    `${voxel.filter((run) => run.modelId === "gpt-6-astra").length} 条记录`,
+  );
   await group.locator("[data-model-toggle]").click();
   await expect(group.locator(".model-condition")).toHaveCount(4);
   await expect(group.locator("[data-history-toggle]")).toHaveCount(0);
@@ -178,16 +180,15 @@ test("history comparison opens the exact pair in live preview", async ({
   await page.goto(
     "topic.html?id=voxel-construction-site&view=models&model=gpt-6-astra",
   );
-  const link = modelGroup(page, "gpt-6-astra").locator(
-    ".model-history-controls a",
-  );
+  const condition = modelGroup(page, "gpt-6-astra")
+    .locator(".model-condition")
+    .filter({ has: page.locator(`#run-${repeated[0].id}`) });
+  const link = condition.locator(".model-history-controls a");
   const url = new URL(await link.getAttribute("href"), page.url());
   expect(url.searchParams.get("left")).toBe(repeated[0].id);
   expect(url.searchParams.get("right")).toBe(repeated[1].id);
   expect(url.searchParams.has("tab")).toBe(false);
-  await modelGroup(page, "gpt-6-astra")
-    .locator("[data-history-toggle]")
-    .click();
+  await condition.locator("[data-history-toggle]").click();
   await page.locator(`#run-${repeated[1].id} [data-compare]`).click();
   await expect(page.locator(".selection-item")).toHaveCount(1);
   await expect(
