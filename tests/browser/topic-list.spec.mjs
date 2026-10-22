@@ -24,6 +24,7 @@ test("topic opens the complete compact list with recorded batch durations", asyn
   await expect(page.locator(".topic-runs-table thead th")).toHaveText([
     "作品",
     "模型 / 档位",
+    "实验日期",
     "截图评分",
     "费用记录",
     "执行耗时",
@@ -95,6 +96,45 @@ test("topic opens the complete compact list with recorded batch durations", asyn
   );
   await page.goBack();
   await expect(page.locator("#topic-list")).toBeVisible();
+});
+
+test("experiment dates stay visible with their recorded precision on desktop and mobile", async ({
+  page,
+}) => {
+  const dates = ["2026-10-23", "2026-10", "2026", null];
+  let sampleIds;
+  await page.route(
+    "**/assets/generated/topics/voxel-construction-site.json",
+    async (route) => {
+      const response = await route.fetch();
+      const details = await response.json();
+      sampleIds = details.runs.slice(0, dates.length).map((run, i) => {
+        run.date = dates[i];
+        return run.id;
+      });
+      await route.fulfill({ json: details });
+    },
+  );
+  await page.goto("topic.html?id=voxel-construction-site&view=list");
+  await expect(page.locator(".topic-run-date").first()).toBeVisible();
+  for (const width of [1440, 768, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const [i, id] of sampleIds.entries()) {
+      const date = page.locator(`#run-${id} .topic-run-date`);
+      await expect(date).toHaveCount(1);
+      await expect(date).toBeVisible();
+      await expect(date).toHaveText(dates[i] || "日期未记录");
+      if (dates[i])
+        await expect(date.locator("time")).toHaveAttribute(
+          "datetime",
+          dates[i],
+        );
+      else await expect(date.locator("time")).not.toHaveAttribute("datetime");
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width);
+  }
 });
 
 test("390px list keeps works compact and expands recorded facts without page overflow", async ({

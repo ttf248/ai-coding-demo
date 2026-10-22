@@ -177,7 +177,6 @@
       <dt>模型厂商</dt><dd class="topic-run-model-maker">${e(U.modelProvider(data, run))}</dd>
       <dt>接入/付费供应商</dt><dd class="topic-run-provider">${e(run.billing?.provider || "未记录")}</dd>
       <dt>运行工具</dt><dd class="topic-run-tool">${e(toolLabel(run))}</dd>
-      <dt>实验日期</dt><dd class="topic-run-date" id="date-${e(run.id)}">${e(run.date || "日期未记录")}</dd>
       <dt>执行模式</dt><dd>${e(U.executionModeText(run))}</dd>
     </dl></details>`;
   }
@@ -704,9 +703,9 @@
                 items.length +
                 ' 条实验</span></div><a href="compare.html?group=' +
                 encodeURIComponent(topic.id + "/" + p.id) +
-                '">比较此版本 →</a></header><div class="topic-table-scroll" tabindex="0" aria-label="实验记录表，包含作品、模型、截图评分、费用与耗时"><table class="topic-runs-table"><caption class="sr-only">' +
+                '">比较此版本 →</a></header><div class="topic-table-scroll" tabindex="0" aria-label="实验记录表，包含作品、模型、实验日期、截图评分、费用与耗时"><table class="topic-runs-table"><caption class="sr-only">' +
                 e(p.title) +
-                '的实验记录</caption><thead><tr><th scope="col">作品</th><th scope="col">模型 / 档位</th><th scope="col">截图评分</th><th scope="col">费用记录</th><th scope="col">执行耗时</th><th scope="col">操作</th></tr></thead><tbody>' +
+                '的实验记录</caption><thead><tr><th scope="col">作品</th><th scope="col">模型 / 档位</th><th scope="col">实验日期</th><th scope="col">截图评分</th><th scope="col">费用记录</th><th scope="col">执行耗时</th><th scope="col">操作</th></tr></thead><tbody>' +
                 items
                   .map((r) => {
                     const href = U.previewURL(r),
@@ -727,6 +726,7 @@
                       <span class="topic-selection-relation" data-relation-run="${e(r.id)}" hidden></span>
                       ${mobileFilters.matches ? "" : executionContext(r)}
                     </th>
+                    <td class="topic-run-date" id="date-${e(r.id)}"><time${r.date ? ` datetime="${e(r.date)}"` : ""}>${e(r.date || "日期未记录")}</time></td>
                     <td class="topic-run-score">${U.scoreDetails(r)}</td>
                     ${
                       mobileFilters.matches

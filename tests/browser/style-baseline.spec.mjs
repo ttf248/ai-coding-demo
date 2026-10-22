@@ -321,6 +321,21 @@ BASELINE["home@390"]["#display-options > summary"] = {
 BASELINE["home@390"][".compact-hero"] = { padding: "8px 0px" };
 BASELINE["topic@1440"][".topic-run-model"] = { "font-size": "14px" };
 BASELINE["topic@390"][".topic-run-model"] = { "font-size": "15px" };
+// 实验日期独立成列，手机在模型信息下方始终显示，不需要展开执行条件。
+BASELINE["topic@1440"][".topic-run-date"] = {
+  display: "table-cell",
+  "font-size": "12px",
+  "white-space": "nowrap",
+  "font-variant-numeric": "tabular-nums",
+};
+BASELINE["topic@390"][".topic-run-date"] = {
+  display: "block",
+  "font-size": "12px",
+  "grid-column-start": "2",
+  "grid-row-start": "1",
+  "align-self": "end",
+};
+BASELINE["topic@390"][".topic-run-model"]["padding-bottom"] = "22px";
 BASELINE["topic@390"][".topic-run-score .score-details > summary"] = {
   "min-height": "44px",
 };
@@ -397,7 +412,7 @@ for (const [width, sizes] of [
           .evaluate((table) => ({
             layout: getComputedStyle(table).tableLayout,
             scoreColumn: getComputedStyle(
-              table.querySelector("thead th:nth-child(3)"),
+              table.querySelector("thead th:nth-child(4)"),
             ).width,
             tableWidth: table.getBoundingClientRect().width,
           }));

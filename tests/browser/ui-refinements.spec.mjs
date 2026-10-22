@@ -37,7 +37,7 @@ test("mobile experiment cards show actions without horizontal scrolling and expa
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("topic.html?id=fluid-simulation&view=list");
   const row = page.locator("#run-" + batchRun.id);
-  await expect(row.locator(".topic-run-date")).toBeHidden();
+  await expect(row.locator(".topic-run-date")).toBeVisible();
   await row.locator(".run-context > summary").click();
   await expect(row.locator(".topic-run-date")).toBeVisible();
   await expect(row.locator(".topic-run-provider")).toBeVisible();
@@ -85,7 +85,6 @@ test("experiment rows distinguish model makers from billing providers and explai
     "模型厂商",
     "接入/付费供应商",
     "运行工具",
-    "实验日期",
     "执行模式",
   ]);
   await expect(row.locator(".topic-run-billing summary")).not.toContainText(
