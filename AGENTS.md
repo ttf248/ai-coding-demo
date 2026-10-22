@@ -6,7 +6,7 @@
 
 - 保持现有 GitHub Pages 分支自动发布、域名与 CNB → GitHub 同步；提交到 GitHub 即自动更新。
 - 未经用户明确要求，不得改为 Actions 部署、修改 Pages 发布源或引入独立 deploy 步骤。
-- 仓库根目录必须是可直接静态托管的完整站点。首页、主题页、对比页、assets/generated 与 previews 都必须提交。
+- 仓库根目录必须是可直接静态托管的完整站点。首页、主题页、对比页、截图集页、assets/generated 与 previews 都必须提交。
 - 需要独立服务的项目继续由维护者人工部署到 Vercel。除非明确授权，不修改外部部署设置；目录迁移后的 Root Directory 调整必须同步记录在 [Vercel 对照表](docs/vercel-root-directories.md)，并保留 GitHub Pages 提交即发布逻辑。
 
 ## 目录与数据
@@ -52,10 +52,11 @@
 ## 首页与文档
 
 - 首页卡片、筛选、统计、主题版本和对比候选均从生成数据读取，禁止手写卡片或人工维护项目计数。
+- 采集截图同时用于作品浏览：完整截图集从已登记的采集清单生成，首页预览、主题页、对比页和实验阅读页复用公共入口。截图数量由生成数据提供，不手填；截图集按需加载当前图，对比各侧独立选择取景并保留分享状态，不暗示同步操作或同一时刻。只新增浏览入口不改写评分、输入或原 PNG。实现和边界见[维护指南](docs/maintenance.md#截图浏览与复用)。
 - 主题页实验记录默认按截图评分排序，这是一套独立于模型排序的顺序；模型代际排序只在用户显式选择 `sort=model` 时使用。评分排序的并列规则与无评分记录的位置见[维护指南](docs/maintenance.md#主题页浏览)。
 - assets/generated/catalog.js、阅读页、截图缩略图与竖图封面、主题 Readme、根 README 的 catalog 区块和实验 README 的 archive 区块由 generate 维护，禁止手改。导入截图时只登记真实 PNG；派生图由生成器创建，细节见[维护指南](docs/maintenance.md#生成的站点资料)。
 - 根 README 的开发时间线和实验复盘为人工内容，生成器不得覆盖。
-- 站点样式按页面归属放置：跨页面共用的规则放 `assets/polish.css`，页面专属规则只放该页的样式表（`home.css`、`topic.css` / `topic-lifecycle.css`、`compare.css`），共用组件放 `assets/site.css`。同一选择器不写在多个文件里，`npm run validate` 的样式重复闸门保持跨文件重复选择器与同文件完全相同声明都不增加。案例自身的样式仍归对应 run，导入案例不需要调整本站样式表。
+- 站点样式按页面归属放置：跨页面共用的规则放 `assets/polish.css`，页面专属规则只放该页的样式表（`home.css`、`topic.css` / `topic-lifecycle.css`、`compare.css`、`screenshots.css`），共用组件放 `assets/site.css`。同一选择器不写在多个文件里，`npm run validate` 的样式重复闸门保持跨文件重复选择器与同文件完全相同声明都不增加。案例自身的样式仍归对应 run，导入案例不需要调整本站样式表。
 - 新技术主题在 docs/{slug}/ 保留 Readme.md 与可运行示例，同时登记 catalog/guides.json。
 - Google Analytics 统一通过公共脚本 `assets/analytics.js` 接入，测量 ID `G-8E54P1HX3G` 和初始化逻辑只在该脚本维护，不在页面复制 Google tag。后续新增或导入实验记录时，生成的实验阅读页及本仓库可维护的网页入口（静态 HTML 各页面、构建型项目入口与 previews 产物）都必须用带 `defer` 的 script 标签引用公共脚本，并按入口位置设置可用路径，兼容根路径与 Pages 子路径。阅读页由生成器统一添加引用；预览入口在源码中添加，构建型实验须重建预览。维护者追加引用须在 run.json 的 changes 登记，不修改原始输入，也不为补统计批量改写历史实验产物。仅提示词或无网页入口的记录由阅读页承载统计；外部部署继续遵循既有人工部署约束。代码和检查方式见[维护指南的访问统计要求](docs/maintenance.md#访问统计)。
 - CLAUDE.md 只引用本文件，不复制第二套规则。

@@ -41,6 +41,14 @@ test("summary omits large bodies and deduplicated inputs preserve normalized tex
     assert.equal(run.score.total, original.score.total);
     assert.equal(run.score.rubricVersion, original.score.rubricVersion);
     assert.equal(run.score.captureState, original.score.captureState);
+    assert.equal(
+      run.captureCount ?? (original.screenshot ? 1 : 0),
+      original.score.captureManifest
+        ? readJSON(original.score.captureManifest).frames.length
+        : original.screenshot
+          ? 1
+          : 0,
+    );
     for (const field of [
       "taskChecks",
       "visualChecks",

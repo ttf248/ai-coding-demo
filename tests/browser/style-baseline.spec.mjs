@@ -5,6 +5,9 @@ import { test, expect } from "@playwright/test";
 const PAGES = {
   home: "index.html?testing=all",
   topic: "topic.html?id=bluebook&view=list",
+  captures: "screenshots.html?run=circuit-lab--claude-opus-5-5-max-r01",
+  snapshot:
+    "compare.html?group=circuit-lab/v1&left=circuit-lab--claude-opus-5-5-max-r01&right=circuit-lab--gpt-6-1-sol-max-r01&tab=snapshot",
   compare:
     "compare.html?group=circuit-lab/v1&left=circuit-lab--claude-opus-5-5-max-r01&right=circuit-lab--gpt-6-1-sol-max-r01",
 };
@@ -260,6 +263,23 @@ BASELINE["compare@390"][".panel-identity"] = {
 BASELINE["topic@390"][".run-context > summary"] = { "min-height": "44px" };
 
 for (const width of [1440, 390]) {
+  BASELINE[`topic@${width}`][".topic-capture-link"] = {
+    "min-height": "44px",
+    position: "relative",
+  };
+  BASELINE[`topic@${width}`][".topic-capture-count"] = { "font-size": "12px" };
+  BASELINE[`captures@${width}`] = {
+    ".captures-heading h1": { "font-size": width === 1440 ? "28px" : "22px" },
+    ".captures-controls select": { "min-height": "44px" },
+    ".captures-stage": {
+      "overflow-x": "auto",
+      "max-height": width === 1440 ? "702px" : "630px",
+    },
+  };
+  BASELINE[`snapshot@${width}`] = {
+    ".snapshot-controls": { display: "flex", padding: "8px" },
+    ".snapshot-controls select": { "min-height": "44px" },
+  };
   BASELINE[`home@${width}`][".score-chip"] = {
     "font-size": "12px",
     "background-color": "rgb(246, 247, 249)",

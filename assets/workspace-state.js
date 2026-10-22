@@ -71,6 +71,11 @@
       mobile: sides.includes(p.get("mobile")) ? p.get("mobile") : "left",
     };
     for (const side of sides) {
+      state[side + "Capture"] = /^[a-z0-9-]{1,120}$/.test(
+        p.get(side + "Capture") || "",
+      )
+        ? p.get(side + "Capture")
+        : "";
       const run = data.runs.find((run) => run.id === state[side]);
       const model = p.get(side + "Model") || run?.modelId || "";
       state[side + "Model"] = run?.modelId || model;

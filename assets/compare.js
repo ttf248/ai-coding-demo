@@ -89,6 +89,7 @@
         state[side + "Effort"] = run?.effort || "";
       }
       state[side + "Page"] = "";
+      state[side + "Capture"] = "";
       unloaded[side] = false;
     });
     state.mobile = "left";
@@ -117,6 +118,7 @@
     state[side + "Model"] = run?.modelId || "";
     state[side + "Effort"] = run?.effort || "";
     state[side + "Page"] = "";
+    state[side + "Capture"] = "";
     unloaded[side] = false;
   }
   function stepTopic(direction) {
@@ -184,6 +186,15 @@
         state.layout !== "quad" && ["third", "fourth"].includes(option.value);
   }
   const getRun = (side) => data.runs.find((r) => r.id === state[side]);
+  function selectedCapture(side) {
+    const run = getRun(side),
+      frames = U.captureFrames(run);
+    return (
+      frames.find((frame) => frame.id === state[side + "Capture"]) ||
+      frames.find((frame) => frame.file === U.screenshotURL(run)) ||
+      frames[0]
+    );
+  }
   function updateURL() {
     const p = new URLSearchParams();
     for (const [k, v] of Object.entries(state))
@@ -397,6 +408,7 @@
         frameKey(side),
         !run && [state.group, state[side + "Model"], state[side + "Effort"]],
         state.tab,
+        state.tab === "snapshot" ? selectedCapture(side)?.id : "",
         state.tab === "prompt"
           ? diffCache.key
           : state.tab === "info"
@@ -451,7 +463,9 @@
         options +
         "</select>" +
         `<div class="panel-navigation"><button data-step="-1" data-side="${side}" aria-label="${labels[side]} 上一版本">←</button><button data-step="1" data-side="${side}" aria-label="${labels[side]} 下一版本">→</button><button data-maximize="${side}" aria-label="放大或还原 ${labels[side]}">${state.focus === side ? "还原" : "放大"}</button></div>` +
-        (run && (run.preview.pages.length > 1 || invalidPage)
+        (run &&
+        state.tab === "preview" &&
+        (run.preview.pages.length > 1 || invalidPage)
           ? '<label for="page-' +
             side +
             '">页面模块</label><select id="page-' +
@@ -479,7 +493,7 @@
             "</select>"
           : "") +
         '<div class="panel-actions">' +
-        (run && state.tab === "snapshot" && U.screenshotURL(run)
+        (run && state.tab === "snapshot" && selectedCapture(side)
           ? '<button class="snapshot-zoom-button" data-zoom-snapshot="' +
             side +
             '">放大截图</button>'
@@ -511,7 +525,35 @@
           : "") +
         '</div><p class="panel-status">' +
         (run ? e(run.environment.tool || "工具未记录") : "请选择实验") +
-        '</p><p class="panel-status" data-size></p></div><div data-content></div>';
+        '</p><p class="panel-status" data-size></p></div>' +
+        (run && state.tab === "snapshot" && U.captureFrames(run).length
+          ? '<div class="snapshot-controls"><label for="capture-' +
+            side +
+            '">截图取景</label><select id="capture-' +
+            side +
+            '" data-capture-side="' +
+            side +
+            '">' +
+            U.captureFrames(run)
+              .map(
+                (frame) =>
+                  '<option value="' +
+                  e(frame.id) +
+                  '"' +
+                  (selectedCapture(side)?.id === frame.id ? " selected" : "") +
+                  ">" +
+                  e(U.captureFrameLabel(frame, run)) +
+                  (U.captureDevice(frame) === "mobile" ? " · 手机" : "") +
+                  "</option>",
+              )
+              .join("") +
+            '</select><a class="capture-collection-link" href="' +
+            e(U.captureURL(run, selectedCapture(side)?.id)) +
+            '" target="_blank" rel="noopener">全部 ' +
+            U.captureFrames(run).length +
+            " 张 ↗</a></div>"
+          : "") +
+        "<div data-content></div>";
       const content = panel.querySelector("[data-content]");
       if (!run) {
         const model = state[side + "Model"];
@@ -564,17 +606,22 @@
         continue;
       }
       if (state.tab === "snapshot") {
-        const screenshot = U.screenshotURL(run);
+        if (!active) continue;
+        const frame = selectedCapture(side),
+          screenshot = frame?.file;
+        const isCover = screenshot === U.screenshotURL(run);
         content.innerHTML = screenshot
           ? '<a class="snapshot-preview" href="' +
             e(screenshot) +
             '" target="_blank" rel="noopener" aria-label="查看实际截图原图"><img src="' +
-            e(U.screenshotThumbnailURL(run, 640)) +
+            e(isCover ? U.screenshotThumbnailURL(run, 640) : screenshot) +
             '"' +
-            U.screenshotSrcset(run) +
+            (isCover ? U.screenshotSrcset(run) : "") +
             ' sizes="(max-width: 700px) 100vw, 600px" alt="' +
             e(run.title + " · " + runLabel(run) + " 实际截图") +
-            '"><span>已登记实际截图 · 打开原图 ↗</span></a>'
+            '"><span>' +
+            e(U.captureFrameLabel(frame, run)) +
+            " · 打开原图 ↗</span></a>"
           : '<div class="frame-placeholder">此实验未登记截图，可查看记录或切换实时预览。</div>';
         continue;
       }
@@ -905,6 +952,8 @@
     } else if (el.dataset.page) {
       state[el.dataset.page + "Page"] = el.value;
       unloaded[el.dataset.page] = false;
+    } else if (el.dataset.captureSide) {
+      state[el.dataset.captureSide + "Capture"] = el.value;
     } else if (el.id === "viewport") state.viewport = el.value;
     else if (el.id === "prompt-source") state.source = el.value;
     else if (el.id === "related-only") state.relatedOnly = el.checked;
@@ -951,12 +1000,14 @@
     }
     if (el.dataset.zoomSnapshot) {
       const run = getRun(el.dataset.zoomSnapshot);
-      if (!run || !U.screenshotURL(run)) return;
+      const frame = selectedCapture(el.dataset.zoomSnapshot);
+      if (!run || !frame) return;
       screenshotTrigger = el;
-      $("screenshot-zoom-title").textContent = runLabel(run) + " · 实际截图";
-      $("screenshot-zoom-image").src = U.screenshotURL(run);
+      $("screenshot-zoom-title").textContent =
+        runLabel(run) + " · " + U.captureFrameLabel(frame, run);
+      $("screenshot-zoom-image").src = frame.file;
       $("screenshot-zoom-image").alt = runLabel(run) + " 实际截图";
-      $("screenshot-original").href = U.screenshotURL(run);
+      $("screenshot-original").href = frame.file;
       setImageScale("fit");
       $("screenshot-zoom").showModal();
       return;
@@ -1012,6 +1063,10 @@
         state.leftEffort,
       ];
       [state.leftPage, state.rightPage] = [state.rightPage, state.leftPage];
+      [state.leftCapture, state.rightCapture] = [
+        state.rightCapture,
+        state.leftCapture,
+      ];
       [unloaded.left, unloaded.right] = [unloaded.right, unloaded.left];
     } else return;
     updateURL();

@@ -202,6 +202,68 @@
     (typeof run.raw === "string" ? !!run.raw.trim() : !!run.hasRaw) &&
     run.input.completeness !== "unknown";
   const documentURL = (run) => run?.reader || run?.document;
+  const captureURL = (run, frameId = "") =>
+    "screenshots.html?run=" +
+    encodeURIComponent(run.id) +
+    (frameId ? "&frame=" + encodeURIComponent(frameId) : "");
+  function captureFrames(run) {
+    if (!run) return [];
+    const frames = (run.scoreEvidence?.frames || []).filter(
+      (frame) =>
+        typeof frame.id === "string" &&
+        typeof frame.file === "string" &&
+        frame.file.startsWith(run.directory + "/") &&
+        /^demos\/[a-z0-9/.-]+\.png$/.test(frame.file) &&
+        !frame.file.includes(".."),
+    );
+    if (frames.length) return frames;
+    const file = screenshotURL(run);
+    return file
+      ? [
+          {
+            id: "selected-cover",
+            file,
+            width: run.screenshotInfo?.width,
+            height: run.screenshotInfo?.height,
+          },
+        ]
+      : [];
+  }
+  const captureCount = (run) => run?.captureCount ?? captureFrames(run).length;
+  const captureDevice = (frame) =>
+    !frame.viewport?.width
+      ? "unknown"
+      : frame.viewport.width <= 700
+        ? "mobile"
+        : "desktop";
+  function captureFrameLabel(frame, run) {
+    const page = run?.preview?.pages?.find((page) => page.id === frame.pageId);
+    if (frame.id.startsWith("page-") && page?.label) return page.label;
+    const names = {
+      "selected-cover": "已选封面",
+      "desktop-initial": "桌面首屏",
+      "mobile-initial": "手机首屏",
+      "desktop-result": "操作结果",
+      "desktop-full": "完整页面",
+      "desktop-bottom": "页面底部",
+      "desktop-scrolled-full": "滚动加载后的完整页面",
+      "desktop-scrolled-top": "滚动后返回顶部",
+      "desktop-scrolled-lower": "滚动后的下部页面",
+      "desktop-settled": "等待后的桌面",
+      "mobile-settled": "等待后的手机",
+      "desktop-second-scene": "第二场景",
+      "desktop-completed": "完成后的结果",
+      "desktop-delayed-upload": "等待后上传图片",
+      "desktop-restored-confirmed": "还原操作后",
+      "desktop-restored-sample": "样例还原后",
+    };
+    return (
+      names[frame.id] ||
+      frame.id
+        .replaceAll("desktop-horizontal-", "横向页面 ")
+        .replace(/^page-/, "登记页面 ")
+    );
+  }
   const screenshotVariants = (run) => run?.screenshotInfo?.variants || [];
   // 选不小于目标宽度的最小变体；没有合适变体时退回最小的一个。
   const screenshotVariantFor = (run, targetWidth) => {
@@ -949,21 +1011,6 @@
         '" target="_blank" rel="noopener">查看采集环境与操作记录</a>'
       : "";
     const frames = run?.scoreEvidence?.frames || [];
-    const frameNames = {
-      "desktop-initial": "桌面首屏",
-      "desktop-result": "桌面结果态",
-      "desktop-full": "桌面长图",
-      "mobile-initial": "手机首屏",
-      "desktop-scrolled-full": "滚动加载后的桌面长图",
-      "desktop-scrolled-top": "滚动后返回顶部",
-      "desktop-settled": "延长等待后的桌面",
-      "mobile-settled": "延长等待后的手机",
-      "desktop-second-scene": "第二场景",
-      "desktop-completed": "完成后的结果",
-      "desktop-delayed-upload": "等待后上传图片",
-      "desktop-restored-confirmed": "还原操作后",
-      "desktop-restored-sample": "样例还原后",
-    };
     const gallery = frames.length
       ? '<details class="score-captures"><summary>查看已复核的 ' +
         frames.length +
@@ -979,12 +1026,7 @@
               '<li><a class="score-frame-link" href="' +
               escape(frame.file) +
               '" target="_blank" rel="noopener">' +
-              escape(
-                frameNames[frame.id] ||
-                  frame.id
-                    .replaceAll("desktop-horizontal-", "桌面横向页面 ")
-                    .replaceAll("page-", "登记页面 "),
-              ) +
+              escape(captureFrameLabel(frame, run)) +
               " · " +
               frame.width +
               " × " +
@@ -1069,6 +1111,11 @@
     completenessLabel,
     hasRecordedInput,
     documentURL,
+    captureURL,
+    captureFrames,
+    captureCount,
+    captureDevice,
+    captureFrameLabel,
     screenshotVariants,
     screenshotVariantFor,
     screenshotSrcset,

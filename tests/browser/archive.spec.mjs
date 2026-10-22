@@ -277,7 +277,7 @@ test("module selection, sharing, missing HTTP preview and external fallback", as
   context,
 }) => {
   const multi = data.runs.find((r) => r.preview.pages.length > 1);
-  await page.goto(url(multi, blue[0], "&tab=snapshot"));
+  await page.goto(url(multi, blue[0], "&tab=preview"));
   await page.locator("#page-left").selectOption(multi.preview.pages[1].id);
   await expect(page).toHaveURL(
     new RegExp("leftPage=" + multi.preview.pages[1].id),
@@ -288,6 +288,9 @@ test("module selection, sharing, missing HTTP preview and external fallback", as
   );
   await page.locator("#share").click();
   await expect(page.locator("#share-message")).toContainText(/已复制|请复制/);
+  await page.locator('[data-tab="snapshot"]').click();
+  await expect(page.locator("#page-left")).toHaveCount(0);
+  await expect(page.locator("#capture-left")).toBeVisible();
   const preview = blue[0].preview.pages[0].href;
   await page.route("**/" + preview, (route) =>
     route.fulfill({ status: 404, body: "Missing" }),

@@ -1025,6 +1025,10 @@
     if (href) $("preview-open").href = href;
     else $("preview-open").removeAttribute("href");
     $("preview-original").hidden = !screenshot || previewMode !== "image";
+    $("preview-collection").hidden = !U.captureCount(run);
+    $("preview-collection").href = U.captureURL(run);
+    $("preview-collection").textContent =
+      "查看全部 " + U.captureCount(run) + " 张截图";
     if (screenshot) $("preview-original").href = screenshot;
     else $("preview-original").removeAttribute("href");
     document.querySelectorAll("[data-preview-mode]").forEach((button) => {

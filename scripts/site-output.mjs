@@ -128,6 +128,16 @@ export function browserOutputs(catalog) {
     fs.readFileSync(path.join(root, "catalog/scoring-rubric.json"), "utf8"),
   );
   const json = (file, data) => outputs.set(file, JSON.stringify(data) + "\n");
+  const captures = new Map(
+    catalog.runs.map((run) => [
+      run.id,
+      run.score.captureManifest
+        ? JSON.parse(
+            fs.readFileSync(path.join(root, run.score.captureManifest), "utf8"),
+          )
+        : null,
+    ]),
+  );
   const runs = catalog.runs.map((run) => {
     const { raw, changes, billing, environment, input, score, ...summary } =
       run;
@@ -136,6 +146,9 @@ export function browserOutputs(catalog) {
     json(rawHref, raw);
     return {
       ...summary,
+      ...(captures.get(run.id)?.frames.length > 1
+        ? { captureCount: captures.get(run.id).frames.length }
+        : {}),
       score: {
         rubricVersion: score.rubricVersion,
         status: score.status,
@@ -187,20 +200,16 @@ export function browserOutputs(catalog) {
           ...run,
           scoreEvidence: run.score.captureManifest
             ? (() => {
-                const capture = JSON.parse(
-                  fs.readFileSync(
-                    path.join(root, run.score.captureManifest),
-                    "utf8",
-                  ),
-                );
+                const capture = captures.get(run.id);
                 return {
                   frames: capture.frames.map(
-                    ({ id, file, width, height, viewport }) => ({
+                    ({ id, file, width, height, viewport, pageId }) => ({
                       id,
                       file,
                       width,
                       height,
                       viewport,
+                      pageId,
                     }),
                   ),
                   capturedAt: capture.capturedAt,
@@ -376,7 +385,10 @@ export function documentOutputs(catalog, generated) {
               ? `<a class="button primary" href="${escape(run.preview.kind === "external" ? href : relative(href))}" target="_blank" rel="noopener">运行作品 ↗</a>`
               : "";
           })() +
-          `<a class="button" href="${escape(relative("compare.html"))}?left=${encodeURIComponent(run.id)}">对比此实验</a>`
+          `<a class="button" href="${escape(relative("compare.html"))}?left=${encodeURIComponent(run.id)}">对比此实验</a>` +
+          (run.screenshot
+            ? `<a href="${escape(relative("screenshots.html"))}?run=${encodeURIComponent(run.id)}">浏览截图集 →</a>`
+            : "")
         : "") +
       (guide
         ? `<a class="button primary" href="${escape(relative(guide.example))}">运行示例 ↗</a>`

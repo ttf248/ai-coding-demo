@@ -270,7 +270,7 @@
         : '<span class="missing-record">无预览</span>') +
       (U.screenshotURL(run)
         ? '<a class="model-record-screenshot" href="' +
-          e(U.screenshotURL(run)) +
+          e(U.captureURL(run)) +
           '" target="_blank" rel="noopener">截图 ↗</a>'
         : "") +
       '<button data-compare="' +
@@ -460,7 +460,7 @@
           '<div class="card-actions">' +
           (U.screenshotURL(r)
             ? '<a href="' +
-              e(U.screenshotURL(r)) +
+              e(U.captureURL(r)) +
               '" target="_blank" rel="noopener">截图 ↗</a>'
             : "") +
           (href
@@ -720,7 +720,7 @@
                         ? U.screenshotCoverSrcset(r)
                         : U.screenshotSrcset(r);
                     return `<tr class="topic-run-row" id="run-${e(r.id)}">
-                    <td class="topic-run-art">${image ? `<a href="${e(U.screenshotURL(r))}" target="_blank" rel="noopener" aria-label="查看 ${e(U.runSummary(data, r))} 截图"><img loading="lazy" decoding="async" src="${e(image)}"${srcset} sizes="(max-width: 700px) 88px, (min-width: 1288px) 118px, calc(11vw - 23.5px)" alt="${e(r.title)} 实际截图"></a>` : '<span class="missing-record">无截图</span>'}</td>
+                    <td class="topic-run-art">${image ? `<a class="topic-capture-link" href="${e(U.captureURL(r))}" aria-label="查看 ${e(U.runSummary(data, r))} 全部 ${U.captureCount(r)} 张截图"><img loading="lazy" decoding="async" src="${e(image)}"${srcset} sizes="(max-width: 700px) 88px, (min-width: 1288px) 118px, calc(11vw - 23.5px)" alt="${e(r.title)} 实际截图"><span class="topic-capture-count">${U.captureCount(r)} 张</span></a>` : '<span class="missing-record">无截图</span>'}</td>
                     <th scope="row" class="topic-run-model">${e(U.modelLabel(data, r))}
                       <small class="topic-run-condition"><span class="topic-run-effort">${e(U.effortLabel(r.effort))}</span> · <span class="topic-run-round">${e(U.roundLabel(r))}</span></small>
                       <span class="topic-run-input"><span>${e(U.completenessLabel(r.input?.completeness))}</span><small>${U.executionModeBadge(r)}</small></span>

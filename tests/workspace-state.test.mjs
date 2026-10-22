@@ -38,6 +38,13 @@ test("URL decoding preserves shared links and rejects unsupported view values", 
   assert.equal(state.tab, "conditions");
   assert.equal(state.layout, "quad");
   assert.equal(state.differencesOnly, true);
+  const captures = compareFromURL(
+    "?left=a&leftCapture=mobile-initial&rightCapture=../../bad&thirdCapture=desktop-result",
+    { runs },
+  );
+  assert.equal(captures.leftCapture, "mobile-initial");
+  assert.equal(captures.rightCapture, "");
+  assert.equal(captures.thirdCapture, "desktop-result");
   assert.equal(
     compareFromURL(
       "?left=missing&leftModel=alpha&leftEffort=high&group=other/v2",
