@@ -24,6 +24,7 @@ test("public pages and generated readers load the shared analytics script", asyn
     "index.html",
     "topic.html?id=circuit-lab",
     "compare.html",
+    "model.html",
     "404.html",
     ...catalog.guides.map((guide) => guide.example),
     readerPath(catalog.runs[0].document),

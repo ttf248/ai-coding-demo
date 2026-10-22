@@ -5,6 +5,7 @@ import { test, expect } from "@playwright/test";
 const PAGES = {
   home: "index.html?testing=all",
   topic: "topic.html?id=bluebook&view=list",
+  model: "model.html?id=minimax-m3-1-flash",
   captures: "screenshots.html?run=circuit-lab--claude-opus-5-5-max-r01",
   snapshot:
     "compare.html?group=circuit-lab/v1&left=circuit-lab--claude-opus-5-5-max-r01&right=circuit-lab--gpt-6-1-sol-max-r01&tab=snapshot",
@@ -265,6 +266,10 @@ BASELINE["compare@390"][".panel-identity"] = {
 BASELINE["topic@390"][".run-context > summary"] = { "min-height": "44px" };
 
 for (const width of [1440, 390]) {
+  BASELINE[`model@${width}`] = {
+    ".model-topic": { padding: "12px 16px", "border-radius": "12px" },
+    "#overview-model": { "min-height": "44px" },
+  };
   BASELINE[`topic@${width}`][".score-split"] = {
     display: "block",
     "font-size": "12px",
