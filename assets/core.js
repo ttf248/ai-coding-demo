@@ -1043,7 +1043,14 @@
     return (
       '<details class="score-details"><summary>截图评分 · ' +
       (total === null ? status[s?.status] || "待评分" : total + "/100") +
-      '</summary><div class="score-evidence"><p class="score-context">规则 v' +
+      (global.ArchiveEvidence && total !== null
+        ? '<span class="score-split">' +
+          escape(global.ArchiveEvidence.splitScore(run)) +
+          "</span>"
+        : "") +
+      '</summary><div class="score-evidence">' +
+      (global.ArchiveEvidence ? global.ArchiveEvidence.verification(run) : "") +
+      '<p class="score-context">规则 v' +
       escape(s?.rubricVersion || "未记录") +
       " · " +
       escape(capture[s?.captureState] || "取景未记录") +

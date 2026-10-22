@@ -44,6 +44,15 @@ const schemas = Object.fromEntries(
   ]),
 );
 const catalog = loadCatalog();
+for (const run of catalog.runs) {
+  for (const checkItem of run.verification?.checks || []) {
+    if (checkItem.evidence)
+      check(
+        exists(checkItem.evidence),
+        `${run.id}: missing verification evidence ${checkItem.evidence}`,
+      );
+  }
+}
 const scoringRubric = readJSON("catalog/scoring-rubric.json");
 errors.push(...rubricErrors(scoringRubric, catalog, schema));
 try {

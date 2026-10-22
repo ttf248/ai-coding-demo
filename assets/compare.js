@@ -793,6 +793,11 @@
     holder.dataset.key = key;
     const base = getRun("left");
     holder.innerHTML =
+      window.ArchiveEvidence.summary(
+        data,
+        selected.map(getRun),
+        selected.map((side) => labels[side]),
+      ) +
       '<div class="summary-heading"><h2>截图与实验数据</h2><span>费用与耗时保留批次口径</span></div><div class="summary-columns">' +
       selected
         .map((side) => {

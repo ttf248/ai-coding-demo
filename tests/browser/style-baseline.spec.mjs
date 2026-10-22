@@ -265,6 +265,10 @@ BASELINE["compare@390"][".panel-identity"] = {
 BASELINE["topic@390"][".run-context > summary"] = { "min-height": "44px" };
 
 for (const width of [1440, 390]) {
+  BASELINE[`topic@${width}`][".score-split"] = {
+    display: "block",
+    "font-size": "12px",
+  };
   BASELINE[`topic@${width}`][".topic-capture-link"] = {
     "min-height": "44px",
     position: "relative",
@@ -279,6 +283,7 @@ for (const width of [1440, 390]) {
     },
   };
   BASELINE[`snapshot@${width}`] = {
+    ".difference-summary": { padding: "16px", "margin-bottom": "16px" },
     ".snapshot-controls": { display: "flex", padding: "8px" },
     ".snapshot-controls select": { "min-height": "44px" },
   };
