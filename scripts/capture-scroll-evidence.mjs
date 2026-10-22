@@ -9,10 +9,15 @@ import { scrollExistingDocument, restoreScrollTop } from "./capture-scroll.mjs";
 const args = process.argv.slice(2),
   option = (key, fallback) =>
     args.includes(key) ? args[args.indexOf(key) + 1] : fallback;
-const sourceBatch = option("--source", "2026-10-21"),
-  batch = option("--batch", sourceBatch + "-scroll");
+const sourceBatch = option("--source", ""),
+  batch = option("--batch", "");
 const topic = option("--topic", "");
-if (!/^\d{4}-\d{2}-\d{2}(?:-[a-z0-9]+)?$/.test(batch) || batch === sourceBatch)
+const runId = option("--run", "");
+if (
+  !/^\d{4}-\d{2}-\d{2}(?:-[a-z0-9]+)?$/.test(batch) ||
+  !/^\d{4}-\d{2}-\d{2}(?:-[a-z0-9]+)?$/.test(sourceBatch) ||
+  batch === sourceBatch
+)
   throw Error("Supplement must use a distinct dated batch");
 const catalog = loadCatalog(),
   directory = path.join(ROOT, "catalog/screenshot-captures", batch);
@@ -33,6 +38,7 @@ const queue = catalog.runs.filter((run) => {
   );
   if (
     (topic && run.topicId !== topic) ||
+    (runId && run.id !== runId) ||
     !fs.existsSync(file) ||
     fs.existsSync(path.join(directory, run.id + ".json"))
   )
@@ -118,10 +124,13 @@ async function capture(run) {
     const entry =
       run.preview.pages.find((p) => p.id === run.preview.defaultPage) ||
       run.preview.pages[0];
-    await page.goto(new URL(entry.href, "http://127.0.0.1:43931/").href, {
-      waitUntil: "domcontentloaded",
-      timeout: 25000,
-    });
+    await page.goto(
+      new URL(entry.href, option("--base-url", "http://127.0.0.1:4173/")).href,
+      {
+        waitUntil: "domcontentloaded",
+        timeout: 25000,
+      },
+    );
     await page.waitForTimeout(1800);
     record.actions.push(await scrollExistingDocument(page));
     const height = await page.evaluate(

@@ -8,15 +8,18 @@ import { loadCatalog, ROOT } from "./lib.mjs";
 const args = process.argv.slice(2);
 const value = (flag, fallback) =>
   args.includes(flag) ? args[args.indexOf(flag) + 1] : fallback;
-const batch = value("--batch", "2026-10-21");
+const batch = value("--batch", "");
 if (!/^\d{4}-\d{2}-\d{2}(?:-[a-z0-9]+)?$/.test(batch))
-  throw Error("Invalid capture batch");
-const baseURL = value("--base-url", "http://127.0.0.1:43931/");
+  throw Error(
+    "Specify a new dated capture batch with --batch YYYY-MM-DD-label",
+  );
+const baseURL = value("--base-url", "http://127.0.0.1:4173/");
 const topicId = value("--topic", "");
 const runId = value("--run", "");
 const limit = Number(value("--limit", "0"));
 const navigation = value("--navigation", "domcontentloaded");
-if (!["commit", "domcontentloaded"].includes(navigation)) throw Error("Invalid navigation wait");
+if (!["commit", "domcontentloaded"].includes(navigation))
+  throw Error("Invalid navigation wait");
 const boundedFontWait = args.includes("--bounded-font-wait");
 if (boundedFontWait) process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
 const catalog = loadCatalog();
@@ -122,14 +125,12 @@ async function interact(page, run, log) {
     );
   }
   if (run.topicId === "fluid-simulation") {
-    const boxes = await page
-      .locator("canvas")
-      .evaluateAll((es) =>
-        es.map((e, i) => ({
-          index: i,
-          rect: e.getBoundingClientRect().toJSON(),
-        })),
-      );
+    const boxes = await page.locator("canvas").evaluateAll((es) =>
+      es.map((e, i) => ({
+        index: i,
+        rect: e.getBoundingClientRect().toJSON(),
+      })),
+    );
     const largest = boxes
       .filter((x) => x.rect.width > 180 && x.rect.height > 180)
       .sort(
@@ -220,7 +221,9 @@ async function captureRun(run) {
       analytics: "blocked",
       network: "真实网络资源，不替换 CDN、图片或应用脚本",
       navigationWait: navigation,
-      fontWait: boundedFontWait ? "bounded 1800ms; screenshot does not await unresolved fonts" : "Playwright screenshot default",
+      fontWait: boundedFontWait
+        ? "bounded 1800ms; screenshot does not await unresolved fonts"
+        : "Playwright screenshot default",
     },
     previousScreenshot: run.screenshot
       ? {

@@ -12,8 +12,14 @@ import {
 const args = process.argv.slice(2);
 const option = (name, fallback = "") =>
   args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
-const batch = option("--batch", "2026-10-21-horizontal");
-if (!/^\d{4}-\d{2}-\d{2}-[a-z0-9]+$/.test(batch)) throw Error("Invalid batch");
+const batch = option("--batch"),
+  sourceBatch = option("--source");
+if (
+  !/^\d{4}-\d{2}-\d{2}-[a-z0-9]+$/.test(batch) ||
+  !/^\d{4}-\d{2}-\d{2}(?:-[a-z0-9]+)?$/.test(sourceBatch) ||
+  batch === sourceBatch
+)
+  throw Error("Specify distinct dated --batch and --source batches");
 const hash = (file) =>
   crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 const relative = (file) => path.relative(ROOT, file).replaceAll("\\", "/");
@@ -35,20 +41,13 @@ try {
       run.id + ".json",
     );
     if (fs.existsSync(target)) continue;
-    const sourceFile = [
-      "2026-10-21-states4",
-      "2026-10-21-states3",
-      "2026-10-21-states2",
-      "2026-10-21-states",
-      "2026-10-21-retry",
-      "2026-10-21-scroll",
-      "2026-10-21",
-    ]
-      .map((b) =>
-        path.join(ROOT, "catalog/screenshot-captures", b, run.id + ".json"),
-      )
-      .find((f) => fs.existsSync(f));
-    if (!sourceFile) throw Error("Missing capture " + run.id);
+    const sourceFile = path.join(
+      ROOT,
+      "catalog/screenshot-captures",
+      sourceBatch,
+      run.id + ".json",
+    );
+    if (!fs.existsSync(sourceFile)) throw Error("Missing capture " + run.id);
     const source = JSON.parse(fs.readFileSync(sourceFile, "utf8"));
     if (source.status !== "captured") continue;
     const output = path.join(ROOT, run.directory, "captures", batch);
@@ -89,7 +88,7 @@ try {
         run.preview.pages.find((p) => p.id === run.preview.defaultPage) ||
         run.preview.pages[0];
       await page.goto(
-        new URL(entry.href, option("--base-url", "http://127.0.0.1:43931/"))
+        new URL(entry.href, option("--base-url", "http://127.0.0.1:4173/"))
           .href,
         { waitUntil: "commit", timeout: 25000 },
       );

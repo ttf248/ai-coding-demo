@@ -438,6 +438,11 @@ if (fs.existsSync(readerRoot)) {
     });
   for (const file of walk(readerRoot)) {
     if (!file.endsWith(".html")) continue;
+    const relative = path.relative(ROOT, file).replaceAll("\\", "/");
+    check(
+      generated.has(relative),
+      `Obsolete reader page ${relative}; run npm run generate`,
+    );
     const content = fs.readFileSync(file, "utf8");
     check(
       !/&lt;!-- (?:archive|catalog):(?:start|end) --&gt;/.test(content),

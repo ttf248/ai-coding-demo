@@ -2,7 +2,9 @@
 
 本规则于 2026-10-22 启用。评分衡量**归档证据中可见的任务成果与视觉质量**，用于同主题内选择代表实验。截图及操作日志不能证明算法正确、真实手势追踪、全部交互、后端或性能；不同任务的分数不作为统一模型能力排名。
 
-机器定义见 [scoring-rubric.json](../catalog/scoring-rubric.json)，按 `topicId/promptId` 登记八项任务检查及任务正文指纹。缺陷分析与采集过程见 [实施方案](scoring-reviews/2026-10-21-v3-plan.md)，全量结果见 [v3 复核报告](scoring-reviews/2026-10-22-v3.md)。[切换前快照](../catalog/score-reviews/2026-10-21-v3-source.json) 保留原评分、封面及规则；`catalog/score-reviews/2026-10-21-v3/` 保留独立观察和分项原始记录，例如[蓝书审阅记录](../catalog/score-reviews/2026-10-21-v3/bluebook.json)。
+唯一现行机器定义是 [scoring-rubric.json](../catalog/scoring-rubric.json)，按 `topicId/promptId` 登记八项任务检查及任务正文指纹。本文件是新增、导入、补拍及重评共用的执行规则；不再维护日期命名的待实施方案或另一份现行规则。全量复核的历史结果见 [v3 报告](scoring-reviews/2026-10-22-v3.md)，历史评分与规则快照留在 `catalog/score-reviews/`，不作为新案例的操作入口。
+
+v3 针对旧方案的六类问题增加约束：拆开混合任务要求、分别记录视觉子项、统一桌面和手机取景、展开隐藏流程并补齐输入状态、绑定全部采集证据，以及明确区分可见成果与功能验证。后续案例直接执行本规则。
 
 ## 先判断证据状态
 
@@ -49,12 +51,31 @@
 1. 阅读任务正文、完整原始输入与追加要求，登记八项任务检查。批量模型实验先执行 `npm run topics:active`；已归档主题继续检查历史链接和证据，不因此重跑模型。
 2. 采集真实桌面和手机画面，默认 Chromium、DPR 1、1440×900 与 390×844。适用时通过实际控件输入种子、选择预设、运行寻路、注入流体、上传相同测试图片，记录操作、等待与结果态。原型检查登记入口、内部导航及横向隐藏页面。
 3. 懒加载、长页、内部滚动容器及初始化等待需要补充取景；记录滚动范围和实际位置，不宣称穷尽无限信息流。补拍使用新批次、新 PNG，保留旧图、失败尝试和原始采集清单；不改页面内部状态、不伪造网络返回或真实相机。
-4. 运行 `npm run review:scores` 生成临时匿名联系图；指定主题可直接执行 `node scripts/review-captures.mjs --topic <topic-id>`，避免部分 PowerShell/npm 包装脚本吞掉参数。默认读取当前评分绑定的完整采集清单，`--batch <batch>` 可查看指定历史批次，`--output <空目录>` 可指定输出。工具不自动识图、评分或代写观察。模型标签和旧分隐藏，原始输入仍可能包含模型信息，因此不宣称严格双盲。
+4. 新案例使用 `node scripts/review-captures.mjs --run <run-id> --batch <最终批次>` 生成匿名联系图；已有评分的记录默认读取其绑定的完整采集清单，批量复核可用 `npm run review:scores`。`--topic <topic-id>` 可限制主题，`--output <空目录>` 可指定输出。直接调用 node 可避免部分 PowerShell/npm 包装脚本吞掉参数。工具不自动识图、评分或代写观察。模型标签和旧分隐藏，原始输入仍可能包含模型信息，因此不宣称严格双盲。
 5. 逐张查看清单中的全部帧；长图、小字、遮挡和高低分候选放大原图校准。先判证据状态，再写五维观察、二十项分数、置信度和限制。不同输入、取景、资源环境均须说明，禁止从旧分换算。
 6. 将已复核的真实帧选作封面，登记完整证据指纹，并在 `changes` 说明维护者的采集与重评。没有可运行入口的历史记录保留 `unavailable`，不制造占位产物。
 7. 保留前次评分和规则快照，执行生成、验证、测试和实际页面验收后提交。操作日志记录发生的操作，不替代独立功能测试。
 
 采集清单位于 `catalog/screenshot-captures/<batch>/<run-id>.json`，PNG 位于对应 run 的 `captures/<batch>/`。补充清单通过 `previousCapture` 及其 SHA-256 保留来源链；后续清单包含已归并的历史帧。只读静态服务器不启动历史后端，不改外部部署；采集和测试屏蔽正式统计访问。
+
+## 新案例可复用命令
+
+下列 `<run-id>`、`<batch>`、`<source-batch>` 均须替换为本次实际值。批次统一使用 `YYYY-MM-DD-label`，每轮补拍用新标签；所有命令都复用现有工具，不重建一次性迁移或评分脚本。
+
+1. 填完 draft 的完整输入和预览配置；构建型案例先 build。执行 `node scripts/demo-sync.mjs <run-id>` 同步输入与任务正文的首次指纹，此时列出截图、评分缺项是正常现象。新任务将八项检查登记到当前机器规则，其 `promptHash` 取已同步的任务元数据。
+2. 在独立终端运行 `node scripts/serve.mjs --read-only`，默认本地地址为 `http://127.0.0.1:4173/`。采集前实际打开新入口，确认统计被屏蔽且页面主体可运行。
+3. 执行 `node scripts/capture-screenshots.mjs --run <run-id> --batch <batch> --base-url http://127.0.0.1:4173/ --navigation commit --bounded-font-wait`。该命令采集已登记的本地页面，只保存真实截图和采集清单，不改 run.json 或自动评分。外部部署须人工从真实 HTTPS 页面采集并按同一清单结构登记；不能用本站记录页或本地空页替代。无入口、加载失败或缺少结果时先判断是否需要补拍。
+4. 纵向补拍使用 `node scripts/capture-scroll-evidence.mjs --run <run-id> --source <source-batch> --batch <新批次> --base-url http://127.0.0.1:4173/`；横向补拍使用 `node scripts/capture-horizontal-evidence.mjs` 的相同参数。两者必须显式指定来源，取最近已核对的完整清单，不回退到某次历史批次。
+5. 内部导航、上传、切换场景及延长等待使用 `capture-review-states.mjs`，从标准输入读取 JSON：指定 `runId`、新 `batch`、`source` 清单相对路径、`baseUrl` 和 `states`。每个 state 明确独立 `id`、真实 `actions` 及必要的 `preActionWaitMs` / `settleMs`（0–30000ms）；按下文协议补充取景，失败尝试同样保留。PowerShell 可用 `Get-Content -Raw <计划文件> | node scripts/capture-review-states.mjs`。
+6. 对最终完整清单执行 `node scripts/review-captures.mjs --run <run-id> --batch <最终批次>`，阅读 manifest 中的原始输入差异，查看所有联系图并按需打开原 PNG。人工填写下节字段及确实看过的全部帧 ID，不能让脚本默认宣称已看图。
+7. 将所选帧相对 run 的 PNG 路径登记到 `screenshot`，采集日期取该帧所属原始清单的 `capturedAt`，不能使用末次补拍日期替代。`score.captureManifest` 指向最终完整清单，首次证据指纹留 `null` 后执行 `node scripts/demo-sync.mjs <run-id>` 自动补写。已有非空指纹失效时先人工重评、留档，再更新评分，禁止仅刷新哈希。
+8. 执行 `node scripts/demo-sync.mjs <run-id> --check`，完成实际预览验收后再 `--finalize`。最后按[维护指南](maintenance.md#导入执行顺序)执行生成、校验、测试并提交。新增案例不运行全量评分迁移，也不改旧案例的输入或评分。
+
+### 补拍操作协议
+
+`capture-review-states.mjs` 的 `states[].actions` 使用 `kind` 和真实 `selector`，支持 `click`、`pointer-click`、`double-click`、`press`（Home/End/方向键/Enter）、`upload-review-fixture`（已提交且固定指纹的测试 PNG）和 `scroll`（明确页面滚动元素或内部容器）。选择框可通过真实按键操作；不使用脚本注入选中状态。记录请求动作、实际位置、等待、资源错误和采集方式。其他已登记入口由基础采集处理；补拍只展开任务相关的实际页面。
+
+长页及小字必须查看原图，联系图缩放不构成读过全部细节的证明。CDP 视口采集仅用于截图等待受阻时保留真实视口，明确 `captureMethod: "cdp-viewport"`；不重绘页面或替换素材。自动化操作失败不得直接推断人工点击也失败。
 
 ## 数据字段与校验
 
@@ -69,6 +90,8 @@
 
 `insufficient` 的总分、维度、两组子项和上限均为 `null`，仍需完整观察、原因、日期及证据指纹。`unavailable` 没有 PNG，`screenshotHash` 为 `null`，仍绑定真实输入、任务规则和无图采集清单；不得补造数值。`pending` 仅供未完成草稿使用。
 
+人工填写 `status`、`captureState`、`assessedAt`、二十个具名子项、维度及总分、`observations`、`confidence`、`limitations`、`evidence`、`captureManifest` 和 `reviewedFrames`；子项键以当前任务和视觉检查定义为准，不能复用旧版的四项键。`rubricVersion` 取现行版本，所有首次指纹由 `demo:sync` 补写；不手工计算哈希、不生成模拟评分，不复制其他案例的评语。
+
 `npm run validate` 同时检查规则、schema、八项任务与十二项视觉分数、五维观察、加总、上限、封面归属、全部证据帧及采集历史。所有 PNG 核对指纹与实际尺寸，历史来源链也要有效。截图、输入、规则或补充证据变化必须重看相关完整证据，不能只刷新指纹。`demo:sync` 只为 draft 补写尚未记录的机械指纹，不覆盖已有失效指纹。
 
 ## 展示与长期维护
@@ -77,4 +100,6 @@
 
 主题页的评分明细展示五维观察、二十项分数、限制、置信度、采集环境与全部已复核原图入口。首页摘要只保留版本、状态和总分，完整评分从主题详情数据加载。
 
-后续新增、迁移和截图更新均执行相同复核。修订时在 `catalog/score-reviews/` 新增审阅记录，保留前次评分及依据。全局权重、锚点或状态门槛改变时递增规则版本，同步 schema、脚手架、展示和校验器，并重新看图；仅增加新任务无需升级全局版本。只改说明文字且不改变任务或证据无需重评。
+后续新增、迁移和截图更新均执行相同复核。修订时在 `catalog/score-reviews/` 新增审阅记录，保留前次评分及依据。历史规则快照只用于验证当时的审阅档案，与唯一现行规则分开。全局权重、锚点或状态门槛改变时递增规则版本，同步 schema、脚手架、展示和校验器，并重新看图；仅增加新任务无需升级全局版本。只改说明文字且不改变任务或证据无需重评。
+
+被现行规则替代的阶段计划和旧版说明可以删除，相关引用改到有效说明或历史数据快照。生成阅读页由 `generate` 一并清理；不要把历史评分 JSON、规则快照、原始输入和真实截图当作过期文档删除。

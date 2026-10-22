@@ -16,6 +16,23 @@ const escape = (value) =>
 export const readerPath = (source) =>
   `assets/generated/readers/${source.replace(/\.md$/i, ".html")}`;
 
+export function obsoleteDocumentReaders(outputs, workspaceRoot = root) {
+  const directory = path.join(workspaceRoot, "assets/generated/readers");
+  if (!fs.existsSync(directory)) return [];
+  const visit = (dir) =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory()) return visit(file);
+      const relative = path.relative(workspaceRoot, file).replaceAll("\\", "/");
+      return entry.isFile() &&
+        entry.name.endsWith(".html") &&
+        !outputs.has(relative)
+        ? [relative]
+        : [];
+    });
+  return visit(directory).sort();
+}
+
 // 生成器写入 Markdown 的区块标记。标记必须留在 .md 文件里（replaceBlock 依赖它们），
 // 但渲染时不能显示给读者，因此只在渲染前剔除这些整行。
 const GENERATOR_MARKER =
@@ -237,8 +254,6 @@ export function documentOutputs(catalog, generated) {
       "docs/maintenance.md",
       "docs/model-ordering.md",
       "docs/case-scoring.md",
-      "docs/scoring-reviews/2026-10-15-v2.md",
-      "docs/scoring-reviews/2026-10-21-v3-plan.md",
       "docs/scoring-reviews/2026-10-22-v3.md",
       "docs/archive-workspace.md",
       "docs/vercel-root-directories.md",

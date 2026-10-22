@@ -20,7 +20,10 @@ let records = 0,
   attempts = 0,
   supplements = 0;
 const rubric = JSON.parse(
-  fs.readFileSync(path.join(ROOT, "catalog/scoring-rubric-v3.json"), "utf8"),
+  fs.readFileSync(
+    path.join(ROOT, "catalog/score-reviews/2026-10-21-v3-rubric.json"),
+    "utf8",
+  ),
 );
 const reviewed = new Set();
 for (const batch of fs.readdirSync(directory)) {

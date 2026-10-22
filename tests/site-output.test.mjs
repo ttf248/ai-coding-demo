@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import vm from "node:vm";
 import Ajv from "ajv";
 import {
@@ -16,6 +18,7 @@ import {
   documentOutputs,
   readerPath,
   stripGeneratorMarkers,
+  obsoleteDocumentReaders,
 } from "../scripts/site-output.mjs";
 const catalog = loadCatalog(),
   outputs = browserOutputs(catalog),
@@ -395,6 +398,30 @@ test("reader omits generator block markers but keeps fenced comments escaped", (
   ).get(readerPath("Readme.md"));
   assert.ok(fenced.includes("&lt;!-- archive:start --&gt;"));
 });
+test("reader cleanup only removes HTML absent from current generated outputs", () => {
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "ai-reader-cleanup-"),
+  );
+  try {
+    const reader = "assets/generated/readers/docs/";
+    fs.mkdirSync(path.join(directory, reader), { recursive: true });
+    for (const name of ["current.html", "retired.html", "notes.txt"])
+      fs.writeFileSync(path.join(directory, reader, name), name);
+    fs.writeFileSync(path.join(directory, "index.html"), "Maintained source");
+    const outputs = new Map([[reader + "current.html", "current.html"]]);
+    const stale = obsoleteDocumentReaders(outputs, directory);
+    assert.deepEqual(stale, [reader + "retired.html"]);
+    for (const file of stale) fs.unlinkSync(path.join(directory, file));
+    assert.deepEqual(obsoleteDocumentReaders(outputs, directory), []);
+    assert.ok(fs.existsSync(path.join(directory, "index.html")));
+    assert.ok(fs.existsSync(path.join(directory, reader, "notes.txt")));
+  } finally {
+    assert.equal(path.dirname(directory), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(directory).startsWith("ai-reader-cleanup-"));
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("stripGeneratorMarkers only removes known markers outside code fences", () => {
   const source = [
     "<!-- archive:start -->",

@@ -17,7 +17,7 @@ process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
 const run = loadCatalog().runs.find((r) => r.id === plan.runId);
 if (!run || !Array.isArray(plan.states) || !plan.states.length)
   throw Error("Missing state plan");
-const batch = plan.batch || "2026-10-21-states";
+const batch = plan.batch || "";
 if (!/^\d{4}-\d{2}-\d{2}-[a-z0-9]+$/.test(batch)) throw Error("Invalid batch");
 const sourceFile = path.resolve(ROOT, plan.source);
 if (
@@ -98,7 +98,7 @@ try {
           (p) => p.id === (state.pageId || run.preview.defaultPage),
         ) || run.preview.pages[0];
       await page.goto(
-        new URL(entry.href, plan.baseUrl || "http://127.0.0.1:43931/").href,
+        new URL(entry.href, plan.baseUrl || "http://127.0.0.1:4173/").href,
         { waitUntil: "commit", timeout: 25000 },
       );
       try {

@@ -10,7 +10,7 @@ import {
   v3ReviewErrors,
   expandManualReview,
 } from "../scripts/scoring-v3.mjs";
-const rubric = readJSON("catalog/scoring-rubric-v3.json"),
+const rubric = readJSON("catalog/scoring-rubric.json"),
   catalog = loadCatalog();
 
 test("capture PNGs do not invalidate builds, while source assets and code still do", () => {

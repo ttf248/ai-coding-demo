@@ -14,7 +14,7 @@
 
 Pixel Flow 先保留 screenshot.png 的初始粒子流，另拍 screenshot-restoration.png 记录内置示例图通过页面提供的鼠标牵引后的状态，并登记后者评分；未启用摄像头，没有模拟手部关键点或手势。图像重构轮廓不清楚，按已展示的点阵和进度评价。
 
-使用 npm run review:scores 生成 348 张既有截图的匿名图集，按同主题总览比较，再逐图查看新增原图。来源已知，不称独立盲测。按[评分规则 v2](../case-scoring.md)独立评价，未依据模型、费用、tok/s、代码声明或旧分换算。首次评分与完整规则保存在[审阅快照](../../catalog/score-reviews/2026-10-21-minimax-opencode.json)。输入、截图和检查项指纹由 demo:sync 首次补写，旧实验评分保持不变。
+使用 npm run review:scores 生成 348 张既有截图的匿名图集，按同主题总览比较，再逐图查看新增原图。来源已知，不称独立盲测。按[当时的 v2 规则快照](../../catalog/score-reviews/2026-10-21-minimax-opencode.json)独立评价，未依据模型、费用、tok/s、代码声明或旧分换算。首次评分与完整规则保存在[审阅快照](../../catalog/score-reviews/2026-10-21-minimax-opencode.json)。输入、截图和检查项指纹由 demo:sync 首次补写，旧实验评分保持不变。
 
 任务四项按对应任务顺序，视觉四项依次为构图/可读性/操作表达/精修；详细证据和限制见各 run.json。
 

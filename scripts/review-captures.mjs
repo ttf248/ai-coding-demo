@@ -9,6 +9,7 @@ const args = process.argv.slice(2);
 const options = new Set([
   "--batch",
   "--topic",
+  "--run",
   "--fallback-batch",
   "--retry-batch",
   "--output",
@@ -20,8 +21,9 @@ for (let i = 0; i < args.length; i += 2)
     );
 const option = (name, fallback) =>
   args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
-const batch = option("--batch", "2026-10-21"),
-  topicId = option("--topic", "");
+const batch = option("--batch", ""),
+  topicId = option("--topic", ""),
+  runId = option("--run", "");
 const fallbackBatch = option("--fallback-batch", "");
 const retryBatch = option("--retry-batch", "");
 const output = option(
@@ -32,6 +34,8 @@ if (fs.existsSync(output) && fs.readdirSync(output).length)
   throw Error("Review output must be empty; preserve earlier review evidence");
 fs.mkdirSync(output, { recursive: true });
 const catalog = loadCatalog();
+if (runId && !catalog.runs.some((run) => run.id === runId))
+  throw Error("Unknown run: " + runId);
 const anon = (run) =>
   crypto
     .createHash("sha256")
@@ -44,6 +48,7 @@ const runs = [...catalog.runs].sort(
 const manifest = [];
 for (const [index, run] of runs.entries()) {
   if (topicId && run.topicId !== topicId) continue;
+  if (runId && run.id !== runId) continue;
   const recordFile =
     !args.includes("--batch") && run.score?.captureManifest
       ? path.join(ROOT, run.score.captureManifest)
@@ -134,6 +139,8 @@ for (const [index, run] of runs.entries()) {
     authorization: run.input.authorization || null,
   });
 }
+if (runId && !manifest.length)
+  throw Error("No capture manifest selected; provide --batch for a new draft");
 fs.writeFileSync(
   path.join(output, "manifest.json"),
   JSON.stringify(manifest, null, 2) + "\n",

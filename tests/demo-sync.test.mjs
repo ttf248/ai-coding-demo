@@ -153,7 +153,7 @@ test("demo sync refuses to rewrite a registered record and refuses an incomplete
   }
 });
 
-function preparedDraft() {
+function preparedDraft(batch = "test") {
   const f = fixture();
   execFileSync(
     process.execPath,
@@ -182,9 +182,9 @@ function preparedDraft() {
   );
   record.description = "真实描述";
   record.input.notes = "完整留存";
-  record.screenshot = "captures/test/desktop.png";
+  record.screenshot = `captures/${batch}/desktop.png`;
   f.write(
-    `${directory}/captures/test/desktop.png`,
+    `${directory}/captures/${batch}/desktop.png`,
     fs.readFileSync(path.join(f.temporary, directory, "screenshot.png")),
   );
   record.preview = {
@@ -212,8 +212,7 @@ function preparedDraft() {
       ].map((k) => [k, "测试夹具未提供真实任务主体，不能判断这一维度。"]),
     ),
     limitations: ["仅用于验证同步指纹，不代表真实实验产物。"],
-    captureManifest:
-      "catalog/screenshot-captures/test/sample--unknown-unknown-r01.json",
+    captureManifest: `catalog/screenshot-captures/${batch}/sample--unknown-unknown-r01.json`,
     reviewedFrames: ["desktop-initial", "mobile-initial"],
     evidence:
       "这是测试夹具的证据说明，截图未展示任务主体，因此不能给出数值评分。",
@@ -286,6 +285,79 @@ test("demo sync rejects conflicting flags without writes and accepts an external
     f.save();
     run(f.temporary, ["sample--unknown-unknown-r01", "--finalize"]);
     assert.equal(JSON.parse(fs.readFileSync(f.file)).status, "ready");
+  } finally {
+    cleanup(f.temporary);
+  }
+});
+
+test("new imports reuse the current twenty-check rubric and first fingerprints in an independent batch", () => {
+  const f = preparedDraft("2030-01-01-import");
+  try {
+    const rubric = JSON.parse(
+      fs.readFileSync(path.join(ROOT, "catalog/scoring-rubric.json")),
+    );
+    const points = [5, 4, 3, 2, 1, 0, 5, 4];
+    const checks = points.map((_, index) => ({
+      id: "requirement" + index,
+      label: "测试任务项 " + index,
+      description: "测试新主题的独立任务要求，不代表真实案例评分。",
+    }));
+    rubric.tasks = { "sample/v1": { promptHash: hash("真实正文"), checks } };
+    f.write("catalog/scoring-rubric.json", JSON.stringify(rubric));
+    Object.assign(f.record.score, {
+      rubricVersion: rubric.version,
+      status: "rated",
+      captureState: "initial",
+      ceiling: 100,
+      total: 72,
+      taskChecks: Object.fromEntries(
+        checks.map((check, index) => [check.id, points[index]]),
+      ),
+      visualChecks: Object.fromEntries(
+        Object.values(rubric.visualChecks)
+          .flat()
+          .map(([id]) => [id, 4]),
+      ),
+      dimensions: {
+        taskCoverage: 24,
+        composition: 16,
+        readability: 12,
+        interactionClarity: 8,
+        craft: 12,
+      },
+      observations: Object.fromEntries(
+        Object.keys(rubric.dimensionMaximums).map((key) => [
+          key,
+          key +
+            "：测试夹具仅验证独立分项、维度及证据绑定，不代表实际看图评分。",
+        ]),
+      ),
+    });
+    f.record.score.visualChecks.focus = 5;
+    f.save();
+    assert.throws(
+      () => run(f.temporary, [f.record.id, "--finalize"]),
+      /Visual dimension differs/,
+    );
+    assert.equal(JSON.parse(fs.readFileSync(f.file)).status, "draft");
+    f.record.score.visualChecks.focus = 4;
+    f.save();
+    run(f.temporary, [f.record.id, "--finalize"]);
+    const result = JSON.parse(fs.readFileSync(f.file));
+    assert.equal(result.status, "ready");
+    assert.equal(result.score.total, 72);
+    assert.equal(Object.keys(result.score.taskChecks).length, 8);
+    assert.equal(Object.keys(result.score.visualChecks).length, 12);
+    assert.ok(result.score.captureManifest.includes("2030-01-01-import"));
+    for (const key of [
+      "inputHash",
+      "screenshotHash",
+      "criteriaHash",
+      "rubricHash",
+      "evidenceSetHash",
+      "captureInventoryHash",
+    ])
+      assert.match(result.score[key], /^[a-f0-9]{64}$/);
   } finally {
     cleanup(f.temporary);
   }
