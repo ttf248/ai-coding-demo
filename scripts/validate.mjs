@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import Ajv from "ajv";
+import { execFileSync } from "node:child_process";
 import { isDeepStrictEqual } from "node:util";
 import { siteResourceOutputs } from "./site-assets.mjs";
 import { CSS_BASELINE, cssReport } from "./css-structure.mjs";
@@ -45,6 +46,17 @@ const schemas = Object.fromEntries(
 const catalog = loadCatalog();
 const scoringRubric = readJSON("catalog/scoring-rubric.json");
 errors.push(...rubricErrors(scoringRubric, catalog, schema));
+try {
+  execFileSync(
+    process.execPath,
+    [path.join(ROOT, "scripts/validate-captures.mjs")],
+    { cwd: ROOT, encoding: "utf8", stdio: "pipe" },
+  );
+} catch (error) {
+  errors.push(
+    "Capture archive validation failed: " + (error.stderr || error.message),
+  );
+}
 for (const [kind, list] of [
   ["topic", catalog.topics],
   ["prompt", catalog.prompts],

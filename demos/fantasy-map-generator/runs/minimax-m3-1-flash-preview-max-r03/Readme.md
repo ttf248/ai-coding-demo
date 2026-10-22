@@ -92,4 +92,5 @@
 - 第 9 轮：城镇命名与地形挂钩——新增 terrainKind（沿海/河畔/山口/平原），后缀改为港/渡/关/原，而非与地形无关的随机组合。
 - 第 10 轮：视图状态集中为 view 对象（zoomBy/setZoom/pan），滚轮、缩放滑杆、键盘三处入口复用同一套夹取逻辑；同时新增 clampPan，把视口限制在地图范围内，修正经纬度读数越界（原为 -197.8° ~ 162.2°，现为 -180° ~ 162°）。
 - 同轮更新归档：测试分支后续更新的完整产物、执行记录和文档已并入本条实验记录，不另建新轮次。来源：F:/dev/ai-coding-demo-test（model-test-base）/demos/fantasy-map-generator/runs/minimax-m3-1-flash-preview-max-r01。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

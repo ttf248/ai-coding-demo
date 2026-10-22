@@ -38,6 +38,19 @@ test("summary omits large bodies and deduplicated inputs preserve normalized tex
     assert.equal(run.score.total, original.score.total);
     assert.equal(run.score.rubricVersion, original.score.rubricVersion);
     assert.equal(run.score.captureState, original.score.captureState);
+    for (const field of [
+      "taskChecks",
+      "visualChecks",
+      "observations",
+      "captureManifest",
+      "reviewedFrames",
+      "captureInventoryHash",
+    ])
+      assert.equal(
+        run.score[field],
+        undefined,
+        "Detailed review stays in the topic payload: " + field,
+      );
     if (run.score.status === "insufficient")
       assert.equal(run.score.evidence, original.score.evidence);
     assert.equal(raw, original.raw);
@@ -53,9 +66,16 @@ test("summary omits large bodies and deduplicated inputs preserve normalized tex
   );
   assert.ok(
     // Keep the summary budget proportional to the growing archive. 每条实验除了
-    // 元数据还要登记三档截图变体路径（240/480/960），因此预算相应上调。
+    // 元数据还要登记三档截图变体路径（240/480/960）。新长图另有两档
+    // 竖图封面；其实际字节单列预算，完整评分仍必须延迟加载。
     Buffer.byteLength(outputs.get("assets/generated/catalog.js")) <
-      catalog.runs.length * 2500,
+      catalog.runs.length * 2500 +
+        summary.runs.reduce(
+          (sum, run) =>
+            sum +
+            Buffer.byteLength(JSON.stringify(run.screenshotInfo?.cover || [])),
+          0,
+        ),
   );
   // 目录数据逐条输出，改一条实验只产生一行 diff。
   const catalogJs = outputs.get("assets/generated/catalog.js");
@@ -125,7 +145,8 @@ test("filter results match a naive reference implementation", () => {
             state.testing === "all" ||
             (state.testing === "archived") ===
               (topic.testingStatus === "archived")) &&
-          (!state.provider || (model?.provider || "unknown") === state.provider) &&
+          (!state.provider ||
+            (model?.provider || "unknown") === state.provider) &&
           (!state.tool ||
             (run.environment?.toolId || "unknown") === state.tool) &&
           (!state.type || run.type === state.type) &&
@@ -157,8 +178,7 @@ test("filter results match a naive reference implementation", () => {
     { testing: "all", tool: "claude-code" },
     { testing: "all", type: "app" },
   ]) {
-    const actual = ui.ArchiveUI
-      .filterRuns(summary, state)
+    const actual = ui.ArchiveUI.filterRuns(summary, state)
       .map((run) => run.id)
       .sort();
     assert.deepEqual(actual, naive(state));
@@ -172,8 +192,8 @@ test("run cards are assembled from options instead of markup surgery", () => {
   assert.ok(plain.includes('class="run-body"'));
   assert.ok(plain.includes('class="card-actions"'));
   const custom = ui.ArchiveUI.runCard(summary, run, {
-    figure: "<figure class=\"run-card-screenshot\"></figure>",
-    badges: "<span class=\"score-chip\">94</span>",
+    figure: '<figure class="run-card-screenshot"></figure>',
+    badges: '<span class="score-chip">94</span>',
     tagsBadge: "",
     articleAttributes: 'data-item="x"',
     previewLinkClass: "preview-link",
@@ -236,7 +256,8 @@ test("generated thumbnail dimensions and provenance match original PNGs", () => 
     // 缩略图槽位需要更小的变体，避免为 118px 的缩略图拉取 960w。
     assert.ok(run.screenshotInfo.variants.some((v) => v.width === 240));
     // 竖版整页截图才有派生封面，横版截图不需要。
-    const portrait = run.screenshotInfo.height / run.screenshotInfo.width > 1.15;
+    const portrait =
+      run.screenshotInfo.height / run.screenshotInfo.width > 1.15;
     if (portrait) {
       assert.ok(run.screenshotInfo.cover?.length);
       for (const cover of run.screenshotInfo.cover) {
@@ -370,12 +391,7 @@ test("reader omits generator block markers but keeps fenced comments escaped", (
 
   const fenced = documentOutputs(
     catalog,
-    new Map([
-      [
-        "Readme.md",
-        "```html\n<!-- archive:start -->\n```\n",
-      ],
-    ]),
+    new Map([["Readme.md", "```html\n<!-- archive:start -->\n```\n"]]),
   ).get(readerPath("Readme.md"));
   assert.ok(fenced.includes("&lt;!-- archive:start --&gt;"));
 });

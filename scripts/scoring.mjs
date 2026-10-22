@@ -1,27 +1,53 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { ROOT, resolveLocal } from "./lib.mjs";
+import {
+  captureErrors,
+  v3ReviewErrors,
+  v3RubricErrors,
+} from "./scoring-v3.mjs";
 
 export const criteriaHash = (definition) =>
   crypto.createHash("sha256").update(JSON.stringify(definition)).digest("hex");
+export function rubricFingerprint({ tasks, ...globalRules }) {
+  return criteriaHash(globalRules);
+}
+const fileHash = (file) =>
+  crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+
+// New supplements invalidate a review even when its selected cover is unchanged.
+export function captureInventoryHash(runId) {
+  const directory = path.join(ROOT, "catalog/screenshot-captures");
+  const records = fs.existsSync(directory)
+    ? fs
+        .readdirSync(directory)
+        .sort()
+        .flatMap((batch) => {
+          const file = path.join(directory, batch, runId + ".json");
+          return fs.existsSync(file)
+            ? [[batch + "/" + runId + ".json", fileHash(file)]]
+            : [];
+        })
+    : [];
+  return criteriaHash(records);
+}
 
 export function rubricErrors(rubric, catalog, schema) {
-  const errors = [];
+  const errors = v3RubricErrors(rubric, catalog);
   if (rubric.version !== schema.$defs.caseScore.properties.rubricVersion.const)
     errors.push("Scoring rubric and run schema versions differ");
   const maxima = rubric.dimensionMaximums || {};
-  const schemaDimensions = schema.$defs.scoreDimensions;
+  const dimensions = schema.$defs.scoreDimensions;
   if (
-    Object.values(maxima).reduce((sum, value) => sum + value, 0) !== 100 ||
+    Object.values(maxima).reduce((a, b) => a + b, 0) !== 100 ||
     JSON.stringify(Object.keys(maxima).sort()) !==
-      JSON.stringify([...schemaDimensions.required].sort()) ||
+      JSON.stringify([...dimensions.required].sort()) ||
     Object.entries(maxima).some(
-      ([key, value]) => value !== schemaDimensions.properties[key]?.maximum,
+      ([key, value]) => value !== dimensions.properties[key]?.maximum,
     )
   )
     errors.push("Scoring weights must match schema and sum to 100");
-  if (rubric.taskCheckMaximum !== 10 || maxima.taskCoverage !== 40)
-    errors.push(
-      "Task coverage must contain four independent checks worth 10 each",
-    );
   if (
     JSON.stringify(rubric.stateCeilings) !==
     JSON.stringify({ result: 100, initial: 100, partial: 100, blocked: 39 })
@@ -29,88 +55,76 @@ export function rubricErrors(rubric, catalog, schema) {
     errors.push(
       "Unexpected screenshot state ceilings; update rubric version and validation together",
     );
-  for (const [key, definition] of Object.entries(rubric.tasks || {})) {
-    const prompt = catalog.prompts.find((p) => `${p.topicId}/${p.id}` === key);
-    if (!prompt || prompt.hash !== definition.promptHash)
-      errors.push(`Scoring task definition is missing or stale: ${key}`);
-    const checks = definition.checks || [];
-    if (
-      checks.length !== 4 ||
-      new Set(checks.map((check) => check.id)).size !== 4 ||
-      checks.some(
-        (check) =>
-          !/^[a-z][a-zA-Z]*$/.test(check.id) ||
-          !check.label ||
-          !check.description,
-      )
-    )
-      errors.push(`Scoring task needs four distinct documented checks: ${key}`);
-  }
   return errors;
 }
 
 export function scoreErrors(run, rubric) {
   const errors = [],
     score = run.score || {};
-  const fail = (message) => errors.push(`${message}: ${run.id}`);
+  const fail = (message) => errors.push(message + ": " + run.id);
   if (score.rubricVersion !== rubric.version)
     fail("Reassess with current scoring rubric");
+  if (score.status === "pending") {
+    if (run.status !== "draft" || run.screenshot)
+      fail("Only an unfinished draft can await visual review");
+    return errors;
+  }
   if (run.screenshot) {
     if (!["rated", "insufficient"].includes(score.status))
       fail("Screenshot requires a completed visual review");
-    const definition = rubric.tasks?.[`${run.topicId}/${run.promptId}`];
-    if (!definition)
-      fail("Register task-specific scoring checks before rating");
-    if (definition && score.criteriaHash !== criteriaHash(definition))
-      fail("Scoring checks changed; reassess");
     if (score.screenshotHash !== run.screenshotInfo?.hash)
       fail("Screenshot changed; reassess score");
-    if (score.inputHash !== run.rawHash)
-      fail("Original input changed; reassess score");
-    if (typeof score.evidence !== "string" || score.evidence.trim().length < 24)
-      fail("Explain visible evidence and the principal limitation");
-    if (score.status === "rated") {
-      const expected = definition?.checks.map((check) => check.id).sort() || [];
-      if (
-        JSON.stringify(Object.keys(score.taskChecks || {}).sort()) !==
-        JSON.stringify(expected)
-      )
-        fail("Task scoring checks do not match this prompt");
-      if (
-        Object.values(score.taskChecks || {}).some(
-          (value) =>
-            !Number.isInteger(value) ||
-            value < 0 ||
-            value > rubric.taskCheckMaximum,
-        )
-      )
-        fail("Invalid task check points");
-      if (
-        Object.values(score.taskChecks || {}).reduce(
-          (sum, value) => sum + value,
-          0,
-        ) !== score.dimensions?.taskCoverage
-      )
-        fail("Task coverage differs from its four checks");
-      const ceiling = rubric.stateCeilings?.[score.captureState];
-      if (!Number.isInteger(ceiling) || score.ceiling !== ceiling)
-        fail("Screenshot state ceiling differs from rubric");
-      const sum = Object.values(score.dimensions || {}).reduce(
-        (total, value) => total + value,
-        0,
-      );
-      if (score.total !== Math.min(sum, ceiling))
-        fail("Score total differs from dimensions and state ceiling");
-    }
-  } else if (
-    score.status !== "unavailable" &&
-    !(
-      score.status === "pending" &&
-      run.status === "draft" &&
-      run.preview.kind === "none"
-    )
-  ) {
+  } else if (score.status !== "unavailable")
     fail("Missing screenshot must be unavailable or an unfinished draft");
+  const definition = rubric.tasks?.[run.topicId + "/" + run.promptId];
+  if (!definition) fail("Register task-specific scoring checks before rating");
+  if (definition && score.criteriaHash !== criteriaHash(definition))
+    fail("Scoring checks changed; reassess");
+  if (score.rubricHash !== rubricFingerprint(rubric))
+    fail("Scoring rubric changed; reassess");
+  if (score.inputHash !== run.rawHash)
+    fail("Original input changed; reassess score");
+  if (typeof score.evidence !== "string" || score.evidence.trim().length < 24)
+    fail("Explain visible evidence and the principal limitation");
+  try {
+    if (
+      !/^catalog\/screenshot-captures\/[^/]+\/[^/]+\.json$/.test(
+        score.captureManifest || "",
+      )
+    )
+      throw Error("Missing capture manifest");
+    const capture = JSON.parse(
+      fs.readFileSync(resolveLocal(score.captureManifest), "utf8"),
+    );
+    errors.push(...captureErrors(capture, run).map((e) => e + ": " + run.id));
+    errors.push(
+      ...v3ReviewErrors(score, rubric, capture).map((e) => e + ": " + run.id),
+    );
+    if (score.captureInventoryHash !== captureInventoryHash(run.id))
+      fail("Capture inventory changed; reassess all supplemental evidence");
+    if (
+      run.screenshot &&
+      !capture.frames.some(
+        (frame) =>
+          frame.file === run.directory + "/" + run.screenshot &&
+          frame.sha256 === score.screenshotHash,
+      )
+    )
+      fail("Selected screenshot must be a reviewed capture frame");
+    for (const frame of capture.frames) {
+      const file = resolveLocal(frame.file);
+      if (fileHash(file) !== frame.sha256)
+        fail("Evidence PNG changed; reassess all frames");
+      const bytes = fs.readFileSync(file);
+      if (
+        bytes.toString("hex", 0, 8) !== "89504e470d0a1a0a" ||
+        bytes.readUInt32BE(16) !== frame.width ||
+        bytes.readUInt32BE(20) !== frame.height
+      )
+        fail("Evidence PNG dimensions differ from capture");
+    }
+  } catch (error) {
+    fail("Invalid capture evidence: " + error.message);
   }
   return errors;
 }

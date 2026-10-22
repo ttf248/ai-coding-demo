@@ -54,4 +54,5 @@
 - 暴雨与尘土使用 Points 粒子 + 自定义 Shader；昼夜用插值平滑过渡。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/voxel-construction-site/runs/minimax-m3-max-r01；按原实验轮次导入。
 - 2026-10-09：修正 Three.js r160 CDN 地址版本号（r160 → 0.160.0），恢复 HTTP 预览入口加载。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

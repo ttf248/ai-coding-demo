@@ -86,4 +86,5 @@
 - 第 9 轮：窄屏整体缩放（≤720px 用 0.78、≤520px 用 0.62），6 台 375pt 手机在 390px 视口不再横向溢出；同时给 Tailwind 配置脚本加了 window.tailwind 兜底，CDN 不可达时不再抛 ReferenceError。
 - 第 10 轮：屏幕状态摘要与 aria-live 播报——新增「屏幕状态」面板逐屏列出当前状态（静态稿 / 已选择「开心」8.6 分 / 已识别 疲惫 0.82 / 切到「趋势」），并新增 ←/→、Home/End 键盘导航与 #pN 定位。
 - 同轮更新归档：测试分支后续更新的完整产物、执行记录和文档已并入本条实验记录，不另建新轮次。来源：F:/dev/ai-coding-demo-test（model-test-base）/demos/life-diary/runs/minimax-m3-1-flash-preview-max-r01。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

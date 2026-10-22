@@ -61,4 +61,5 @@ npm run build:demo -- bluebook--gpt-6-1-sol-max-r01
 
 - 2026-09-30：从空白基线首次实现；按主题最新提示词执行，未获取历史实现。
 - 2026-09-30：显式补齐 react-lazyload 的 prop-types 运行依赖；修复分页 effect 清理提前取消计时器、卡片图片留白。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

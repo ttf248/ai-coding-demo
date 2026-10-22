@@ -91,4 +91,5 @@
 - 第 9 轮：键盘可达性与播报——按键处理加了焦点保护（在输入框里打字不再被 WASD 抢走）、Esc 释放拖拽并清空按键、H 显隐控制面板、T 切夜景、G 换城；画布可聚焦并声明 role/aria-label；所有会改变画面的操作写入 aria-live；补齐 focus-visible 焦点环。
 - 第 10 轮：容器自适应与嵌入——除 window.resize 外挂 ResizeObserver 监听画布宿主（本站会把它以 iframe 嵌入对比页，容器尺寸变化与窗口 resize 不是一回事）；resize 加了幂等判断，尺寸没变就不重建 framebuffer；像素比上限从 2 降到 1.5，嵌入窄栏时不至于把渲染开销放大到卡顿。420px 宽度下画布 420×820、无水平溢出。
 - 同轮更新归档：测试分支后续更新的完整产物、执行记录和文档已并入本条实验记录，不另建新轮次。来源：F:/dev/ai-coding-demo-test（model-test-base）/demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r01。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

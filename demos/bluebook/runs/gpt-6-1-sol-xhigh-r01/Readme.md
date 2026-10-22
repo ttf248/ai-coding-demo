@@ -63,4 +63,5 @@
 - 本轮由模型直接生成，无人工代码修改；校验后的修复另行记录。
 - 将 mock 图片实现为本地 SVG 插画；发布图片、收藏与点赞使用本地状态。public/images 由 Vite 自动复制到预览。
 - 首次交付校验修复：浏览器首轮报告 react-lazyload 的 prop-types 无法解析；390px 顶部搜索栏最小宽度导致 10px 溢出。 显式安装 prop-types，更新独立 lockfile，并允许搜索容器收缩。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

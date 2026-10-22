@@ -48,4 +48,5 @@
 - 默认演示图为 Canvas 绘制的日落剪影，避免上传依赖。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/pixel-flow/runs/minimax-m3-max-r01；按原实验轮次导入。
 - 2026-10-12: 通过本地 HTTP 预览补拍桌面截图 preview-2026-10-12.png；使用内置“使用演示图”，将采样密度设为 10、吸引强度设为 0.2 后截取粒子云状态；摄像头不可用，因此页面显示手动控制提示。截图对应真实运行状态，实验源码和原始输入未修改。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

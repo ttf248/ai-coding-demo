@@ -25,4 +25,5 @@
 
 - 显式追加已归档主题实验；主题归档状态保持不变。
 - 来源：F:/dev/ai-coding-demo-test 的 model-test-base 分支工作树，HEAD 452ac58；这些测试记录迁移时处于未提交状态。源标识为 stock-watching/runs/claude-haiku-45-mid-r01，依据用户确认将主分支档位和 run ID 规范为 default；输入快照与模型产物按源文件保留。 此主题在主分支已归档，本次作为用户指定的一次性迁移例外；源记录状态 draft 和无预览状态保持不变。
+- 维护者于 2026-10-22 按 v3 核对原始输入及无预览采集记录，保留 unavailable；未生成截图或数值评分。旧 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json，未重跑模型、启动历史后端或改写实验源码。
 <!-- archive:end -->

@@ -87,4 +87,5 @@
 - 第 9 轮：屏幕状态摘要——新增「屏幕状态」面板，逐屏列出当前状态（静态稿 / 切到某标签 / 正在播放 4:10 / 专注中剩余 x 分），由脚本实时写入，便于对照检查哪些状态真的做到了。
 - 第 10 轮：动效与系统偏好联动——prefers-reduced-motion 不仅关掉 CSS 动画，还给 body 加 no-motion 类统一控制呼吸与浮动动画，并在偏好变化时实时同步。
 - 同轮更新归档：测试分支后续更新的完整产物、执行记录和文档已并入本条实验记录，不另建新轮次。来源：F:/dev/ai-coding-demo-test（model-test-base）/demos/meditation/runs/minimax-m3-1-flash-preview-max-r01。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

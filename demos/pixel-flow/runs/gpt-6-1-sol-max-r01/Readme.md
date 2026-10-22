@@ -51,4 +51,5 @@ npm run preview
 
 - 2026-09-30：从空白基线首次实现；按主题最新提示词执行，未获取历史实现。
 - 2026-09-30：修复坐标分量误计为粒子数、shader 重复 color attribute、摄像头画面与骨架比例、实际帧率统计；核实并固定可用 MediaPipe 0.10.21，采用支持 importScripts 的经典 Worker。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

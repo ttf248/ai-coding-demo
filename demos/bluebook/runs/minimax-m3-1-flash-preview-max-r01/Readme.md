@@ -73,4 +73,5 @@ src/index.css                  Tailwind 入口与瀑布流列数、下拉动画
 - 构建修复：补充 @types/react-lazyload 3.2.3 以通过 tsc 类型检查；该类型不提供 width 属性，LazyLoad 占位只传 height。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/bluebook/runs/minimax-m3-1-flash-preview-max-r01；保留该测试轮号。
 - 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；滚动首屏实验卡片触发懒加载后回到顶部拍摄；实验源码和原始输入未修改。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

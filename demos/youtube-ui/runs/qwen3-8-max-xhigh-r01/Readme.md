@@ -56,4 +56,5 @@ Aliyun 批次合计 91.81 CNY，覆盖 11 个案例，耗时 2h 50m 7s；费用�
 ### 部署适配记录
 
 - 多页面实验：五个功能页（home/watch/explore/profile/studio.html）全部显式登记为 preview.pages，默认入口 home.html。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

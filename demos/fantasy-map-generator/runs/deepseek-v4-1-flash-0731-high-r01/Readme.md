@@ -54,4 +54,5 @@
 - 迁移来源：F:\dev\ai-coding-demo-test（model-test-base 工作区）/demos/fantasy-map-generator/runs/deepseek-v4-1-flash-high-r01；保留原测试轮次 r01 与完整输入快照。
 - 迁移验收：通过本地 HTTP 实际入口补拍 desktop screenshot.png；390px 页面无横向溢出。静态入口也通过 file:// 直接打开检查。
 - 模型与实验目录标识按用户确认更新为 DeepSeek-V4.1-Flash-0731；历史输入、评分、产物与迁移来源保留。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

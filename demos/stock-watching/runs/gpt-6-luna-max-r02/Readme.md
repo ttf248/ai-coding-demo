@@ -42,4 +42,5 @@ npm run dev
 - 从独立模型测试分支导入本轮实现，作为新的实验记录，保留本轮原始输入和产物。
 - 数据库种子行情用于交互演示；未连接真实行情供应商或外部服务。
 - 归档来源：model-test-base 分支 demos/stock-watching/runs/gpt-6-luna-max-r01；此前归档已有旧 r01，因此本轮保存为 gpt-6-luna-max-r02。
+- 维护者于 2026-10-22 按 v3 核对原始输入及无预览采集记录，保留 unavailable；未生成截图或数值评分。旧 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json，未重跑模型、启动历史后端或改写实验源码。
 <!-- archive:end -->

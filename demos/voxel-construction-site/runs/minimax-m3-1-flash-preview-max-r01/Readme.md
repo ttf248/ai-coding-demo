@@ -89,4 +89,5 @@
 - 性能：静态体素几何按材质合并为 InstancedMesh（工地场景 571 个实例、桥梁场景 825 个实例），动态机械使用共享 BoxGeometry 与共享材质；扬尘与雨各用一个 Points + 自定义 GLSL 材质。
 - 交互修正：桌沿旋钮最初用 DOM click 事件绑定在 THREE.Object3D 上不会触发，改为在 canvas 的 pointerdown 中做射线拾取、pointerup 时执行拨动，并同步右侧面板状态。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/voxel-construction-site/runs/minimax-m3-1-flash-preview-max-r01；保留该测试轮号。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

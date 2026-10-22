@@ -38,4 +38,5 @@
 - 本轮从空白基线首次实现；没有人工修改。
 - 任务未给 APP 需求；依据 topic.json 采用 YouTube 视频应用，涵盖首页、播放、发现、个人与创作。用户本轮要求全部完成，因此连续制作全部功能。Artifacts 插件不可用，使用本地浏览器预览。
 - 首次定稿前检查：草稿保存读取文本标题，避免误读取文件选择框。 首次文件保存在 docs/model-tests/2026-10-08-gpt-6-astra-xhigh/first-output/youtube-ui.zip；无新增用户提示或人工修改。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

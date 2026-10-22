@@ -33,4 +33,5 @@ Aliyun 批次共 11 个案例，合计 3.6 CNY，耗时 1h 18m 26s；费用和�
 - 产物入口按本站约定统一为 index.html（原任务要求命名 canghe_app_prototype.html），内容未改动此要求外的其他方面。
 - Unsplash 图片增加 onerror 降级渐变占位，离线打开版式不塌陷（但 Tailwind/图标 CDN 仍要求联网）。
 - 迁移时根据用户确认将误记的 default 档位纠正为 high，并同步更正实验 ID 与路径。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

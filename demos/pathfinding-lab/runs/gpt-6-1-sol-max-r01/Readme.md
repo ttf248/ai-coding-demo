@@ -64,4 +64,5 @@ BFS 使用先进先出队列；Dijkstra / A* 使用带过期项过滤的二叉�
 
 - 本轮首次实现；首版源码保存于 iterations/01/index.html。
 - 浏览器检查后补充显式网格底色，增强空白格边界的可见性。首版源码保留在 iterations/01/index.html。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

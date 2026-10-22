@@ -117,4 +117,5 @@ Lucide 的 SVG 内部写的是 `stroke="currentColor"`，直接用 `<img>` 引�
 - 图标着色：Lucide Static CDN 提供的 SVG 固定为 currentColor 描边，直接用 <img> 引入无法跟随主题色。改用 CSS mask（--u 变量 + background-color: currentColor）着色，图标因此能跟随所在容器的文字颜色。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/youtube-ui/runs/minimax-m3-1-flash-preview-max-r01；保留该测试轮号。
 - 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

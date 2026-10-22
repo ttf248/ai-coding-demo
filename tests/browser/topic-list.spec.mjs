@@ -164,16 +164,16 @@ test("screenshot ranking restores from URL and expands real evidence", async ({
   await expect(page.locator("#topic-sort")).toHaveValue("score");
   expect(new URL(page.url()).searchParams.has("sort")).toBe(false);
   const first = page.locator(".topic-run-row").first();
-  await expect(first.locator(".score-details summary")).toContainText(
+  await expect(first.locator(".score-details > summary")).toContainText(
     `${expected.score.total}/100`,
   );
   await page.goto("topic.html?id=circuit-lab&sort=score");
-  await expect(first.locator(".score-details summary")).toContainText(
+  await expect(first.locator(".score-details > summary")).toContainText(
     `${expected.score.total}/100`,
   );
-  await first.locator(".score-details summary").click();
+  await first.locator(".score-details > summary").click();
   await expect(first.locator("meter")).toHaveCount(5);
-  await expect(first.locator(".score-evidence")).toContainText("规则 v2");
+  await expect(first.locator(".score-evidence")).toContainText("规则 v3");
   await page.reload();
   await expect(page.locator("#topic-sort")).toHaveValue("score");
 });

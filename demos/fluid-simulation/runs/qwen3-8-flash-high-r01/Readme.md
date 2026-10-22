@@ -32,4 +32,5 @@ Aliyun 批次共 11 个案例，合计 3.6 CNY，耗时 1h 18m 26s；费用和�
 - 实现期清理：显示着色器去掉冗余混合行；half-float 线性过滤按 WebGL2 核心能力处理。
 - 窗口尺寸变化时重建 GPU 资源并显式 deleteTexture/deleteFramebuffer，重建后坐标按归一化 UV 保持正确。
 - 迁移时根据用户确认将误记的 default 档位纠正为 high，并同步更正实验 ID 与路径。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

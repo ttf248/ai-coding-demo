@@ -46,4 +46,5 @@ Tailwind Play CDN 处理样式，Unsplash 提供摄影，Lucide Static 提供图
 - 2026-09-30：从空白基线首次实现；按主题最新提示词执行，未获取历史实现。
 - 同时保留任务指定的 canghe_app_prototype.html 和归档规范入口 index.html；AI 对话为显式说明的本地引导示例。
 - 2026-09-30：保留任务指定文件名与 index.html；去重初次生成的入口元数据，图表完全使用 Tailwind 类。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

@@ -23,4 +23,5 @@
 - 对话、记录保存和回顾数据是前端示例，不连接后端或 AI 服务。
 - 归档来源：model-test-base 分支 demos/life-diary/runs/gpt-6-luna-max-r01；此前归档已有旧 r01，因此本轮保存为 gpt-6-luna-max-r02。
 - 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

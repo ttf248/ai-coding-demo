@@ -91,4 +91,5 @@
 - 第 9 轮：编辑效率——按住 Shift 可拖出矩形批量刷墙 / 刷高代价格，不用逐格点击；光标所在格子的坐标、地形、可通行性实时显示在检视条里。
 - 第 10 轮：共享求解内核去重——动画逐步搜索、整图对比、可达性诊断三处原本各写了一份邻接、路径还原与代价统计。统一成 neighbours() / reconstruct() / pathMetrics() / countVisited() 四个函数，并删掉遗留的 DIRS 常量，杜绝三处规则不一致。
 - 同轮更新归档：测试分支后续更新的完整产物、执行记录和文档已并入本条实验记录，不另建新轮次。来源：F:/dev/ai-coding-demo-test（model-test-base）/demos/pathfinding-lab/runs/minimax-m3-1-flash-preview-max-r01。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

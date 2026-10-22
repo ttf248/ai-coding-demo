@@ -48,4 +48,5 @@ HTTP 和 file:// 均在 Chromium 中检查；390px 触摸模式无页面水平�
 
 - 本轮从 v1 任务正文首次实现；first-pass/index.html 保留浏览器验证前的首次完整产物。
 - 无人工代码修改，无追加用户修复指令；代理自检与修复记录见 Readme.md。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

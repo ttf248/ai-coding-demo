@@ -111,7 +111,17 @@ test("homepage covers pick the variant that matches the displayed size", async (
   await page.goto("./?group=runs&view=list");
   const ledger = page.locator("#project-grid .run-card-screenshot img").first();
   await expect(ledger).toHaveAttribute("sizes", /88px/);
-  expect(await ledger.evaluate((img) => img.currentSrc)).toMatch(/-240\.webp$/);
+  // 新封面可能是竖图裁切，最小规格为 480w；横图仍从 240w 开始。
+  const portrait = (await ledger.getAttribute("srcset")).includes("-cover-");
+  await expect(ledger).toHaveAttribute(
+    "srcset",
+    portrait
+      ? /-cover-v1-480\.webp 480w.*-cover-v1-960\.webp 960w/
+      : /240w.*480w.*960w/,
+  );
+  expect(await ledger.evaluate((img) => img.currentSrc)).toMatch(
+    portrait ? /-cover-v1-480\.webp$/ : /-240\.webp$/,
+  );
 
   // 主题列表与实验账本是两套槽位：主题列表在桌面上铺到 224px，
   // 声明成账位的 88px 会让浏览器按更窄的宽度选图。

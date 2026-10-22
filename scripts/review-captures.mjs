@@ -5,9 +5,21 @@ import crypto from "node:crypto";
 import sharp from "sharp";
 import { loadCatalog, ROOT } from "./lib.mjs";
 
-const args = process.argv.slice(2),
-  option = (name, fallback) =>
-    args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
+const args = process.argv.slice(2);
+const options = new Set([
+  "--batch",
+  "--topic",
+  "--fallback-batch",
+  "--retry-batch",
+  "--output",
+]);
+for (let i = 0; i < args.length; i += 2)
+  if (!options.has(args[i]) || !args[i + 1] || args[i + 1].startsWith("--"))
+    throw Error(
+      "Expected option/value pairs; use node scripts/review-captures.mjs --topic <topic-id> --output <empty-directory>",
+    );
+const option = (name, fallback) =>
+  args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
 const batch = option("--batch", "2026-10-21"),
   topicId = option("--topic", "");
 const fallbackBatch = option("--fallback-batch", "");
@@ -16,6 +28,8 @@ const output = option(
   "--output",
   fs.mkdtempSync(path.join(os.tmpdir(), "ai-score-v3-")),
 );
+if (fs.existsSync(output) && fs.readdirSync(output).length)
+  throw Error("Review output must be empty; preserve earlier review evidence");
 fs.mkdirSync(output, { recursive: true });
 const catalog = loadCatalog();
 const anon = (run) =>
@@ -30,9 +44,20 @@ const runs = [...catalog.runs].sort(
 const manifest = [];
 for (const [index, run] of runs.entries()) {
   if (topicId && run.topicId !== topicId) continue;
-  const recordFile = [retryBatch, batch, fallbackBatch].filter(Boolean)
-    .map((candidate) => path.join(ROOT, "catalog/screenshot-captures", candidate, run.id + ".json"))
-    .find((candidate) => fs.existsSync(candidate));
+  const recordFile =
+    !args.includes("--batch") && run.score?.captureManifest
+      ? path.join(ROOT, run.score.captureManifest)
+      : [retryBatch, batch, fallbackBatch]
+          .filter(Boolean)
+          .map((candidate) =>
+            path.join(
+              ROOT,
+              "catalog/screenshot-captures",
+              candidate,
+              run.id + ".json",
+            ),
+          )
+          .find((candidate) => fs.existsSync(candidate));
   if (!recordFile) continue;
   if (!fs.existsSync(recordFile)) continue;
   const capture = JSON.parse(fs.readFileSync(recordFile, "utf8"));

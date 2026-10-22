@@ -29,4 +29,5 @@
 - 目录规范适配：将原始入口 canghe_app_prototype.html 标准化为 index.html，页面内容未改写。
 - 迁移验收：通过本地 HTTP 入口（Edge 桌面视口）补拍实际运行截图；10 个静态入口另通过 file:// 检查。
 - 目录规范适配：将原始入口 canghe_app_prototype.html 标准化为 index.html，页面内容未改写。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

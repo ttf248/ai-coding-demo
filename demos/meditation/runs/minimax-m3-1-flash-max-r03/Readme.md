@@ -46,4 +46,5 @@
 - 迁移来源：F:\dev\ai-coding-demo-test（model-test-base 分支，提交 9e5302c3）中的 demos/meditation/runs/minimax-m3-1-flash-max-r01。本轮 OpenCode 实验在 main 另存为 r03，保留既有 r01/r02；源原始输入、源码、运行说明与复盘保留。
 - 维护者于 2026-10-21 为网页入口添加带 defer 的公共 assets/analytics.js 引用；原始输入未修改。
 - 维护者于 2026-10-21 在本地 HTTP 中补拍真实桌面截图（1440px 宽；日记与冥想为整页长图），按案例评分规则 v2 和对应任务检查项逐图复核；统计远程请求使用拦截，不发送正式测试访问。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

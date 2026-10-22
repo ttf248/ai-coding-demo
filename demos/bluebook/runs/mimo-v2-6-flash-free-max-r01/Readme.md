@@ -46,4 +46,5 @@
 - react-lazyload 运行时依赖 prop-types，补充为显式依赖以消除 Vite 构建外部化警告（构建修复登记）。
 - 迁移来源：F:\dev\ai-coding-demo-test（experiment/mimo-v26-flash-free）/demos/bluebook/runs/mimo-v2-6-flash-free-max-r01；保留源测试轮号 r01，原始输入指纹与 main 的 vv2 提示词一致。
 - 迁移验收：通过本地 HTTP 实际入口补拍 desktop screenshot.png；390px 页面无横向溢出。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

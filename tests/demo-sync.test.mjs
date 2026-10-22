@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { ROOT } from "../scripts/lib.mjs";
 import { hash } from "../scripts/lib.mjs";
@@ -22,6 +23,7 @@ function fixture() {
     "site-output.mjs",
     "model-ordering.mjs",
     "scoring.mjs",
+    "scoring-v3.mjs",
     "new-demo.mjs",
     "demo-sync.mjs",
   ])
@@ -34,7 +36,7 @@ function fixture() {
   write("catalog/batches.json", "[]");
   write(
     "catalog/scoring-rubric.json",
-    JSON.stringify({ version: 2, dimensionMaximums: {}, tasks: {} }),
+    JSON.stringify({ version: 3, dimensionMaximums: {}, tasks: {} }),
   );
   return { temporary, write };
 }
@@ -180,7 +182,11 @@ function preparedDraft() {
   );
   record.description = "真实描述";
   record.input.notes = "完整留存";
-  record.screenshot = "screenshot.png";
+  record.screenshot = "captures/test/desktop.png";
+  f.write(
+    `${directory}/captures/test/desktop.png`,
+    fs.readFileSync(path.join(f.temporary, directory, "screenshot.png")),
+  );
   record.preview = {
     kind: "external",
     embed: true,
@@ -190,18 +196,64 @@ function preparedDraft() {
     network: "required",
   };
   record.score = {
-    rubricVersion: 2,
+    ...record.score,
+    rubricVersion: 3,
     status: "insufficient",
+    captureState: "undemonstrated",
+    assessedAt: "2026-10-22",
+    confidence: "low",
+    observations: Object.fromEntries(
+      [
+        "taskCoverage",
+        "composition",
+        "readability",
+        "interactionClarity",
+        "craft",
+      ].map((k) => [k, "测试夹具未提供真实任务主体，不能判断这一维度。"]),
+    ),
+    limitations: ["仅用于验证同步指纹，不代表真实实验产物。"],
+    captureManifest:
+      "catalog/screenshot-captures/test/sample--unknown-unknown-r01.json",
+    reviewedFrames: ["desktop-initial", "mobile-initial"],
     evidence:
       "这是测试夹具的证据说明，截图未展示任务主体，因此不能给出数值评分。",
   };
   f.write(
     "catalog/scoring-rubric.json",
     JSON.stringify({
-      version: 2,
+      version: 3,
       tasks: { "sample/v1": { promptHash: hash("真实正文"), checks: [] } },
     }),
   );
+  const png = fs.readFileSync(
+    path.join(f.temporary, directory, record.screenshot),
+  );
+  const capture = {
+    runId: record.id,
+    topicId: "sample",
+    promptId: "v1",
+    inputHash: hash("真实输入"),
+    status: "captured",
+    capturedAt: "2026-10-22T00:00:00Z",
+    environment: {
+      browser: "fixture",
+      deviceScaleFactor: 1,
+      analytics: "blocked",
+    },
+    frames: ["desktop-initial", "mobile-initial"].map((id) => ({
+      id,
+      file: directory + "/" + record.screenshot,
+      sha256: crypto.createHash("sha256").update(png).digest("hex"),
+      width: 1,
+      height: 1,
+      viewport: { width: 1, height: 1 },
+      observation: {},
+    })),
+    actions: [],
+    errors: [],
+    failedRequests: [],
+  };
+  f.write(record.score.captureManifest, JSON.stringify(capture));
   const save = () => fs.writeFileSync(file, JSON.stringify(record));
   save();
   return { ...f, file, record, save };
@@ -254,6 +306,32 @@ test("demo sync blocks stale evidence for both rated and insufficient reviews", 
       assert.equal(result.status, "draft");
       assert.equal(result.score.inputHash, "outdated");
     }
+  } finally {
+    cleanup(f.temporary);
+  }
+});
+
+test("demo sync rejects a new supplemental capture without refreshing existing review fingerprints", () => {
+  const f = preparedDraft();
+  try {
+    const id = "sample--unknown-unknown-r01";
+    run(f.temporary, [id]);
+    const before = JSON.parse(fs.readFileSync(f.file));
+    f.write(
+      "catalog/screenshot-captures/supplement/" + id + ".json",
+      fs.readFileSync(path.join(f.temporary, before.score.captureManifest)),
+    );
+    assert.throws(
+      () => run(f.temporary, [id, "--finalize"]),
+      /不一致|Capture inventory changed/,
+    );
+    const after = JSON.parse(fs.readFileSync(f.file));
+    assert.equal(after.status, "draft");
+    assert.equal(
+      after.score.captureInventoryHash,
+      before.score.captureInventoryHash,
+    );
+    assert.equal(after.score.evidenceSetHash, before.score.evidenceSetHash);
   } finally {
     cleanup(f.temporary);
   }

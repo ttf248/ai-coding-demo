@@ -119,4 +119,5 @@ npm run dev
 - 全栈项目保留源码与运行说明；按仓库维护规则不制造静态预览，由维护者部署到 Vercel。
 - 前端行情区域使用 mock 数据，预留真实行情接口接入点。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/stock-watching/runs/minimax-m3-max-r01；按原实验轮次导入。
+- 维护者于 2026-10-22 按 v3 核对原始输入及无预览采集记录，保留 unavailable；未生成截图或数值评分。旧 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json，未重跑模型、启动历史后端或改写实验源码。
 <!-- archive:end -->

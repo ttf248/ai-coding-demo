@@ -63,7 +63,9 @@ test("new demo scaffolding reuses prompts, allocates repeat runs and refuses unk
     assert.equal(second.preview.kind, "none");
     assert.equal(second.status, "draft");
     assert.equal(second.score.status, "pending");
-    assert.equal(second.score.rubricVersion, 2);
+    assert.equal(second.score.rubricVersion, 3);
+    assert.equal(second.score.captureManifest, null);
+    assert.equal(second.score.visualChecks, null);
     assert.throws(() => command(["--model", "not-registered"]));
     assert.equal(fs.readdirSync(path.join(base, "runs")).length, 2);
   } finally {

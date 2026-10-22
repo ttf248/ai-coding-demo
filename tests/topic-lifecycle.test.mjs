@@ -36,6 +36,10 @@ function fixture() {
   write("catalog/categories.json", "[]");
   write("catalog/guides.json", "[]");
   write(
+    "catalog/scoring-rubric.json",
+    JSON.stringify({ version: 3, visualChecks: {}, tasks: {} }),
+  );
+  write(
     "Readme.md",
     "Human timeline\n<!-- catalog:start -->\n<!-- catalog:end -->\n",
   );

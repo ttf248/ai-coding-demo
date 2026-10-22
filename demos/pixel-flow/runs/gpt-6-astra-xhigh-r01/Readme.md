@@ -39,4 +39,5 @@ Three.js r160；MediaPipe Tasks Vision 0.10.21 HandLandmarker，HTTP 下模型�
 - 首次定稿前检查：握拳/没有活动力场时停止尚未完成的目标吸引，已完成粒子保持归位。 首次文件保存在 docs/model-tests/2026-10-08-gpt-6-astra-xhigh/first-output/pixel-flow.zip；无新增用户提示或人工修改。
 - 首次定稿前联网验收发现 MediaPipe 0.10.22 稳定版 CDN URL 返回 404；改为已验证可用的 0.10.21，并追加虚拟摄像头加载/释放测试。
 - 最终网络复测：Google 模型 URL 在浏览器多次 ERR_CONNECTION_RESET。将官方未修改的 7,819,105 字节模型随静态应用归档，HTTP 下使用相对路径；file:// 保留官方远程模型备用。记录来源、SHA-256、官方 ETag 对应 MD5 和 Apache-2.0 许可证；产物类型更新为无需构建的静态 app。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

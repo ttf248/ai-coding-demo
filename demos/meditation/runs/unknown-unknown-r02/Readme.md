@@ -16,4 +16,5 @@
 
 - 续作来源：此主题的 Opus r01 输入保存了冥想 App 完整任务正文；Codex 续作遵循同一 v1 正文，原 Opus draft 记录保持独立。
 - 完成核验：HTTP 与 file:// 均可打开；浏览器无脚本错误，桌面及 390px 手机宽度无横向溢出；登记真实桌面截图。Tailwind CSS 与 Unsplash 图片通过 CDN 加载，需要网络。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

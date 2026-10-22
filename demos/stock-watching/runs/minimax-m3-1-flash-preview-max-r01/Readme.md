@@ -150,4 +150,5 @@ handler 与前端都不需要改。
 - 错误对象改为不可变：包级 ErrXxx 作为只读模板，WithField / WithCause 返回副本，避免并发请求之间互相污染 fields（初版直接改共享对象，实测出现跨请求串字段）。
 - 前端补充网关错误识别：Vite dev proxy 与反向代理在后端宕机时返回的是代理自己的 5xx（不含后端的 error.code），前端据此判定为「后端不可用」而不是普通业务错误。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/stock-watching/runs/minimax-m3-1-flash-preview-max-r01；保留该测试轮号。
+- 维护者于 2026-10-22 按 v3 核对原始输入及无预览采集记录，保留 unavailable；未生成截图或数值评分。旧 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json，未重跑模型、启动历史后端或改写实验源码。
 <!-- archive:end -->

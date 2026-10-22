@@ -12,7 +12,7 @@ import {
 
 const catalog = loadCatalog(),
   problems = [],
-  files = new Set();
+  files = new Map();
 const digest = (file) =>
   crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 const directory = path.join(ROOT, "catalog/screenshot-captures");
@@ -50,11 +50,15 @@ for (const batch of fs.readdirSync(directory)) {
       problems.push(name + ": previous capture changed");
     for (const frame of capture.frames) {
       const png = resolveLocal(frame.file);
-      if (files.has(png)) continue;
-      files.add(png);
-      if (digest(png) !== frame.sha256)
+      if (!files.has(png))
+        files.set(png, {
+          sha256: digest(png),
+          ...(await sharp(png).metadata()),
+        });
+      // Each manifest declaration must match the PNG, including repeated references.
+      const meta = files.get(png);
+      if (meta.sha256 !== frame.sha256)
         problems.push(frame.file + ": PNG fingerprint changed");
-      const meta = await sharp(png).metadata();
       if (
         meta.format !== "png" ||
         meta.width !== frame.width ||
@@ -64,7 +68,15 @@ for (const batch of fs.readdirSync(directory)) {
     }
   }
 }
-for (const run of catalog.runs) {
+const historicalIds = new Set(
+  JSON.parse(
+    fs.readFileSync(
+      path.join(ROOT, "catalog/score-reviews/2026-10-21-v3-source.json"),
+      "utf8",
+    ),
+  ).runs.map((r) => r.id),
+);
+for (const run of catalog.runs.filter((r) => historicalIds.has(r.id))) {
   const base = path.join(directory, "2026-10-21", run.id + ".json");
   if (!fs.existsSync(base)) {
     problems.push("Missing base capture: " + run.id);
@@ -124,5 +136,5 @@ if (problems.length) {
   process.exitCode = 1;
 } else
   console.log(
-    `${records} capture records, ${files.size} PNGs, ${attempts} retained failed attempts, ${supplements} incomplete supplemental attempts; ${reviewed.size}/${catalog.runs.length} manual draft reviews. Draft coverage is not a completed rescore.`,
+    `${records} capture records, ${files.size} PNGs, ${attempts} retained failed attempts, ${supplements} incomplete supplemental attempts; ${reviewed.size}/${historicalIds.size} archived manual reviews. Production rubric v${JSON.parse(fs.readFileSync(path.join(ROOT, "catalog/scoring-rubric.json"), "utf8")).version}.`,
   );

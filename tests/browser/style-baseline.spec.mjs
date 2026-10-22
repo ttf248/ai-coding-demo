@@ -283,6 +283,17 @@ BASELINE["topic@390"][".topic-run-model"] = { "font-size": "15px" };
 BASELINE["topic@390"][".topic-run-score .score-details > summary"] = {
   "min-height": "44px",
 };
+// v3 的逐项评分与证据入口保持阅读字号，手机点击区至少 44px。
+for (const width of [1440, 390]) {
+  BASELINE[`topic@${width}`][".score-check-list"] = {
+    display: "grid",
+    gap: "6px",
+  };
+  BASELINE[`topic@${width}`][".score-review-group h4"] = {
+    "font-size": "13px",
+  };
+  BASELINE[`topic@${width}`][".score-frame-link"] = { "min-height": "44px" };
+}
 BASELINE["home@390"][".topic-metrics"] = { "min-height": "44px" };
 BASELINE["home@390"][".experiment-info > summary"] = { "min-height": "44px" };
 BASELINE["home@390"][".quick-filters button"] = {
@@ -334,6 +345,27 @@ for (const [width, sizes] of [
       expect(actual, `${name}@${width} computed styles changed`).toEqual(
         expected,
       );
+      if (name === "topic" && width === 1440) {
+        await page
+          .locator(".topic-run-score .score-details > summary")
+          .first()
+          .click();
+        const opened = await page
+          .locator(".topic-runs-table")
+          .first()
+          .evaluate((table) => ({
+            layout: getComputedStyle(table).tableLayout,
+            scoreColumn: getComputedStyle(
+              table.querySelector("thead th:nth-child(3)"),
+            ).width,
+            tableWidth: table.getBoundingClientRect().width,
+          }));
+        expect(opened.layout).toBe("fixed");
+        expect(parseFloat(opened.scoreColumn) / opened.tableWidth).toBeCloseTo(
+          0.42,
+          2,
+        );
+      }
     }
   });
 }

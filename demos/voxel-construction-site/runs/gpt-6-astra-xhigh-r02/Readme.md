@@ -43,4 +43,5 @@ Three.js r160 为唯一外部库。桌面木纹、图纸、标牌、所有几何
 - 任务同时要求 Three.js r160 CDN 与无外部资源；解释为仅允许 Three.js 库 CDN，几何体、材质和纹理全部代码生成。
 - 首次定稿前检查：分开两台挖掘机作业行，调整挖掘姿态；增加动态方块实例批次减少绘制调用。 首次文件保存在 docs/model-tests/2026-10-08-gpt-6-astra-xhigh/first-output/voxel-construction-site.zip；无新增用户提示或人工修改。
 - 迁入 main 时发现该主题已有 2026-09-16 的 gpt-6-astra-xhigh-r01；保留原实验，本次记录号调整为 r02，源码与原始输入未改动。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

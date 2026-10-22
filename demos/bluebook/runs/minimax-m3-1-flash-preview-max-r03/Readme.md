@@ -47,4 +47,5 @@ npm run build
 - 迁移来源：F:\dev\ai-coding-demo-test（experiment/minimax-m3-1-flash-preview-max）/demos/bluebook/runs/minimax-m3-1-flash-preview-max-r01；当前 main 已存在该轮号，保留历史并迁入为 minimax-m3-1-flash-preview-max-r03。 源 Readme.md 中的提示词版本、工具、网络状态、历史目录及截图说明与本次 run.json/源码不一致；改写运行说明，以本次 run.json、源码和测试记录为准。
 - 迁移验证：使用本仓库本地 HTTP 入口补拍实际桌面截图 screenshot.png；Chromium 确认入口可加载且无页面异常，390px 视口横向溢出为 0。
 - 迁移整理：修正环境说明中的旧 r01 预览目录，并按源码与依赖修复记录注明图片仅使用 picsum.photos、头像为本地 SVG。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

@@ -28,4 +28,5 @@
 - 迁移来源：F:/dev/ai-coding-demo-test/demos/bluebook/runs/deepseek-v4-pro-0813-high-r01；保留原始 r01、完整输入快照与测试产物。
 - 迁移验收：通过本地 HTTP 入口（Edge 桌面视口）补拍实际运行截图；10 个静态入口另通过 file:// 检查。
 - 迁移验收备注：picsum.photos 图片成功加载；i.pravatar.cc 头像请求在自动化浏览器中受跨源响应策略阻止，页面显示原有回退头像；未改写模型产物。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

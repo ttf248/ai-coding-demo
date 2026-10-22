@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import Ajv from "ajv";
 import { loadCatalog, read, readJSON } from "../scripts/lib.mjs";
-import { rubricErrors, scoreErrors } from "../scripts/scoring.mjs";
+import {
+  rubricErrors,
+  scoreErrors,
+  rubricFingerprint,
+} from "../scripts/scoring.mjs";
 const catalog = loadCatalog(),
   rubric = readJSON("catalog/scoring-rubric.json"),
   schema = readJSON("catalog/schema.json");
@@ -67,21 +71,20 @@ test("task points, dimension weights and blocking ceilings cannot drift", () => 
   const invalid = structuredClone(rated);
   invalid.score.taskChecks[Object.keys(invalid.score.taskChecks)[0]]--;
   assert.ok(
-    scoreErrors(invalid, rubric).some((error) => error.includes("four checks")),
+    scoreErrors(invalid, rubric).some((error) =>
+      error.includes("eight observed checks"),
+    ),
   );
-  const blocked = catalog.runs.find(
-    (run) => run.score.captureState === "blocked",
-  );
-  assert.ok(blocked);
-  assert.equal(blocked.score.total, 39);
-  const uncapped = structuredClone(blocked);
+  const uncapped = structuredClone(rated);
+  uncapped.score.captureState = "blocked";
+  uncapped.score.ceiling = 39;
   uncapped.score.total = Object.values(uncapped.score.dimensions).reduce(
     (a, b) => a + b,
     0,
   );
   assert.ok(
     scoreErrors(uncapped, rubric).some((error) =>
-      error.includes("state ceiling"),
+      error.includes("Total differs"),
     ),
   );
   const weights = structuredClone(rubric);
@@ -104,8 +107,49 @@ test("score details preserve evidence states and escape review text", () => {
     assert.ok(!html.includes("0/100"));
     assert.ok(html.includes("&lt;script&gt;"));
   }
-  const html = ui.scoreDetails(rated);
+  const html = ui.scoreDetails(rated, {
+    taskChecks: rubric.tasks[`${rated.topicId}/${rated.promptId}`].checks,
+    visualChecks: rubric.visualChecks,
+  });
   assert.equal((html.match(/<meter /g) || []).length, 5);
   assert.ok(html.includes(`${rated.score.total}/100`));
-  assert.ok(html.includes("规则 v2"));
+  assert.ok(html.includes("规则 v3"));
+  assert.equal((html.match(/\/5<\/strong>/g) || []).length, 20);
+  assert.ok(html.includes("证据置信度"));
+  assert.ok(html.includes("证据限制"));
+});
+
+test("visual points, global anchors and capture inventories invalidate stale reviews", () => {
+  const changed = structuredClone(rated);
+  changed.score.visualChecks.focus =
+    changed.score.visualChecks.focus === 5 ? 4 : 5;
+  assert.ok(
+    scoreErrors(changed, rubric).some((e) =>
+      e.includes("Visual dimension differs"),
+    ),
+  );
+  const altered = structuredClone(rubric);
+  altered.anchors[5] += "规则改变";
+  assert.ok(
+    scoreErrors(rated, altered).some((e) =>
+      e.includes("Scoring rubric changed"),
+    ),
+  );
+  const extended = structuredClone(rubric);
+  extended.tasks["new/v1"] = {};
+  assert.equal(rubricFingerprint(extended), rubricFingerprint(rubric));
+  changed.score = structuredClone(rated.score);
+  changed.score.captureInventoryHash = "0".repeat(64);
+  assert.ok(
+    scoreErrors(changed, rubric).some((e) =>
+      e.includes("Capture inventory changed"),
+    ),
+  );
+  changed.score = structuredClone(rated.score);
+  changed.score.reviewedFrames.pop();
+  assert.ok(
+    scoreErrors(changed, rubric).some((e) =>
+      e.includes("every recorded frame"),
+    ),
+  );
 });

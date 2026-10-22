@@ -65,4 +65,5 @@
 
 - 本轮首次实现；首版源码保存于 iterations/01/index.html。
 - 专项检查发现 Canvas 绘图状态残留会使重复生成的墨线端点不同；每次绘图重置画布状态，确认同种子及参数的 PNG 完全一致。首版源码保留在 iterations/01/index.html。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

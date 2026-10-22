@@ -69,4 +69,5 @@
 - 依赖：任务正文允许自行决定摄像机移动方式，这里未使用 examples/jsm 的 OrbitControls，而是自行实现拖拽转向 + WASD 位移 + 闲置自动回到巡航，避免额外 CDN 模块。
 - 归档来源：F:\dev\ai-coding-demo-test（model-test-base 分支）中的 demos/neo-gothic-tower-city/runs/minimax-m3-1-flash-preview-max-r01；保留该测试轮号。
 - 2026-10-12: 通过本地 HTTP 预览补拍代表性桌面截图 preview-2026-10-12.png；实验源码和原始输入未修改。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

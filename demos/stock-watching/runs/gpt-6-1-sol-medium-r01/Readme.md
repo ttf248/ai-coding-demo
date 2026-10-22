@@ -35,4 +35,5 @@ React + Go Gin/GORM + PostgreSQL，完整市场切换与合约 CRUD、约束校�
 
 - 任务提及的项目原型图未提供；按文字需求原创实现。不登记外部部署或伪静态预览。
 - React + Go Gin/GORM + PostgreSQL，完整市场切换与合约 CRUD、约束校验、CORS 和通讯日志。修复 TypeScript ES2020 数组兼容性，锁定兼容 Go 1.23 的间接依赖；请求 ID 增加原子序列以避免 Windows 时间精度造成重复；改善后端非 JSON 失败应答告警。报价始终标记 simulated。
+- 维护者于 2026-10-22 按 v3 核对原始输入及无预览采集记录，保留 unavailable；未生成截图或数值评分。旧 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json，未重跑模型、启动历史后端或改写实验源码。
 <!-- archive:end -->

@@ -39,4 +39,5 @@
 
 - 迁移来源：F:\dev\ai-coding-demo-test（model-test-base）/demos/voxel-construction-site/runs/longcat-25-preview-free-default-r01；保留原始输入、模型产物和轮号，未改写模型生成代码。
 - 迁移验收：HTTP 返回 200，file:// 入口可打开；实测桌面页面截图 screenshot.png（1440×960，2026-10-14）。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

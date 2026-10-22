@@ -282,6 +282,13 @@
           const run = dataIndex(data).runs.get(item.id);
           if (run && !run.detailsLoaded) {
             Object.assign(run, item);
+            const definition =
+              details.scoringRubric?.tasks?.[run.topicId + "/" + run.promptId];
+            if (definition)
+              run.scoreCriteria = {
+                taskChecks: definition.checks,
+                visualChecks: details.scoringRubric.visualChecks,
+              };
             if (run.billing?.type === "batch")
               run.billing = {
                 ...data.batches.find(
@@ -869,7 +876,7 @@
     );
   }
   // Scores describe the recorded screenshot, never unobserved functionality.
-  function scoreDetails(run) {
+  function scoreDetails(run, criteria = run?.scoreCriteria) {
     const s = run?.score;
     const total = scoreValue(run);
     const status = {
@@ -891,6 +898,102 @@
       ["interactionClarity", "操作表达", 10],
       ["craft", "视觉精修", 15],
     ];
+    const groups = s?.observations
+      ? dimensions
+          .map(([key, label]) => {
+            const checks =
+              key === "taskCoverage"
+                ? (criteria?.taskChecks || []).map((check) => [
+                    check.id,
+                    check.label,
+                    check.description,
+                  ])
+                : criteria?.visualChecks?.[key] || [];
+            const points =
+              key === "taskCoverage" ? s.taskChecks : s.visualChecks;
+            return (
+              '<section class="score-review-group"><h4>' +
+              label +
+              "</h4>" +
+              (s.status === "rated"
+                ? '<ul class="score-check-list">' +
+                  checks
+                    .map(
+                      ([id, name, description]) =>
+                        "<li><span" +
+                        (description
+                          ? ' title="' + escape(description) + '"'
+                          : "") +
+                        ">" +
+                        escape(name) +
+                        "</span><strong>" +
+                        escape(points?.[id] ?? "未记录") +
+                        "/5</strong></li>",
+                    )
+                    .join("") +
+                  "</ul>"
+                : "") +
+              "<p>" +
+              escape(s.observations[key]) +
+              "</p></section>"
+            );
+          })
+          .join("")
+      : "";
+    const confidence = { high: "高", medium: "中", low: "低" }[s?.confidence];
+    const manifest = /^catalog\/screenshot-captures\/[a-z0-9/-]+\.json$/.test(
+      s?.captureManifest || "",
+    )
+      ? '<a class="score-capture-link" href="' +
+        escape(s.captureManifest) +
+        '" target="_blank" rel="noopener">查看采集环境与操作记录</a>'
+      : "";
+    const frames = run?.scoreEvidence?.frames || [];
+    const frameNames = {
+      "desktop-initial": "桌面首屏",
+      "desktop-result": "桌面结果态",
+      "desktop-full": "桌面长图",
+      "mobile-initial": "手机首屏",
+      "desktop-scrolled-full": "滚动加载后的桌面长图",
+      "desktop-scrolled-top": "滚动后返回顶部",
+      "desktop-settled": "延长等待后的桌面",
+      "mobile-settled": "延长等待后的手机",
+      "desktop-second-scene": "第二场景",
+      "desktop-completed": "完成后的结果",
+      "desktop-delayed-upload": "等待后上传图片",
+      "desktop-restored-confirmed": "还原操作后",
+      "desktop-restored-sample": "样例还原后",
+    };
+    const gallery = frames.length
+      ? '<details class="score-captures"><summary>查看已复核的 ' +
+        frames.length +
+        " 张截图</summary><ul>" +
+        frames
+          .filter(
+            (frame) =>
+              /^demos\/[a-z0-9/.-]+\.png$/.test(frame.file) &&
+              !frame.file.includes(".."),
+          )
+          .map(
+            (frame) =>
+              '<li><a class="score-frame-link" href="' +
+              escape(frame.file) +
+              '" target="_blank" rel="noopener">' +
+              escape(
+                frameNames[frame.id] ||
+                  frame.id
+                    .replaceAll("desktop-horizontal-", "桌面横向页面 ")
+                    .replaceAll("page-", "登记页面 "),
+              ) +
+              " · " +
+              frame.width +
+              " × " +
+              frame.height +
+              "</a></li>",
+          )
+          .join("") +
+        "</ul></details>"
+      : "";
     return (
       '<details class="score-details"><summary>截图评分 · ' +
       (total === null ? status[s?.status] || "待评分" : total + "/100") +
@@ -898,6 +1001,10 @@
       escape(s?.rubricVersion || "未记录") +
       " · " +
       escape(capture[s?.captureState] || "取景未记录") +
+      (confidence ? " · 证据置信度：" + confidence : "") +
+      (s?.reviewedFrames?.length
+        ? " · 已复核 " + s.reviewedFrames.length + " 张"
+        : "") +
       "</p>" +
       (total !== null && s?.dimensions
         ? '<div class="score-dimensions">' +
@@ -921,9 +1028,19 @@
             .join("") +
           "</div>"
         : "") +
-      "<p>" +
-      escape(s?.evidence || "暂无足够的截图评分依据。") +
-      "</p>" +
+      (s?.status !== "rated" || !groups
+        ? "<p>" + escape(s?.evidence || "暂无足够的截图评分依据。") + "</p>"
+        : "") +
+      groups +
+      (s?.limitations?.length
+        ? '<div class="score-limitations"><strong>证据限制</strong><ul>' +
+          s.limitations
+            .map((note) => "<li>" + escape(note) + "</li>")
+            .join("") +
+          "</ul></div>"
+        : "") +
+      manifest +
+      gallery +
       (s?.ceiling < 100 && total !== null
         ? "<p>环境阻塞上限：" + s.ceiling + " 分；维度独立评分。</p>"
         : "") +

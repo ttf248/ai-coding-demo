@@ -37,4 +37,5 @@ Three.js r160 CDN；尺度为米，幻想城市以建筑比例构造，并非特
 
 - 本轮从空白基线首次实现；没有人工修改。
 - 首次定稿前检查：状态文本使用独立时间间隔更新，避免低帧率时长期保留初始化字样。 首次文件保存在 docs/model-tests/2026-10-08-gpt-6-astra-xhigh/first-output/neo-gothic-tower-city.zip；无新增用户提示或人工修改。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

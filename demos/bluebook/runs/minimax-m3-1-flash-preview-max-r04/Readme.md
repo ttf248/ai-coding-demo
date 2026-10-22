@@ -92,4 +92,5 @@
 - 第 9 轮：失败态可恢复——数据加载失败原来被静默吞掉，界面永远停在「加载中…」。现在 store 增加 error 状态与 retry，加载异常时记录原因并进入 error 态，底部显示失败原因与重试按钮。图片失败占位沿用既有的占位图实现，本次确认无需改动。
 - 第 10 轮：滚动加载的观察根与去抖——IntersectionObserver 原来没写 root，默认以视口为根，而真正的滚动容器是 main[data-scroll-root]——rootMargin 作用在视口而不是列表底部，提前量算不准。现在显式指定 root 为滚动容器，并加 180ms 去抖，避免列宽变化或图片加载后重排导致的连续触发。
 - 同轮更新归档：测试分支后续更新的完整产物、执行记录和文档已并入本条实验记录，不另建新轮次。来源：F:/dev/ai-coding-demo-test（model-test-base）/demos/bluebook/runs/minimax-m3-1-flash-preview-max-r01。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

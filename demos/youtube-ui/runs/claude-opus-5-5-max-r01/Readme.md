@@ -26,4 +26,5 @@
 - 迁移来源：F:/dev/ai-coding-demo-test 的 experiment/claude-opus-5-5-max-r01 工作树（HEAD 452ac588702d3bde24f048fcf47cc5ffa7abb602），源记录迁移时未提交；输入快照和已有模型产物按源文件保留。
 - 源实验记录在测试分支中处于 draft；据用户说明，本批 Copilot 额度已耗尽。迁移时保留其未完成状态，后续续作将单独注明来源。
 - 续作备注：后续由 OpenAI Codex 独立补充主题参考原型，见 youtube-ui--unknown-unknown-r02；原始 APP 具体需求未留存，不能视为 Claude Opus 5.5 对原任务的完成结果。
+- 维护者于 2026-10-22 按 v3 核对原始输入及无预览采集记录，保留 unavailable；未生成截图或数值评分。旧 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json，未重跑模型、启动历史后端或改写实验源码。
 <!-- archive:end -->

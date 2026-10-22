@@ -54,4 +54,5 @@ npm run images              # 重新生成 public/images 下的 SVG 插画
 
 - 迁移来源：F:/dev/ai-coding-demo-test 的 experiment/claude-opus-5-5-max-r01 工作树（HEAD 452ac588702d3bde24f048fcf47cc5ffa7abb602），源记录迁移时未提交；输入快照和已有模型产物按源文件保留。
 - 迁移核验：构建预览通过 HTTP 打开，浏览器未报告脚本错误，1440px 与 390px 宽度无横向溢出；已登记真实桌面截图。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

@@ -26,4 +26,5 @@
 - 从独立模型测试分支导入本轮实现，作为新的实验记录，保留本轮原始输入和产物。
 - “添加新场景”没有附带目标场景或历史场景上下文，因此没有虚构具体新增场景。
 - 归档来源：model-test-base 分支 demos/voxel-construction-site/runs/gpt-6-luna-max-r01；此前归档已有旧 r01，因此本轮保存为 gpt-6-luna-max-r02。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->

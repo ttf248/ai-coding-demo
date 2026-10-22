@@ -107,6 +107,9 @@ export function serializeArchive(summary) {
 }
 export function browserOutputs(catalog) {
   const outputs = new Map();
+  const rubric = JSON.parse(
+    fs.readFileSync(path.join(root, "catalog/scoring-rubric.json"), "utf8"),
+  );
   const json = (file, data) => outputs.set(file, JSON.stringify(data) + "\n");
   const runs = catalog.runs.map((run) => {
     const { raw, changes, billing, environment, input, score, ...summary } =
@@ -153,10 +156,44 @@ export function browserOutputs(catalog) {
   });
   for (const topic of catalog.topics)
     json(`assets/generated/topics/${topic.id}.json`, {
+      scoringRubric: {
+        visualChecks: rubric.visualChecks,
+        tasks: Object.fromEntries(
+          Object.entries(rubric.tasks).filter(([key]) =>
+            key.startsWith(topic.id + "/"),
+          ),
+        ),
+      },
       runs: catalog.runs
         .filter((run) => run.topicId === topic.id)
         .map(({ raw, ...run }) => ({
           ...run,
+          scoreEvidence: run.score.captureManifest
+            ? (() => {
+                const capture = JSON.parse(
+                  fs.readFileSync(
+                    path.join(root, run.score.captureManifest),
+                    "utf8",
+                  ),
+                );
+                return {
+                  frames: capture.frames.map(
+                    ({ id, file, width, height, viewport }) => ({
+                      id,
+                      file,
+                      width,
+                      height,
+                      viewport,
+                    }),
+                  ),
+                  capturedAt: capture.capturedAt,
+                  browser: capture.environment.browser,
+                  pageErrors: capture.errors.length,
+                  failedRequests: capture.failedRequests.length,
+                  incomplete: !!capture.supplementError,
+                };
+              })()
+            : null,
           billing:
             run.billing?.type === "batch"
               ? { type: "batch", batchId: run.billing.batchId }
@@ -201,6 +238,8 @@ export function documentOutputs(catalog, generated) {
       "docs/model-ordering.md",
       "docs/case-scoring.md",
       "docs/scoring-reviews/2026-10-15-v2.md",
+      "docs/scoring-reviews/2026-10-21-v3-plan.md",
+      "docs/scoring-reviews/2026-10-22-v3.md",
       "docs/archive-workspace.md",
       "docs/vercel-root-directories.md",
     ]),

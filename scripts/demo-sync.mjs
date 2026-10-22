@@ -9,7 +9,13 @@ import {
   loadCatalog,
   resolveLocal,
 } from "./lib.mjs";
-import { criteriaHash, scoreErrors } from "./scoring.mjs";
+import {
+  criteriaHash,
+  scoreErrors,
+  rubricFingerprint,
+  captureInventoryHash,
+} from "./scoring.mjs";
+import { evidenceSetHash } from "./scoring-v3.mjs";
 
 // 导入案例时的机械字段同步：输入指纹、提示词指纹和首次评分指纹由脚本写入，
 // 事实性内容（运行方式、复盘、分数、预览入口）仍由维护者填写。
@@ -80,7 +86,20 @@ if (["rated", "insufficient"].includes(score.status)) {
     ["screenshotHash", screenshotHash],
     ["inputHash", rawHash],
     ["criteriaHash", definition ? criteriaHash(definition) : null],
+    ["rubricHash", rubricFingerprint(rubric)],
   ];
+  if (score.captureManifest) {
+    try {
+      const capture = readJSON(score.captureManifest);
+      // Hashes can be filled once, but the explicit reviewed frame list remains manual.
+      fingerprints.push(
+        ["evidenceSetHash", evidenceSetHash(capture)],
+        ["captureInventoryHash", captureInventoryHash(run.id)],
+      );
+    } catch {
+      /* The scoring checklist reports a missing or invalid manifest. */
+    }
+  }
   for (const [field, value] of fingerprints) {
     if (!value) continue;
     if (score[field] === null || score[field] === undefined) {

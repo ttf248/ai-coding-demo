@@ -87,4 +87,5 @@
 - 第 9 轮：滚动加载的观察根与去抖——IntersectionObserver 显式指定 root 为滚动容器 main[data-scroll-root]，并加 180ms 去抖，避免连续触发。
 - 第 10 轮：构建产物与源码同步核验——重新执行 tsc -b && vite build，两个任务正文版本（v1 用本地 images 目录、v2 用运行时生成的不同高度 SVG）都能干净构建，产物与源码同步提交。
 - 同轮更新归档：测试分支后续更新的完整产物、执行记录和文档已并入本条实验记录，不另建新轮次。来源：F:/dev/ai-coding-demo-test（model-test-base）/demos/bluebook/runs/minimax-m3-1-flash-preview-max-r02。
+- 维护者于 2026-10-22 按 v3 对本轮桌面、手机及补充状态逐图重评并绑定 captures 证据；旧截图和 v2 评分见 catalog/score-reviews/2026-10-21-v3-source.json。未重跑模型或改写实验源码，截图不证明完整功能、算法、手势或性能。
 <!-- archive:end -->
