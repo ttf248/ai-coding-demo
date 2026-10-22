@@ -21,6 +21,7 @@ test("topic effort order matches comparison selectors and date sorting remains e
   await expect(solRows.locator(".topic-run-effort")).toHaveText([
     "max（最大）",
     "xhigh（超高）",
+    "xhigh（超高）",
     "medium（中）",
   ]);
   await expect(page.locator("#topic-effort option")).toHaveText([
@@ -49,6 +50,7 @@ test("topic effort order matches comparison selectors and date sorting remains e
     );
   expect(options).toEqual([
     "bluebook--gpt-6-1-sol-max-r01",
+    "bluebook--gpt-6-1-sol-xhigh-r02",
     "bluebook--gpt-6-1-sol-xhigh-r01",
     "bluebook--gpt-6-1-sol-medium-r01",
   ]);

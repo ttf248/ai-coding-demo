@@ -70,11 +70,14 @@ test("explicit model view retains the complete overview and collapsed history", 
   await expect(page.locator("#topic-context-title")).toContainText("v1");
   await expect(page.locator("#pricing-context")).not.toHaveAttribute("open");
   await expect(page.locator("iframe")).toHaveCount(0);
+  const sol = modelGroup(page, "gpt-6-1-sol");
+  await expect(sol.locator(".model-quick-preview")).toBeVisible();
+  await sol.locator("[data-model-toggle]").click();
   await expect(
-    modelGroup(page, "gpt-6-1-sol").locator(
-      ".model-quick-preview .execution-mode-chip",
+    page.locator(
+      "#run-voxel-construction-site--gpt-6-1-sol-xhigh-r01 .model-record-input",
     ),
-  ).toBeVisible();
+  ).toContainText("自主设计授权");
   const group = modelGroup(page, "gpt-6-astra");
   await expect(group.locator(".model-record-count")).toHaveText(
     `${voxel.filter((run) => run.modelId === "gpt-6-astra").length} 条记录`,
@@ -109,9 +112,10 @@ test("model filters expand matching records and restore explicit collapse and so
   await page.locator("#topic-model").selectOption("gpt-6-1-sol");
   const group = modelGroup(page, "gpt-6-1-sol");
   await expect(group.locator(".model-group-records")).toBeVisible();
-  await expect(group.locator(".model-condition")).toHaveCount(3);
+  await expect(group.locator(".model-condition")).toHaveCount(4);
   await expect(group.locator(".model-record-effort")).toContainText([
     "max",
+    "xhigh",
     "xhigh",
     "medium",
   ]);
@@ -123,7 +127,7 @@ test("model filters expand matching records and restore explicit collapse and so
   await expect(group.locator(".model-group-records")).toBeHidden();
   await page.locator("#topic-effort").selectOption("xhigh");
   await expect(group.locator(".model-group-records")).toBeVisible();
-  await expect(group.locator(".model-run-record")).toHaveCount(1);
+  await expect(group.locator(".model-run-record")).toHaveCount(2);
   await page.locator("#topic-reset").click();
   await page.locator("#topic-search").fill("MiniMax");
   await expect(page.locator(".model-run-record")).toHaveCount(
@@ -273,7 +277,7 @@ test("expanded model shows compact facts and direct detail links without nested 
     "topic.html?id=voxel-construction-site&view=models&model=gpt-6-1-sol",
   );
   const group = modelGroup(page, "gpt-6-1-sol");
-  await expect(group.locator(".model-run-record")).toHaveCount(3);
+  await expect(group.locator(".model-run-record")).toHaveCount(4);
   await expect(group.locator(".model-group-records details")).toHaveCount(0);
   await expect(group.locator(".model-record-facts").first()).toContainText(
     "OpenAI",
@@ -284,7 +288,7 @@ test("expanded model shows compact facts and direct detail links without nested 
   await expect(group.locator(".model-record-fee").first()).toContainText(
     "ChatGPT Plus",
   );
-  expect((await group.boundingBox()).height).toBeLessThan(330);
+  expect((await group.boundingBox()).height).toBeLessThan(400);
   const row = group.locator(".model-run-record").first();
   await expect(row).toHaveRole("row");
   await expect(row.locator("th, td")).toHaveCount(7);
@@ -306,6 +310,7 @@ test("expanded model shows compact facts and direct detail links without nested 
     );
   expect(positions[1]).toEqual(positions[0]);
   expect(positions[2]).toEqual(positions[0]);
+  expect(positions[3]).toEqual(positions[0]);
   await row.locator(".model-record-reader").click();
   await expect(page).toHaveURL(
     /assets\/generated\/readers\/demos\/voxel-construction-site\/runs\/gpt-6-1-sol-max-r01\/Readme\.html/,

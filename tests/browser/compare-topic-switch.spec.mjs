@@ -242,13 +242,13 @@ test("same-model slots reserve exact efforts before fallbacks and preserve prefe
   );
   await page.locator("#group").selectOption("fluid-simulation/v1");
   await expectTask(page, "fluid-simulation/v1", [
-    "fluid-simulation--gpt-6-1-sol-xhigh-r01",
+    "fluid-simulation--gpt-6-1-sol-xhigh-r02",
     "fluid-simulation--gpt-6-1-sol-max-r01",
   ]);
   expect(new URL(page.url()).searchParams.get("leftEffort")).toBe("medium");
   await page.reload();
   await expect(page.locator("#run-left")).toHaveValue(
-    "fluid-simulation--gpt-6-1-sol-xhigh-r01",
+    "fluid-simulation--gpt-6-1-sol-xhigh-r02",
   );
   await page.locator("#swap").click();
   await page.locator("#group").selectOption("voxel-construction-site/v1");
