@@ -9,10 +9,13 @@ import {
   settleReviewState,
   doubleClickReviewTarget,
   uploadReviewFixture,
+  reviewBrowserLaunch,
+  dragReviewTarget,
 } from "./capture-state-timing.mjs";
 
 // Explicit reviewer-selected navigation only; original artifacts and captures stay intact.
 const plan = JSON.parse(fs.readFileSync(0, "utf8").replace(/^\uFEFF/, ""));
+const launch = reviewBrowserLaunch(plan.renderingBackend);
 process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
 const run = loadCatalog().runs.find((r) => r.id === plan.runId);
 if (!run || !Array.isArray(plan.states) || !plan.states.length)
@@ -52,6 +55,7 @@ const record = {
   environment: {
     ...source.environment,
     screenshotFontWait: "bounded-1800ms-before-capture",
+    ...(plan.renderingBackend ? { renderer: launch.renderer } : {}),
   },
   previousCapture: { file: relative(sourceFile), sha256: hash(sourceFile) },
   actions: [...source.actions],
@@ -61,7 +65,7 @@ const record = {
 };
 const browser = await chromium.launch({
   headless: true,
-  args: ["--enable-unsafe-swiftshader"],
+  args: launch.args,
 });
 try {
   for (const state of plan.states) {
@@ -144,6 +148,18 @@ try {
             state: state.id,
             selector: action.selector,
             box,
+          });
+        } else if (action.kind === "pointer-drag") {
+          record.actions.push({
+            kind: "observed-pointer-drag",
+            state: state.id,
+            selector: action.selector,
+            ...(await dragReviewTarget(
+              page,
+              locator,
+              action.start,
+              action.end,
+            )),
           });
         } else if (action.kind === "scroll") {
           const observed = await locator.evaluate((e, a) => {

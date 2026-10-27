@@ -4,7 +4,26 @@ import {
   settleReviewState,
   doubleClickReviewTarget,
   uploadReviewFixture,
+  dragReviewTarget,
 } from "../../scripts/capture-state-timing.mjs";
+
+test("review drag sends bounded real pointer events", async ({ page }) => {
+  await page.setContent(
+    `<div id="target" style="width:400px;height:200px"></div><output></output><script>const events=[];target.addEventListener('pointerdown',()=>events.push('down'));target.addEventListener('pointermove',e=>{if(e.buttons)events.push('move')});target.addEventListener('pointerup',()=>{events.push('up');document.querySelector('output').textContent=events.join(',')});</script>`,
+  );
+  const result = await dragReviewTarget(
+    page,
+    page.locator("#target"),
+    [0.2, 0.5],
+    [0.8, 0.5],
+  );
+  expect(result.steps).toBe(16);
+  await expect(page.locator("output")).toContainText("down,move");
+  await expect(page.locator("output")).toContainText("up");
+  await expect(
+    dragReviewTarget(page, page.locator("#target"), [-1, 0], [1, 1]),
+  ).rejects.toThrow("Invalid review drag coordinates");
+});
 
 test("review capture uses real range keyboard events and waits for delayed results", async ({
   page,

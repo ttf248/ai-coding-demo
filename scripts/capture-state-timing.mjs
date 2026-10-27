@@ -3,6 +3,20 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 import { ROOT } from "./lib.mjs";
 
+export function reviewBrowserLaunch(backend = "default") {
+  if (backend === "default")
+    return {
+      args: ["--enable-unsafe-swiftshader"],
+      renderer: "Chromium / software WebGL allowed",
+    };
+  if (backend === "d3d11")
+    return {
+      args: ["--use-angle=d3d11"],
+      renderer: "Chromium / ANGLE D3D11 requested",
+    };
+  throw Error("Unsupported review rendering backend");
+}
+
 // Use ordinary keyboard input and explicit, bounded settling; never change app state directly.
 export async function pressReviewKey(locator, key) {
   if (
@@ -32,6 +46,35 @@ export async function settleReviewState(page, milliseconds = 0) {
 
 export async function doubleClickReviewTarget(locator) {
   await locator.dblclick({ timeout: 5000 });
+}
+
+export async function dragReviewTarget(page, locator, start, end) {
+  if (
+    ![start, end].every(
+      (point) =>
+        Array.isArray(point) &&
+        point.length === 2 &&
+        point.every((n) => Number.isFinite(n) && n >= 0 && n <= 1),
+    )
+  )
+    throw Error("Invalid review drag coordinates");
+  await locator.scrollIntoViewIfNeeded({ timeout: 10000 });
+  const box = await locator.boundingBox();
+  if (!box) throw Error("Pointer target is absent");
+  const position = ([x, y]) => ({
+    x: box.x + box.width * x,
+    y: box.y + box.height * y,
+  });
+  const from = position(start),
+    to = position(end);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  try {
+    await page.mouse.move(to.x, to.y, { steps: 16 });
+  } finally {
+    await page.mouse.up();
+  }
+  return { box, start, end, steps: 16 };
 }
 
 export async function uploadReviewFixture(locator) {

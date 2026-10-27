@@ -73,7 +73,9 @@ v3 针对旧方案的六类问题增加约束：拆开混合任务要求、分�
 
 ### 补拍操作协议
 
-`capture-review-states.mjs` 的 `states[].actions` 使用 `kind` 和真实 `selector`，支持 `click`、`pointer-click`、`double-click`、`press`（Home/End/方向键/Enter）、`upload-review-fixture`（已提交且固定指纹的测试 PNG）和 `scroll`（明确页面滚动元素或内部容器）。选择框可通过真实按键操作；不使用脚本注入选中状态。记录请求动作、实际位置、等待、资源错误和采集方式。其他已登记入口由基础采集处理；补拍只展开任务相关的实际页面。
+`capture-review-states.mjs` 的 `states[].actions` 使用 `kind` 和真实 `selector`，支持 `click`、`pointer-click`、`pointer-drag`（起点与终点均为目标框内 0–1 的相对坐标）、`double-click`、`press`（Home/End/方向键/Enter）、`upload-review-fixture`（已提交且固定指纹的测试 PNG）和 `scroll`（明确页面滚动元素或内部容器）。选择框可通过真实按键操作；不使用脚本注入选中状态。记录请求动作、实际位置、等待、资源错误和采集方式。其他已登记入口由基础采集处理；补拍只展开任务相关的实际页面。
+
+当默认 Chromium 渲染环境丢失 WebGL 上下文时，补拍计划可设置 `renderingBackend: "d3d11"` 请求 ANGLE D3D11；清单记录请求的渲染方式，不推断实际硬件，既有帧的环境以其来源清单为准。原失败证据和来源链仍须保留。
 
 长页及小字必须查看原图，联系图缩放不构成读过全部细节的证明。CDP 视口采集仅用于截图等待受阻时保留真实视口，明确 `captureMethod: "cdp-viewport"`；不重绘页面或替换素材。自动化操作失败不得直接推断人工点击也失败。
 

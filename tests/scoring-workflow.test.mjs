@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { ROOT, loadCatalog, readJSON } from "../scripts/lib.mjs";
+import { reviewBrowserLaunch } from "../scripts/capture-state-timing.mjs";
 
 const execute = (script, args = [], input) =>
   execFileSync(
@@ -12,6 +13,13 @@ const execute = (script, args = [], input) =>
     [path.join(ROOT, "scripts", script), ...args],
     { cwd: ROOT, encoding: "utf8", stdio: "pipe", input },
   );
+
+test("review capture selects and records only supported rendering backends", () => {
+  assert.deepEqual(reviewBrowserLaunch().args, ["--enable-unsafe-swiftshader"]);
+  assert.deepEqual(reviewBrowserLaunch("d3d11").args, ["--use-angle=d3d11"]);
+  assert.match(reviewBrowserLaunch("d3d11").renderer, /D3D11 requested/);
+  assert.throws(() => reviewBrowserLaunch("unknown"), /Unsupported/);
+});
 
 test("capture tools require explicit new batches and supplement sources before writing", () => {
   assert.throws(
