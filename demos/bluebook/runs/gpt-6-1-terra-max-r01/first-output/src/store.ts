@@ -1,0 +1,4 @@
+import { create } from 'zustand';
+import { notes, type Note } from './data';
+type Store={ items:Note[]; count:number; query:string; category:string; loading:boolean; setQuery:(s:string)=>void; setCategory:(s:string)=>void; toggle:(id:number)=>void; load:()=>void; refresh:()=>void; publish:(title:string)=>void };
+export const useStore=create<Store>((set,get)=>({items:notes,count:20,query:'',category:'推荐',loading:false,setQuery:query=>set({query,count:20}),setCategory:category=>set({category,count:20}),toggle:id=>set(s=>({items:s.items.map(n=>n.id===id?{...n,liked:!n.liked,likes:n.likes+(n.liked?-1:1)}:n)})),load:()=>{if(get().loading)return;set({loading:true});setTimeout(()=>set(s=>({count:Math.min(s.count+20,s.items.length),loading:false})),550)},refresh:()=>{set({loading:true});setTimeout(()=>set({count:20,loading:false}),550)},publish:title=>set(s=>({items:[{...notes[0],id:Date.now(),title,author:'我',likes:0},...s.items],count:20,category:'推荐',query:''}))}));
