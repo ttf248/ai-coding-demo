@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>奇幻地图生成器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --accent: #7c5c33; --panel: #fff; --line: #e2e8f0; --text: #0f172a; }
+  body { font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; background: #f6f1e7; color: var(--text); font-size: 14px; overflow-x: hidden; }
+  header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 12px 16px; }
+  header h1 { font-size: 18px; }
+  header p { color: #78716c; font-size: 12px; margin-top: 4px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; background: var(--panel); border-bottom: 1px solid var(--line); align-items: center; }
+  .toolbar button, .toolbar input { padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fafaf8; cursor: pointer; font-size: 13px; color: var(--text); }
+  .toolbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .toolbar label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #57534e; }
+  .toolbar input[type="text"] { width: 110px; }
+  .toolbar input[type="range"] { width: 90px; }
+  .stage-wrap { padding: 10px 12px 0; }
+  canvas#stage { width: 100%; display: block; border: 2px solid #a8a29e; border-radius: 10px; background: #9dbbd8; touch-action: none; cursor: grab; }
+  .legend { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin: 10px 12px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: #57534e; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin: 0 12px 10px; padding: 12px; font-size: 13px; color: #44403c; }
+  details summary { cursor: pointer; font-weight: 600; }
+  details ol { margin: 8px 0 0 20px; display: grid; gap: 4px; }
+</style>
+  <script src="../../../../assets/analytics.js" defer></script>
+</head>
+<body>
+<header>
+  <h1>奇幻地图生成器</h1>
+  <p>手绘风格奇幻岛屿：种子噪声地形、沿地势下降的河流、可升降的画笔编辑、平移缩放与 PNG 导出。相同种子与参数生成完全相同的地图。</p>
+</header>
+
+<div class="toolbar">
+  <label>种子 <input type="text" id="seed" value="dragon-isle"></label>
+  <button id="regen">生成地图</button>
+  <label>海平面 <input type="range" id="seaLevel" min="0" max="100" value="32"></label>
+  <label>粗糙度 <input type="range" id="roughness" min="0" max="100" value="55"></label>
+  <button data-tool="raise">⤒ 升高画笔</button>
+  <button data-tool="lower">⤓ 降低画笔</button>
+  <button id="toggleTowns" class="active">🏷 城镇标签</button>
+  <button id="resetView">复位视角</button>
+  <button id="export">🖼 导出 PNG</button>
+</div>
+
+<div class="stage-wrap"><canvas id="stage"></canvas></div>
+
+<div class="legend" id="legend">
+  <span><i style="background:#3f6fa8"></i>海洋</span>
+  <span><i style="background:#d9c79a"></i>海岸</span>
+  <span><i style="background:#a8bd6a"></i>平原</span>
+  <span><i style="background:#4e7a45"></i>森林</span>
+  <span><i style="background:#8d8577"></i>山脉</span>
+  <span><i style="background:#5b9bd5"></i>河流</span>
+  <span><i style="background:#cfe3f2"></i>内陆水体</span>
+  <span>🏷 城镇</span>
+</div>
+
+<details open>
+  <summary>操作说明</summary>
+  <ol>
+    <li>修改种子后点"生成地图"重新生成；同一种子与参数必定得到相同地图，不同种子得到不同地图。海平面滑杆控制淹水高度，粗糙度控制地形细节的破碎程度。</li>
+    <li>鼠标拖动平移，滚轮缩放；触摸设备单指拖动、双指捏合缩放。</li>
+    <li>选择"升高/降低画笔"后在地图上按住拖动即可雕刻地形；海岸与河流会随地形实时重新计算，河流始终沿地势下降流动，不会翻越山峰。</li>
+    <li>"城镇标签"开关控制地名显示；"导出 PNG"下载包含当前地图与图例的完整图片。</li>
+    <li>河流从山地发源，顺最陡下降汇入海洋；无法入海时在低洼处形成内陆水体。</li>
+  </ol>
+</details>
+
+<script>
+"use strict";
+const canvas = document.getElementById("stage");
+const ctx = canvas.getContext("2d");
+const W = 220, H = 150;
+let height = new Float32Array(W * H);
+let rivers = new Uint8Array(W * H);
+let lakes = new Uint8Array(W * H);
+let towns = [];
+let showTowns = true;
+let tool = null;
+let view = { scale: 1, x: 0, y: 0 };
+let baseCell = 0;
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hashSeed(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function valueNoise(seed) {
+  const rng = mulberry32(seed);
+  const g = new Float32Array(64 * 64);
+  for (let i = 0; i < g.length; i++) g[i] = rng();
+  const sample = (x, y) => {
+    const xi = ((Math.floor(x) % 64) + 64) % 64, yi = ((Math.floor(y) % 64) + 64) % 64;
+    return g[yi * 64 + xi];
+  };
+  return (x, y) => {
+    const fx = x - Math.floor(x), fy = y - Math.floor(y);
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const a = sample(x, y), b = sample(x + 1, y), c = sample(x, y + 1), d = sample(x + 1, y + 1);
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+  };
+}
+const idx = (x, y) => y * W + x;
+const inMap = (x, y) => x >= 0 && x < W && y >= 0 && y < H;
+
+function generate() {
+  const seedStr = document.getElementById("seed").value.trim() || "dragon-isle";
+  const seed = hashSeed(seedStr);
+  const rough = +document.getElementById("roughness").value / 100;
+  const n1 = valueNoise(seed), n2 = valueNoise(seed ^ 0x9e3779b9), n3 = valueNoise(seed ^ 0x85ebca6b);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      let h = 0, amp = 1, freq = 3.2, norm = 0;
+      for (let o = 0; o < 6; o++) {
+        const fx = x / W * freq, fy = y / H * freq;
+        h += amp * (o % 3 === 0 ? n1 : o % 3 === 1 ? n2 : n3)(fx, fy);
+        norm += amp;
+        amp *= 0.45 + rough * 0.3;
+        freq *= 2;
+      }
+      h /= norm;
+      const dx = (x / (W - 1)) * 2 - 1, dy = (y / (H - 1)) * 2 - 1;
+      const dist = Math.max(Math.abs(dx), Math.abs(dy)) * 0.55 + Math.hypot(dx, dy) * 0.45;
+      const falloff = Math.max(0, 1 - dist * dist * (1.05 + rough * 0.2));
+      height[idx(x, y)] = Math.min(1, Math.max(0, h * 0.55 + falloff * 0.62 - 0.08));
+    }
+  computeAll();
+  placeTowns(seed);
+}
+
+function terrainOf(x, y) {
+  const sea = +document.getElementById("seaLevel").value / 100;
+  const h = height[idx(x, y)];
+  if (h < sea) return 0;
+  if (h < sea + 0.045) return 1;
+  if (h < sea + 0.22) return 2;
+  if (h < sea + 0.34) return 3;
+  return 4;
+}
+
+function traceRivers() {
+  rivers.fill(0); lakes.fill(0);
+  const sea = +document.getElementById("seaLevel").value / 100;
+  const rng = mulberry32(hashSeed(document.getElementById("seed").value.trim() || "dragon-isle") ^ 0x1234);
+  const sources = [];
+  for (let y = 2; y < H - 2; y += 2)
+    for (let x = 2; x < W - 2; x += 2)
+      if (height[idx(x, y)] > sea + 0.36 && rng() < 0.3) sources.push({ x, y });
+  for (const s of sources) {
+    let cx = s.x, cy = s.y, steps = 0;
+    const visited = new Set();
+    while (steps++ < 400) {
+      rivers[idx(cx, cy)] = 1;
+      if (height[idx(cx, cy)] < sea) break;
+      let bestH = height[idx(cx, cy)], bx = -1, by = -1;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = cx + dx, ny = cy + dy;
+          if (!inMap(nx, ny)) continue;
+          const key = nx + "," + ny;
+          if (visited.has(key)) continue;
+          const h = height[idx(nx, ny)] + (rivers[idx(nx, ny)] ? -0.004 : 0);
+          if (h < bestH) { bestH = h; bx = nx; by = ny; }
+        }
+      if (bx < 0) { lakes[idx(cx, cy)] = 1; break; }
+      visited.add(bx + "," + by);
+      cx = bx; cy = by;
+    }
+  }
+}
+
+function placeTowns(seed) {
+  towns = [];
+  const rng = mulberry32(seed ^ 0xbeef);
+  const names = ["乌鸦港", "风信镇", "石锤堡", "月溪村", "盐帆城", "苔原集", "灰岩哨", "龙息镇", "白鹿城", "雾湾港", "红麦屯", "星陨堡", "柳林镇", "铁砧营", "静水村"];
+  let ni = 0;
+  for (let attempt = 0; attempt < 400 && towns.length < 8; attempt++) {
+    const x = 4 + Math.floor(rng() * (W - 8)), y = 4 + Math.floor(rng() * (H - 8));
+    const t = terrainOf(x, y);
+    const nearWater = rivers[idx(x, y)] || lakes[idx(x, y)] ||
+      [idx(Math.max(0, x - 1), y), idx(Math.min(W - 1, x + 1), y), idx(x, Math.max(0, y - 1)), idx(x, Math.min(H - 1, y + 1))].some(i => rivers[i] || terrainAtIdx(i) === 0);
+    if ((t === 1 || t === 2) && nearWater &&
+        towns.every(o => Math.hypot(o.x - x, o.y - y) > 24)) {
+      towns.push({ x, y, name: names[ni++ % names.length] });
+    }
+  }
+}
+function terrainAtIdx(i) { return terrainOf(i % W, (i / W) | 0); }
+
+function computeAll() { traceRivers(); }
+
+function resize() {
+  const w = canvas.parentElement.clientWidth;
+  baseCell = w / W;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = w * dpr;
+  canvas.height = H * baseCell * dpr;
+  canvas.style.height = H * baseCell + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+function seaNow() { return +document.getElementById("seaLevel").value / 100; }
+
+const COLORS = ["#3f6fa8", "#d9c79a", "#a8bd6a", "#4e7a45", "#8d8577"];
+function draw() {
+  const cell = baseCell;
+  ctx.save();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.translate(view.x, view.y);
+  ctx.scale(view.scale, view.scale);
+  const sea = seaNow();
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const i = idx(x, y);
+      const h = height[i];
+      let color;
+      if (h < sea) {
+        const d = (sea - h) / Math.max(0.001, sea);
+        color = `hsl(${210 - d * 18}, ${52 - d * 22}%, ${38 - d * 18}%)`;
+      } else {
+        const t = terrainOf(x, y);
+        color = COLORS[t];
+        if (t === 1 || t === 2 || t === 3) {
+          const shade = Math.sin(x * 1.7 + y * 2.3) * 4 - (h - sea) * 14;
+          color = shadeColor(COLORS[t], shade);
+        }
+      }
+      ctx.fillStyle = color;
+      ctx.fillRect(x * cell, y * cell, cell + 0.6, cell + 0.6);
+    }
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const i = idx(x, y);
+      if (rivers[i] && height[i] >= sea) {
+        ctx.fillStyle = "#5b9bd5";
+        ctx.fillRect(x * cell, y * cell, Math.max(1.5, cell * 0.45), Math.max(1.5, cell * 0.45));
+      }
+      if (lakes[i]) {
+        ctx.fillStyle = "#cfe3f2";
+        ctx.fillRect(x * cell, y * cell, cell + 0.6, cell + 0.6);
+      }
+      if (terrainOf(x, y) === 4 && (x + y) % 3 === 0) {
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.lineWidth = Math.max(0.7, cell * 0.16);
+        ctx.beginPath();
+        ctx.moveTo(x * cell + cell * 0.2, y * cell + cell * 0.75);
+        ctx.lineTo(x * cell + cell * 0.5, y * cell + cell * 0.2);
+        ctx.lineTo(x * cell + cell * 0.8, y * cell + cell * 0.75);
+        ctx.stroke();
+      }
+    }
+  ctx.strokeStyle = "rgba(60,40,20,0.5)";
+  ctx.lineWidth = Math.max(1, cell * 0.28);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (height[idx(x, y)] >= sea && (y === 0 || height[idx(x, y - 1)] < sea)) { ctx.beginPath(); ctx.moveTo(x * cell, y * cell); ctx.lineTo((x + 1) * cell, y * cell); ctx.stroke(); }
+      if (height[idx(x, y)] >= sea && (y === H - 1 || height[idx(x, y + 1)] < sea)) { ctx.beginPath(); ctx.moveTo(x * cell, (y + 1) * cell); ctx.lineTo((x + 1) * cell, (y + 1) * cell); ctx.stroke(); }
+      if (height[idx(x, y)] >= sea && (x === 0 || height[idx(x - 1, y)] < sea)) { ctx.beginPath(); ctx.moveTo(x * cell, y * cell); ctx.lineTo(x * cell, (y + 1) * cell); ctx.stroke(); }
+      if (height[idx(x, y)] >= sea && (x === W - 1 || height[idx(x + 1, y)] < sea)) { ctx.beginPath(); ctx.moveTo((x + 1) * cell, y * cell); ctx.lineTo((x + 1) * cell, (y + 1) * cell); ctx.stroke(); }
+    }
+  if (showTowns) {
+    for (const t of towns) {
+      const px = t.x * cell + cell / 2, py = t.y * cell + cell / 2;
+      ctx.fillStyle = "#7c2d12";
+      ctx.beginPath();
+      ctx.arc(px, py, Math.max(2.5, cell * 0.9), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(px, py, Math.max(1.2, cell * 0.4), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = "bold " + Math.max(8, cell * 2.2) + "px 'Comic Sans MS', cursive, sans-serif";
+      ctx.fillStyle = "#3f2412";
+      ctx.strokeStyle = "rgba(255,250,240,0.85)";
+      ctx.lineWidth = Math.max(2, cell * 0.7);
+      ctx.textAlign = "center";
+      ctx.strokeText(t.name, px, py - cell * 1.6);
+      ctx.fillText(t.name, px, py - cell * 1.6);
+    }
+  }
+  ctx.restore();
+}
+function shadeColor(hex, delta) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.max(0, Math.min(255, (n >> 16) + delta));
+  const g = Math.max(0, Math.min(255, ((n >> 8) & 255) + delta));
+  const b = Math.max(0, Math.min(255, (n & 255) + delta));
+  return `rgb(${r},${g},${b})`;
+}
+
+/* ---------- 交互 ---------- */
+function mapFromEvent(evt) {
+  const r = canvas.getBoundingClientRect();
+  const mx = (evt.clientX - r.left - view.x) / (baseCell * view.scale);
+  const my = (evt.clientY - r.top - view.y) / (baseCell * view.scale);
+  return { x: Math.floor(mx), y: Math.floor(my) };
+}
+let mode = null, lastMap = null;
+canvas.addEventListener("pointerdown", evt => {
+  evt.preventDefault();
+  canvas.setPointerCapture(evt.pointerId);
+  if (tool) { mode = "brush"; applyBrush(mapFromEvent(evt)); }
+  else mode = "pan";
+  lastMap = { x: evt.clientX, y: evt.clientY };
+});
+canvas.addEventListener("pointermove", evt => {
+  if (!mode) return;
+  if (mode === "pan") {
+    view.x += evt.clientX - lastMap.x;
+    view.y += evt.clientY - lastMap.y;
+    lastMap = { x: evt.clientX, y: evt.clientY };
+    draw();
+  } else if (mode === "brush") {
+    applyBrush(mapFromEvent(evt));
+  }
+});
+window.addEventListener("pointerup", () => { mode = null; });
+canvas.addEventListener("wheel", evt => {
+  evt.preventDefault();
+  const r = canvas.getBoundingClientRect();
+  const cx = evt.clientX - r.left, cy = evt.clientY - r.top;
+  const old = view.scale;
+  view.scale = Math.max(0.6, Math.min(6, view.scale * (evt.deltaY < 0 ? 1.15 : 1 / 1.15)));
+  view.x = cx - (cx - view.x) * (view.scale / old);
+  view.y = cy - (cy - view.y) * (view.scale / old);
+  draw();
+}, { passive: false });
+
+function applyBrush(p) {
+  const radius = 6;
+  if (!inMap(p.x, p.y)) return;
+  const delta = (tool === "raise" ? 0.012 : -0.012);
+  for (let dy = -radius; dy <= radius; dy++)
+    for (let dx = -radius; dx <= radius; dx++) {
+      const d = Math.hypot(dx, dy);
+      if (d > radius) continue;
+      const nx = p.x + dx, ny = p.y + dy;
+      if (!inMap(nx, ny)) continue;
+      const k = 1 - d / radius;
+      const i = idx(nx, ny);
+      height[i] = Math.min(1, Math.max(0, height[i] + delta * k * (0.4 + k * 0.6)));
+    }
+  computeAll();
+  draw();
+}
+let pinch = null;
+canvas.addEventListener("touchstart", evt => {
+  if (evt.touches.length === 2) {
+    tool = null;
+    document.querySelectorAll("button[data-tool]").forEach(b => b.classList.remove("active"));
+    pinch = { d: Math.hypot(evt.touches[0].clientX - evt.touches[1].clientX, evt.touches[0].clientY - evt.touches[1].clientY) };
+  }
+});
+canvas.addEventListener("touchmove", evt => {
+  if (evt.touches.length === 2 && pinch) {
+    const d = Math.hypot(evt.touches[0].clientX - evt.touches[1].clientX, evt.touches[0].clientY - evt.touches[1].clientY);
+    view.scale = Math.max(0.6, Math.min(6, view.scale * (d / pinch.d)));
+    pinch.d = d;
+    draw();
+  }
+}, { passive: true });
+
+document.querySelectorAll("button[data-tool]").forEach(btn => {
+  btn.onclick = () => {
+    tool = tool === btn.dataset.tool ? null : btn.dataset.tool;
+    document.querySelectorAll("button[data-tool]").forEach(b => b.classList.toggle("active", b.dataset.tool === tool));
+    canvas.style.cursor = tool ? "crosshair" : "grab";
+  };
+});
+document.getElementById("regen").onclick = () => { generate(); draw(); };
+document.getElementById("seaLevel").oninput = () => { computeAll(); draw(); };
+document.getElementById("roughness").onchange = () => { generate(); draw(); };
+document.getElementById("toggleTowns").onclick = evt => {
+  showTowns = !showTowns;
+  evt.currentTarget.classList.toggle("active", showTowns);
+  draw();
+};
+document.getElementById("resetView").onclick = () => { view = { scale: 1, x: 0, y: 0 }; draw(); };
+document.getElementById("export").onclick = () => {
+  const saved = { ...view };
+  view = { scale: 1, x: 0, y: 0 };
+  draw();
+  const a = document.createElement("a");
+  a.href = canvas.toDataURL("image/png");
+  a.download = (document.getElementById("seed").value.trim() || "map") + ".png";
+  a.click();
+  view = saved;
+  draw();
+};
+window.addEventListener("resize", resize);
+
+generate();
+resize();
+</script>
+</body>
+</html>
