@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>新哥特式塔楼城市 · 可漫游 3D</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#05070d;color:#e8e2d4;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  body{padding:12px;max-width:1280px;margin:0 auto}
+  h1{font-size:19px;margin:0 0 4px;letter-spacing:.5px}
+  .sub{color:#9aa5b5;font-size:12px;line-height:1.6;margin:0 0 10px}
+  .stage{position:relative;border:1px solid #2e3b4d;border-radius:10px;overflow:hidden;background:#05070d}
+  canvas{display:block;width:100%;height:min(68vh,620px);touch-action:none;cursor:grab}
+  .hud{position:absolute;pointer-events:none;font-size:11px;line-height:1.6}
+  .tl{top:10px;left:12px;color:#d9cdb1;text-shadow:0 1px 4px #000}
+  .tr{top:10px;right:12px;text-align:right;color:#b9c6d6;text-shadow:0 1px 4px #000}
+  .bl{bottom:10px;left:12px;color:#c9b98f;text-shadow:0 1px 4px #000;max-width:66%}
+  .bar{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  button{font:inherit;font-size:12px;color:#e8e2d4;background:#1c2735;border:1px solid #40536b;border-radius:6px;padding:6px 10px;cursor:pointer;touch-action:manipulation}
+  button:hover{background:#27384c}
+  button.on{background:#3d4d2a;border-color:#7d9b45;color:#eaf3cf}
+  .note{margin-top:9px;font-size:11px;line-height:1.7;color:#8e9bad}
+  .tag{color:#e0b45c}
+  @media(max-width:640px){body{padding:8px}canvas{height:58vh}.bl{max-width:92%}}
+</style>
+<script defer src="../../../../assets/analytics.js"></script>
+</head>
+<body>
+<h1>新哥特式塔楼城市</h1>
+<p class="sub">以真实比例重建的可漫游 3D 城市：尖塔、飞扶壁、尖拱窗、中央大教堂、环城海面与火焰粒子。拖拽或触摸转动视角，WASD 行走，滚轮调整视场。</p>
+<div class="stage">
+  <canvas id="scene"></canvas>
+  <div class="hud tl" id="tl">新哥特式塔楼城市</div>
+  <div class="hud tr" id="tr"></div>
+  <div class="hud bl" id="bl">拖拽/触摸转视角 · WASD / 方向键行走 · Q/E 升降 · 滚轮视场</div>
+</div>
+<div class="bar">
+  <button id="orbit" class="on">自动漫游：开</button>
+  <button id="cycle" class="on">昼夜循环：开</button>
+  <button id="night">切到夜晚</button>
+  <button id="dusk">切到黄昏</button>
+  <button id="reset">复位视角</button>
+  <button id="fire">火焰粒子：开</button>
+  <button id="info">待确认项</button>
+</div>
+<div class="note" id="note"><span class="tag">待确认：</span>运行环境未确认是否有可用的外部 3D 库，因此不引入 CDN，改用页面内置的透视投影渲染器（面排序 + 背面剔除 + 方向光）继续完成全部场景；海浪为网格顶点波动而非物理水面，火焰/尘埃为屏幕空间粒子。以上均为简化实现，其余场景、比例、漫游与昼夜系统按原要求交付。</div>
+<script>
+(function(){
+"use strict";
+const canvas=document.getElementById("scene"),ctx=canvas.getContext("2d");
+const trEl=document.getElementById("tr"),tlEl=document.getElementById("tl"),noteEl=document.getElementById("note");
+let W=0,H=0,DPR=1,showNote=true;
+const cam={x:0,y:26,z:-96,yaw:0.12,pitch:0.10,fov:1.05};
+const START={...cam};
+let autoOrbit=true,autoCycle=true,nightMode=false,fireOn=true,timeOfDay=0.28,frameNo=0;
+const keys=new Set(),pointers=new Map(),dragging={active:false,x:0,y:0};
+const faces=[],flames=[];
+const rnd=(()=>{let s=20261106;return()=>{s=(Math.imul(s,1664525)+1013904223)|0;return ((s>>>0)/4294967296);};})();
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+/* ---------- geometry helpers ---------- */
+function face(pts,n,color,opts){
+  faces.push({pts,n,color,alpha:opts&&opts.alpha||1,emissive:opts&&opts.emissive||0,edge:opts&&opts.edge||null});
+}
+function box(cx,cy,cz,w,h,d,color,opts){
+  const x0=cx-w/2,x1=cx+w/2,y0=cy-h/2,y1=cy+h/2,z0=cz-d/2,z1=cz+d/2;
+  const o=opts||{};
+  face([{x:x0,y:y1,z:z0},{x:x1,y:y1,z:z0},{x:x1,y:y1,z:z1},{x:x0,y:y1,z:z1}],{x:0,y:1,z:0},shade(color,1.12),o);
+  face([{x:x0,y:y0,z:z1},{x:x1,y:y0,z:z1},{x:x1,y:y0,z:z0},{x:x0,y:y0,z:z0}],{x:0,y:-1,z:0},shade(color,.45),o);
+  face([{x:x0,y:y0,z:z1},{x:x0,y:y1,z:z1},{x:x1,y:y1,z:z1},{x:x1,y:y0,z:z1}],{x:0,y:0,z:1},color,o);
+  face([{x:x1,y:y0,z:z0},{x:x1,y:y1,z:z0},{x:x0,y:y1,z:z0},{x:x0,y:y0,z:z0}],{x:0,y:0,z:-1},shade(color,.80),o);
+  face([{x:x1,y:y0,z:z1},{x:x1,y:y1,z:z1},{x:x1,y:y1,z:z0},{x:x1,y:y0,z:z0}],{x:1,y:0,z:0},shade(color,.92),o);
+  face([{x:x0,y:y0,z:z0},{x:x0,y:y1,z:z0},{x:x0,y:y1,z:z1},{x:x0,y:y0,z:z1}],{x:-1,y:0,z:0},shade(color,.68),o);
+}
+function shade(c,f){return [clamp(c[0]*f,0,255),clamp(c[1]*f,0,255),clamp(c[2]*f,0,255)];}
+function pyramid(cx,baseY,cz,w,d,tipY,color){
+  const x0=cx-w/2,x1=cx+w/2,z0=cz-d/2,z1=cz+d/2;
+  const b=[{x:x0,y:baseY,z:z0},{x:x1,y:baseY,z:z0},{x:x1,y:baseY,z:z1},{x:x0,y:baseY,z:z1}];
+  const t={x:cx,y:tipY,z:cz};
+  const cols=[shade(color,.72),shade(color,.92),shade(color,1.06),shade(color,.60)];
+  for(let i=0;i<4;i++){
+    const a=b[i],c=b[(i+1)%4];
+    const u={x:c.x-a.x,y:c.y-a.y,z:c.z-a.z},v={x:t.x-a.x,y:t.y-a.y,z:t.z-a.z};
+    const n=normalize({x:u.y*v.z-u.z*v.y,y:u.z*v.x-u.x*v.z,z:u.x*v.y-u.y*v.x});
+    // point outward from centre
+    const mid={x:(a.x+c.x+t.x)/3,y:(a.y+c.y+t.y)/3,z:(a.z+c.z+t.z)/3};
+    if(dot(n,{x:mid.x-cx,y:0,z:mid.z-cz})<0)n={x:-n.x,y:-n.y,z:-n.z};
+    face([a,c,t],n,cols[i],{edge:"rgba(20,16,12,.35)"});
+  }
+}
+function normalize(v){const l=Math.hypot(v.x,v.y,v.z)||1;return {x:v.x/l,y:v.y/l,z:v.z/l};}
+function dot(a,b){return a.x*b.x+a.y*b.y+a.z*b.z;}
+function archWindow(center,y,plane,w,h,axis,sign,color){
+  // 尖拱窗：矩形下半 + 尖顶，可贴在 ±z 或 ±x 四个墙面
+  const P=(u,v)=>axis==="z"?{x:center+u,y:v,z:plane}:{x:plane,y:v,z:center+u};
+  const pts=[P(-w/2,y),P(w/2,y),P(w/2,y+h*0.62),P(0,y+h),P(-w/2,y+h*0.62)];
+  const n=axis==="z"?{x:0,y:0,z:sign}:{x:sign,y:0,z:0};
+  face(pts,n,color,{emissive:1,edge:"rgba(255,225,150,.45)"});
+}
+/* ---------- build the city ---------- */
+const STONE=[104,102,112],DARK=[62,64,78],ROOF=[48,52,70],TRIM=[142,136,128],WINDOW=[232,178,88];
+function tower(x,z,w,h,d,spire,extra){
+  const base=[STONE[0]+((x*7+z*3)%18)-9,STONE[1]+((z*5)%14)-7,STONE[2]+((x*3)%16)-8];
+  box(x,h/2,z,w,h,d,base,{edge:"rgba(18,18,26,.28)"});
+  // 竖向壁柱
+  for(const sx of [-1,1])for(const sz of [-1,1])
+    box(x+sx*(w/2-0.35),h/2,z+sz*(d/2-0.35),.7,h,.7,shade(TRIM,.72));
+  // 腰线
+  box(x,h*0.52,z,w+.7,.9,d+.7,shade(TRIM,.82));
+  // 尖拱窗（正面与侧面）
+  const rows=Math.max(2,Math.floor(h/11));
+  for(let r=0;r<rows;r++){
+    const wy=5+r*(h-11)/Math.max(1,rows);
+    const ww=Math.min(2.3,w*0.24),wh=Math.min(4.2,(h-11)/rows*0.62);
+    archWindow(x,wy,z+d/2+.06,ww,wh,"z",1,WINDOW);
+    archWindow(x,wy,z-d/2-.06,ww,wh,"z",-1,WINDOW);
+    archWindow(z,wy,x+w/2+.06,ww,wh,"x",1,WINDOW);
+    archWindow(z,wy,x-w/2-.06,ww,wh,"x",-1,WINDOW);
+  }
+  // 尖顶
+  pyramid(x,h,z,w*1.12,d*1.12,h+spire,ROOF);
+  // 四角小尖塔
+  if(extra!==false)for(const sx of [-1,1])for(const sz of [-1,1]){
+    const px=x+sx*(w/2-.7),pz=z+sz*(d/2-.7),sh=h*0.34;
+    box(px,h+sh/2,pz,1.5,sh,1.5,shade(base,.9));
+    pyramid(px,h+sh,pz,2.1,2.1,h+sh+spire*0.42,shade(ROOF,1.15));
+  }
+  // 塔顶火盆
+  flames.push({x,y:h+spire*0.55,z,phase:rnd()*6.28,scale:1});
+}
+function build(){
+  // 岛屿基座与街道
+  box(0,-1.5,0,132,3,132,[42,44,54],{edge:"rgba(20,22,30,.4)"});
+  for(let i=-60;i<=60;i+=12){
+    box(i,.06,0,1.1,.12,128,[70,70,80]);box(0,.06,i,128,.12,1.1,[70,70,80]);
+  }
+  // 中央大教堂
+  box(0,11,0,30,22,44,[112,108,116],{edge:"rgba(18,18,26,.3)"});
+  box(0,22,0,32,1.4,46,shade(TRIM,.85));
+  pyramid(0,22.7,0,32,46,42,ROOF);
+  tower(-15,18,9,50,9,20);tower(15,18,9,50,9,20);
+  tower(-15,-18,9,44,9,17);tower(15,-18,9,44,9,17);
+  // 玫瑰窗
+  for(const z of [22.1,-22.1])for(let k=0;k<8;k++){
+    const a=k*Math.PI/4;
+    box(Math.cos(a)*4.2,13+Math.sin(a)*4.2,z,1.5,1.5,.25,WINDOW,{emissive:1});
+  }
+  // 飞扶壁
+  for(const sx of [-1,1])for(const z of [-14,-4,6,16]){
+    box(sx*19,7,z,10,1.2,1.6,shade(TRIM,.75));
+    box(sx*22,4,z,1.4,7,1.4,shade(STONE,.8));
+  }
+  // 外围塔楼群
+  const spots=[[-44,-40],[-44,0],[-44,40],[0,-44],[0,44],[44,-40],[44,0],[44,40],[-26,-32],[26,-32],[-26,32],[26,32]];
+  spots.forEach((s,i)=>{
+    const w=7+((i*3)%4),h=22+((i*7)%19),sp=9+((i*5)%10);
+    tower(s[0],s[1],w,h,w,sp,i%3!==0);
+  });
+  // 环城墙与拱廊
+  for(const sx of [-1,1]){
+    box(sx*58,4,0,2,8,110,[76,76,88]);
+    for(let z=-50;z<=50;z+=10)box(sx*58,8.4,z,3,1.1,3.4,shade(TRIM,.7));
+  }
+  for(const sz of [-1,1]){
+    box(0,4,sz*58,116,8,2,[76,76,88]);
+    for(let x=-50;x<=50;x+=10)box(x,8.4,sz*58,3.4,1.1,3,shade(TRIM,.7));
+  }
+  // 桥梁（跨海）
+  box(0,2,78,14,1.6,44,[88,84,78]);
+  for(const sx of [-1,1])for(let z=60;z<=98;z+=8)box(sx*6.6,4,z,1.1,3.4,1.1,shade(TRIM,.7));
+}
+/* ---------- sea ---------- */
+function seaFaces(t){
+  const out=[],N=18,S=340,step=S/N,wave=(x,z)=>-4.2+Math.sin(x*0.075+t*1.2)*1.1+Math.cos(z*0.09+t*0.8)*0.9;
+  for(let i=0;i<N;i++)for(let j=0;j<N;j++){
+    const x0=-S/2+i*step,x1=x0+step,z0=-S/2+j*step,z1=z0+step;
+    const p=[{x:x0,y:wave(x0,z0),z:z0},{x:x1,y:wave(x1,z0),z:z0},{x:x1,y:wave(x1,z1),z:z1},{x:x0,y:wave(x0,z1),z:z1}];
+    const shadeV=0.62+0.18*Math.sin(i*0.9+j*0.7+t*1.5);
+    out.push({pts:p,n:{x:0,y:1,z:0},color:[36*shadeV,74*shadeV,104*shadeV],alpha:.92,emissive:0,edge:"rgba(120,180,210,.10)"});
+  }
+  return out;
+}
+/* ---------- camera / projection ---------- */
+function toCam(p){
+  const dx=p.x-cam.x,dy=p.y-cam.y,dz=p.z-cam.z;
+  const cy=Math.cos(cam.yaw),sy=Math.sin(cam.yaw);
+  const rx=dx*cy-dz*sy,rz=dx*sy+dz*cy;
+  const cp=Math.cos(cam.pitch),sp=Math.sin(cam.pitch);
+  return {x:rx,y:dy*cp-rz*sp,z:dy*sp+rz*cp};
+}
+function project(p){
+  const c=toCam(p),f=(H/2)/Math.tan(cam.fov/2);
+  return {x:W/2+f*c.x/c.z,y:H/2-f*c.y/c.z,z:c.z};
+}
+function sky(t){
+  const day=clamp((Math.sin(t*Math.PI*2-Math.PI/2)+1)/2,0,1);
+  return day;
+}
+function palette(day){
+  const top=day>.55?[38,62,96]:[9,12,26],bot=day>.55?[126,142,152]:[28,24,42];
+  const dusk=Math.abs(day-.5)<.16;
+  if(dusk){top[0]=90;top[1]=52;top[2]=70;bot[0]=196;bot[1]=112;bot[2]=74;}
+  return {top,bot,fog:[(top[0]+bot[0])/2,(top[1]+bot[1])/2,(top[2]+bot[2])/2]};
+}
+function render(){
+  const t=performance.now()/1000;
+  const day=nightMode?0.06:sky(autoCycle?t*0.012+0.1:timeOfDay);
+  const pal=palette(day);
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,"rgb("+pal.top.map(Math.round).join(",")+")");
+  g.addColorStop(1,"rgb("+pal.bot.map(Math.round).join(",")+")");
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // stars / moon
+  if(day<.42){
+    ctx.fillStyle="rgba(255,246,214,"+(0.55-day)+")";
+    for(let i=0;i<90;i++){const x=((i*137.5)%W),y=((i*79.3)%(H*0.6));ctx.fillRect(x,y,1.4,1.4);}
+    ctx.beginPath();ctx.arc(W*0.78,H*0.19,17,0,Math.PI*2);ctx.fill();
+  }else{
+    ctx.fillStyle="rgba(255,232,178,.55)";ctx.beginPath();ctx.arc(W*0.78,H*0.19,22,0,Math.PI*2);ctx.fill();
+  }
+  const L=normalize({x:0.45+Math.cos(t*.05)*.3,y:0.75,z:0.35});
+  const list=[];
+  const all=faces.concat(seaFaces(t));
+  for(const f of all){
+    let cx=0,cy=0,cz=0;for(const p of f.pts){cx+=p.x;cy+=p.y;cz+=p.z;}
+    const n=f.pts.length;cx/=n;cy/=n;cz/=n;
+    const centerCam=toCam({x:cx,y:cy,z:cz});
+    if(centerCam.z<0.6)continue;
+    const v={x:cam.x-cx,y:cam.y-cy,z:cam.z-cz};
+    if(f.n&&dot(f.n,v)<=0)continue;
+    const sp=f.pts.map(project);
+    if(sp.some(p=>p.z<0.6))continue;
+    // 视锥外的面直接跳过，避免为远处几何做无用填充
+    let xMin=Infinity,xMax=-Infinity,yMin=Infinity,yMax=-Infinity;
+    for(const p of sp){xMin=Math.min(xMin,p.x);xMax=Math.max(xMax,p.x);yMin=Math.min(yMin,p.y);yMax=Math.max(yMax,p.y);}
+    if(xMax<0||xMin>W||yMax<0||yMin>H)continue;
+    const lam=f.n?Math.max(0,dot(f.n,L)):0.5;
+    const amb=0.30+0.30*day;
+    let b=amb+0.70*lam*(0.25+0.75*day);
+    let col=f.color.map(c=>c*b);
+    if(f.emissive)col=f.color.map(c=>c*(0.30+0.70*(1-day)));
+    const fog=clamp(centerCam.z/300,0,.82);
+    col=col.map((c,k)=>c*(1-fog)+pal.fog[k]*fog);
+    list.push({sp,depth:centerCam.z,col:col.map(c=>Math.round(clamp(c,0,255))),alpha:f.alpha,edge:f.edge});
+  }
+  list.sort((a,b)=>b.depth-a.depth);
+  for(const e of list){
+    ctx.globalAlpha=e.alpha;
+    ctx.beginPath();ctx.moveTo(e.sp[0].x,e.sp[0].y);
+    for(let i=1;i<e.sp.length;i++)ctx.lineTo(e.sp[i].x,e.sp[i].y);
+    ctx.closePath();
+    ctx.fillStyle="rgb("+e.col.join(",")+")";ctx.fill();
+    if(e.edge){ctx.strokeStyle=e.edge;ctx.lineWidth=.6;ctx.stroke();}
+  }
+  ctx.globalAlpha=1;
+  // fire & dust particles
+  if(fireOn){
+    for(const fl of flames){
+      const p0={x:fl.x,y:fl.y,z:fl.z};
+      for(let k=0;k<7;k++){
+        const ph=t*2.1+fl.phase+k*.9;
+        const px=p0.x+Math.sin(ph*1.7)*1.1,py=p0.y+(k*1.05+((t*3+k)%3)),pz=p0.z+Math.cos(ph*1.3)*1.1;
+        const s=project({x:px,y:py,z:pz});if(s.z<0.6)continue;
+        const r=Math.max(1,(14-k*1.5)/Math.max(1,s.z/70));
+        ctx.fillStyle="rgba(255,"+(130+k*14)+",60,"+(0.62-k*0.07)+")";
+        ctx.beginPath();ctx.arc(s.x,s.y,r,0,Math.PI*2);ctx.fill();
+      }
+    }
+  }
+  // drifting dust
+  ctx.fillStyle="rgba(220,205,170,.28)";
+  for(let i=0;i<60;i++){
+    const px=Math.sin(i*12.9+t*.3)*70,pz=Math.cos(i*7.7+t*.22)*70,py=6+((i*3+t*3)%28);
+    const s=project({x:px,y:py,z:pz});if(s.z<0.6)continue;ctx.fillRect(s.x,s.y,1.6,1.6);
+  }
+  // vignette
+  const vg=ctx.createRadialGradient(W/2,H/2,H*.25,W/2,H/2,H*.85);
+  vg.addColorStop(0,"rgba(0,0,0,0)");vg.addColorStop(1,"rgba(0,0,0,.42)");
+  ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+  frameNo++;
+  trEl.innerHTML="时刻 "+(day>.66?"白昼":day>.34?"黄昏":"夜晚")+" · 视角 "+Math.round(cam.yaw*180/Math.PI)+"°<br>位置 ("+cam.x.toFixed(0)+", "+cam.y.toFixed(0)+", "+cam.z.toFixed(0)+") · 面数 "+list.length;
+}
+function update(dt){
+  if(autoOrbit){
+    const a=t=>t*0.00013;
+    const angle=performance.now()*0.00013;
+    cam.x=Math.sin(angle)*104;cam.z=-Math.cos(angle)*104;cam.y=27+Math.sin(angle*2)*7;
+    cam.yaw=Math.atan2(-cam.x,-cam.z)+Math.PI;
+    cam.pitch=0.10+Math.sin(angle*1.5)*0.035;
+  }else{
+    const sp=34*dt,cy=Math.cos(cam.yaw),sy=Math.sin(cam.yaw);
+    let fx=0,fz=0,fy=0;
+    if(keys.has("w")||keys.has("arrowup"))fz+=1;
+    if(keys.has("s")||keys.has("arrowdown"))fz-=1;
+    if(keys.has("a")||keys.has("arrowleft"))fx-=1;
+    if(keys.has("d")||keys.has("arrowright"))fx+=1;
+    if(keys.has("q"))fy-=1;if(keys.has("e"))fy+=1;
+    cam.x+=(fx*cy+fz*sy)*sp;cam.z+=(-fx*sy+fz*cy)*sp;cam.y+=fy*sp;
+    cam.y=clamp(cam.y,3,90);
+  }
+}
+let last=0;
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000||0.016);last=now;
+  update(dt);render();requestAnimationFrame(frame);
+}
+/* ---------- interaction ---------- */
+function resize(){
+  const r=canvas.getBoundingClientRect();DPR=Math.min(2,window.devicePixelRatio||1);
+  W=r.width;H=r.height;canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+canvas.addEventListener("pointerdown",e=>{
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  dragging.active=true;dragging.x=e.clientX;dragging.y=e.clientY;dragging.id=e.pointerId;
+  autoOrbit=false;$("orbit").classList.remove("on");$("orbit").textContent="自动漫游：关";
+  try{canvas.setPointerCapture(e.pointerId);}catch(_){}
+});
+canvas.addEventListener("pointermove",e=>{
+  if(!pointers.has(e.pointerId))return;
+  const prev=pointers.get(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pointers.size>=2)return;
+  cam.yaw+=(e.clientX-prev.x)*0.005;
+  cam.pitch=clamp(cam.pitch-(e.clientY-prev.y)*0.004,-0.55,0.75);
+});
+const up=e=>{pointers.delete(e.pointerId);if(pointers.size===0)dragging.active=false;};
+canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);
+canvas.addEventListener("wheel",e=>{e.preventDefault();cam.fov=clamp(cam.fov+(e.deltaY>0?.06:-.06),.55,1.6);},{passive:false});
+window.addEventListener("keydown",e=>{const k=e.key.toLowerCase();keys.add(k);if(["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k))e.preventDefault();});
+window.addEventListener("keyup",e=>keys.delete(e.key.toLowerCase()));
+const $=id=>document.getElementById(id);
+$("orbit").onclick=()=>{autoOrbit=!autoOrbit;$("orbit").classList.toggle("on",autoOrbit);$("orbit").textContent="自动漫游："+(autoOrbit?"开":"关");};
+$("cycle").onclick=()=>{autoCycle=!autoCycle;nightMode=false;$("cycle").classList.toggle("on",autoCycle);$("cycle").textContent="昼夜循环："+(autoCycle?"开":"关");};
+$("night").onclick=()=>{nightMode=true;autoCycle=false;$("cycle").classList.remove("on");$("cycle").textContent="昼夜循环：关";};
+$("dusk").onclick=()=>{nightMode=false;autoCycle=false;timeOfDay=0.25;$("cycle").classList.remove("on");$("cycle").textContent="昼夜循环：关";};
+$("reset").onclick=()=>{Object.assign(cam,START);autoOrbit=true;$("orbit").classList.add("on");$("orbit").textContent="自动漫游：开";};
+$("fire").onclick=()=>{fireOn=!fireOn;$("fire").classList.toggle("on",fireOn);$("fire").textContent="火焰粒子："+(fireOn?"开":"关");};
+$("info").onclick=()=>{showNote=!showNote;noteEl.style.display=showNote?"block":"none";};
+window.addEventListener("resize",resize);
+build();resize();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

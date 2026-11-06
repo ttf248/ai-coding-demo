@@ -118,6 +118,14 @@
 - **GPT-5.6 Luna**（`gpt-5-6-luna`）：与 GPT-5.6 Sol 同日发布；不将后续降价日期作为发布日期。 根据同一官方公告的能力与效率定位，在同代 Sol 之后。 [官方来源 1](https://developers.openai.com/api/docs/changelog)
 - **GPT-6**（`gpt-6`）：仓库仅记录 GPT-6，未细分 Astra / Sol / Luna。官方家族名称无法确认历史实验实际使用的具体模型；不套用任何成员的发布日期。 待维护者确认历史型号，不按版本号或实验成绩补造能力顺序。 [官方来源 1](https://developers.openai.com/api/docs/models) · [官方来源 2](https://developers.openai.com/api/docs/guides/latest-model)
 
+## tencent
+
+| 顺序 | 模型 | 代际 | 同代能力优先级 | 发布日期 | 状态 | 查证日期 |
+|---|---|---|---|---|---|---|
+| 1 | Hy4 | 4 | 未比较 | 2026-11-04 | 已核实 | 2026-11-06 |
+
+- **Hy4**（`hy4`）：腾讯官方公告记载 Hy4 于 2026-11-04 发布，区别于 Hy4 preview；供应商按用户提供登记为 tencent。 当前该供应商仅登记此型号，不推断同代能力优先级。 [官方来源 1](https://www.tencent.com/zh-cn/tencent-launches-hy4-joining-the-ranks-of-the-worlds-leading-open-source-ai-models/)
+
 ## Xiaomi
 
 | 顺序 | 模型 | 代际 | 同代能力优先级 | 发布日期 | 状态 | 查证日期 |

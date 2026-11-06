@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixel Flow · 图片粒子化与手势还原</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#080b12;color:#e9eef7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  body{padding:12px;max-width:1240px;margin:0 auto}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:#98a9be;font-size:12px;line-height:1.6;margin:0 0 10px}
+  .layout{display:flex;gap:12px;align-items:flex-start}
+  .stage{flex:1 1 640px;min-width:0;position:relative;background:#05080f;border:1px solid #24344a;border-radius:10px;overflow:hidden}
+  #scene{display:block;width:100%;height:min(64vh,560px);touch-action:none;cursor:crosshair}
+  .video-box{position:absolute;right:10px;bottom:10px;width:190px;height:143px;border:2px solid #3a5a78;border-radius:8px;overflow:hidden;background:#0b1220}
+  video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+  #overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .vlabel{position:absolute;left:0;bottom:0;right:0;background:rgba(6,12,20,.72);font-size:10px;padding:3px 5px;color:#9fd4f5;text-align:center}
+  .side{flex:0 0 300px;display:flex;flex-direction:column;gap:10px;min-width:0}
+  .card{background:#121c2a;border:1px solid #263a52;border-radius:10px;padding:11px}
+  .card h2{font-size:12px;margin:0 0 8px;color:#5cc9f5}
+  .row{display:flex;align-items:center;gap:7px;margin:7px 0;font-size:12px;flex-wrap:wrap}
+  .row label{min-width:66px;color:#98a9be}
+  input[type=range]{flex:1;min-width:88px;accent-color:#5cc9f5}
+  input[type=file]{font-size:11px;max-width:100%;color:#b9c9dc}
+  .val{color:#5cc9f5;min-width:32px;text-align:right;font-variant-numeric:tabular-nums}
+  button{font:inherit;font-size:12px;color:#e9eef7;background:#1f3247;border:1px solid #3c5f80;border-radius:6px;padding:6px 9px;cursor:pointer;touch-action:manipulation}
+  button:hover{background:#2a4360}
+  button.on{background:#1d6b4a;border-color:#2e9c6c}
+  button.primary{background:#1c5f86;border-color:#2b87bb}
+  .status{font-size:11px;line-height:1.7;color:#b9c9dc}
+  .status b{color:#e9eef7}
+  .bar{height:7px;background:#1b2a3c;border-radius:4px;overflow:hidden;margin-top:6px}
+  .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3aa0d8,#7be0c0);transition:width .12s}
+  .msg{font-size:11px;line-height:1.6;padding:7px 9px;border-radius:6px;background:#102436;color:#9fd4f5;border:1px solid #2a5474;margin-bottom:7px}
+  .msg.warn{background:#33260f;color:#ffc97a;border-color:#7a5a1c}
+  .hint{color:#8fa3ba;font-size:11px;line-height:1.7;margin:0}
+  @media(max-width:900px){.layout{flex-direction:column}.side{flex:1 1 auto;width:100%}#scene{height:50vh}body{padding:9px}.video-box{width:140px;height:105px}}
+</style>
+<script defer src="../../../../assets/analytics.js"></script>
+</head>
+<body>
+<h1>Pixel Flow · 图片粒子化与手势还原</h1>
+<p class="sub">上传本地图片，用 Canvas 提取像素并转成 Three.js 粒子流；通过摄像头 + MediaPipe Hands 实时追踪手部关键点，张开手掌激活吸引、握拳暂停、双手张开快速完成还原。手部附近形成跟随的力场，粒子被加速吸回原始位置。</p>
+<div class="layout">
+  <div class="stage">
+    <canvas id="scene"></canvas>
+    <div class="video-box"><video id="video" playsinline muted></video><canvas id="overlay"></canvas><div class="vlabel" id="vlabel">摄像头未启动</div></div>
+  </div>
+  <div class="side">
+    <div class="card"><h2>图片与粒子</h2>
+      <div class="row"><input type="file" id="file" accept="image/*"></div>
+      <div class="row"><label>采样率</label><input type="range" id="sample" min="2" max="9" step="1" value="4"><span class="val" id="sampleV">4</span></div>
+      <div class="row"><button id="scatter" class="primary">重新打散</button><button id="restore">一键完全还原</button><button id="demo">示例图案</button></div>
+    </div>
+    <div class="card"><h2>摄像头与手势</h2>
+      <div class="row"><button id="camera">启动摄像头</button><button id="stopcam">关闭摄像头</button></div>
+      <div class="row"><label><input type="checkbox" id="skeleton" checked> 绘制手部关键点</label></div>
+      <div class="row"><label>力场半径</label><input type="range" id="radius" min="20" max="160" step="5" value="80"><span class="val" id="radiusV">80</span></div>
+      <div class="row"><label>还原速度</label><input type="range" id="speed" min="0.2" max="3" step="0.1" value="1"><span class="val" id="speedV">1.0</span></div>
+    </div>
+    <div class="card"><h2>状态</h2>
+      <div class="msg" id="msg">正在加载 Three.js 与 MediaPipe…</div>
+      <div class="status" id="status"></div>
+      <div class="bar"><i id="progress"></i></div>
+    </div>
+    <div class="card"><h2>手势说明</h2>
+      <p class="hint">张开手掌 → 粒子开始向原图位置聚拢；握拳 → 暂停吸引；双手同时张开 → 快速完成还原。手掌中心是跟随的力场中心，半径内粒子会加速归位。<br><br>若没有摄像头、页面以 file:// 打开或 MediaPipe 模型不可用，会自动降级为鼠标 / 触摸模拟：移动指针相当于张开手掌的力场，按住相当于握拳暂停。页面仍可完整演示粒子化与还原。</p>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const canvas=$("scene"),video=$("video"),overlay=$("overlay"),octx=overlay.getContext("2d");
+const msg=$("msg"),statusEl=$("status"),progressBar=$("progress");
+let T=null,HandsCtor=null,renderer=null,scene=null,camera=null,points=null,geo=null;
+let pos=null,colors=null,sizes=null,target=null,scatter=null,restore=null,seeds=null,count=0;
+let planeW=320,planeH=240,sourceCanvas=document.createElement("canvas"),sctx=sourceCanvas.getContext("2d");
+let hands=null,stream=null,camRunning=false,modelReady=false,pumping=false,lastHands=null;
+let gesture="idle",handWorld=null,hand2World=null,mouse={x:0,y:0,active:false,down:false};
+let sample=4,forceRadius=80,speed=1,showSkeleton=true,lastFrame=0;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function setMsg(t,warn){msg.className="msg"+(warn?" warn":"");msg.textContent=t;}
+function loadScript(src,cb){const s=document.createElement("script");s.src=src;s.onload=()=>cb(true);s.onerror=()=>cb(false);document.head.appendChild(s);}
+const threeUrls=["https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js","https://unpkg.com/three@0.160.0/build/three.min.js"];
+const handsUrls=["https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js","https://unpkg.com/@mediapipe/hands/hands.js"];
+function bootThree(i){
+  if(i>=threeUrls.length){setMsg("Three.js 加载失败：请检查网络后刷新。页面其余说明仍可阅读。",true);updateStatus();return;}
+  loadScript(threeUrls[i],ok=>{
+    if(!ok||!window.THREE){bootThree(i+1);return;}
+    T=window.THREE;initThree();
+    bootHands(0);
+  });
+}
+function bootHands(i){
+  if(i>=handsUrls.length){setMsg("MediaPipe Hands 模型不可用，已自动降级为鼠标 / 触摸模拟手势。",true);updateStatus();return;}
+  loadScript(handsUrls[i],ok=>{
+    if(!ok||!window.Hands){bootHands(i+1);return;}
+    HandsCtor=window.Hands;
+    try{
+      hands=new HandsCtor({locateFile:f=>"https://cdn.jsdelivr.net/npm/@mediapipe/hands/"+f});
+      hands.setOptions({maxNumHands:2,modelComplexity:0,minDetectionConfidence:0.6,minTrackingConfidence:0.5});
+      hands.onResults(onHandResults);modelReady=true;
+      setMsg("MediaPipe Hands 已就绪。点击「启动摄像头」开始手势追踪；也可直接用鼠标模拟。",false);
+    }catch(e){modelReady=false;setMsg("手部模型初始化失败，已降级为鼠标模拟："+e.message,true);}
+    updateStatus();
+  });
+}
+/* ---------- Three.js particle field ---------- */
+function initThree(){
+  renderer=new T.WebGLRenderer({canvas,antialias:true,alpha:false});
+  renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+  renderer.setClearColor(0x05080f,1);
+  scene=new T.Scene();
+  camera=new T.PerspectiveCamera(60,1,0.1,2000);camera.position.set(0,0,330);camera.lookAt(0,0,0);
+  resize();window.addEventListener("resize",resize);
+  buildDemoImage();buildParticles();
+  requestAnimationFrame(loop);
+}
+function resize(){
+  const r=canvas.getBoundingClientRect();if(!r.width||!r.height||!renderer)return;
+  renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();
+  const vb=document.querySelector(".video-box").getBoundingClientRect();
+  overlay.width=Math.round(vb.width);overlay.height=Math.round(vb.height);
+}
+/* ---------- image → particles ---------- */
+function buildDemoImage(){
+  sourceCanvas.width=320;sourceCanvas.height=240;
+  const g=sctx;
+  const grd=g.createLinearGradient(0,0,320,240);grd.addColorStop(0,"#123a63");grd.addColorStop(.5,"#7a3f8f");grd.addColorStop(1,"#e2794a");
+  g.fillStyle=grd;g.fillRect(0,0,320,240);
+  for(let i=0;i<26;i++){
+    g.strokeStyle="rgba(255,255,255,"+(0.05+i*0.012)+")";g.lineWidth=2;
+    g.beginPath();g.arc(160,120,18+i*7,0,Math.PI*2);g.stroke();
+  }
+  g.fillStyle="#ffffff";g.font="bold 44px sans-serif";g.textAlign="center";g.fillText("PIXEL FLOW",160,118);
+  g.font="16px sans-serif";g.fillStyle="rgba(255,255,255,.82)";g.fillText("上传图片开始体验",160,150);
+}
+function loadImageFile(file){
+  const url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{
+    const maxW=360,maxH=280,k=Math.min(maxW/img.width,maxH/img.height,1);
+    sourceCanvas.width=Math.max(1,Math.round(img.width*k));sourceCanvas.height=Math.max(1,Math.round(img.height*k));
+    sctx.drawImage(img,0,0,sourceCanvas.width,sourceCanvas.height);
+    URL.revokeObjectURL(url);buildParticles();
+    setMsg("已载入本地图片并生成 "+count+" 个粒子，现处于随机飘散状态。",false);updateStatus();
+  };
+  img.onerror=()=>{URL.revokeObjectURL(url);setMsg("图片解码失败，请换一张图片。",true);};
+  img.src=url;
+}
+function buildParticles(){
+  const w=sourceCanvas.width,h=sourceCanvas.height,data=sctx.getImageData(0,0,w,h).data;
+  const k=Math.min(320/w,240/h,1);planeW=w*k;planeH=h*k;
+  const list=[];
+  for(let y=0;y<h;y+=sample)for(let x=0;x<w;x+=sample){
+    const i=(y*w+x)*4;if(data[i+3]<24)continue;
+    list.push({tx:(x-w/2)*k,ty:-(y-h/2)*k,r:data[i]/255,g:data[i+1]/255,b:data[i+2]/255});
+  }
+  if(!list.length)list.push({tx:0,ty:0,r:1,g:1,b:1});
+  if(list.length>26000){const step=list.length/26000,reduced=[];for(let i=0;i<list.length;i+=step)reduced.push(list[Math.floor(i)]);list.length=0;for(const o of reduced)list.push(o);}
+  count=list.length;
+  pos=new Float32Array(count*3);colors=new Float32Array(count*3);sizes=new Float32Array(count);
+  target=new Float32Array(count*2);scatter=new Float32Array(count*3);restore=new Float32Array(count);seeds=new Float32Array(count);
+  for(let i=0;i<count;i++){
+    const o=list[i];
+    target[i*2]=o.tx;target[i*2+1]=o.ty;
+    colors[i*3]=o.r;colors[i*3+1]=o.g;colors[i*3+2]=o.b;
+    sizes[i]=1.6+Math.random()*1.2;seeds[i]=Math.random();
+    const sx=(Math.random()-.5)*520,sy=(Math.random()-.5)*400,sz=(Math.random()-.5)*260;
+    scatter[i*3]=sx;scatter[i*3+1]=sy;scatter[i*3+2]=sz;
+    pos[i*3]=sx;pos[i*3+1]=sy;pos[i*3+2]=sz;
+    restore[i]=0;
+  }
+  if(points){scene.remove(points);geo.dispose();points.material.dispose();}
+  geo=new T.BufferGeometry();
+  geo.setAttribute("position",new T.BufferAttribute(pos,3));
+  geo.setAttribute("color",new T.BufferAttribute(colors,3));
+  geo.setAttribute("aSize",new T.BufferAttribute(sizes,1));
+  const mat=new T.ShaderMaterial({
+    vertexShader:`attribute vec3 color;attribute float aSize;varying vec3 vColor;
+      void main(){vColor=color;vec4 mv=modelViewMatrix*vec4(position,1.0);
+      gl_PointSize=aSize*clamp(340.0/-mv.z,0.7,4.0);gl_Position=projectionMatrix*mv;}`,
+    fragmentShader:`varying vec3 vColor;
+      void main(){float d=length(gl_PointCoord-0.5);float a=smoothstep(0.5,0.12,d);
+      gl_FragColor=vec4(vColor,a);}`,
+    transparent:true,depthWrite:false
+  });
+  points=new T.Points(geo,mat);points.frustumCulled=false;scene.add(points);
+  updateStatus();
+}
+function doScatter(){if(!restore)return;for(let i=0;i<count;i++){restore[i]=0;pos[i*3]=scatter[i*3];pos[i*3+1]=scatter[i*3+1];pos[i*3+2]=scatter[i*3+2];}geo.attributes.position.needsUpdate=true;setMsg("粒子已重新打散，等待还原手势。",false);updateStatus();}
+function doRestore(){if(!restore)return;for(let i=0;i<count;i++)restore[i]=1;setMsg("已完成还原（等价于一键完成手势）。",false);updateStatus();}
+/* ---------- gesture handling ---------- */
+function classify(lm){
+  const wrist=lm[0],mcp=[lm[5],lm[9],lm[13],lm[17]],tips=[lm[8],lm[12],lm[16],lm[20]];
+  const d=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+  let ext=0;
+  for(let i=0;i<4;i++)ext+=d(tips[i],wrist)>d(mcp[i],wrist)*1.55?1:0;
+  return ext>=3?"open":ext<=1?"fist":"partial";
+}
+function toWorld(lm){
+  // 关键点为归一化坐标，视频镜像显示，因此 x 取反
+  return {x:(0.5-lm.x)*planeW*1.55,y:(0.5-lm.y)*planeH*1.55};
+}
+function onHandResults(res){
+  lastHands=res;
+  const list=res.multiHandLandmarks||[];
+  if(showSkeleton)drawSkeleton(list);
+  if(!list.length){if(camRunning){gesture="idle";handWorld=null;hand2World=null;}return;}
+  const states=list.map(classify);
+  handWorld=toWorld(list[0][9]||list[0][0]);
+  hand2World=list[1]?toWorld(list[1][9]||list[1][0]):null;
+  if(list.length>=2&&states[0]==="open"&&states[1]==="open")gesture="complete";
+  else if(states[0]==="fist")gesture="fist";
+  else if(states[0]==="open")gesture="open";
+  else gesture="partial";
+}
+function drawSkeleton(list){
+  const w=overlay.width,h=overlay.height;octx.clearRect(0,0,w,h);
+  if(!list.length)return;
+  const pairs=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  octx.strokeStyle="rgba(90,220,255,.85)";octx.lineWidth=1.4;
+  for(const lm of list){
+    octx.beginPath();
+    for(const [a,b] of pairs){octx.moveTo((1-lm[a].x)*w,lm[a].y*h);octx.lineTo((1-lm[b].x)*w,lm[b].y*h);}
+    octx.stroke();
+    octx.fillStyle="#ffe38a";
+    for(const p of lm){octx.beginPath();octx.arc((1-p.x)*w,p.y*h,2.4,0,Math.PI*2);octx.fill();}
+  }
+}
+async function pump(){
+  if(!camRunning||!hands||!video.videoWidth){pumping=false;return;}
+  try{await hands.send({image:video});}catch(e){}
+  requestAnimationFrame(pump);
+}
+async function startCamera(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    setMsg("当前环境不支持摄像头（file:// 或非安全上下文），已使用鼠标 / 触摸模拟手势。",true);return;
+  }
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:"user"},audio:false});
+    video.srcObject=stream;await video.play();
+    camRunning=true;$("vlabel").textContent="摄像头 · 实时手部追踪";
+    if(modelReady&&!pumping){pumping=true;requestAnimationFrame(pump);}
+    setMsg("摄像头已启动。"+(modelReady?"MediaPipe Hands 正在识别手势。":"手部模型尚未就绪，使用鼠标模拟。"),!modelReady);
+  }catch(e){setMsg("摄像头启动失败（"+e.name+"），已降级为鼠标 / 触摸模拟手势。",true);}
+  updateStatus();
+}
+function stopCamera(){
+  camRunning=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  video.srcObject=null;$("vlabel").textContent="摄像头未启动";octx.clearRect(0,0,overlay.width,overlay.height);
+  handWorld=null;hand2World=null;gesture="idle";
+  setMsg("摄像头已关闭，现使用鼠标 / 触摸模拟手势。",false);updateStatus();
+}
+/* ---------- animation ---------- */
+function loop(now){
+  requestAnimationFrame(loop);
+  if(!renderer||!points)return;
+  const dt=Math.min(.05,(now-lastFrame)/1000||.016);lastFrame=now,t=now/1000;
+  let active=false,complete=false,field=null;
+  if(camRunning&&modelReady){
+    active=gesture==="open"||gesture==="complete";
+    complete=gesture==="complete";
+    field=active?handWorld:null;
+  }else{
+    active=mouse.active&&!mouse.down;
+    field=active?{x:mouse.x,y:mouse.y}:null;
+  }
+  if(active){
+    const rate=(complete?2.6:0.30)*speed*dt;
+    const R=forceRadius*2.2;
+    for(let i=0;i<count;i++){
+      let r=restore[i];if(r>=1)continue;
+      let boost=0;
+      if(field){
+        const dx=pos[i*3]-field.x,dy=pos[i*3+1]-field.y;
+        const d=Math.hypot(dx,dy);
+        if(d<R)boost=(1-d/R)*2.4;
+      }
+      restore[i]=Math.min(1,r+rate+boost*dt*speed);
+    }
+  }
+  for(let i=0;i<count;i++){
+    const r=restore[i],e=r*r*(3-2*r),s=seeds[i];
+    const drift=(1-r)*Math.sin(t*(.5+s)+s*30)*6;
+    const tx=target[i*2]+drift,ty=target[i*2+1]+Math.cos(t*(.4+s)+s*22)*6*(1-r),tz=Math.sin(t*.6+s*20)*10*(1-r);
+    const k=Math.min(1,dt*7);
+    pos[i*3]+=(scatter[i*3]*(1-e)+tx*e-pos[i*3])*k;
+    pos[i*3+1]+=(scatter[i*3+1]*(1-e)+ty*e-pos[i*3+1])*k;
+    pos[i*3+2]+=(scatter[i*3+2]*(1-e)+tz*e-pos[i*3+2])*k;
+  }
+  geo.attributes.position.needsUpdate=true;
+  if(handWorld||field){
+    // 力场可视化由粒子加速体现，不额外绘制覆盖层
+  }
+  renderer.render(scene,camera);
+  if((now|0)%250<18)updateStatus();
+}
+function updateStatus(){
+  let sum=0;if(restore)for(let i=0;i<count;i++)sum+=restore[i];
+  const pct=count?sum/count*100:0;
+  progressBar.style.width=pct.toFixed(1)+"%";
+  const gName={idle:"未检测到手 / 待机",open:"张开手掌 · 吸引中",fist:"握拳 · 暂停",partial:"半张开 · 缓慢吸引",complete:"双手张开 · 快速完成"}[gesture]||"—";
+  statusEl.innerHTML="<b>粒子数</b>："+count+"　<b>采样率</b>："+sample+"<br><b>还原进度</b>："+pct.toFixed(1)+"%<br><b>输入源</b>："+(camRunning&&modelReady?"摄像头 + MediaPipe Hands":"鼠标 / 触摸模拟")+"<br><b>当前手势</b>："+(camRunning&&modelReady?gName:(mouse.down?"按住 · 暂停":mouse.active?"移动 · 吸引":"待机"))+"<br><b>力场半径</b>："+forceRadius+"　<b>速度</b>："+speed.toFixed(1)+"×";
+}
+/* ---------- UI ---------- */
+$("file").onchange=e=>{const f=e.target.files[0];if(f)loadImageFile(f);};
+$("sample").oninput=()=>{sample=+$("sample").value;$("sampleV").textContent=sample;buildParticles();};
+$("radius").oninput=()=>{forceRadius=+$("radius").value;$("radiusV").textContent=forceRadius;updateStatus();};
+$("speed").oninput=()=>{speed=+$("speed").value;$("speedV").textContent=speed.toFixed(1);updateStatus();};
+$("skeleton").onchange=()=>{showSkeleton=$("skeleton").checked;if(!showSkeleton)octx.clearRect(0,0,overlay.width,overlay.height);};
+$("scatter").onclick=doScatter;$("restore").onclick=doRestore;
+$("demo").onclick=()=>{buildDemoImage();buildParticles();setMsg("已恢复示例图案并重新打散。",false);};
+$("camera").onclick=startCamera;$("stopcam").onclick=stopCamera;
+canvas.addEventListener("pointermove",e=>{
+  const r=canvas.getBoundingClientRect();
+  mouse.x=((e.clientX-r.left)/r.width-.5)*planeW*1.55;
+  mouse.y=-((e.clientY-r.top)/r.height-.5)*planeH*1.55;
+  mouse.active=true;
+});
+canvas.addEventListener("pointerdown",e=>{mouse.down=true;try{canvas.setPointerCapture(e.pointerId);}catch(_){}});
+canvas.addEventListener("pointerup",()=>mouse.down=false);
+canvas.addEventListener("pointercancel",()=>mouse.down=false);
+canvas.addEventListener("pointerleave",()=>{if(!mouse.down)mouse.active=false;});
+setMsg("正在加载 Three.js 与 MediaPipe Hands…",false);
+bootThree(0);
+})();
+</script>
+</body>
+</html>

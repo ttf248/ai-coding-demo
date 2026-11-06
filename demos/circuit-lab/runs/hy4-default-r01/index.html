@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>简化电路实验台</title>
+<style>
+  :root{--bg:#0d1520;--panel:#16212e;--line:#2b3b4d;--ink:#e7eef6;--muted:#93a6bb;--accent:#4fc3f7;--warn:#ffb74d;--bad:#ff6b6b;--ok:#7bd88f}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  body{padding:16px;max-width:1180px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 14px}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  button{font:inherit;font-size:13px;color:var(--ink);background:#213247;border:1px solid #38506a;border-radius:8px;padding:7px 11px;cursor:pointer;touch-action:manipulation}
+  button:hover{background:#2a4059}
+  button.primary{background:#1c5f86;border-color:#2b87bb}
+  button.danger{background:#5a2a32;border-color:#8b4149}
+  button.on{background:#1d6b4a;border-color:#2e9c6c}
+  .wrap{display:flex;gap:14px;align-items:flex-start}
+  .stage{flex:1 1 560px;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px}
+  svg{display:block;width:100%;height:auto;touch-action:none;background:radial-gradient(circle at 50% 40%,#14283a,#101b27);border-radius:8px}
+  .side{flex:0 0 300px;display:flex;flex-direction:column;gap:12px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .card h2{font-size:14px;margin:0 0 8px;color:var(--accent)}
+  .row{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:13px;flex-wrap:wrap}
+  .row label{min-width:64px;color:var(--muted)}
+  input[type=number]{width:86px;background:#0f1a26;color:var(--ink);border:1px solid #38506a;border-radius:6px;padding:5px 7px;font:inherit;font-size:13px}
+  input[type=color]{width:36px;height:30px;padding:0;border:1px solid #38506a;border-radius:6px;background:none}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:5px 4px;border-bottom:1px solid #26374a;white-space:nowrap}
+  th{color:var(--muted);font-weight:500}
+  .msg{font-size:13px;line-height:1.6;padding:8px 10px;border-radius:8px;background:#102a1c;color:var(--ok);border:1px solid #27633f;margin-bottom:8px}
+  .msg.warn{background:#33260f;color:var(--warn);border-color:#7a5a1c}
+  .msg.bad{background:#361b20;color:var(--bad);border-color:#7d3540}
+  .hint{color:var(--muted);font-size:12px;line-height:1.7;margin:0}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted);margin-top:8px}
+  .pill{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  @media(max-width:860px){.wrap{flex-direction:column}.side{flex:1 1 auto;width:100%}body{padding:10px}}
+</style>
+<script defer src="../../../../assets/analytics.js"></script>
+</head>
+<body>
+<h1>简化电路实验台</h1>
+<p class="sub">理想直流电池、电阻、开关、灯泡与导线。节点归并后使用修正节点分析（MNA）真实求解，显示各元件电压、电流与方向。灯泡按耗散功率发光，模型为简化直流模型，不含交流、电容、电感或半导体。</p>
+<div class="bar">
+  <button data-add="battery">＋ 电池</button>
+  <button data-add="resistor">＋ 电阻</button>
+  <button data-add="lamp">＋ 灯泡</button>
+  <button data-add="switch">＋ 开关</button>
+  <button class="primary" data-preset="series">串联预设</button>
+  <button class="primary" data-preset="parallel">并联预设</button>
+  <button class="danger" id="clear">清空画布</button>
+</div>
+<div class="wrap">
+  <div class="stage">
+    <svg id="svg" viewBox="0 0 900 460" preserveAspectRatio="xMidYMid meet" aria-label="电路画布"></svg>
+    <div class="legend">
+      <span class="pill"><i class="dot" style="background:#4fc3f7"></i>端子（点两次连线）</span>
+      <span class="pill"><i class="dot" style="background:#ffb74d"></i>拖动元件</span>
+      <span class="pill"><i class="dot" style="background:#ff6b6b"></i>点击导线删除</span>
+      <span class="pill">开路 I=0；短路／冲突电源会明确报错</span>
+    </div>
+  </div>
+  <div class="side">
+    <div class="card">
+      <h2>选中元件</h2>
+      <div id="props"><p class="hint">点击画布中的元件进行编辑，点击端子后再点另一个端子即可连线；拖动元件可移动位置，连线会保留。</p></div>
+    </div>
+    <div class="card">
+      <h2>求解状态</h2>
+      <div id="status" class="msg">等待电路…</div>
+      <table><thead><tr><th>元件</th><th>电压 V</th><th>电流 A</th><th>功率 W</th></tr></thead><tbody id="results"></tbody></table>
+    </div>
+    <div class="card">
+      <h2>操作与验收</h2>
+      <p class="hint">串联预设：12 V 电源与 100 Ω、200 Ω 串联 → 0.04 A。并联预设：同样两电阻并联 → 支路 0.12 A、0.06 A，总电流 0.18 A。断开开关后相关支路电流为零；电源两端被导线直连会提示短路，不会输出 NaN 或伪造电流。</p>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+"use strict";
+const SVG="http://www.w3.org/2000/svg";
+const svg=document.getElementById("svg");
+const props=document.getElementById("props"), statusEl=document.getElementById("status"), results=document.getElementById("results");
+let comps=[], wires=[], seq=1, selected=null, pending=null, drag=null, result=new Map();
+const NS=(tag,attrs)=>{const e=document.createElementNS(SVG,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;};
+const txt=(x,y,s,size,color,anchor)=>{const t=NS("text",{x,y,"font-size":size||12,fill:color||"#e7eef6","text-anchor":anchor||"middle","font-family":"ui-monospace,Menlo,Consolas,monospace"});t.textContent=s;return t;};
+const termPos=(c,t)=>({x:c.x+(t===0?-32:32),y:c.y});
+const labelOf=c=>({battery:"电池",resistor:"电阻",lamp:"灯泡",switch:"开关"})[c.type]+"#" + c.id;
+const unitOf=c=>c.type==="battery"?"V":"Ω";
+function def(type,x,y,value,closed){
+  return {id:seq++,type,x,y,value,closed:closed===undefined?true:closed};
+}
+function preset(kind){
+  comps=[];wires=[];seq=1;selected=null;pending=null;
+  const B=def("battery",150,330,12);
+  if(kind==="series"){
+    const S=def("switch",250,130,0),R1=def("resistor",440,130,100),R2=def("resistor",650,330,200);
+    comps=[B,S,R1,R2];
+    const m={b0:B.id+":0",b1:B.id+":1",s0:S.id+":0",s1:S.id+":1",r10:R1.id+":0",r11:R1.id+":1",r1:R2.id+":0",r2:R2.id+":1"};
+    // 电池负极 → 开关 → R1 → R2 → 电池正极，构成单一回路
+    wires=[{id:seq++,a:m.b0,b:m.s0},{id:seq++,a:m.s1,b:m.r10},{id:seq++,a:m.r11,b:m.r1},{id:seq++,a:m.r2,b:m.b1}];
+  }else{
+    const R1=def("resistor",480,160,100),R2=def("resistor",480,320,200);
+    comps=[B,R1,R2];
+    const bn=B.id+":0",bp=B.id+":1";
+    wires=[{id:seq++,a:bn,b:R1.id+":0"},{id:seq++,a:R1.id+":1",b:bp},
+           {id:seq++,a:bn,b:R2.id+":0"},{id:seq++,a:R2.id+":1",b:bp}];
+  }
+  render();
+}
+function parseKey(k){const p=k.split(":");return {cid:+p[0],term:+p[1]};}
+function findComp(id){return comps.find(c=>c.id===id);}
+function endpoint(k){const p=parseKey(k),c=findComp(p.cid);return c?termPos(c,p.term):{x:0,y:0};}
+
+/* ---------- MNA solver ---------- */
+function solve(){
+  const parent=new Map();
+  const find=x=>{if(!parent.has(x))parent.set(x,x);let r=x;while(parent.get(r)!==r)r=parent.get(r);while(parent.get(x)!==x){const n=parent.get(x);parent.set(x,r);x=n;}return r;};
+  const union=(a,b)=>{const ra=find(a),rb=find(b);if(ra!==rb)parent.set(ra,rb);};
+  for(const c of comps){find(c.id+":0");find(c.id+":1");}
+  for(const w of wires){find(w.a);find(w.b);union(w.a,w.b);}
+  for(const c of comps) if(c.type==="switch"&&c.closed) union(c.id+":0",c.id+":1");
+  const roots=[...new Set([...parent.keys()].map(find))];
+  const idx=new Map(roots.map((r,i)=>[r,i]));
+  const nodeOf=k=>idx.get(find(k));
+  const batteries=comps.filter(c=>c.type==="battery");
+  const ground=batteries.length?nodeOf(batteries[0].id+":0"):0;
+  // A shorted ideal source means its two terminals were joined by ideal wires.
+  const shorted=batteries.some(c=>Math.abs(c.value)>1e-9&&nodeOf(c.id+":0")===nodeOf(c.id+":1"));
+  if(shorted) return {error:"bad",text:"电源短路：电池正负端被理想导线直接连通。请移除该导线或闭合支路。",rows:[]};
+  const sources=batteries.filter(c=>Math.abs(c.value)>1e-9||nodeOf(c.id+":0")!==nodeOf(c.id+":1"));
+  const loads=comps.filter(c=>c.type==="resistor"||c.type==="lamp");
+  const n=roots.length, m=sources.length, size=Math.max(0,(n-1)+m);
+  const A=Array.from({length:size},()=>new Float64Array(size+1));
+  const ix=r=>r===ground?-1:(r>ground?r-1:r);
+  const GMIN=1e-9;
+  for(let r=0;r<n;r++){const i=ix(r);if(i>=0)A[i][i]+=GMIN;}
+  for(const c of loads){
+    const R=Math.max(1e-6,c.value),g=1/R;
+    const a=nodeOf(c.id+":0"),b=nodeOf(c.id+":1"),ia=ix(a),ib=ix(b);
+    if(ia>=0)A[ia][ia]+=g; if(ib>=0)A[ib][ib]+=g;
+    if(ia>=0&&ib>=0){A[ia][ib]-=g;A[ib][ia]-=g;}
+  }
+  const srcVec=[];
+  sources.forEach((c,k)=>{
+    const p=nodeOf(c.id+":1"),q=nodeOf(c.id+":0"),s=(n-1)+k;
+    const ip=ix(p),iq=ix(q);
+    if(ip>=0){A[ip][s]+=1;A[s][ip]+=1;}
+    if(iq>=0){A[iq][s]-=1;A[s][iq]-=1;}
+    A[s][size]=c.value; // V_pos - V_neg = E
+    srcVec.push({c,k,s});
+  });
+  // Gaussian elimination with partial pivoting.
+  for(let col=0;col<size;col++){
+    let piv=col;
+    for(let r=col+1;r<size;r++) if(Math.abs(A[r][col])>Math.abs(A[piv][col])) piv=r;
+    if(Math.abs(A[piv][col])<1e-12) return {error:"bad",text:"无唯一解：可能存在相互冲突的理想电源或悬空回路。请检查连线与电源设置。",rows:[]};
+    if(piv!==col){const t=A[piv];A[piv]=A[col];A[col]=t;}
+    const d=A[col][col];
+    for(let j=col;j<=size;j++)A[col][j]/=d;
+    for(let r=0;r<size;r++){if(r===col)continue;const f=A[r][col];if(!f)continue;for(let j=col;j<=size;j++)A[r][j]-=f*A[col][j];}
+  }
+  const x=A.map(r=>r[size]);
+  const V=r=>r===ground?0:x[ix(r)];
+  const rows=[];let total=0,any=false;
+  const info=new Map();
+  for(const c of comps){
+    const a=nodeOf(c.id+":0"),b=nodeOf(c.id+":1"),va=V(a),vb=V(b);
+    let I=0,U=0,P=0;
+    if(c.type==="resistor"||c.type==="lamp"){
+      U=va-vb; I=U/Math.max(1e-6,c.value); P=I*I*c.value; any=true;
+    }else if(c.type==="battery"){
+      const rec=srcVec.find(v=>v.c.id===c.id);
+      U=vb-va; I=rec?-x[rec.s]:0; P=Math.abs(U*I);
+      total+=-I;
+    }else if(c.type==="switch"&&c.closed){
+      U=0;
+    }
+    if(![U,I,P].every(Number.isFinite)) return {error:"bad",text:"求解结果不是有限数值，已阻止输出 NaN。请检查电路。",rows:[]};
+    info.set(c.id,{U,I,P});
+    rows.push({name:labelOf(c),U,I,P,type:c.type});
+  }
+  let text;
+  if(!batteries.length) text="电路中没有电源：所有支路电流为 0。";
+  else if(!any) text="电源未连接负载：支路电流为 0（开路）。";
+  else if(Math.abs(total)<1e-7&&rows.every(r=>Math.abs(r.I)<1e-7)) text="电路开路，所有支路电流为 0。";
+  else text="求解成功：已按节点电压法计算各支路电流，电源输出约 "+Math.abs(total).toFixed(3)+" A。";
+  return {error:"ok",text,rows,info,total};
+}
+
+/* ---------- rendering ---------- */
+function render(){
+  const out=solve();result=out.info||new Map();
+  statusEl.className="msg"+(out.error==="bad"?" bad":"");
+  statusEl.textContent=out.text;
+  results.innerHTML="";
+  (out.rows||[]).forEach(r=>{
+    const tr=document.createElement("tr");
+    const f=v=>Math.abs(v)<5e-4?"0.000":v.toFixed(3);
+    tr.innerHTML="<td>"+r.name+"</td><td>"+f(r.U)+"</td><td>"+f(r.I)+"</td><td>"+f(r.P)+"</td>";
+    results.appendChild(tr);
+  });
+  if(!(out.rows||[]).length)results.innerHTML="<tr><td colspan='4' style='color:#93a6bb'>暂无元件</td></tr>";
+  while(svg.firstChild)svg.removeChild(svg.firstChild);
+  const defs=NS("defs",{});
+  const grad=NS("radialGradient",{id:"glow"});
+  grad.appendChild(NS("stop",{offset:"0%","stop-color":"#ffe27a","stop-opacity":"0.95"}));
+  grad.appendChild(NS("stop",{offset:"100%","stop-color":"#ffb300","stop-opacity":"0"}));
+  defs.appendChild(grad);svg.appendChild(defs);
+  // wires
+  for(const w of wires){
+    const a=endpoint(w.a),b=endpoint(w.b);
+    const line=NS("line",{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:"#7d94ab","stroke-width":3,"stroke-linecap":"round"});
+    line.style.cursor="pointer";
+    line.addEventListener("pointerdown",e=>{e.stopPropagation();wires=wires.filter(v=>v.id!==w.id);render();});
+    svg.appendChild(line);
+    const hit=NS("line",{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:"transparent","stroke-width":14});
+    hit.style.cursor="pointer";
+    hit.addEventListener("pointerdown",e=>{e.stopPropagation();wires=wires.filter(v=>v.id!==w.id);render();});
+    svg.appendChild(hit);
+  }
+  // components
+  for(const c of comps){
+    const g=NS("g",{});g.style.cursor="grab";
+    const r=result.get(c.id)||{U:0,I:0,P:0};
+    if(c.type==="lamp"){
+      const p=Math.min(1,r.P/4);
+      if(p>0.02)g.appendChild(NS("circle",{cx:c.x,cy:c.y,r:16+p*40,fill:"url(#glow)"}));
+    }
+    const body=NS("rect",{x:c.x-26,y:c.y-22,width:52,height:44,rx:7,fill:selected===c.id?"#264a68":"#1c2c3d",stroke:selected===c.id?"#4fc3f7":"#5b7791","stroke-width":2});
+    g.appendChild(body);
+    if(c.type==="battery"){
+      g.appendChild(NS("line",{x1:c.x-8,y1:c.y-13,x2:c.x-8,y2:c.y+13,stroke:"#ffd479","stroke-width":3}));
+      g.appendChild(NS("line",{x1:c.x+7,y1:c.y-8,x2:c.x+7,y2:c.y+8,stroke:"#ffd479","stroke-width":6}));
+      g.appendChild(txt(c.x-14,c.y+3,"−",13,"#ffd479"));g.appendChild(txt(c.x+17,c.y+3,"+",13,"#ffd479"));
+    }else if(c.type==="resistor"){
+      for(let i=0;i<6;i++)g.appendChild(NS("line",{x1:c.x-20+i*8,y1:c.y+(i%2?-6:6),x2:c.x-14+i*8,y2:c.y+(i%2?6:-6),stroke:"#8fd3ff","stroke-width":2}));
+    }else if(c.type==="lamp"){
+      g.appendChild(NS("circle",{cx:c.x,cy:c.y,r:13,fill:r.P>0.01?"#ffe6a0":"#2b3c50",stroke:"#ffd479","stroke-width":2}));
+      g.appendChild(NS("line",{x1:c.x-8,y1:c.y-8,x2:c.x+8,y2:c.y+8,stroke:"#8a6a2a","stroke-width":1.6}));
+      g.appendChild(NS("line",{x1:c.x-8,y1:c.y+8,x2:c.x+8,y2:c.y-8,stroke:"#8a6a2a","stroke-width":1.6}));
+    }else if(c.type==="switch"){
+      g.appendChild(NS("line",{x1:c.x-17,y1:c.y+7,x2:c.x-17,y2:c.y-7,stroke:"#8fd3ff","stroke-width":2}));
+      g.appendChild(NS("line",{x1:c.x+17,y1:c.y+7,x2:c.x+17,y2:c.y-7,stroke:"#8fd3ff","stroke-width":2}));
+      g.appendChild(NS("line",{x1:c.x-17,y1:c.y+6,x2:c.x+(c.closed?17:12),y2:c.y+(c.closed?6:-12),stroke:c.closed?"#7bd88f":"#ff9b6b","stroke-width":3,"stroke-linecap":"round"}));
+      g.appendChild(txt(c.x,c.y-14,c.closed?"闭合":"断开",10,c.closed?"#7bd88f":"#ff9b6b"));
+    }
+    const val=c.type==="switch"?(c.closed?"ON":"OFF"):(c.value+unitOf(c));
+    g.appendChild(txt(c.x,c.y+34,val,12,"#cfe3f5"));
+    const rr=r.I;
+    const dir=Math.abs(rr)<5e-4?"":(rr>0?"→":"←");
+    g.appendChild(txt(c.x,c.y+50,Math.abs(rr).toFixed(3)+" A "+dir,11,"#ffca7a"));
+    g.appendChild(txt(c.x,c.y-30,labelOf(c),10,"#7f98ae"));
+    // terminals
+    for(const t of [0,1]){
+      const p=termPos(c,t);
+      const isPending=pending&&pending===c.id+":"+t;
+      const dot=NS("circle",{cx:p.x,cy:p.y,r:8,fill:isPending?"#ffb74d":"#4fc3f7",stroke:"#0d1520","stroke-width":2});
+      dot.style.cursor="crosshair";
+      dot.addEventListener("pointerdown",e=>{e.stopPropagation();onTerminal(c.id+":"+t);});
+      g.appendChild(dot);
+    }
+    g.addEventListener("pointerdown",e=>{
+      e.preventDefault();selected=c.id;showProps();const p=toSvg(e);
+      drag={id:c.id,dx:p.x-c.x,dy:p.y-c.y};
+      try{svg.setPointerCapture(e.pointerId);}catch(_){}
+    });
+    svg.appendChild(g);
+  }
+}
+svg.addEventListener("pointermove",onMove);
+svg.addEventListener("pointerup",endDrag);
+svg.addEventListener("pointercancel",endDrag);
+svg.addEventListener("pointerdown",e=>{if(e.target===svg){selected=null;pending=null;showProps();render();}});
+function toSvg(e){const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const m=svg.getScreenCTM();return m?p.matrixTransform(m.inverse()):{x:0,y:0};}
+function onMove(e){if(!drag)return;const p=toSvg(e),c=findComp(drag.id);if(!c)return;c.x=Math.max(34,Math.min(866,p.x-drag.dx));c.y=Math.max(40,Math.min(420,p.y-drag.dy));render();}
+function endDrag(){if(drag){drag=null;render();}}
+function onTerminal(key){
+  if(!pending){pending=key;render();return;}
+  if(pending===key){pending=null;render();return;}
+  const dup=wires.some(w=>(w.a===pending&&w.b===key)||(w.a===key&&w.b===pending));
+  if(!dup)wires.push({id:seq++,a:pending,b:key});
+  pending=null;render();
+}
+function showProps(){
+  const c=findComp(selected);
+  if(!c){props.innerHTML="<p class='hint'>点击画布中的元件进行编辑，点击端子后再点另一个端子即可连线；拖动元件可移动位置，连线会保留。</p>";return;}
+  let h="<div class='row'><label>元件</label><strong>"+labelOf(c)+"</strong></div>";
+  if(c.type==="battery"||c.type==="resistor"||c.type==="lamp"){
+    h+="<div class='row'><label>"+(c.type==="battery"?"电压 (V)":"电阻 (Ω)")+"</label><input type='number' id='pv' min='0' step='1' value='"+c.value+"'><button id='apply'>应用</button></div>";
+  }
+  if(c.type==="switch")h+="<div class='row'><button id='toggle' class='"+(c.closed?"on":"")+"'>"+(c.closed?"断开开关":"闭合开关")+"</button></div>";
+  h+="<div class='row'><button id='del' class='danger'>删除元件（含相关连线）</button></div>";
+  props.innerHTML=h;
+  const apply=document.getElementById("apply");
+  if(apply)apply.onclick=()=>{const v=parseFloat(document.getElementById("pv").value);if(Number.isFinite(v)&&v>0){c.value=v;render();showProps();}else alert("请输入大于 0 的数值");};
+  const tg=document.getElementById("toggle");
+  if(tg)tg.onclick=()=>{c.closed=!c.closed;render();showProps();};
+  document.getElementById("del").onclick=()=>{
+    comps=comps.filter(v=>v.id!==c.id);
+    wires=wires.filter(w=>parseKey(w.a).cid!==c.id&&parseKey(w.b).cid!==c.id);
+    selected=null;pending=null;render();showProps();
+  };
+}
+document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
+  const t=b.dataset.add;
+  const c=def(t,180+((comps.length*97)%560),230+((comps.length*53)%140),t==="battery"?12:(t==="resistor"?100:(t==="lamp"?60:0)));
+  comps.push(c);selected=c.id;render();showProps();
+});
+document.querySelectorAll("[data-preset]").forEach(b=>b.onclick=()=>{preset(b.dataset.preset);selected=null;showProps();});
+document.getElementById("clear").onclick=()=>{comps=[];wires=[];selected=null;pending=null;render();showProps();};
+preset("series");
+showProps();
+})();
+</script>
+</body>
+</html>
