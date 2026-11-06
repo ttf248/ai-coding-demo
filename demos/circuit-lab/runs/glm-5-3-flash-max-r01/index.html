@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script src="../../../../assets/analytics.js" defer></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>简化电路实验台</title>
+<style>
+  :root { --bg:#0f172a; --panel:#1e293b; --line:#334155; --text:#e2e8f0; --dim:#94a3b8; --accent:#38bdf8; --warn:#fbbf24; --err:#f87171; --ok:#4ade80; }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; }
+  body { font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; overflow-x:hidden; }
+  header { padding:10px 14px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  header h1 { font-size:17px; margin-right:auto; white-space:nowrap; }
+  button { font:inherit; background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px 12px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:#0c4a6e; border-color:#0369a1; }
+  button.danger { background:#7f1d1d; border-color:#991b1b; }
+  button.active { background:#0c4a6e; border-color:var(--accent); color:#fff; }
+  main { flex:1; display:flex; flex-direction:column; min-height:0; }
+  #toolbar { display:flex; flex-wrap:wrap; gap:6px; padding:8px 14px; border-bottom:1px solid var(--line); }
+  #stage-wrap { flex:1; position:relative; min-height:260px; background:#0b1120; }
+  canvas { display:block; width:100%; height:100%; touch-action:none; }
+  #msg { position:absolute; left:10px; right:10px; top:10px; padding:8px 12px; border-radius:8px; font-size:13px; line-height:1.5; pointer-events:none; display:none; z-index:5; }
+  #msg.warn { display:block; background:rgba(120,53,15,.92); border:1px solid var(--warn); color:#fde68a; }
+  #msg.err { display:block; background:rgba(127,29,29,.92); border:1px solid var(--err); color:#fecaca; }
+  #msg.ok { display:block; background:rgba(20,83,45,.85); border:1px solid var(--ok); color:#bbf7d0; }
+  #side { border-top:1px solid var(--line); padding:10px 14px 16px; display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .box { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 12px; min-width:230px; flex:1; max-width:420px; }
+  .box h2 { font-size:14px; color:var(--dim); font-weight:600; margin-bottom:8px; }
+  .row { display:flex; align-items:center; gap:8px; margin:6px 0; font-size:13px; flex-wrap:wrap; }
+  input[type=number] { font:inherit; width:90px; background:#0b1120; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:4px 6px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td { text-align:left; padding:4px 6px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th { color:var(--dim); font-weight:600; }
+  .dir { color:var(--accent); }
+  .hint { font-size:12px; color:var(--dim); line-height:1.7; }
+  .lamp { display:inline-block; width:14px; height:14px; border-radius:50%; vertical-align:-2px; margin-right:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>简化电路实验台</h1>
+  <button id="btn-series">串联预设</button>
+  <button id="btn-parallel">并联预设</button>
+  <button id="btn-reset" class="danger">一键重置</button>
+</header>
+<main>
+  <div id="toolbar">
+    <button data-tool="select" class="active">选择/拖动</button>
+    <button data-tool="battery">电池</button>
+    <button data-tool="resistor">电阻</button>
+    <button data-tool="switch">开关</button>
+    <button data-tool="bulb">灯泡</button>
+    <button data-tool="wire">导线</button>
+    <button data-tool="delete">删除</button>
+  </div>
+  <div id="stage-wrap">
+    <canvas id="stage"></canvas>
+    <div id="msg"></div>
+  </div>
+  <div id="side">
+    <div class="box" id="edit-box" style="display:none">
+      <h2>元件属性</h2>
+      <div class="row" id="edit-fields"></div>
+      <div class="row"><button id="btn-del" class="danger">删除该元件</button></div>
+    </div>
+    <div class="box" id="result-box">
+      <h2>求解结果</h2>
+      <div id="result-body" class="hint">在画布上放置元件并用导线连接后自动求解。</div>
+    </div>
+    <div class="box" style="max-width:300px">
+      <h2>操作说明</h2>
+      <div class="hint">
+        选择左侧工具后在画布上<strong>按住拖动</strong>放置元件；「选择」模式下拖动元件可移动（连线跟随），点击开关切换通断，点击元件可编辑电压/电阻或删除。
+        「导线」工具从一个端子拖到另一个端子完成连线。电池两端用导线直接相连会提示短路；理想电源相互冲突或电路无唯一解时给出提示，不会输出错误数值。灯泡为固定电阻的简化模型，亮度随耗散功率变化。
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+"use strict";
+const CELL = 36;
+const TYPES = {
+  battery:  { label:"电池",   color:"#fbbf24", span:3, draw:"battery" },
+  resistor: { label:"电阻",   color:"#e2e8f0", span:2, draw:"zigzag" },
+  bulb:     { label:"灯泡",   color:"#fca5a5", span:2, draw:"bulb", fixedR:50 },
+  switch:   { label:"开关",   color:"#4ade80", span:2, draw:"switch" },
+};
+let tool = "select";
+let elements = [];   // {id,type,x1,y1,x2,y2, value, closed}
+let wires = [];      // {id, a:{el,term}|{x,y}, b:{el,term}|{x,y}}
+let seq = 1;
+let drag = null;     // {kind:"move"|"place"|"wire", ...}
+let selected = null;
+let canvas = document.getElementById("stage");
+let ctx = canvas.getContext("2d");
+let wrap = document.getElementById("stage-wrap");
+let msgBox = document.getElementById("msg");
+let solution = null;
+let msg = null;
+
+function snap(v){ return Math.round(v / CELL) * CELL; }
+function W(){ return wrap.clientWidth; }
+function H(){ return wrap.clientHeight; }
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W() * dpr; canvas.height = H() * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+window.addEventListener("resize", resize);
+
+function termPos(el, i){
+  return i === 0 ? { x:el.x1, y:el.y1 } : { x:el.x2, y:el.y2 };
+}
+function wireEnd(w, which){
+  const p = which === 0 ? w.a : w.b;
+  if (p.el){
+    const el = elements.find(e => e.id === p.el);
+    if (!el) return null;
+    return termPos(el, p.term);
+  }
+  return { x:p.x, y:p.y };
+}
+function otherEnd(w, which){ return wireEnd(w, which === 0 ? 1 : 0); }
+
+/* ---------- 放置与编辑 ---------- */
+document.querySelectorAll("#toolbar button[data-tool]").forEach(b => {
+  b.addEventListener("click", () => {
+    tool = b.dataset.tool;
+    document.querySelectorAll("#toolbar button[data-tool]").forEach(x => x.classList.toggle("active", x === b));
+    hideEdit();
+    setMsg(null);
+  });
+});
+
+function hitTerminal(pt, radius){
+  for (const el of elements){
+    for (let i = 0; i < 2; i++){
+      const t = termPos(el, i);
+      if (Math.hypot(pt.x - t.x, pt.y - t.y) <= radius) return { el, term:i, x:t.x, y:t.y };
+    }
+  }
+  return null;
+}
+function hitWirePoint(pt, radius){
+  for (const w of wires){
+    for (const which of [0,1]){
+      const p = wireEnd(w, which);
+      if (p && Math.hypot(pt.x - p.x, pt.y - p.y) <= radius) return p;
+    }
+  }
+  return null;
+}
+function hitElement(pt){
+  for (let i = elements.length - 1; i >= 0; i--){
+    const el = elements[i];
+    const cx = (el.x1 + el.x2)/2, cy = (el.y1 + el.y2)/2;
+    const half = TYPES[el.type].span * CELL / 2 + 6;
+    const horiz = el.y1 === el.y2;
+    const dx = horiz ? half : 14, dy = horiz ? 14 : half;
+    if (pt.x >= cx - dx && pt.x <= cx + dx && pt.y >= cy - dy && pt.y <= cy + dy) return el;
+  }
+  return null;
+}
+function hitWire(pt){
+  for (let i = wires.length - 1; i >= 0; i--){
+    const p1 = wireEnd(wires[i], 0), p2 = wireEnd(wires[i], 1);
+    if (!p1 || !p2) continue;
+    if (distToSeg(pt, p1, p2) <= 7) return wires[i];
+  }
+  return null;
+}
+function distToSeg(p, a, b){
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx*dx + dy*dy;
+  let t = len2 ? ((p.x - a.x)*dx + (p.y - a.y)*dy) / len2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x - (a.x + t*dx), p.y - (a.y + t*dy));
+}
+
+function canvasPoint(ev){
+  const r = canvas.getBoundingClientRect();
+  return { x: ev.clientX - r.left, y: ev.clientY - r.top };
+}
+canvas.addEventListener("pointerdown", ev => {
+  ev.preventDefault();
+  canvas.setPointerCapture(ev.pointerId);
+  const pt = canvasPoint(ev);
+  if (tool === "select"){
+    const t = hitTerminal(pt, 14);
+    const el = hitElement(pt);
+    if (el){
+      selected = el;
+      showEdit(el);
+      if (el.type === "switch" && Math.hypot(pt.x - (el.x1+el.x2)/2, pt.y - (el.y1+el.y2)/2) < 20){
+        el.closed = !el.closed; solve(); draw(); return;
+      }
+      drag = { kind:"move", el, start:pt, o:{x1:el.x1,y1:el.y1,x2:el.x2,y2:el.y2} };
+    } else {
+      selected = null; hideEdit();
+    }
+  } else if (tool === "wire"){
+    const p = hitTerminal(pt, 16) || hitWirePoint(pt, 16) || { x:snap(pt.x), y:snap(pt.y) };
+    drag = { kind:"wire", from:{ el:p.el ? p.el.id : undefined, term:p.term, x:p.x, y:p.y }, to:null };
+  } else if (tool === "delete"){
+    const el = hitElement(pt);
+    if (el){ removeElement(el); solve(); draw(); return; }
+    const w = hitWire(pt);
+    if (w){ wires = wires.filter(x => x !== w); solve(); draw(); return; }
+  } else {
+    // 放置元件：拖出跨度
+    const start = { x:snap(pt.x), y:snap(pt.y) };
+    drag = { kind:"place", type:tool, start, end:start };
+  }
+  draw();
+});
+canvas.addEventListener("pointermove", ev => {
+  if (!drag) return;
+  const pt = canvasPoint(ev);
+  if (drag.kind === "place"){
+    const s = drag.start;
+    drag.end = Math.abs(pt.x - s.x) >= Math.abs(pt.y - s.y)
+      ? { x:snap(pt.x), y:s.y } : { x:s.x, y:snap(pt.y) };
+  } else if (drag.kind === "wire"){
+    const t = hitTerminal(pt, 16) || hitWirePoint(pt, 16) || { x:snap(pt.x), y:snap(pt.y) };
+    drag.to = { el:t.el ? t.el.id : undefined, term:t.term, x:t.x, y:t.y };
+  } else if (drag.kind === "move"){
+    const dx = snap(pt.x - drag.start.x), dy = snap(pt.y - drag.start.y);
+    const el = drag.el;
+    el.x1 = drag.o.x1 + dx; el.y1 = drag.o.y1 + dy;
+    el.x2 = drag.o.x2 + dx; el.y2 = drag.o.y2 + dy;
+  }
+  draw();
+});
+canvas.addEventListener("pointerup", ev => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (d.kind === "place"){
+    const s = d.start, e = d.end;
+    const len = Math.abs(e.x - s.x) + Math.abs(e.y - s.y);
+    if (len > 0){
+      elements.push({
+        id: seq++, type: d.type, x1:s.x, y1:s.y, x2:e.x, y2:e.y,
+        value: d.type === "battery" ? 12 : d.type === "resistor" ? 100 : null,
+        closed: d.type === "switch" ? false : undefined,
+      });
+    }
+    solve();
+  } else if (d.kind === "wire"){
+    if (d.to){
+      const a = d.from, b = d.to;
+      const same = (a.el && b.el) ? a.el === b.el && a.term === b.term
+        : (!a.el && !b.el && a.x === b.x && a.y === b.y);
+      if (!same) wires.push({ id: seq++, a, b });
+      solve();
+    }
+  } else if (d.kind === "move"){
+    solve();
+  }
+  draw();
+});
+
+function removeElement(el){
+  elements = elements.filter(e => e !== el);
+  wires = wires.filter(w => w.a.el !== el.id && w.b.el !== el.id);
+  if (selected === el){ selected = null; hideEdit(); }
+}
+
+function showEdit(el){
+  const box = document.getElementById("edit-box");
+  const f = document.getElementById("edit-fields");
+  box.style.display = "";
+  let html = "";
+  if (el.type === "battery") html = `电压 <input type="number" id="f-v" min="0.5" max="1000" step="0.5" value="${el.value}"> V`;
+  else if (el.type === "resistor") html = `电阻 <input type="number" id="f-r" min="1" max="100000" step="1" value="${el.value}"> Ω`;
+  else if (el.type === "bulb") html = `<span class="lamp" id="lamp-dot"></span> 灯泡（固定电阻 50 Ω 简化模型）`;
+  else if (el.type === "switch") html = `状态：<strong>${el.closed ? "闭合" : "断开"}</strong>（在画布上点击开关本体切换）`;
+  f.innerHTML = html;
+  const vi = document.getElementById("f-v");
+  if (vi) vi.addEventListener("change", () => {
+    const v = parseFloat(vi.value);
+    if (isFinite(v) && v > 0) { el.value = v; solve(); draw(); }
+  });
+  const ri = document.getElementById("f-r");
+  if (ri) ri.addEventListener("change", () => {
+    const v = parseFloat(ri.value);
+    if (isFinite(v) && v >= 1) { el.value = v; solve(); draw(); }
+  });
+  const dot = document.getElementById("lamp-dot");
+  if (dot) dot.style.background = bulbColor(el);
+}
+function hideEdit(){ document.getElementById("edit-box").style.display = "none"; }
+document.getElementById("btn-del").addEventListener("click", () => {
+  if (selected){ removeElement(selected); solve(); draw(); }
+});
+
+/* ---------- 节点与求解（改进节点法） ---------- */
+function buildNodes(){
+  const parent = new Map();
+  const find = k => {
+    while (parent.get(k) !== k){ parent.set(k, parent.get(parent.get(k))); k = parent.get(k); }
+    return k;
+  };
+  const uni = (a,b) => { a = find(a); b = find(b); if (a !== b) parent.set(a,b); };
+  const key = (x,y) => x + "," + y;
+  for (const el of elements){
+    for (let i = 0; i < 2; i++){
+      const t = termPos(el, i);
+      const k = key(t.x, t.y);
+      if (!parent.has(k)) parent.set(k, k);
+    }
+  }
+  for (const w of wires){
+    const p1 = wireEnd(w, 0), p2 = wireEnd(w, 1);
+    if (!p1 || !p2) continue;
+    const k1 = key(p1.x, p1.y), k2 = key(p2.x, p2.y);
+    if (!parent.has(k1)) parent.set(k1, k1);
+    if (!parent.has(k2)) parent.set(k2, k2);
+    uni(k1, k2);
+  }
+  const nodeOf = new Map();
+  for (const el of elements)
+    for (let i = 0; i < 2; i++){
+      const t = termPos(el, i);
+      nodeOf.set(el.id + ":" + i, find(key(t.x, t.y)));
+    }
+  return { parent, find, nodeOf, key };
+}
+
+function solve(){
+  solution = null;
+  msg = null;
+  if (elements.length === 0){
+    setResult("在画布上放置元件并用导线连接后自动求解。");
+    return;
+  }
+  const { find, nodeOf } = buildNodes();
+  const nodeIds = [...new Set(elements.flatMap(e => [nodeOf.get(e.id+":0"), nodeOf.get(e.id+":1")]))];
+  const idx = new Map(nodeIds.map((n,i) => [n,i]));
+  const N = nodeIds.length;
+
+  // 悬空闭合开关按断开处理（无电流回路）
+  const degree = new Map();
+  for (const el of elements)
+    for (let i = 0; i < 2; i++){
+      const n = nodeOf.get(el.id+":"+i);
+      degree.set(n, (degree.get(n)||0) + 1);
+    }
+  const effClosed = el => el.type === "switch" && el.closed &&
+    [0,1].every(i => (degree.get(nodeOf.get(el.id+":"+i)) || 0) >= 2);
+
+  // 电池两端同节点 → 短路
+  for (const el of elements){
+    if (el.type === "battery" && nodeOf.get(el.id+":0") === nodeOf.get(el.id+":1")){
+      msg = { cls:"err", text:"检测到电池两端被导线直接相连：电源短路！请调整连线，短路会产生无穷大电流，本实验台不输出该数值。" };
+      setResult("", true);
+      return;
+    }
+  }
+
+  const sources = elements.filter(e => e.type === "battery");
+  const switches = elements.filter(e => e.type === "switch");
+  const vBranches = [...sources, ...switches.filter(effClosed)];   // 电压源型支路
+  const passive = elements.filter(e => (e.type === "resistor" || e.type === "bulb") ||
+    (e.type === "switch" && !effClosed(e)));
+  for (const sw of switches)
+    if (sw.type === "switch" && sw.closed && !effClosed(sw))
+      sw._openReason = "一端悬空，按断开处理";
+
+  const M = N + vBranches.length;
+  const A = Array.from({length:M}, () => new Array(M).fill(0));
+  const z = new Array(M).fill(0);
+
+  for (const el of passive){
+    const a = idx.get(nodeOf.get(el.id+":0")), b = idx.get(nodeOf.get(el.id+":1"));
+    const g = (el.type === "switch") ? 0 : 1 / el.value;
+    if (a === b) continue; // 两端同节点：对电阻而言被短路，无独立方程
+    A[a][a] += g; A[a][b] -= g; A[b][a] -= g; A[b][b] += g;
+  }
+  vBranches.forEach((el, k) => {
+    const a = idx.get(nodeOf.get(el.id+":0")), b = idx.get(nodeOf.get(el.id+":1"));
+    const row = N + k;
+    if (a !== b){ A[a][row] += 1; A[b][row] -= 1; A[row][a] += 1; A[row][b] -= 1; }
+    z[row] = el.type === "battery" ? el.value : 0;
+    if (a === b) z[row] = el.type === "battery" ? el.value : 0;
+  });
+
+  // 参考节点：第一个电池的负端，否则任一节点
+  let gnd = 0;
+  if (sources.length){
+    const b0 = sources[0];
+    gnd = idx.get(nodeOf.get(b0.id+":1"));
+  }
+  // 消去参考节点行与列
+  for (let r = 0; r < M; r++){ A[r][gnd] = 0; }
+  A[gnd] = new Array(M).fill(0); A[gnd][gnd] = 1; z[gnd] = 0;
+
+  const res = gauss(A, z);
+  if (!res){
+    msg = { cls:"err", text:"电路无唯一解：可能存在理想电源相互冲突（如不同电压的电池并联）或悬空的电源支路。请检查连线。" };
+    setResult("", true);
+    return;
+  }
+  const V = res.slice(0, N);
+  const I = res.slice(N);
+
+  // 电池电流过大 → 短路提示（保留计算值但给出警告）
+  const I_SHORT = 200;
+  for (let k = 0; k < vBranches.length; k++){
+    const el = vBranches[k];
+    if (el.type === "battery" && Math.abs(I[k]) > I_SHORT){
+      msg = { cls:"warn", text:"警告：电池电流异常大（" + Math.abs(I[k]).toFixed(2) + " A），接近短路状态，请检查是否用导线或闭合开关直接旁路了电池。" };
+    }
+  }
+
+  solution = { V, idx, I, vBranches, nodeOf, find };
+  renderResults();
+  draw();
+}
+
+function gauss(A, z){
+  const n = A.length;
+  const M = A.map((row,i) => [...row, z[i]]);
+  for (let c = 0; c < n; c++){
+    let p = c;
+    for (let r = c+1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    if (Math.abs(M[p][c]) < 1e-10) return null;
+    [M[c], M[p]] = [M[p], M[c]];
+    for (let r = 0; r < n; r++){
+      if (r === c) continue;
+      const f = M[r][c] / M[c][c];
+      if (!f) continue;
+      for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
+    }
+  }
+  return M.map((row,i) => row[n] / row[i]);
+}
+
+function currentOf(el){
+  if (!solution) return { i:0, dir:1 };
+  const { V, idx, I, vBranches } = solution;
+  const a = idx.get(solution.nodeOf.get(el.id+":0"));
+  const b = idx.get(solution.nodeOf.get(el.id+":1"));
+  if (el.type === "battery" || el.type === "switch"){
+    const k = vBranches.indexOf(el);
+    if (k < 0) return { i:0, dir:1 };
+    return { i:I[k], dir:1 };
+  }
+  const va = V[a] ?? 0, vb = V[b] ?? 0;
+  const i = (va - vb) / el.value;
+  return { i, dir: i >= 0 ? 1 : -1 };
+}
+function bulbPower(el){
+  if (!solution || el.type !== "bulb") return 0;
+  const { i } = currentOf(el);
+  return i*i*50;
+}
+function bulbColor(el){
+  const pw = bulbPower(el);
+  const t = Math.min(1, pw / 2);
+  return `rgb(${Math.round(71+254*t)},${Math.round(69+120*t)},${Math.round(105-40*t)})`;
+}
+
+function setResult(text, keepTable){
+  const body = document.getElementById("result-body");
+  if (text && !keepTable){ body.innerHTML = text; body.className = "hint"; return; }
+  if (keepTable && text === ""){ body.innerHTML = `<div class="hint">无法求解，请查看画布上方提示。</div>`; return; }
+  body.innerHTML = text;
+  body.className = "";
+}
+function fmt(x){
+  if (!isFinite(x)) return "—";
+  const a = Math.abs(x);
+  if (a >= 1e5 || (a < 1e-9 && a > 0)) return x.toExponential(2);
+  return x.toFixed(a < 0.1 ? 4 : 3).replace(/0+$/,"").replace(/\.$/,"");
+}
+function renderResults(){
+  const rows = elements.map(el => {
+    const { i, dir } = currentOf(el);
+    const a = solution.idx.get(solution.nodeOf.get(el.id+":0"));
+    const b = solution.idx.get(solution.nodeOf.get(el.id+":1"));
+    const va = solution.V[a] ?? 0, vb = solution.V[b] ?? 0;
+    const u = va - vb;
+    let extra = "";
+    if (el.type === "bulb"){
+      const pw = i*i*50;
+      extra = ` · ${(pw*1000).toFixed(0)} mW`;
+    }
+    if (el.type === "switch") extra = el.closed ? " · 闭合" : " · 断开";
+    let arrow;
+    if (el.type === "battery"){
+      arrow = i === 0 ? "无电流" : (i < 0 ? `<span class="dir">对外供电</span>` : "被充电");
+    } else {
+      arrow = i === 0 ? "无电流" : `<span class="dir">${dir > 0 ? "端子1 → 端子2" : "端子2 → 端子1"}</span>`;
+    }
+    return `<tr><td>${TYPES[el.type].label}${el.type==="resistor"?` ${el.value}Ω`:el.type==="battery"?` ${el.value}V`:""}</td>
+      <td>${fmt(u)} V</td><td>${fmt(Math.abs(i))} A</td><td>${arrow}${extra}</td></tr>`;
+  });
+  let total = 0;
+  if (solution){
+    solution.vBranches.forEach((el,k) => { if (el.type === "battery") total += Math.abs(solution.I[k]); });
+  }
+  setResult(`<table><tr><th>元件</th><th>电压</th><th>电流</th><th>方向</th></tr>${rows.join("")}
+    ${total ? `<tr><td colspan="4">电池总电流 ${fmt(total)} A</td></tr>` : ""}</table>`);
+}
+
+/* ---------- 绘制 ---------- */
+function setMsg(m){
+  msg = m;
+  msgBox.className = m ? m.cls : "";
+  msgBox.textContent = m ? m.text : "";
+  msgBox.id = "msg";
+  if (!m) msgBox.style.display = "none";
+  else msgBox.style.display = "";
+}
+
+function draw(){
+  ctx.clearRect(0, 0, W(), H());
+  // 网格
+  ctx.strokeStyle = "rgba(51,65,85,.45)";
+  ctx.lineWidth = 1;
+  const cols = Math.ceil(W()/CELL), rows = Math.ceil(H()/CELL);
+  ctx.beginPath();
+  for (let i = 0; i <= cols; i++){ ctx.moveTo(i*CELL, 0); ctx.lineTo(i*CELL, H()); }
+  for (let j = 0; j <= rows; j++){ ctx.moveTo(0, j*CELL); ctx.lineTo(W(), j*CELL); }
+  ctx.stroke();
+
+  // 导线
+  ctx.strokeStyle = "#7dd3fc";
+  ctx.lineWidth = 3;
+  for (const w of wires){
+    const p1 = wireEnd(w, 0), p2 = wireEnd(w, 1);
+    if (p1 && p2){
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    }
+  }
+  // 元件
+  for (const el of elements) drawElement(el);
+  // 拖放预览
+  if (drag && drag.kind === "place") drawPreview(drag);
+  if (drag && drag.kind === "wire" && drag.to){
+    const a = drag.from, b = drag.to;
+    ctx.strokeStyle = "rgba(125,211,252,.6)";
+    ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // 端子
+  for (const el of elements)
+    for (let i = 0; i < 2; i++){
+      const t = termPos(el, i);
+      ctx.fillStyle = "#38bdf8";
+      ctx.beginPath(); ctx.arc(t.x, t.y, 4, 0, Math.PI*2); ctx.fill();
+    }
+  if (msg) setMsg(msg);
+}
+
+function drawElement(el){
+  const t = TYPES[el.type];
+  const horiz = el.y1 === el.y2;
+  ctx.save();
+  ctx.translate((el.x1+el.x2)/2, (el.y1+el.y2)/2);
+  if (!horiz) ctx.rotate(Math.PI/2);
+  const half = t.span * CELL / 2;
+  ctx.strokeStyle = t.color;
+  ctx.fillStyle = t.color;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-half, 0); ctx.lineTo(-half + 12, 0);
+  if (t.draw === "battery"){
+    ctx.moveTo(-half+12, 0); ctx.lineTo(-6, 0);
+    ctx.moveTo(-6, -14); ctx.lineTo(-6, 14);        // 长线 正极（端子1侧）
+    ctx.moveTo(-1, -8); ctx.lineTo(-1, 8);          // 短线 负极
+    ctx.moveTo(-1, 0); ctx.lineTo(half, 0);
+    ctx.stroke();
+    ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(el.value + "V", 0, -20);
+    ctx.fillStyle = "#fde68a";
+    ctx.fillText("+", -9, -17);
+  } else if (t.draw === "zigzag"){
+    ctx.moveTo(-half+12, 0);
+    const seg = (half*2 - 24) / 6;
+    for (let k = 0; k < 6; k++){
+      const x0 = -half + 12 + seg*k;
+      ctx.lineTo(x0 + seg/2, k % 2 ? 9 : -9);
+    }
+    ctx.lineTo(half - 12, 0);
+    ctx.stroke();
+    ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(el.value + "Ω", 0, 24);
+  } else if (t.draw === "bulb"){
+    ctx.moveTo(-half, 0); ctx.lineTo(-10, 0);
+    ctx.arc(0, 0, 10, 0, Math.PI*2);
+    ctx.moveTo(10, 0); ctx.lineTo(half, 0);
+    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-4,3); ctx.lineTo(0,-4); ctx.lineTo(4,3); ctx.stroke();
+    ctx.font = "11px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("灯泡 50Ω", 0, 24);
+    const c = bulbColor(el);
+    if (solution){
+      const { i } = currentOf(el);
+      const pw = i*i*50;
+      const a = Math.min(0.85, pw/3);
+      if (a > 0.02){
+        const g = ctx.createRadialGradient(0,0,2, 0,0,30);
+        g.addColorStop(0, `rgba(253,224,71,${a})`);
+        g.addColorStop(1, "rgba(253,224,71,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0,0,30,0,Math.PI*2); ctx.fill();
+      }
+    }
+  } else if (t.draw === "switch"){
+    ctx.moveTo(-half, 0); ctx.lineTo(-8, 0);
+    ctx.moveTo(8, 0); ctx.lineTo(half, 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(-8, 0, 2.5, 0, Math.PI*2); ctx.arc(8, 0, 2.5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-8, 0);
+    if (el.closed) ctx.lineTo(8, 0);
+    else ctx.lineTo(4, -14);
+    ctx.stroke();
+    ctx.font = "11px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(el.closed ? "闭合" : "断开", 0, 24);
+  }
+  if (selected === el){
+    ctx.strokeStyle = "rgba(56,189,248,.9)";
+    ctx.setLineDash([4,3]);
+    const hw = t.span*CELL/2 + 8;
+    ctx.strokeRect(-hw, -18, hw*2, 36);
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+function drawPreview(d){
+  const s = d.start, e = d.end;
+  if (s.x === e.x && s.y === e.y) return;
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  drawElement({ type:d.type, x1:s.x, y1:s.y, x2:e.x, y2:e.y, value: d.type==="battery"?12:d.type==="resistor"?100:null, closed:false });
+  ctx.restore();
+}
+
+/* ---------- 预设 ---------- */
+function addEl(type, x1, y1, x2, y2, value){
+  const el = { id: seq++, type, x1, y1, x2, y2, value, closed: type==="switch"?true:undefined };
+  elements.push(el);
+  return el;
+}
+function loadSeries(){
+  elements = []; wires = []; selected = null; hideEdit();
+  const k = (x,y)=>({x,y});
+  // 电池正极(2,5) → 上行 → R100 → R200 → 右侧下行 → 底部回到负极(5,5)
+  addEl("battery", 2*CELL, 5*CELL, 5*CELL, 5*CELL, 12);
+  addEl("resistor", 6*CELL, 2*CELL, 8*CELL, 2*CELL, 100);
+  addEl("resistor", 10*CELL, 2*CELL, 12*CELL, 2*CELL, 200);
+  wires.push(
+    { id: seq++, a:k(2*CELL,5*CELL), b:k(2*CELL,2*CELL) },
+    { id: seq++, a:k(2*CELL,2*CELL), b:k(6*CELL,2*CELL) },
+    { id: seq++, a:k(8*CELL,2*CELL), b:k(10*CELL,2*CELL) },
+    { id: seq++, a:k(12*CELL,2*CELL), b:k(12*CELL,5*CELL) },
+    { id: seq++, a:k(12*CELL,5*CELL), b:k(5*CELL,5*CELL) },
+  );
+  solve(); draw();
+}
+function loadParallel(){
+  elements = []; wires = []; selected = null; hideEdit();
+  const k = (x,y)=>({x,y});
+  // 电池正极(2,5) → 左母线；R100 与 R200 并联在左/右母线之间；右母线经右侧回到负极(5,5)
+  addEl("battery", 2*CELL, 6*CELL, 5*CELL, 6*CELL, 12);
+  addEl("resistor", 4*CELL, 2*CELL, 6*CELL, 2*CELL, 100);
+  addEl("resistor", 4*CELL, 4*CELL, 6*CELL, 4*CELL, 200);
+  wires.push(
+    { id: seq++, a:k(2*CELL,6*CELL), b:k(2*CELL,2*CELL) },
+    { id: seq++, a:k(2*CELL,2*CELL), b:k(4*CELL,2*CELL) },
+    { id: seq++, a:k(2*CELL,2*CELL), b:k(2*CELL,4*CELL) },
+    { id: seq++, a:k(2*CELL,4*CELL), b:k(4*CELL,4*CELL) },
+    { id: seq++, a:k(6*CELL,2*CELL), b:k(9*CELL,2*CELL) },
+    { id: seq++, a:k(9*CELL,2*CELL), b:k(9*CELL,4*CELL) },
+    { id: seq++, a:k(9*CELL,4*CELL), b:k(6*CELL,4*CELL) },
+    { id: seq++, a:k(9*CELL,4*CELL), b:k(9*CELL,6*CELL) },
+    { id: seq++, a:k(9*CELL,6*CELL), b:k(5*CELL,6*CELL) },
+  );
+  solve(); draw();
+}
+document.getElementById("btn-series").addEventListener("click", loadSeries);
+document.getElementById("btn-parallel").addEventListener("click", loadParallel);
+document.getElementById("btn-reset").addEventListener("click", () => {
+  elements = []; wires = []; selected = null; hideEdit();
+  solution = null; setMsg(null);
+  setResult("在画布上放置元件并用导线连接后自动求解。");
+  draw();
+});
+
+loadSeries();
+resize();
+</script>
+</body>
+</html>

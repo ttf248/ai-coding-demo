@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script src="../../../../assets/analytics.js" defer></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新哥特式塔楼城市 · 夜与昼</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; overflow:hidden; background:#000; }
+  body { font-family:"Segoe UI","PingFang SC",sans-serif; }
+  #stage { display:block; width:100vw; height:100vh; touch-action:none; cursor:grab; }
+  #stage.dragging { cursor:grabbing; }
+  #hud { position:fixed; left:14px; top:12px; color:rgba(255,240,214,.85); font-size:12.5px; line-height:1.7; text-shadow:0 1px 3px rgba(0,0,0,.8); pointer-events:none; }
+  #hud b { font-size:15px; letter-spacing:1px; }
+  #tips { position:fixed; left:14px; bottom:12px; color:rgba(255,240,214,.55); font-size:11.5px; text-shadow:0 1px 3px rgba(0,0,0,.8); pointer-events:none; }
+  #clock { position:fixed; right:14px; top:12px; color:rgba(255,240,214,.85); font-size:13px; text-shadow:0 1px 3px rgba(0,0,0,.8); pointer-events:none; text-align:right; }
+  #fallback { position:fixed; inset:0; display:none; align-items:center; justify-content:center; color:#fca5a5; font-size:14px; padding:30px; text-align:center; line-height:1.8; background:#0a0a12; z-index:9; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="hud"><b>NOCTURNE SPIRES</b><br>新哥特式塔楼城市</div>
+<div id="clock"></div>
+<div id="tips">拖动环视 · 滚轮缩放 · 松手后镜头自动漫游</div>
+<div id="fallback">待确认：当前浏览器无法创建 WebGL 上下文，3D 城市无法渲染。<br>请使用支持 WebGL 的桌面 Chrome / Edge / Firefox 打开本页面。</div>
+<script>
+"use strict";
+const canvas = document.getElementById("stage");
+const gl = canvas.getContext("webgl", { antialias:true });
+if (!gl){
+  document.getElementById("fallback").style.display = "flex";
+  throw new Error("no webgl");
+}
+
+/* ================= 数学 ================= */
+function mat4(){ return new Float32Array(16); }
+function identity(m){ m.set([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); return m; }
+function multiply(out, a, b){
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++)
+    for (let r = 0; r < 4; r++){
+      let s = 0;
+      for (let k = 0; k < 4; k++) s += a[k*4 + r] * b[c*4 + k];
+      o[c*4 + r] = s;
+    }
+  out.set(o); return out;
+}
+function perspective(out, fovy, aspect, near, far){
+  const f = 1 / Math.tan(fovy/2), nf = 1/(near - far);
+  out.fill(0);
+  out[0] = f/aspect; out[5] = f;
+  out[10] = (far+near)*nf; out[11] = -1; out[14] = 2*far*near*nf;
+  return out;
+}
+function lookAt(out, eye, center, up){
+  const zx = eye[0]-center[0], zy = eye[1]-center[1], zz = eye[2]-center[2];
+  let l = Math.hypot(zx,zy,zz) || 1;
+  const z = [zx/l, zy/l, zz/l];
+  const x = [up[1]*zz - up[2]*zy, up[2]*zx - up[0]*zz, up[0]*zy - up[1]*zx];
+  l = Math.hypot(...x) || 1;
+  const xn = [x[0]/l, x[1]/l, x[2]/l];
+  const y = [xn[1]*z[2]-xn[2]*z[1], xn[2]*z[0]-xn[0]*z[2], xn[0]*z[1]-xn[1]*z[0]];
+  out.set([
+    xn[0], y[0], z[0], 0,
+    xn[1], y[1], z[1], 0,
+    xn[2], y[2], z[2], 0,
+    -(xn[0]*eye[0]+xn[1]*eye[1]+xn[2]*eye[2]),
+    -(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]),
+    -(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]), 1
+  ]);
+  return out;
+}
+
+/* ================= RNG ================= */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ================= 几何构建 ================= */
+// 顶点: pos(3) normal(3) color(3) emissive(1)
+const V = [], I = [];
+let vCount = 0;
+function pushBox(x, y, z, sx, sy, sz, r, g, b, e){
+  const hx = sx/2, hy = sy/2, hz = sz/2;
+  const faces = [
+    [[-hx,-hy, hz],[hx,-hy, hz],[hx,hy,hz],[-hx,hy,hz],[0,0,1]],
+    [[ hx,-hy,-hz],[-hx,-hy,-hz],[-hx,hy,-hz],[hx,hy,-hz],[0,0,-1]],
+    [[ hx,-hy, hz],[hx,-hy,-hz],[hx,hy,-hz],[hx,hy,hz],[1,0,0]],
+    [[-hx,-hy,-hz],[-hx,-hy, hz],[-hx,hy,hz],[-hx,hy,-hz],[-1,0,0]],
+    [[-hx, hy, hz],[hx,hy,hz],[hx,hy,-hz],[-hx,hy,-hz],[0,1,0]],
+    [[-hx,-hy,-hz],[hx,-hy,-hz],[hx,-hy,hz],[-hx,-hy,hz],[0,-1,0]],
+  ];
+  for (const f of faces){
+    const [nx, ny, nz] = f[4];
+    for (let k = 0; k < 4; k++)
+      V.push(f[k][0]+x, f[k][1]+y, f[k][2]+z, nx, ny, nz, r, g, b, e);
+    I.push(vCount, vCount+1, vCount+2, vCount, vCount+2, vCount+3);
+    vCount += 4;
+  }
+}
+function pushPyramid(x, y, z, sx, sy, sz, r, g, b, e){
+  const hx = sx/2, hz = sz/2, top = y + sy, base = y;
+  const quads = [
+    [[-hx,base, hz],[hx,base, hz],[0,top,0],[0,0,0]],      // 留待逐面法线
+    [[ hx,base,-hz],[-hx,base,-hz],[0,top,0]],
+    [[ hx,base, hz],[hx,base,-hz],[0,top,0]],
+    [[-hx,base,-hz],[-hx,base, hz],[0,top,0]],
+  ];
+  for (const q of quads){
+    const ax = q[1][0]-q[0][0], ay = q[1][1]-q[0][1], az = q[1][2]-q[0][2];
+    const bx = q[2][0]-q[0][0], by = q[2][1]-q[0][1], bz = q[2][2]-q[0][2];
+    let nx = ay*bz - az*by, ny = az*bx - ax*bz, nz = ax*by - ay*bx;
+    const l = Math.hypot(nx,ny,nz) || 1;
+    nx/=l; ny/=l; nz/=l;
+    for (const p of q)
+      V.push(p[0]+x, p[1], p[2]+z, nx, ny, nz, r, g, b, e);
+    I.push(vCount, vCount+1, vCount+2);
+    vCount += 3;
+  }
+}
+// 尖拱窗（发光薄盒）
+function pushWindow(x, y, z, alongX, w, h, r, g, b, e){
+  if (alongX) pushBox(x, y, z, w, h, 0.12, r, g, b, e);
+  else pushBox(x, y, z, 0.12, h, w, r, g, b, e);
+}
+
+function buildCity(){
+  const rnd = mulberry32(20261107);
+  const stone = [0.42, 0.40, 0.44], dark = [0.30, 0.29, 0.33];
+  const glowWarm = [1.0, 0.72, 0.35];
+  // 大教堂广场地面
+  pushBox(0, -0.5, 0, 46, 1, 46, 0.16, 0.15, 0.17, 0);
+  for (let i = 0; i < 60; i++){
+    const x = (rnd()-0.5)*44, z = (rnd()-0.5)*44;
+    pushBox(x, 0.02, z, 1.4+rnd()*2, 0.1, 1.4+rnd()*2, 0.13+rnd()*0.03, 0.12+rnd()*0.03, 0.14, 0);
+  }
+  // 中央大教堂
+  const cathedral = (cx, cz, s) => {
+    pushBox(cx, s*2, cz, s*2.4, s*4, s*1.6, ...stone, 0);
+    pushBox(cx, s*4.4, cz, s*1.8, s*1.2, s*1.2, ...dark, 0);
+    pushPyramid(cx, s*5, cz, s*1.2, s*2.6, s*0.9, ...stone, 0);
+    pushBox(cx, s*4.4, cz - s*0.0, 0.4, 0.4, 0.4, 1, 0.8, 0.4, 0.6);
+    // 两侧塔
+    for (const side of [-1, 1]){
+      const tx = cx + side * s * 1.5;
+      pushBox(tx, s*3.2, cz, s*1.1, s*6.4, s*1.1, ...stone, 0);
+      pushBox(tx, s*6.6, cz, s*0.8, s*0.5, s*0.8, ...dark, 0);
+      pushPyramid(tx, s*6.85, cz, s*0.7, s*2.2, s*0.7, ...stone, 0);
+      pushBox(tx, s*9.1, cz, 0.22, 0.22, 0.22, 1, 0.85, 0.45, 0.9);
+      // 塔身竖窗
+      for (let f = 0; f < 5; f++)
+        pushWindow(tx, s*1.6 + f*s*0.9, cz + s*0.56, true, s*0.28, s*0.55, ...glowWarm, 0.85);
+    }
+    // 玫瑰窗
+    pushWindow(cx, s*3.6, cz + s*0.82, true, s*0.9, s*0.9, 0.95, 0.55, 0.75, 1.0);
+    // 飞扶壁
+    for (const side of [-1, 1]){
+      pushBox(cx + side*s*1.55, s*1.1, cz, s*1.6, 0.28, 0.28, ...stone, 0);
+      pushBox(cx + side*s*2.3, s*0.55, cz, 0.3, s*1.1, 0.3, ...stone, 0);
+    }
+  };
+  cathedral(0, 0, 1.6);
+  // 环绕塔楼群
+  for (let i = 0; i < 22; i++){
+    const ang = (i/22) * Math.PI*2 + rnd()*0.5;
+    const rad = 11 + rnd()*15;
+    const x = Math.cos(ang)*rad, z = Math.sin(ang)*rad*0.8;
+    const s = 0.5 + rnd()*0.75;
+    const floors = 2 + (rnd()*5|0);
+    let baseY = 0, wid = s*1.5;
+    for (let f = 0; f < floors; f++){
+      pushBox(x, baseY + s*1.5, z, wid, s*3, wid, ...stone, 0);
+      // 每层发光窗
+      const wc = rnd() < 0.8 ? glowWarm : [0.45, 0.75, 1.0];
+      for (let w = 0; w < 3; w++){
+        const off = (w - 1) * wid*0.28;
+        pushWindow(x + off, baseY + s*1.5, z + wid/2 + 0.05, true, wid*0.16, s*0.9, ...wc, 0.8);
+        pushWindow(x + off, baseY + s*1.5, z - wid/2 - 0.05, true, wid*0.16, s*0.9, ...wc, 0.8);
+      }
+      baseY += s*3;
+      wid *= 0.82;
+    }
+    // 哥特尖顶
+    pushPyramid(x, baseY, z, wid*1.15, s*2.4 + rnd()*2, wid*1.15, ...dark, 0);
+    pushBox(x, baseY + s*2.4 + rnd()*2, z, 0.15, 0.15, 0.15, 1, 0.85, 0.5, 0.9);
+  }
+  // 城墙与门
+  for (const a of [0, 1]){
+    for (const side of [-1, 1]){
+      const p = side * 21;
+      if (a === 0) pushBox(0, 1.4, p, 42, 2.8, 1.2, ...dark, 0);
+      else pushBox(p, 1.4, 0, 1.2, 2.8, 34, ...dark, 0);
+      for (let k = -4; k <= 4; k++){
+        const t = k * 4.2;
+        if (a === 0) pushBox(t, 3.2, p, 0.8, 1.2, 1.0, ...stone, 0);
+        else pushBox(p, 3.2, t, 1.0, 1.2, 0.8, ...stone, 0);
+      }
+    }
+  }
+}
+buildCity();
+
+/* ================= 海面网格 ================= */
+const SEA = 64;
+const seaVerts = [], seaIdx = [];
+for (let j = 0; j <= SEA; j++)
+  for (let i = 0; i <= SEA; i++)
+    seaVerts.push((i/SEA - 0.5)*220, 0, (j/SEA - 0.5)*220);
+for (let j = 0; j < SEA; j++)
+  for (let i = 0; i < SEA; i++){
+    const a = j*(SEA+1)+i, b = a+1, c = a+SEA+1, d = c+1;
+    seaIdx.push(a,c,b, b,c,d);
+  }
+
+/* ================= 粒子（火焰余烬） ================= */
+const P = 380;
+const pSeeds = [];
+const prnd = mulberry32(777);
+for (let i = 0; i < P; i++)
+  pSeeds.push({ x:(prnd()-0.5)*40, z:(prnd()-0.5)*40, y0: prnd()*8, sp: 0.4+prnd()*0.9, ph: prnd()*6.28 });
+
+/* ================= 着色器 ================= */
+function sh(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+function prog(vsrc, fsrc){
+  const p = gl.createProgram();
+  gl.attachShader(p, sh(gl.VERTEX_SHADER, vsrc));
+  gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fsrc));
+  gl.linkProgram(p);
+  return p;
+}
+const cityProg = prog(`
+attribute vec3 aPos; attribute vec3 aNormal; attribute vec3 aColor; attribute float aEmis;
+uniform mat4 uMVP;
+varying vec3 vN, vC; varying float vE; varying vec3 vWorld;
+void main(){
+  vN = aNormal; vC = aColor; vE = aEmis;
+  vWorld = aPos;
+  gl_Position = uMVP * vec4(aPos, 1.0);
+}`, `
+precision mediump float;
+varying vec3 vN, vC; varying float vE; varying vec3 vWorld;
+uniform vec3 uSunDir, uSunColor, uAmbient, uCam;
+void main(){
+  vec3 n = normalize(vN);
+  float diff = max(dot(n, uSunDir), 0.0);
+  vec3 col = vC * (uAmbient + uSunColor * diff) + vC * vE * 1.6;
+  float fog = clamp(length(vWorld - uCam) / 130.0, 0.0, 1.0);
+  gl_FragColor = vec4(mix(col, vec3(0.03,0.035,0.06), fog*fog), 1.0);
+}`);
+const seaProg = prog(`
+attribute vec3 aPos;
+uniform mat4 uMVP; uniform float uTime;
+varying float vWave; varying vec3 vWorld;
+void main(){
+  vec3 p = aPos;
+  float w1 = sin(p.x*0.14 + uTime*0.9) * cos(p.z*0.11 + uTime*0.7);
+  float w2 = sin(p.x*0.31 - uTime*1.4 + p.z*0.2);
+  p.y = -1.1 + w1*0.5 + w2*0.28;
+  vWave = w1*0.5 + w2*0.28;
+  vWorld = p;
+  gl_Position = uMVP * vec4(p, 1.0);
+}`, `
+precision mediump float;
+varying float vWave; varying vec3 vWorld;
+uniform vec3 uDeep, uShallow, uCam; uniform float uGlint;
+void main(){
+  vec3 col = mix(uDeep, uShallow, clamp(vWave*1.4 + 0.5, 0.0, 1.0));
+  col += uGlint * max(vWave, 0.0) * vec3(0.9, 0.75, 0.5);
+  float fog = clamp(length(vWorld - uCam) / 130.0, 0.0, 1.0);
+  gl_FragColor = vec4(mix(col, vec3(0.03,0.035,0.06), fog*fog), 1.0);
+}`);
+const partProg = prog(`
+attribute vec4 aSeed;
+uniform mat4 uMVP; uniform float uTime;
+varying float vFade;
+void main(){
+  float y = mod(aSeed.y + uTime * (0.4 + fract(aSeed.w)*0.9), 9.0);
+  vec3 p = vec3(aSeed.x + sin(uTime*0.8 + aSeed.w)*0.8, -0.6 + y, aSeed.z + cos(uTime*0.6 + aSeed.w)*0.8);
+  vFade = 1.0 - y/9.0;
+  gl_Position = uMVP * vec4(p, 1.0);
+  gl_PointSize = mix(5.0, 1.5, y/9.0);
+}`, `
+precision mediump float;
+varying float vFade;
+uniform float uAlpha;
+void main(){
+  vec2 d = gl_PointCoord - 0.5;
+  float a = smoothstep(0.5, 0.05, length(d)) * vFade * uAlpha;
+  gl_FragColor = vec4(1.0, 0.62, 0.25, a);
+}`);
+
+/* ================= 缓冲 ================= */
+function makeBuf(target, data){
+  const b = gl.createBuffer();
+  gl.bindBuffer(target, b);
+  gl.bufferData(target, data, gl.STATIC_DRAW);
+  return b;
+}
+const cityVBO = makeBuf(gl.ARRAY_BUFFER, new Float32Array(V));
+const cityIBO = makeBuf(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(I));
+const seaVBO = makeBuf(gl.ARRAY_BUFFER, new Float32Array(seaVerts));
+const seaIBO = makeBuf(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(seaIdx));
+const partVBO = makeBuf(gl.ARRAY_BUFFER, new Float32Array(pSeeds.flatMap(p => [p.x, p.y0, p.z, p.ph])));
+
+/* ================= 相机与循环 ================= */
+let cam = { yaw: 0.6, pitch: 0.32, dist: 34, auto: true };
+const mProj = mat4(), mView = mat4(), mMVP = mat4();
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+addEventListener("resize", resize);
+
+let drag = null, idleT = 0;
+canvas.addEventListener("pointerdown", ev => {
+  drag = { x: ev.clientX, y: ev.clientY, yaw: cam.yaw, pitch: cam.pitch };
+  canvas.classList.add("dragging");
+  canvas.setPointerCapture(ev.pointerId);
+});
+canvas.addEventListener("pointermove", ev => {
+  if (!drag) return;
+  cam.yaw = drag.yaw - (ev.clientX - drag.x) * 0.005;
+  cam.pitch = Math.max(0.03, Math.min(1.35, drag.pitch + (ev.clientY - drag.y) * 0.004));
+  cam.auto = false; idleT = 0;
+});
+canvas.addEventListener("pointerup", () => { drag = null; canvas.classList.remove("dragging"); });
+canvas.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  cam.dist = Math.max(10, Math.min(90, cam.dist * (ev.deltaY > 0 ? 1.08 : 0.93)));
+}, { passive:false });
+
+const DAY = 60;          // 一昼夜 60 秒
+let t0 = performance.now();
+function frame(now){
+  const t = (now - t0) / 1000;
+  idleT += 1/60;
+  if (!drag && !cam.auto && idleT > 2.5) cam.auto = true;
+  if (cam.auto && !drag){
+    cam.yaw += 0.0016;
+    cam.pitch = 0.30 + Math.sin(t*0.11)*0.12;
+  }
+  const dayPhase = (t % DAY) / DAY;                  // 0..1
+  const sunEl = Math.sin(dayPhase * Math.PI*2);      // -1..1
+  const sunAz = dayPhase * Math.PI*2;
+  const sunDir = [Math.cos(sunAz)*0.6, Math.max(0.08, Math.abs(sunEl)), Math.sin(sunAz)*0.6];
+  const sl = Math.hypot(...sunDir); sunDir[0]/=sl; sunDir[1]/=sl; sunDir[2]/=sl;
+  // 天色
+  let sky, sunC, amb, glint, partA;
+  if (sunEl > 0.35){           // 正午
+    sky = [0.45, 0.62, 0.85]; sunC = [0.95, 0.92, 0.82]; amb = [0.38, 0.40, 0.46]; glint = 0.05; partA = 0.10;
+  } else if (sunEl > 0.0){     // 黎明/黄昏
+    const k = sunEl / 0.35;
+    sky = [0.75*k+0.1, 0.35*k+0.08, 0.18*k+0.07];
+    sunC = [1.0, 0.55*k+0.25, 0.25*k+0.1];
+    amb = [0.30, 0.24, 0.26]; glint = 0.5; partA = 0.35;
+  } else {                     // 夜晚
+    sky = [0.015, 0.02, 0.05]; sunC = [0.06, 0.08, 0.14]; amb = [0.10, 0.11, 0.16]; glint = 0.25; partA = 0.8;
+  }
+  gl.clearColor(sky[0], sky[1], sky[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+
+  const eye = [
+    Math.cos(cam.yaw)*Math.cos(cam.pitch)*cam.dist,
+    2 + Math.sin(cam.pitch)*cam.dist,
+    Math.sin(cam.yaw)*Math.cos(cam.pitch)*cam.dist
+  ];
+  perspective(mProj, 0.9, canvas.width/canvas.height, 0.5, 400);
+  lookAt(mView, eye, [0, 4.5, 0], [0, 1, 0]);
+  multiply(mMVP, mProj, mView);
+
+  // 城市
+  gl.useProgram(cityProg);
+  gl.uniformMatrix4fv(gl.getUniformLocation(cityProg, "uMVP"), false, mMVP);
+  gl.uniform3fv(gl.getUniformLocation(cityProg, "uSunDir"), sunDir);
+  gl.uniform3fv(gl.getUniformLocation(cityProg, "uSunColor"), sunC);
+  gl.uniform3fv(gl.getUniformLocation(cityProg, "uAmbient"), amb);
+  gl.uniform3fv(gl.getUniformLocation(cityProg, "uCam"), eye);
+  gl.bindBuffer(gl.ARRAY_BUFFER, cityVBO);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cityIBO);
+  const stride = 40;
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, stride, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, stride, 24);
+  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, stride, 36);
+  gl.drawElements(gl.TRIANGLES, I.length, gl.UNSIGNED_SHORT, 0);
+
+  // 海面
+  gl.useProgram(seaProg);
+  gl.uniformMatrix4fv(gl.getUniformLocation(seaProg, "uMVP"), false, mMVP);
+  gl.uniform1f(gl.getUniformLocation(seaProg, "uTime"), t);
+  const night = sunEl <= 0.0;
+  gl.uniform3fv(gl.getUniformLocation(seaProg, "uDeep"), night ? [0.01,0.03,0.06] : [0.05,0.16,0.30]);
+  gl.uniform3fv(gl.getUniformLocation(seaProg, "uShallow"), night ? [0.05,0.09,0.16] : [0.16,0.38,0.52]);
+  gl.uniform3fv(gl.getUniformLocation(seaProg, "uCam"), eye);
+  gl.uniform1f(gl.getUniformLocation(seaProg, "uGlint"), glint);
+  gl.bindBuffer(gl.ARRAY_BUFFER, seaVBO);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, seaIBO);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 12, 0);
+  gl.drawElements(gl.TRIANGLES, seaIdx.length, gl.UNSIGNED_SHORT, 0);
+
+  // 粒子（余烬）
+  gl.useProgram(partProg);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  gl.depthMask(false);
+  gl.uniformMatrix4fv(gl.getUniformLocation(partProg, "uMVP"), false, mMVP);
+  gl.uniform1f(gl.getUniformLocation(partProg, "uTime"), t);
+  gl.uniform1f(gl.getUniformLocation(partProg, "uAlpha"), partA);
+  gl.bindBuffer(gl.ARRAY_BUFFER, partVBO);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 16, 0);
+  gl.drawArrays(gl.POINTS, 0, P);
+  gl.depthMask(true);
+  gl.disable(gl.BLEND);
+
+  // 时钟
+  const hh = Math.floor(dayPhase*24), mm = Math.floor((dayPhase*24 - hh)*60);
+  const phaseName = sunEl > 0.35 ? "正午" : sunEl > 0 ? (dayPhase < 0.5 ? "黎明" : "黄昏") : "夜晚";
+  document.getElementById("clock").textContent =
+    `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")} · ${phaseName}`;
+  requestAnimationFrame(frame);
+}
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
