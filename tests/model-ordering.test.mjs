@@ -68,7 +68,11 @@ test("registered models follow curated official release evidence instead of vers
     "claude-haiku-45",
     "claude-4-0",
   ]);
-  assert.deepEqual(ids("Alibaba Cloud"), ["qwen3-8-max", "qwen3-8-flash"]);
+  assert.deepEqual(ids("Alibaba Cloud"), [
+    "qwen4-max-preview",
+    "qwen3-8-max",
+    "qwen3-8-flash",
+  ]);
   assert.deepEqual(ids("Deepseek"), [
     "deepseek-v4-1-flash-1017",
     "deepseek-v4-pro-0813",

@@ -20,7 +20,7 @@ const expected = {
     "claude-haiku-45",
     "claude-4-0",
   ],
-  "Alibaba Cloud": ["qwen3-8-max", "qwen3-8-flash"],
+  "Alibaba Cloud": ["qwen4-max-preview", "qwen3-8-max", "qwen3-8-flash"],
   MiniMax: [
     "minimax-m3-1-flash",
     "minimax-m3",

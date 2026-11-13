@@ -14,9 +14,11 @@
 
 | 顺序 | 模型 | 代际 | 同代能力优先级 | 发布日期 | 状态 | 查证日期 |
 |---|---|---|---|---|---|---|
-| 1 | Qwen 3.8 Max | 3.8 | 2 | 2026-08-03 | 已核实 | 2026-10-19 |
-| 2 | Qwen 3.8 Flash | 3.8 | 1 | 2026-08 | 月份已确认，日待确认 | 2026-10-19 |
+| 1 | Qwen4-Max-Preview | 4 | 未比较 | 2026-11-11 | 已核实 | 2026-11-13 |
+| 2 | Qwen 3.8 Max | 3.8 | 2 | 2026-08-03 | 已核实 | 2026-10-19 |
+| 3 | Qwen 3.8 Flash | 3.8 | 1 | 2026-08 | 月份已确认，日待确认 | 2026-10-19 |
 
+- **Qwen4-Max-Preview**（`qwen4-max-preview`）：官方文档明确预览期从 2026-11-11 10:00（UTC+8）开始，属新一代 Qwen4 旗舰，不套用正式版日期。 未确认同代能力优先级，不从价格或名称推断。 [官方来源 1](https://platform.qianwenai.com/docs/developer-guides/getting-started/latest-model) · [官方来源 2](https://www.alibabacloud.com/help/en/model-studio/models)
 - **Qwen 3.8 Max**（`qwen3-8-max`）：Qwen 官方博客与 Model Studio 产品发布信息记载 2026-08-03 首发；不使用后续快照或区域接入日期。 依据官方 Max 前沿能力定位及 Flash 侧重效率的说明，本站同代展示采用 Max → Flash；这是产品定位排序判断，不声称所有单项任务都更强。 [官方来源 1](https://qwen.ai/blog?id=qwen3.8) · [官方来源 2](https://modelstudio.alibabacloud.com/?source_channel=wanhackathon)
 - **Qwen 3.8 Flash**（`qwen3-8-flash`）：官方 Model Studio 上线记录为 2026-08-26，产品公告为 2026-08-28；仅登记双方一致的月份，排除 9 月文档修改和 10 月美国区域接入日期。 按官方产品能力与效率定位，在同代 Max 后；能力顺序为本站展示判断，供维护者确认。 [官方来源 1](https://www.alibabacloud.com/help/en/model-studio/newly-released-models) · [官方来源 2](https://www.alibabacloud.com/en/news/product/qwen38-flash-released-noi) · [官方来源 3](https://www.alibabacloud.com/help/en/model-studio/qwen3-8-flash) · [官方来源 4](https://qwen.ai/blog?id=qwen3.8)
 
