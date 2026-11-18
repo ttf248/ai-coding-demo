@@ -102,16 +102,18 @@
 
 | 顺序 | 模型 | 代际 | 同代能力优先级 | 发布日期 | 状态 | 查证日期 |
 |---|---|---|---|---|---|---|
-| 1 | GPT-6 Astra | 6 | 5 | 2026-09-03 | 已核实 | 2026-10-19 |
-| 2 | GPT-6.2-Sol | 6 | 4 | 2026-11-17 | 已核实 | 2026-11-18 |
-| 3 | GPT-6.1 Sol | 6 | 3 | 2026-09-29 | 已核实 | 2026-10-19 |
-| 4 | GPT-6 Sol | 6 | 2 | 2026-09-22 | 已核实 | 2026-10-19 |
-| 5 | GPT-6 Luna | 6 | 1 | 2026-09-22 | 已核实 | 2026-10-19 |
-| 6 | GPT-6.1 Terra | 6 | 未比较 | 2026-10-26 | 已核实 | 2026-10-27 |
-| 7 | GPT-5.6 Sol | 5.6 | 2 | 2026-07-09 | 已核实 | 2026-10-19 |
-| 8 | GPT-5.6 Luna | 5.6 | 1 | 2026-07-09 | 已核实 | 2026-10-19 |
-| 9 | GPT-6 | 未确认 | 未比较 | 未记录 | 待确认 | 2026-10-19 |
+| 1 | GPT-6.2-Astra | 6 | 6 | 2026-11-17 | 已核实 | 2026-11-18 |
+| 2 | GPT-6 Astra | 6 | 5 | 2026-09-03 | 已核实 | 2026-10-19 |
+| 3 | GPT-6.2-Sol | 6 | 4 | 2026-11-17 | 已核实 | 2026-11-18 |
+| 4 | GPT-6.1 Sol | 6 | 3 | 2026-09-29 | 已核实 | 2026-10-19 |
+| 5 | GPT-6 Sol | 6 | 2 | 2026-09-22 | 已核实 | 2026-10-19 |
+| 6 | GPT-6 Luna | 6 | 1 | 2026-09-22 | 已核实 | 2026-10-19 |
+| 7 | GPT-6.1 Terra | 6 | 未比较 | 2026-10-26 | 已核实 | 2026-10-27 |
+| 8 | GPT-5.6 Sol | 5.6 | 2 | 2026-07-09 | 已核实 | 2026-10-19 |
+| 9 | GPT-5.6 Luna | 5.6 | 1 | 2026-07-09 | 已核实 | 2026-10-19 |
+| 10 | GPT-6 | 未确认 | 未比较 | 未记录 | 待确认 | 2026-10-19 |
 
+- **GPT-6.2-Astra**（`gpt-6-2-astra`）：官方公告与 API 更新日志均确认 2026-11-17 发布，延续 GPT-6 家族的 Astra 产品线，同代登记为 [6]。 官方公告将 GPT-6.2 Astra 定位于最复杂的项目，并报告多项专业工作与编程评测较 GPT-6 Astra 提升，同代排序登记在 GPT-6 Astra 与 GPT-6.2 Sol 之前。 [官方来源 1](https://openai.com/index/introducing-gpt-6-2-astra-sol/) · [官方来源 2](https://developers.openai.com/api/docs/changelog)
 - **GPT-6 Astra**（`gpt-6-astra`）：API 官方更新日志记载 2026-09-03 发布。 官方定位为最高智能、最复杂端到端工作；本站同代展示优先级高于 Sol 和 Luna，并非统一基准分数。 [官方来源 1](https://developers.openai.com/api/docs/changelog) · [官方来源 2](https://developers.openai.com/api/docs/guides/latest-model)
 - **GPT-6.2-Sol**（`gpt-6-2-sol`）：官方 API 更新日志记载 2026-11-17 首发。延续 GPT-6 家族的 Sol 产品线，同代登记为 [6]。 官方公告明确 GPT-6.2 Sol 较 GPT-6.1 Sol 提升能力，并将 Sol 定位于日常任务和多步骤工作流。本站保留 Astra 的复杂任务定位，将本型号登记在 Astra 与 GPT-6.1 Sol 之间。 [官方来源 1](https://openai.com/index/introducing-gpt-6-2-astra-sol/) · [官方来源 2](https://developers.openai.com/api/docs/changelog)
 - **GPT-6.1 Sol**（`gpt-6-1-sol`）：官方更新日志记载 2026-09-29 发布，不以 10 月新增 Ultrafast 服务日期替代首发日。 根据官方 GPT-6 家族定位，排序代际显式登记为 [6]，作为该代 Sol 的迭代参与能力比较。 根据官方近 Astra 能力定位及 GPT-6 Sol 页面指向新版 Sol 的说明，本站同代顺序采用 Astra → 6.1 Sol → 6 Sol → Luna。 [官方来源 1](https://developers.openai.com/api/docs/changelog) · [官方来源 2](https://developers.openai.com/api/docs/guides/latest-model) · [官方来源 3](https://developers.openai.com/api/docs/models/gpt-6-sol)

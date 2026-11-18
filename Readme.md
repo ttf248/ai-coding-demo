@@ -31,8 +31,8 @@
 ## 项目统计
 
 - 实验主题：12
-- 实验记录：481
-- 可预览记录：469
+- 实验记录：492
+- 可预览记录：480
 - 技术主题：14
 
 ## 实验目录
@@ -64,6 +64,7 @@
 | [小蓝书 · 瀑布流社区 · GPT 6.1 Sol xhigh](demos/bluebook/runs/gpt-6-1-sol-xhigh-r02/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-23 | [v2](demos/bluebook/runs/gpt-6-1-sol-xhigh-r02/prompt.md) | [打开](previews/bluebook/gpt-6-1-sol-xhigh-r02/index.html) |
 | [小蓝书 · 瀑布流社区](demos/bluebook/runs/gpt-6-1-terra-max-r01/Readme.md) | GPT-6.1 Terra / max | 2026-10-27 | [v2](demos/bluebook/runs/gpt-6-1-terra-max-r01/prompt.md) | [打开](previews/bluebook/gpt-6-1-terra-max-r01/index.html) |
 | [小蓝书瀑布流](demos/bluebook/runs/gpt-6-1-terra-xhigh-r01/Readme.md) | GPT-6.1 Terra / xhigh | 2026-10-26 | [v2](demos/bluebook/runs/gpt-6-1-terra-xhigh-r01/prompt.md) | [打开](previews/bluebook/gpt-6-1-terra-xhigh-r01/index.html) |
+| [小蓝书 · 城市采集簿](demos/bluebook/runs/gpt-6-2-astra-max-r01/Readme.md) | GPT-6.2-Astra / max | 2026-11-18 | [v2](demos/bluebook/runs/gpt-6-2-astra-max-r01/prompt.md) | [打开](previews/bluebook/gpt-6-2-astra-max-r01/index.html) |
 | [小蓝书 · 生活灵感集](demos/bluebook/runs/gpt-6-2-sol-max-r01/Readme.md) | GPT-6.2-Sol / max | 2026-11-18 | [v2](demos/bluebook/runs/gpt-6-2-sol-max-r01/prompt.md) | [打开](previews/bluebook/gpt-6-2-sol-max-r01/index.html) |
 | [小蓝书 · 瀑布流社区 · Astra Max](demos/bluebook/runs/gpt-6-astra-max-r01/Readme.md) | GPT-6 Astra / max | 2026-10-16 | [v2](demos/bluebook/runs/gpt-6-astra-max-r01/prompt.md) | [打开](previews/bluebook/gpt-6-astra-max-r01/index.html) |
 | [小蓝书 · 瀑布流社区 · GPT 6 Astra Max](demos/bluebook/runs/gpt-6-astra-max-r02/Readme.md) | GPT-6 Astra / max | 2026-10-22 | [v2](demos/bluebook/runs/gpt-6-astra-max-r02/prompt.md) | [打开](previews/bluebook/gpt-6-astra-max-r02/index.html) |
@@ -119,6 +120,7 @@
 | [简化电路实验台 · GPT 6.1 Sol xhigh](demos/circuit-lab/runs/gpt-6-1-sol-xhigh-r02/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-23 | [v1](demos/circuit-lab/runs/gpt-6-1-sol-xhigh-r02/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-1-sol-xhigh-r02/index.html) |
 | [简化电路实验台](demos/circuit-lab/runs/gpt-6-1-terra-max-r01/Readme.md) | GPT-6.1 Terra / max | 2026-10-27 | [v1](demos/circuit-lab/runs/gpt-6-1-terra-max-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-1-terra-max-r01/index.html) |
 | [简化电路实验台](demos/circuit-lab/runs/gpt-6-1-terra-xhigh-r01/Readme.md) | GPT-6.1 Terra / xhigh | 2026-10-26 | [v1](demos/circuit-lab/runs/gpt-6-1-terra-xhigh-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-1-terra-xhigh-r01/index.html) |
+| [直流电路实验台](demos/circuit-lab/runs/gpt-6-2-astra-max-r01/Readme.md) | GPT-6.2-Astra / max | 2026-11-18 | [v1](demos/circuit-lab/runs/gpt-6-2-astra-max-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-2-astra-max-r01/index.html) |
 | [简化电路实验台](demos/circuit-lab/runs/gpt-6-2-sol-max-r01/Readme.md) | GPT-6.2-Sol / max | 2026-11-18 | [v1](demos/circuit-lab/runs/gpt-6-2-sol-max-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-2-sol-max-r01/index.html) |
 | [circuit-lab · GPT 6 Astra Low](demos/circuit-lab/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-10-06 | [v1](demos/circuit-lab/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-astra-low-r01/index.html) |
 | [简化电路实验台 · Astra Max](demos/circuit-lab/runs/gpt-6-astra-max-r01/Readme.md) | GPT-6 Astra / max | 2026-10-16 | [v1](demos/circuit-lab/runs/gpt-6-astra-max-r01/prompt.md) | [打开](demos/circuit-lab/runs/gpt-6-astra-max-r01/index.html) |
@@ -166,6 +168,7 @@
 | [奇幻地图生成器 · GPT 6.1 Sol xhigh](demos/fantasy-map-generator/runs/gpt-6-1-sol-xhigh-r02/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-23 | [v1](demos/fantasy-map-generator/runs/gpt-6-1-sol-xhigh-r02/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-1-sol-xhigh-r02/index.html) |
 | [奇幻地图生成器](demos/fantasy-map-generator/runs/gpt-6-1-terra-max-r01/Readme.md) | GPT-6.1 Terra / max | 2026-10-27 | [v1](demos/fantasy-map-generator/runs/gpt-6-1-terra-max-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-1-terra-max-r01/index.html) |
 | [奇幻地图生成器](demos/fantasy-map-generator/runs/gpt-6-1-terra-xhigh-r01/Readme.md) | GPT-6.1 Terra / xhigh | 2026-10-26 | [v1](demos/fantasy-map-generator/runs/gpt-6-1-terra-xhigh-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-1-terra-xhigh-r01/index.html) |
+| [潮汐群岛 · 地图工坊](demos/fantasy-map-generator/runs/gpt-6-2-astra-max-r01/Readme.md) | GPT-6.2-Astra / max | 2026-11-18 | [v1](demos/fantasy-map-generator/runs/gpt-6-2-astra-max-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-2-astra-max-r01/index.html) |
 | [奇幻地图生成器](demos/fantasy-map-generator/runs/gpt-6-2-sol-max-r01/Readme.md) | GPT-6.2-Sol / max | 2026-11-18 | [v1](demos/fantasy-map-generator/runs/gpt-6-2-sol-max-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-2-sol-max-r01/index.html) |
 | [fantasy-map-generator · GPT 6 Astra Low](demos/fantasy-map-generator/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-10-06 | [v1](demos/fantasy-map-generator/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-astra-low-r01/index.html) |
 | [奇幻地图生成器 · Astra Max](demos/fantasy-map-generator/runs/gpt-6-astra-max-r01/Readme.md) | GPT-6 Astra / max | 2026-10-16 | [v1](demos/fantasy-map-generator/runs/gpt-6-astra-max-r01/prompt.md) | [打开](demos/fantasy-map-generator/runs/gpt-6-astra-max-r01/index.html) |
@@ -213,6 +216,7 @@
 | [彩色流体实验台 · GPT 6.1 Sol xhigh](demos/fluid-simulation/runs/gpt-6-1-sol-xhigh-r02/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-23 | [v1](demos/fluid-simulation/runs/gpt-6-1-sol-xhigh-r02/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-1-sol-xhigh-r02/index.html) |
 | [彩色流体实验台](demos/fluid-simulation/runs/gpt-6-1-terra-max-r01/Readme.md) | GPT-6.1 Terra / max | 2026-10-27 | [v1](demos/fluid-simulation/runs/gpt-6-1-terra-max-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-1-terra-max-r01/index.html) |
 | [彩色流体实验台](demos/fluid-simulation/runs/gpt-6-1-terra-xhigh-r01/Readme.md) | GPT-6.1 Terra / xhigh | 2026-10-26 | [v1](demos/fluid-simulation/runs/gpt-6-1-terra-xhigh-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-1-terra-xhigh-r01/index.html) |
+| [流体色场](demos/fluid-simulation/runs/gpt-6-2-astra-max-r01/Readme.md) | GPT-6.2-Astra / max | 2026-11-18 | [v1](demos/fluid-simulation/runs/gpt-6-2-astra-max-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-2-astra-max-r01/index.html) |
 | [彩色流体实验台](demos/fluid-simulation/runs/gpt-6-2-sol-max-r01/Readme.md) | GPT-6.2-Sol / max | 2026-11-18 | [v1](demos/fluid-simulation/runs/gpt-6-2-sol-max-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-2-sol-max-r01/index.html) |
 | [fluid-simulation · GPT 6 Astra Low](demos/fluid-simulation/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-10-06 | [v1](demos/fluid-simulation/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-astra-low-r01/index.html) |
 | [彩色流体实验台 · Astra Max](demos/fluid-simulation/runs/gpt-6-astra-max-r01/Readme.md) | GPT-6 Astra / max | 2026-10-16 | [v1](demos/fluid-simulation/runs/gpt-6-astra-max-r01/prompt.md) | [打开](demos/fluid-simulation/runs/gpt-6-astra-max-r01/index.html) |
@@ -260,6 +264,7 @@
 | [生活情绪日记 · GPT 6.1 Sol xhigh](demos/life-diary/runs/gpt-6-1-sol-xhigh-r02/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-23 | [v1](demos/life-diary/runs/gpt-6-1-sol-xhigh-r02/prompt.md) | [打开](demos/life-diary/runs/gpt-6-1-sol-xhigh-r02/index.html) |
 | [生活情绪日记](demos/life-diary/runs/gpt-6-1-terra-max-r01/Readme.md) | GPT-6.1 Terra / max | 2026-10-27 | [v1](demos/life-diary/runs/gpt-6-1-terra-max-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-6-1-terra-max-r01/index.html) |
 | [情绪日记与生活助手](demos/life-diary/runs/gpt-6-1-terra-xhigh-r01/Readme.md) | GPT-6.1 Terra / xhigh | 2026-10-26 | [v1](demos/life-diary/runs/gpt-6-1-terra-xhigh-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-6-1-terra-xhigh-r01/index.html) |
+| [晴间 · 情绪日记](demos/life-diary/runs/gpt-6-2-astra-max-r01/Readme.md) | GPT-6.2-Astra / max | 2026-11-18 | [v1](demos/life-diary/runs/gpt-6-2-astra-max-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-6-2-astra-max-r01/index.html) |
 | [藏禾 · 情绪日记与生活助手](demos/life-diary/runs/gpt-6-2-sol-max-r01/Readme.md) | GPT-6.2-Sol / max | 2026-11-18 | [v1](demos/life-diary/runs/gpt-6-2-sol-max-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-6-2-sol-max-r01/index.html) |
 | [生活情绪日记 · Astra Max](demos/life-diary/runs/gpt-6-astra-max-r01/Readme.md) | GPT-6 Astra / max | 2026-10-16 | [v1](demos/life-diary/runs/gpt-6-astra-max-r01/prompt.md) | [打开](demos/life-diary/runs/gpt-6-astra-max-r01/index.html) |
 | [生活情绪日记 · GPT 6 Astra Max](demos/life-diary/runs/gpt-6-astra-max-r02/Readme.md) | GPT-6 Astra / max | 2026-10-22 | [v1](demos/life-diary/runs/gpt-6-astra-max-r02/prompt.md) | [打开](demos/life-diary/runs/gpt-6-astra-max-r02/index.html) |
@@ -310,6 +315,7 @@
 | [冥想 iOS App · GPT 6.1 Sol xhigh](demos/meditation/runs/gpt-6-1-sol-xhigh-r02/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-23 | [v1](demos/meditation/runs/gpt-6-1-sol-xhigh-r02/prompt.md) | [打开](demos/meditation/runs/gpt-6-1-sol-xhigh-r02/index.html) |
 | [冥想 iOS App](demos/meditation/runs/gpt-6-1-terra-max-r01/Readme.md) | GPT-6.1 Terra / max | 2026-10-27 | [v1](demos/meditation/runs/gpt-6-1-terra-max-r01/prompt.md) | [打开](demos/meditation/runs/gpt-6-1-terra-max-r01/index.html) |
 | [冥想应用原型](demos/meditation/runs/gpt-6-1-terra-xhigh-r01/Readme.md) | GPT-6.1 Terra / xhigh | 2026-10-26 | [v1](demos/meditation/runs/gpt-6-1-terra-xhigh-r01/prompt.md) | [打开](demos/meditation/runs/gpt-6-1-terra-xhigh-r01/index.html) |
+| [汐息 · 冥想](demos/meditation/runs/gpt-6-2-astra-max-r01/Readme.md) | GPT-6.2-Astra / max | 2026-11-18 | [v1](demos/meditation/runs/gpt-6-2-astra-max-r01/prompt.md) | [打开](demos/meditation/runs/gpt-6-2-astra-max-r01/index.html) |
 | [息间 · 冥想 iOS 原型](demos/meditation/runs/gpt-6-2-sol-max-r01/Readme.md) | GPT-6.2-Sol / max | 2026-11-18 | [v1](demos/meditation/runs/gpt-6-2-sol-max-r01/prompt.md) | [打开](demos/meditation/runs/gpt-6-2-sol-max-r01/index.html) |
 | [冥想 iOS App · Astra Max](demos/meditation/runs/gpt-6-astra-max-r01/Readme.md) | GPT-6 Astra / max | 2026-10-16 | [v1](demos/meditation/runs/gpt-6-astra-max-r01/prompt.md) | [打开](demos/meditation/runs/gpt-6-astra-max-r01/index.html) |
 | [冥想 iOS App · GPT 6 Astra Max](demos/meditation/runs/gpt-6-astra-max-r02/Readme.md) | GPT-6 Astra / max | 2026-10-22 | [v1](demos/meditation/runs/gpt-6-astra-max-r02/prompt.md) | [打开](demos/meditation/runs/gpt-6-astra-max-r02/index.html) |
@@ -361,6 +367,7 @@
 | [新哥特式塔楼城市 · GPT 6.1 Sol xhigh](demos/neo-gothic-tower-city/runs/gpt-6-1-sol-xhigh-r02/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-23 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-1-sol-xhigh-r02/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-1-sol-xhigh-r02/index.html) |
 | [新哥特式塔楼城市](demos/neo-gothic-tower-city/runs/gpt-6-1-terra-max-r01/Readme.md) | GPT-6.1 Terra / max | 2026-10-27 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-1-terra-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-1-terra-max-r01/index.html) |
 | [新哥特塔楼城市](demos/neo-gothic-tower-city/runs/gpt-6-1-terra-xhigh-r01/Readme.md) | GPT-6.1 Terra / xhigh | 2026-10-26 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-1-terra-xhigh-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-1-terra-xhigh-r01/index.html) |
+| [雾港钟城](demos/neo-gothic-tower-city/runs/gpt-6-2-astra-max-r01/Readme.md) | GPT-6.2-Astra / max | 2026-11-18 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-2-astra-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-2-astra-max-r01/index.html) |
 | [灰潮城 · 新哥特式塔楼漫游](demos/neo-gothic-tower-city/runs/gpt-6-2-sol-max-r01/Readme.md) | GPT-6.2-Sol / max | 2026-11-18 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-2-sol-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-2-sol-max-r01/index.html) |
 | [新哥特式塔楼城市 · Astra Max](demos/neo-gothic-tower-city/runs/gpt-6-astra-max-r01/Readme.md) | GPT-6 Astra / max | 2026-10-16 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-astra-max-r01/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-astra-max-r01/index.html) |
 | [新哥特式塔楼城市 · GPT 6 Astra Max](demos/neo-gothic-tower-city/runs/gpt-6-astra-max-r02/Readme.md) | GPT-6 Astra / max | 2026-10-22 | [v1](demos/neo-gothic-tower-city/runs/gpt-6-astra-max-r02/prompt.md) | [打开](demos/neo-gothic-tower-city/runs/gpt-6-astra-max-r02/index.html) |
@@ -412,6 +419,7 @@
 | [寻路算法实验室 · GPT 6.1 Sol xhigh](demos/pathfinding-lab/runs/gpt-6-1-sol-xhigh-r02/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-23 | [v1](demos/pathfinding-lab/runs/gpt-6-1-sol-xhigh-r02/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-1-sol-xhigh-r02/index.html) |
 | [寻路算法实验室](demos/pathfinding-lab/runs/gpt-6-1-terra-max-r01/Readme.md) | GPT-6.1 Terra / max | 2026-10-27 | [v1](demos/pathfinding-lab/runs/gpt-6-1-terra-max-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-1-terra-max-r01/index.html) |
 | [寻路算法实验室](demos/pathfinding-lab/runs/gpt-6-1-terra-xhigh-r01/Readme.md) | GPT-6.1 Terra / xhigh | 2026-10-26 | [v1](demos/pathfinding-lab/runs/gpt-6-1-terra-xhigh-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-1-terra-xhigh-r01/index.html) |
+| [格间 · 寻路实验室](demos/pathfinding-lab/runs/gpt-6-2-astra-max-r01/Readme.md) | GPT-6.2-Astra / max | 2026-11-18 | [v1](demos/pathfinding-lab/runs/gpt-6-2-astra-max-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-2-astra-max-r01/index.html) |
 | [寻路算法实验室](demos/pathfinding-lab/runs/gpt-6-2-sol-max-r01/Readme.md) | GPT-6.2-Sol / max | 2026-11-18 | [v1](demos/pathfinding-lab/runs/gpt-6-2-sol-max-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-2-sol-max-r01/index.html) |
 | [pathfinding-lab · GPT 6 Astra Low](demos/pathfinding-lab/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-10-06 | [v1](demos/pathfinding-lab/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-astra-low-r01/index.html) |
 | [寻路算法实验室 · Astra Max](demos/pathfinding-lab/runs/gpt-6-astra-max-r01/Readme.md) | GPT-6 Astra / max | 2026-10-16 | [v1](demos/pathfinding-lab/runs/gpt-6-astra-max-r01/prompt.md) | [打开](demos/pathfinding-lab/runs/gpt-6-astra-max-r01/index.html) |
@@ -459,6 +467,7 @@
 | [Pixel Flow · GPT 6.1 Sol xhigh](demos/pixel-flow/runs/gpt-6-1-sol-xhigh-r02/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-23 | [v1](demos/pixel-flow/runs/gpt-6-1-sol-xhigh-r02/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-1-sol-xhigh-r02/index.html) |
 | [Pixel Flow](demos/pixel-flow/runs/gpt-6-1-terra-max-r01/Readme.md) | GPT-6.1 Terra / max | 2026-10-27 | [v1](demos/pixel-flow/runs/gpt-6-1-terra-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-1-terra-max-r01/index.html) |
 | [图片粒子与手势还原](demos/pixel-flow/runs/gpt-6-1-terra-xhigh-r01/Readme.md) | GPT-6.1 Terra / xhigh | 2026-10-26 | [v1](demos/pixel-flow/runs/gpt-6-1-terra-xhigh-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-1-terra-xhigh-r01/index.html) |
+| [像素回流](demos/pixel-flow/runs/gpt-6-2-astra-max-r01/Readme.md) | GPT-6.2-Astra / max | 2026-11-18 | [v1](demos/pixel-flow/runs/gpt-6-2-astra-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-2-astra-max-r01/index.html) |
 | [Pixel Flow · 粒子手势工作室](demos/pixel-flow/runs/gpt-6-2-sol-max-r01/Readme.md) | GPT-6.2-Sol / max | 2026-11-18 | [v1](demos/pixel-flow/runs/gpt-6-2-sol-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-2-sol-max-r01/index.html) |
 | [Pixel Flow · Astra Max](demos/pixel-flow/runs/gpt-6-astra-max-r01/Readme.md) | GPT-6 Astra / max | 2026-10-16 | [v1](demos/pixel-flow/runs/gpt-6-astra-max-r01/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-astra-max-r01/index.html) |
 | [Pixel Flow · GPT 6 Astra Max](demos/pixel-flow/runs/gpt-6-astra-max-r02/Readme.md) | GPT-6 Astra / max | 2026-10-22 | [v1](demos/pixel-flow/runs/gpt-6-astra-max-r02/prompt.md) | [打开](demos/pixel-flow/runs/gpt-6-astra-max-r02/index.html) |
@@ -526,6 +535,7 @@
 | [体素微缩建筑工地 · GPT 6.1 Sol xhigh](demos/voxel-construction-site/runs/gpt-6-1-sol-xhigh-r02/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-23 | [v1](demos/voxel-construction-site/runs/gpt-6-1-sol-xhigh-r02/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-1-sol-xhigh-r02/index.html) |
 | [体素微缩建筑工地](demos/voxel-construction-site/runs/gpt-6-1-terra-max-r01/Readme.md) | GPT-6.1 Terra / max | 2026-10-27 | [v1](demos/voxel-construction-site/runs/gpt-6-1-terra-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-1-terra-max-r01/index.html) |
 | [体素建筑工地沙盘](demos/voxel-construction-site/runs/gpt-6-1-terra-xhigh-r01/Readme.md) | GPT-6.1 Terra / xhigh | 2026-10-26 | [v1](demos/voxel-construction-site/runs/gpt-6-1-terra-xhigh-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-1-terra-xhigh-r01/index.html) |
+| [方寸工地](demos/voxel-construction-site/runs/gpt-6-2-astra-max-r01/Readme.md) | GPT-6.2-Astra / max | 2026-11-18 | [v1](demos/voxel-construction-site/runs/gpt-6-2-astra-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-2-astra-max-r01/index.html) |
 | [筑场 · 体素微缩建筑工地](demos/voxel-construction-site/runs/gpt-6-2-sol-max-r01/Readme.md) | GPT-6.2-Sol / max | 2026-11-18 | [v1](demos/voxel-construction-site/runs/gpt-6-2-sol-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-2-sol-max-r01/index.html) |
 | [筑间工地 · GPT 6 Astra Low](demos/voxel-construction-site/runs/gpt-6-astra-low-r01/Readme.md) | GPT-6 Astra / low | 2026-09-15 | [v1](demos/voxel-construction-site/runs/gpt-6-astra-low-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-astra-low-r01/index.html) |
 | [体素微缩建筑工地 · Astra Max](demos/voxel-construction-site/runs/gpt-6-astra-max-r01/Readme.md) | GPT-6 Astra / max | 2026-10-16 | [v1](demos/voxel-construction-site/runs/gpt-6-astra-max-r01/prompt.md) | [打开](demos/voxel-construction-site/runs/gpt-6-astra-max-r01/index.html) |
@@ -577,6 +587,7 @@
 | [YouTube UI 模块 · GPT 6.1 Sol xhigh](demos/youtube-ui/runs/gpt-6-1-sol-xhigh-r02/Readme.md) | GPT-6.1 Sol / xhigh | 2026-10-23 | [v1](demos/youtube-ui/runs/gpt-6-1-sol-xhigh-r02/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-1-sol-xhigh-r02/index.html) |
 | [YouTube UI 模块](demos/youtube-ui/runs/gpt-6-1-terra-max-r01/Readme.md) | GPT-6.1 Terra / max | 2026-10-27 | [v1](demos/youtube-ui/runs/gpt-6-1-terra-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-1-terra-max-r01/index.html) |
 | [YouTube UI 模块](demos/youtube-ui/runs/gpt-6-1-terra-xhigh-r01/Readme.md) | GPT-6.1 Terra / xhigh | 2026-10-26 | [v1](demos/youtube-ui/runs/gpt-6-1-terra-xhigh-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-1-terra-xhigh-r01/index.html) |
+| [YouTube 移动端工作台](demos/youtube-ui/runs/gpt-6-2-astra-max-r01/Readme.md) | GPT-6.2-Astra / max | 2026-11-18 | [v1](demos/youtube-ui/runs/gpt-6-2-astra-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-2-astra-max-r01/index.html) |
 | [光屿 · 视频平台模块原型](demos/youtube-ui/runs/gpt-6-2-sol-max-r01/Readme.md) | GPT-6.2-Sol / max | 2026-11-18 | [v1](demos/youtube-ui/runs/gpt-6-2-sol-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-2-sol-max-r01/index.html) |
 | [YouTube UI 模块 · Astra Max](demos/youtube-ui/runs/gpt-6-astra-max-r01/Readme.md) | GPT-6 Astra / max | 2026-10-16 | [v1](demos/youtube-ui/runs/gpt-6-astra-max-r01/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-astra-max-r01/index.html) |
 | [YouTube UI 模块 · GPT 6 Astra Max](demos/youtube-ui/runs/gpt-6-astra-max-r02/Readme.md) | GPT-6 Astra / max | 2026-10-22 | [v1](demos/youtube-ui/runs/gpt-6-astra-max-r02/prompt.md) | [打开](demos/youtube-ui/runs/gpt-6-astra-max-r02/index.html) |
