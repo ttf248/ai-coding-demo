@@ -28,3 +28,28 @@ test("pixel-flow static runs load in comparison iframes", async ({ page }) => {
     ).toBeVisible();
   }
 });
+
+test("local video previews serve byte ranges under the site base", async ({
+  request,
+}) => {
+  const clip = "demos/youtube-ui/runs/gpt-6-2-sol-max-r01/clips/coffee.mp4";
+  const metadata = await request.head(clip);
+  expect(metadata.status()).toBe(200);
+  expect(metadata.headers()["content-type"]).toBe("video/mp4");
+  expect(metadata.headers()["accept-ranges"]).toBe("bytes");
+  const size = Number(metadata.headers()["content-length"]);
+  expect(size).toBeGreaterThan(16);
+
+  const partial = await request.get(clip, { headers: { range: "bytes=0-15" } });
+  expect(partial.status()).toBe(206);
+  expect(partial.headers()["content-range"]).toBe(`bytes 0-15/${size}`);
+  const header = await partial.body();
+  expect(header).toHaveLength(16);
+  expect(header.subarray(4, 8).toString("ascii")).toBe("ftyp");
+
+  const beyondEnd = await request.get(clip, {
+    headers: { range: `bytes=${size}-` },
+  });
+  expect(beyondEnd.status()).toBe(416);
+  expect(beyondEnd.headers()["content-range"]).toBe(`bytes */${size}`);
+});

@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111e22" />
+    <title>息间 · 冥想练习</title>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script src="../../../../assets/analytics.js" defer></script>
+  </head>
+  <body class="m-0 bg-[#111e22] text-[#e8f1e9] antialiased">
+    <header class="mx-auto max-w-[1240px] px-5 pb-5 pt-7 sm:pt-10">
+      <div class="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+        <h1 class="font-serif text-4xl font-bold tracking-tight sm:text-6xl">
+          息间
+        </h1>
+        <p class="text-sm text-[#b0c5bc]">冥想与睡前练习</p>
+      </div>
+      <nav
+        id="page-links"
+        class="mt-4 flex flex-wrap gap-2"
+        aria-label="原型目录"
+      ></nav>
+    </header>
+    <main
+      id="screens"
+      class="mx-auto grid max-w-[1240px] grid-cols-[minmax(0,375px)] justify-center gap-6 px-2.5 pb-10 min-[810px]:grid-cols-[repeat(2,minmax(0,375px))] min-[1200px]:grid-cols-[repeat(3,minmax(0,375px))]"
+    ></main>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const courses = [
+        {
+          id: "breath",
+          name: "回到呼吸",
+          type: "呼吸 · 入门",
+          length: 5,
+          pattern: [4, 0, 6],
+          tone: 174,
+          image: "1500530855697-b586d89ba3ee",
+          description: "找一个舒适的坐姿，让注意力随一次次吸气和呼气回到当下。",
+        },
+        {
+          id: "forest",
+          name: "林中的停顿",
+          type: "专注 · 午间",
+          length: 8,
+          pattern: [5, 0, 5],
+          tone: 196,
+          image: "1448375240586-882707db888b",
+          description:
+            "把手边的任务放一放，借由缓慢而均匀的呼吸，给自己留出一段专注的间隙。",
+        },
+        {
+          id: "night",
+          name: "入夜的潮声",
+          type: "睡前 · 放松",
+          length: 12,
+          pattern: [4, 2, 6],
+          tone: 130,
+          image: "1473116763249-2faaef81ccda",
+          description:
+            "把屏幕亮度调低，随着缓慢的呼气，让注意力从今天的事情中渐渐松开。",
+        },
+      ];
+      const sections = [
+        ["discover", "发现", "compass"],
+        ["course", "课程", "book-open"],
+        ["player", "练习", "audio-waveform"],
+        ["sleep", "睡前", "moon"],
+        ["log", "记录", "calendar-days"],
+      ];
+      const button =
+        "rounded-full bg-[#d1f4dd] px-4 py-2.5 text-sm font-bold text-[#183d34] hover:bg-[#a8ebc7] focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-[#d1f4dd]";
+      const ghost =
+        "rounded-full border border-[#476759] bg-[#1e3b34] px-3 py-2 text-xs font-semibold text-[#d0e9da] hover:bg-[#2c4f43]";
+      const panel = "rounded-2xl border border-[#34534b] bg-[#203832] p-4";
+      const icon = (name, cls = "size-5") =>
+        '<img alt="" class="' +
+        cls +
+        ' shrink-0 invert opacity-75" src="https://unpkg.com/lucide-static@0.468.0/icons/' +
+        name +
+        '.svg">';
+      const img = (course, cls, alt) =>
+        '<img alt="' +
+        alt +
+        '" class="' +
+        cls +
+        '" src="https://images.unsplash.com/photo-' +
+        course.image +
+        '?fit=crop&w=740&h=500&auto=format&q=80">';
+      const load = (key, fallback) => {
+        try {
+          return (
+            JSON.parse(localStorage.getItem("xijian-v1:" + key)) ?? fallback
+          );
+        } catch {
+          return fallback;
+        }
+      };
+      const save = (key, value) => {
+        try {
+          localStorage.setItem("xijian-v1:" + key, JSON.stringify(value));
+        } catch {}
+      };
+      let favorites = load("favorites", []),
+        records = load("records", []);
+      let current = courses[0],
+        minutes = current.length,
+        elapsed = 0,
+        start = 0,
+        running = false,
+        done = false,
+        audible = true;
+      let audio = null,
+        volume = null,
+        oscillator = null,
+        animation = 0;
+      function frame(key, title, html) {
+        const nav = sections
+          .map(
+            ([id, label, glyph]) =>
+              "<a " +
+              (key === id ? 'aria-current="page" ' : "") +
+              'href="#' +
+              id +
+              '" class="grid justify-items-center gap-1 px-0.5 text-[10px] ' +
+              (key === id ? "font-bold text-[#d6f8dd]" : "text-[#b2c7bf]") +
+              '">' +
+              icon(glyph, "size-4") +
+              label +
+              "</a>",
+          )
+          .join("");
+        return (
+          '<section id="' +
+          key +
+          '" aria-label="' +
+          title +
+          '" class="min-w-0 scroll-mt-3"><h2 class="mb-1.5 pl-2 text-xs text-[#b0c5bc]">' +
+          title +
+          "</h2>" +
+          '<div class="grid h-[682px] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[32px] border-[5px] border-[#466057] bg-[#172d29] shadow-lg">' +
+          '<div class="flex justify-between px-6 pt-3 text-[11px] font-bold text-[#c8ded0]" aria-hidden="true"><span>9:41</span><span>▮▮▮ ▰</span></div>' +
+          '<div class="min-w-0 overflow-y-auto overscroll-contain px-4 py-3 [scrollbar-width:thin]">' +
+          html +
+          '</div><nav class="grid grid-cols-5 border-t border-[#33534a] bg-[#172d29] py-2" aria-label="切换原型">' +
+          nav +
+          "</nav></div></section>"
+        );
+      }
+      const title = (heading, sub) =>
+        '<h3 class="font-serif text-3xl font-bold tracking-tight">' +
+        heading +
+        '</h3><p class="mt-1 text-xs leading-relaxed text-[#aac4b8]">' +
+        sub +
+        "</p>";
+      function cover(course) {
+        return (
+          '<button class="relative mt-4 block h-52 w-full overflow-hidden rounded-[20px] bg-[#324a42] text-left" data-course="' +
+          course.id +
+          '">' +
+          img(course, "h-full w-full object-cover opacity-75", "") +
+          '<span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0d251f] to-transparent p-4 pt-14"><span class="block text-[11px] text-[#d1f4dd]">今日练习 · ' +
+          course.length +
+          ' 分钟</span><span class="mt-1 block font-serif text-2xl font-bold">' +
+          course.name +
+          " ↗</span></span></button>"
+        );
+      }
+      function card(course) {
+        return (
+          '<button data-course="' +
+          course.id +
+          '" class="flex w-full items-center gap-3 rounded-2xl border border-[#34534b] bg-[#203832] p-2.5 text-left hover:bg-[#2b4a40]">' +
+          img(course, "size-14 shrink-0 rounded-lg object-cover", "") +
+          '<span class="min-w-0 flex-1"><strong class="block text-sm">' +
+          course.name +
+          '</strong><span class="mt-1 block text-xs text-[#aec9bd]">' +
+          course.type +
+          " · " +
+          course.length +
+          " 分钟</span></span>" +
+          icon("chevron-right", "size-4") +
+          "</button>"
+        );
+      }
+      $("page-links").innerHTML = sections
+        .map(
+          ([id, label]) =>
+            '<a href="#' + id + '" class="' + ghost + '">' + label + "</a>",
+        )
+        .join("");
+      $("screens").innerHTML = [
+        frame(
+          "discover",
+          "发现",
+          title(
+            "留一段静下来的时间",
+            "在早晨、工作间隙或睡前，挑一段适合你的练习。",
+          ) +
+            cover(courses[0]) +
+            '<h4 class="mb-2 mt-4 text-sm font-bold">按时段选课</h4><div class="grid gap-2">' +
+            courses.map(card).join("") +
+            "</div>",
+        ),
+        frame("course", "课程详情", '<div id="course-detail"></div>'),
+        frame(
+          "player",
+          "练习播放",
+          '<h3 id="player-name" class="font-serif text-3xl font-bold"></h3><p class="mt-1 text-xs text-[#aac4b8]">跟随节奏环与文字提示，按舒服的幅度呼吸。</p>' +
+            '<div class="mt-4 grid h-56 place-items-center overflow-hidden rounded-2xl bg-[#112a28] [background-image:radial-gradient(circle_at_center,#31564c,transparent_70%)]">' +
+            '<div id="orb" class="grid size-32 place-items-center rounded-full border border-[#9fd6bd] bg-[#7fc6a538] shadow-[0_0_32px_#9ce6bf35]"><span id="phase" class="font-serif text-xl font-bold">准备</span></div></div>' +
+            '<div class="my-3 flex items-center justify-between text-xs text-[#b7d0c3]"><output id="clock" class="text-2xl font-semibold tabular-nums text-[#e9f9ec]">05:00</output><span id="pace"></span></div>' +
+            '<progress id="progress" value="0" max="300" class="h-2 w-full accent-[#c8f2d6]" aria-label="练习进度"></progress>' +
+            '<div class="mt-4 flex flex-wrap gap-2"><button id="play" class="' +
+            button +
+            '">开始练习</button><button id="restart" class="' +
+            ghost +
+            '">重新开始</button><button id="sound" aria-pressed="true" class="' +
+            ghost +
+            '">环境音开启</button></div><p id="audio-status" class="mt-2 text-xs text-[#b7d0c3]" role="status"></p>',
+        ),
+        frame(
+          "sleep",
+          "睡前",
+          title(
+            "今晚慢一点",
+            "选择一个安静的时段，跟随呼吸节奏，环境音会在练习结束时淡出。",
+          ) +
+            cover(courses[2]) +
+            '<div class="' +
+            panel +
+            ' mt-4"><h4 class="text-sm font-bold">设置练习时长</h4><p class="my-2 text-xs text-[#b4cfc1]">选择入夜的潮声，播放前也能重新选时长。</p><div class="flex flex-wrap gap-2">' +
+            [5, 12, 20]
+              .map(
+                (x) =>
+                  '<button class="' +
+                  ghost +
+                  '" data-sleep="' +
+                  x +
+                  '">' +
+                  x +
+                  " 分钟</button>",
+              )
+              .join("") +
+            "</div></div>",
+        ),
+        frame(
+          "log",
+          "练习记录",
+          title("每一次练习", "查看完成的练习和收藏的课程。") +
+            '<div class="' +
+            panel +
+            ' mt-4"><h4 class="text-sm font-bold">练习统计</h4><div class="mt-2 grid grid-cols-2 gap-2"><p class="rounded-xl bg-[#152b27] p-3 text-xs">次数 <strong id="count" class="mt-1 block text-xl"></strong></p><p class="rounded-xl bg-[#152b27] p-3 text-xs">分钟 <strong id="sum" class="mt-1 block text-xl"></strong></p></div><div id="records" class="mt-2 grid gap-1.5 text-xs text-[#c0d8ca]"></div></div>' +
+            '<div class="' +
+            panel +
+            ' mt-3"><h4 class="mb-2 text-sm font-bold">已收藏</h4><div id="favorites" class="grid gap-2"></div></div>',
+        ),
+      ].join("");
+
+      function drawCourse() {
+        $("course-detail").innerHTML =
+          '<div class="h-44 overflow-hidden rounded-2xl bg-[#324a42]">' +
+          img(current, "h-full w-full object-cover", "课程风景") +
+          "</div>" +
+          '<p class="mt-4 text-xs font-semibold text-[#aaddc3]">' +
+          current.type +
+          '</p><h3 class="mt-1 font-serif text-3xl font-bold">' +
+          current.name +
+          "</h3>" +
+          '<p class="mt-2 text-sm leading-relaxed text-[#c1d7ca]">' +
+          current.description +
+          "</p>" +
+          '<label class="mt-4 block text-xs font-semibold" for="duration">练习时长</label><select id="duration" class="mt-1 w-full rounded-xl border border-[#456657] bg-[#243f38] px-3 py-2 text-sm">' +
+          [...new Set([1, 3, 5, 8, 12, 20, current.length])]
+            .sort((a, b) => a - b)
+            .map(
+              (x) =>
+                '<option value="' +
+                x +
+                '" ' +
+                (x === minutes ? "selected" : "") +
+                ">" +
+                x +
+                " 分钟</option>",
+            )
+            .join("") +
+          '</select><div class="mt-4 flex gap-2"><button class="' +
+          button +
+          '" id="open-player">进入练习</button><button class="' +
+          ghost +
+          '" id="favorite" aria-pressed="' +
+          favorites.includes(current.id) +
+          '">' +
+          (favorites.includes(current.id) ? "取消收藏" : "收藏") +
+          "</button></div>";
+        $("duration").onchange = () => {
+          minutes = Number($("duration").value);
+          reset();
+          drawPlayer();
+        };
+        $("open-player").onclick = () => {
+          location.hash = "player";
+          drawPlayer();
+        };
+        $("favorite").onclick = () => {
+          favorites = favorites.includes(current.id)
+            ? favorites.filter((id) => id !== current.id)
+            : [...favorites, current.id];
+          save("favorites", favorites);
+          drawCourse();
+          drawRecord();
+          $("favorite").focus({ preventScroll: true });
+        };
+      }
+      function drawRecord() {
+        $("count").textContent = records.length;
+        $("sum").textContent = records.reduce(
+          (total, item) => total + item.minutes,
+          0,
+        );
+        $("records").innerHTML = records.length
+          ? records
+              .slice(-5)
+              .reverse()
+              .map(
+                (item) =>
+                  '<p class="flex justify-between gap-2"><span>' +
+                  courses.find((c) => c.id === item.id)?.name +
+                  " · " +
+                  item.minutes +
+                  " 分钟</span><time>" +
+                  new Date(item.date).toLocaleDateString("zh-CN") +
+                  "</time></p>",
+              )
+              .join("")
+          : "<p>完成一段练习后，记录会出现在这里。</p>";
+        $("favorites").innerHTML =
+          courses
+            .filter((c) => favorites.includes(c.id))
+            .map(card)
+            .join("") ||
+          '<p class="text-xs text-[#b0c5bc]">在课程页收藏你喜欢的练习。</p>';
+      }
+      function select(course, desired = course.length, destination = "course") {
+        current = course;
+        minutes = desired;
+        reset();
+        drawCourse();
+        drawPlayer();
+        location.hash = destination;
+      }
+      async function playAudio() {
+        if (!audible || !running) return;
+        try {
+          if (!audio) {
+            const Audio = window.AudioContext || window.webkitAudioContext;
+            audio = new Audio();
+            volume = audio.createGain();
+            volume.gain.value = 0;
+            volume.connect(audio.destination);
+            const buffer = audio.createBuffer(
+                1,
+                2 * audio.sampleRate,
+                audio.sampleRate,
+              ),
+              data = buffer.getChannelData(0);
+            let state = 0;
+            for (let i = 0; i < data.length; i++) {
+              state = state * 0.985 + (Math.random() * 2 - 1) * 0.015;
+              data[i] = state;
+            }
+            const noise = audio.createBufferSource(),
+              filter = audio.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.value = 430;
+            noise.buffer = buffer;
+            noise.loop = true;
+            noise.connect(filter);
+            filter.connect(volume);
+            noise.start();
+            oscillator = audio.createOscillator();
+            oscillator.type = "sine";
+            const gain = audio.createGain();
+            gain.gain.value = 0.025;
+            oscillator.connect(gain);
+            gain.connect(volume);
+            oscillator.start();
+          }
+          await audio.resume();
+          oscillator.frequency.setTargetAtTime(
+            current.tone,
+            audio.currentTime,
+            0.3,
+          );
+          setSound(running && audible ? 0.14 : 0);
+          $("audio-status").textContent = "";
+        } catch {
+          $("audio-status").textContent =
+            "当前浏览器无法播放环境音，练习计时仍可使用。";
+        }
+      }
+      function setSound(target) {
+        if (volume)
+          volume.gain.setTargetAtTime(target, audio.currentTime, 0.17);
+      }
+      function reset() {
+        running = false;
+        done = false;
+        elapsed = 0;
+        cancelAnimationFrame(animation);
+        setSound(0);
+      }
+      function drawPlayer() {
+        $("player-name").textContent = current.name;
+        $("pace").textContent =
+          current.pattern.filter(Boolean).join(" / ") + " 秒节奏";
+        $("progress").max = minutes * 60;
+        $("play").textContent = running
+          ? "暂停"
+          : done
+            ? "再次练习"
+            : elapsed > 0
+              ? "继续练习"
+              : "开始练习";
+        updateClock(elapsed);
+      }
+      const timeText = (seconds) =>
+        String(Math.floor(seconds / 60)).padStart(2, "0") +
+        ":" +
+        String(seconds % 60).padStart(2, "0");
+      function updateClock(time) {
+        $("clock").textContent = timeText(
+          Math.max(0, Math.ceil(minutes * 60 - time)),
+        );
+        $("progress").value = time;
+        const [a, b, c] = current.pattern,
+          phase = time % (a + b + c);
+        const grow =
+          phase < a ? phase / a : phase < a + b ? 1 : 1 - (phase - a - b) / c;
+        $("orb").style.transform = "scale(" + (0.86 + 0.32 * grow) + ")";
+        $("phase").textContent = done
+          ? "已完成"
+          : elapsed === 0 && !running
+            ? "准备"
+            : phase < a
+              ? "吸气"
+              : phase < a + b
+                ? "停留"
+                : "呼气";
+      }
+      function tick() {
+        if (!running) return;
+        const time = elapsed + (performance.now() - start) / 1000;
+        if (time >= minutes * 60) {
+          elapsed = minutes * 60;
+          running = false;
+          done = true;
+          setSound(0);
+          records.push({
+            id: current.id,
+            minutes,
+            date: new Date().toISOString(),
+          });
+          save("records", records);
+          drawRecord();
+          drawPlayer();
+          return;
+        }
+        updateClock(time);
+        animation = requestAnimationFrame(tick);
+      }
+      document.addEventListener("click", (event) => {
+        const course = event.target.closest("[data-course]"),
+          sleep = event.target.closest("[data-sleep]");
+        if (course) select(courses.find((c) => c.id === course.dataset.course));
+        if (sleep) select(courses[2], Number(sleep.dataset.sleep), "player");
+      });
+      $("play").onclick = () => {
+        if (running) {
+          elapsed += (performance.now() - start) / 1000;
+          running = false;
+          cancelAnimationFrame(animation);
+          setSound(0);
+          drawPlayer();
+          return;
+        }
+        if (done) reset();
+        running = true;
+        start = performance.now();
+        drawPlayer();
+        void playAudio();
+        tick();
+      };
+      $("restart").onclick = () => {
+        reset();
+        drawPlayer();
+      };
+      $("sound").onclick = () => {
+        audible = !audible;
+        $("sound").setAttribute("aria-pressed", audible);
+        $("sound").textContent = audible ? "环境音开启" : "环境音关闭";
+        if (audible) void playAudio();
+        else setSound(0);
+      };
+      drawCourse();
+      drawRecord();
+      drawPlayer();
+    </script>
+  </body>
+</html>

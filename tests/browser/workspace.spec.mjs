@@ -70,6 +70,7 @@ test("model picker groups vendors and uses generations and capability on desktop
   ];
   expect(modelsFor("OpenAI")).toEqual([
     "gpt-6-astra",
+    "gpt-6-2-sol",
     "gpt-6-1-sol",
     "gpt-6-sol",
     "gpt-6-luna",

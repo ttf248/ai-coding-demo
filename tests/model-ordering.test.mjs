@@ -53,6 +53,7 @@ test("registered models follow curated official release evidence instead of vers
       .map((m) => m.id);
   assert.deepEqual(ids("OpenAI"), [
     "gpt-6-astra",
+    "gpt-6-2-sol",
     "gpt-6-1-sol",
     "gpt-6-sol",
     "gpt-6-luna",

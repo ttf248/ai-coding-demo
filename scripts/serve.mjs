@@ -15,6 +15,7 @@ const mime = {
   ".png": "image/png",
   ".webp": "image/webp",
   ".jpg": "image/jpeg",
+  ".mp4": "video/mp4",
   ".svg": "image/svg+xml",
   ".woff2": "font/woff2",
 };
@@ -103,12 +104,37 @@ const server = http
         res.writeHead(404).end("Not found");
         return;
       }
-      res.writeHead(200, {
-        "Content-Type": mime[path.extname(file)] || "application/octet-stream",
+      const extension = path.extname(file);
+      const headers = {
+        "Content-Type": mime[extension] || "application/octet-stream",
         "Cache-Control": "no-store",
-      });
+      };
+      let streamOptions;
+      if (extension === ".mp4") {
+        const { size } = fs.statSync(file);
+        headers["Accept-Ranges"] = "bytes";
+        headers["Content-Length"] = size;
+        const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || "");
+        if (range && (range[1] || range[2])) {
+          const start = range[1]
+            ? Number(range[1])
+            : Math.max(size - Number(range[2]), 0);
+          const end =
+            range[1] && range[2]
+              ? Math.min(Number(range[2]), size - 1)
+              : size - 1;
+          if (start > end) {
+            res.writeHead(416, { "Content-Range": `bytes */${size}` }).end();
+            return;
+          }
+          headers["Content-Range"] = `bytes ${start}-${end}/${size}`;
+          headers["Content-Length"] = end - start + 1;
+          streamOptions = { start, end };
+        }
+      }
+      res.writeHead(streamOptions ? 206 : 200, headers);
       if (req.method === "HEAD") res.end();
-      else fs.createReadStream(file).pipe(res);
+      else fs.createReadStream(file, streamOptions).pipe(res);
     } catch {
       res.writeHead(400).end("Bad request");
     }
