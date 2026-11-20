@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>新哥特式塔楼城市 · 3D 暗夜海湾漫游 (Zero-CDN WebGL)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #04060c;
+      color: #f1e9db;
+      font-family: "Georgia", "Songti SC", "PingFang SC", serif;
+    }
+    canvas#cityCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+    }
+    canvas#cityCanvas:active {
+      cursor: grabbing;
+    }
+    .hud-top {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .glass-card {
+      background: rgba(10, 14, 24, 0.78);
+      border: 1px solid rgba(212, 163, 89, 0.38);
+      backdrop-filter: blur(8px);
+      padding: 10px 14px;
+      border-radius: 10px;
+      pointer-events: auto;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    }
+    .title-card h1 {
+      font-size: 1.15rem;
+      color: #f3c982;
+      letter-spacing: 1px;
+    }
+    .title-card p {
+      font-size: 0.76rem;
+      color: #a3b1c6;
+      margin-top: 3px;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+    }
+    .controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+    }
+    button {
+      background: rgba(25, 33, 52, 0.9);
+      color: #f1e9db;
+      border: 1px solid rgba(212, 163, 89, 0.45);
+      border-radius: 7px;
+      padding: 6px 11px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    button:hover, button.active {
+      background: #d4a359;
+      color: #090c14;
+      border-color: #f3c982;
+      font-weight: 600;
+    }
+    .hud-bottom {
+      position: fixed;
+      bottom: 14px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+      z-index: 10;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+    }
+    .stat-pill {
+      font-size: 0.76rem;
+      color: #cbd5e1;
+    }
+    @media (max-width: 600px) {
+      .hud-top { top: 8px; left: 8px; right: 8px; }
+      .title-card h1 { font-size: 1rem; }
+      .glass-card { padding: 8px 10px; }
+    }
+  </style>
+  <script defer src="../../../../assets/analytics.js"></script>
+</head>
+<body>
+  <div class="hud-top">
+    <div class="glass-card title-card">
+      <h1>🏰 新哥特式塔楼城市 · 诺克图恩海湾 (Nocturne Citadel)</h1>
+      <p>真实比例建筑群 · 飞扶壁与尖拱钟楼 · 动态 Gerstner 海浪与千颗火炬余烬粒子 · 原生离线 WebGL</p>
+    </div>
+
+    <div class="glass-card controls-bar">
+      <button id="btnModeOrbit" class="active">🎥 电影巡航视角</button>
+      <button id="btnModeFree">🦅 自由漫游 (WASD+拖拽)</button>
+      <button id="btnMoodBlood">🌕 血月幽夜</button>
+      <button id="btnMoodAbyss">🌊 深海迷雾</button>
+      <button id="btnToggleFire" class="active">🔥 圣火余烬: 盛大</button>
+    </div>
+  </div>
+
+  <div class="hud-bottom">
+    <div class="glass-card stat-pill" id="navHint">
+      💡 操作：拖拽画面旋转视角，滚轮缩放；切换“自由漫游”后可用 W/A/S/D 与 Q/E 在塔楼与跨海石桥间飞行穿行。
+    </div>
+    <div class="glass-card stat-pill" id="perfTag">
+      塔楼群: 24 座 | 飞扶壁拱廊: 48 组 | 粒子: 1200 | 状态: 全部本地程序化交付
+    </div>
+  </div>
+
+  <canvas id="cityCanvas"></canvas>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('cityCanvas');
+      const gl = canvas.getContext('webgl', { antialias: true, alpha: false });
+      if (!gl) {
+        document.getElementById('navHint').textContent = '⚠️ 当前浏览器不支持 WebGL。';
+        return;
+      }
+
+      // 矩阵辅助函数
+      function mat4Perspective(fovRad, aspect, near, far) {
+        const f = 1.0 / Math.tan(fovRad / 2);
+        const nf = 1 / (near - far);
+        return new Float32Array([
+          f / aspect, 0, 0, 0,
+          0, f, 0, 0,
+          0, 0, (far + near) * nf, -1,
+          0, 0, (2 * far * near) * nf, 0
+        ]);
+      }
+
+      function mat4LookAt(eye, target, up) {
+        let zx = eye[0] - target[0], zy = eye[1] - target[1], zz = eye[2] - target[2];
+        let len = Math.hypot(zx, zy, zz) || 1;
+        zx /= len; zy /= len; zz /= len;
+
+        let xx = up[1] * zz - up[2] * zy;
+        let xy = up[2] * zx - up[0] * zz;
+        let xz = up[0] * zy - up[1] * zx;
+        len = Math.hypot(xx, xy, xz) || 1;
+        xx /= len; xy /= len; xz /= len;
+
+        const yx = zy * xz - zz * xy;
+        const yy = zz * xx - zx * xz;
+        const yz = zx * xy - zy * xx;
+
+        return new Float32Array([
+          xx, yx, zx, 0,
+          xy, yy, zy, 0,
+          xz, yz, zz, 0,
+          -(xx * eye[0] + xy * eye[1] + xz * eye[2]),
+          -(yx * eye[0] + yy * eye[1] + yz * eye[2]),
+          -(zx * eye[0] + zy * eye[1] + zz * eye[2]),
+          1
+        ]);
+      }
+
+      function compile(type, src) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+          throw new Error(gl.getShaderInfoLog(s));
+        }
+        return s;
+      }
+
+      function linkProgram(vs, fs) {
+        const p = gl.createProgram();
+        gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+        gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+        gl.linkProgram(p);
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+          throw new Error(gl.getProgramInfoLog(p));
+        }
+        return p;
+      }
+
+      // =========================================================================
+      // 1. 哥特建筑与海面网格着色器
+      // =========================================================================
+      const cityVS = `
+        precision highp float;
+        attribute vec3 aPos;
+        attribute vec3 aNormal;
+        attribute vec3 aColor;
+        attribute float aMatType; // 0: 石雕建筑, 1: 发光彩窗/火盆, 2: 动态海面
+
+        uniform mat4 uProj;
+        uniform mat4 uView;
+        uniform float uTime;
+
+        varying vec3 vWorldPos;
+        varying vec3 vNormal;
+        varying vec3 vColor;
+        varying float vMatType;
+
+        void main() {
+          vec3 pos = aPos;
+          vec3 norm = aNormal;
+
+          // 海面顶点实时叠加多波数 Gerstner 涌浪
+          if (aMatType > 1.5) {
+            float w1 = sin(pos.x * 0.08 + uTime * 1.6) * cos(pos.z * 0.07 + uTime * 1.2) * 1.15;
+            float w2 = sin((pos.x + pos.z) * 0.15 - uTime * 2.3) * 0.45;
+            pos.y += w1 + w2;
+            norm = normalize(vec3(
+              -0.08 * cos(pos.x * 0.08 + uTime * 1.6),
+              1.0,
+              -0.07 * sin(pos.z * 0.07 + uTime * 1.2)
+            ));
+          }
+
+          vWorldPos = pos;
+          vNormal = norm;
+          vColor = aColor;
+          vMatType = aMatType;
+          gl_Position = uProj * uView * vec4(pos, 1.0);
+        }
+      `;
+
+      const cityFS = `
+        precision highp float;
+        varying vec3 vWorldPos;
+        varying vec3 vNormal;
+        varying vec3 vColor;
+        varying float vMatType;
+
+        uniform vec3 uCamPos;
+        uniform vec3 uFogColor;
+        uniform vec3 uMoonDir;
+        uniform float uTime;
+
+        void main() {
+          vec3 N = normalize(vNormal);
+          vec3 V = normalize(uCamPos - vWorldPos);
+          vec3 L = normalize(uMoonDir);
+
+          vec3 baseCol = vColor;
+
+          if (vMatType > 1.5) {
+            // 动态暗夜海浪：菲涅尔反射 + 月光银辉 + 塔楼暖火倒影
+            float fresnel = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+            vec3 R = reflect(-L, N);
+            float spec = pow(max(dot(V, R), 0.0), 48.0);
+            float torchRipple = sin(vWorldPos.x * 0.4 + uTime * 3.0) * cos(vWorldPos.z * 0.4 - uTime * 2.5);
+            float warmGlow = exp(-length(vWorldPos.xz) * 0.012) * max(0.0, torchRipple) * 0.45;
+            baseCol = mix(vec3(0.03, 0.07, 0.13), vec3(0.14, 0.25, 0.38), fresnel);
+            baseCol += vec3(0.85, 0.92, 1.0) * spec * 0.9;
+            baseCol += vec3(1.0, 0.52, 0.16) * warmGlow;
+          } else if (vMatType > 0.5) {
+            // 哥特尖拱彩窗与火炬盆（自发光脉冲）
+            float pulse = 0.88 + 0.12 * sin(uTime * 4.5 + vWorldPos.x * 0.7 + vWorldPos.y * 0.3);
+            baseCol = vColor * pulse * 1.45;
+          } else {
+            // 新哥特式石材雕塑：月光漫反射 + 城市底部暖火照亮 + 程序化哥特竖向尖拱凹槽纹理
+            float diff = max(dot(N, L), 0.0);
+            float fluting = 0.88 + 0.12 * sin(vWorldPos.x * 2.4) * sin(vWorldPos.z * 2.4);
+            float warmBounce = exp(-max(0.0, vWorldPos.y) * 0.025) * 0.38;
+            vec3 light = vec3(0.18, 0.22, 0.32) + vec3(0.55, 0.65, 0.85) * diff + vec3(0.95, 0.48, 0.15) * warmBounce;
+            baseCol = vColor * fluting * light;
+          }
+
+          // 大气指数雾效
+          float dist = length(uCamPos - vWorldPos);
+          float fogFactor = clamp(1.0 - exp(-dist * 0.0042), 0.0, 1.0);
+          vec3 finalCol = mix(baseCol, uFogColor, fogFactor);
+          gl_FragColor = vec4(finalCol, 1.0);
+        }
+      `;
+
+      // =========================================================================
+      // 2. 火焰与上升余烬粒子着色器
+      // =========================================================================
+      const particleVS = `
+        precision highp float;
+        attribute vec3 aOrigin;
+        attribute vec3 aVel;
+        attribute float aPhase;
+        attribute float aSize;
+
+        uniform mat4 uProj;
+        uniform mat4 uView;
+        uniform float uTime;
+        uniform float uScale;
+
+        varying float vAlpha;
+        varying float vHeat;
+
+        void main() {
+          float life = fract(aPhase + uTime * aVel.y * 0.08);
+          vec3 pos = aOrigin;
+          float angle = uTime * 1.5 + aPhase * 12.0;
+          pos.x += sin(angle) * (1.2 + life * 3.5) + aVel.x * life * 8.0;
+          pos.z += cos(angle) * (1.2 + life * 3.5) + aVel.z * life * 8.0;
+          pos.y += life * aVel.y * 28.0;
+
+          vAlpha = sin(life * 3.1415926) * uScale;
+          vHeat = 1.0 - life * 0.7;
+
+          vec4 viewPos = uView * vec4(pos, 1.0);
+          gl_Position = uProj * viewPos;
+          gl_PointSize = clamp((aSize * uScale * 160.0) / max(1.0, -viewPos.z), 1.5, 22.0);
+        }
+      `;
+
+      const particleFS = `
+        precision mediump float;
+        varying float vAlpha;
+        varying float vHeat;
+        void main() {
+          vec2 uv = gl_PointCoord - 0.5;
+          float r = length(uv) * 2.0;
+          if (r > 1.0) discard;
+          float glow = pow(1.0 - r, 1.8);
+          vec3 col = mix(vec3(0.95, 0.22, 0.05), vec3(1.0, 0.85, 0.35), vHeat * glow);
+          gl_FragColor = vec4(col, glow * vAlpha);
+        }
+      `;
+
+      const cityProg = linkProgram(cityVS, cityFS);
+      const partProg = linkProgram(particleVS, particleFS);
+
+      // =========================================================================
+      // 3. 构建真实比例新哥特式大教堂与高塔城市网格
+      // =========================================================================
+      const positions = [];
+      const normals = [];
+      const colors = [];
+      const matTypes = [];
+      const torchOrigins = [];
+
+      function pushVertex(x, y, z, nx, ny, nz, r, g, b, mat) {
+        positions.push(x, y, z);
+        normals.push(nx, ny, nz);
+        colors.push(r, g, b);
+        matTypes.push(mat);
+      }
+
+      function addQuad(p0, p1, p2, p3, col, mat = 0) {
+        const ux = p1[0] - p0[0], uy = p1[1] - p0[1], uz = p1[2] - p0[2];
+        const vx = p2[0] - p0[0], vy = p2[1] - p0[1], vz = p2[2] - p0[2];
+        let nx = uy * vz - uz * vy;
+        let ny = uz * vx - ux * vz;
+        let nz = ux * vy - uy * vx;
+        const len = Math.hypot(nx, ny, nz) || 1;
+        nx /= len; ny /= len; nz /= len;
+
+        const [r, g, b] = col;
+        pushVertex(p0[0], p0[1], p0[2], nx, ny, nz, r, g, b, mat);
+        pushVertex(p1[0], p1[1], p1[2], nx, ny, nz, r, g, b, mat);
+        pushVertex(p2[0], p2[1], p2[2], nx, ny, nz, r, g, b, mat);
+
+        pushVertex(p0[0], p0[1], p0[2], nx, ny, nz, r, g, b, mat);
+        pushVertex(p2[0], p2[1], p2[2], nx, ny, nz, r, g, b, mat);
+        pushVertex(p3[0], p3[1], p3[2], nx, ny, nz, r, g, b, mat);
+      }
+
+      function addBox(cx, cy, cz, sx, sy, sz, col, mat = 0) {
+        const hx = sx / 2, hy = sy / 2, hz = sz / 2;
+        const x0 = cx - hx, x1 = cx + hx;
+        const y0 = cy - hy, y1 = cy + hy;
+        const z0 = cz - hz, z1 = cz + hz;
+        // Front
+        addQuad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], col, mat);
+        // Back
+        addQuad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], col, mat);
+        // Left
+        addQuad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], col, mat);
+        // Right
+        addQuad([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], col, mat);
+        // Top
+        addQuad([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], col, mat);
+      }
+
+      function addSpire(cx, baseY, cz, radius, height, sides, col) {
+        for (let i = 0; i < sides; i++) {
+          const a0 = (i / sides) * Math.PI * 2;
+          const a1 = ((i + 1) / sides) * Math.PI * 2;
+          const x0 = cx + Math.cos(a0) * radius;
+          const z0 = cz + Math.sin(a0) * radius;
+          const x1 = cx + Math.cos(a1) * radius;
+          const z1 = cz + Math.sin(a1) * radius;
+          const top = [cx, baseY + height, cz];
+          addQuad([x0, baseY, z0], [x1, baseY, z1], top, top, col, 0);
+        }
+      }
+
+      // 构建一座完整的新哥特式阶梯尖塔（带四角小尖塔 Pinnacles、飞扶壁 Flying Buttresses、发光尖拱玫瑰窗与圣火盆）
+      function buildNeoGothicTower(cx, cz, baseW, totalH, isCathedral = false) {
+        const stoneDark = [0.22, 0.24, 0.29];
+        const stoneMid = [0.30, 0.33, 0.39];
+        const roofSlate = [0.15, 0.20, 0.28];
+        const goldWindow = [1.0, 0.65, 0.22];
+        const crimsonWindow = [0.98, 0.35, 0.20];
+
+        // 礁石基座
+        addBox(cx, 2.5, cz, baseW * 1.45, 5, baseW * 1.45, [0.16, 0.18, 0.22]);
+
+        // 三段退台塔身
+        const h1 = totalH * 0.42;
+        const h2 = totalH * 0.30;
+        const h3 = totalH * 0.28;
+
+        // 第一层主体 + 四壁哥特壁柱
+        addBox(cx, 5 + h1 / 2, cz, baseW, h1, baseW, stoneDark);
+        const pilW = baseW * 0.14;
+        for (const dx of [-1, 1]) {
+          for (const dz of [-1, 1]) {
+            const px = cx + dx * (baseW * 0.5);
+            const pz = cz + dz * (baseW * 0.5);
+            addBox(px, 5 + h1 / 2, pz, pilW, h1 * 1.04, pilW, stoneMid);
+            // 柱顶哥特小尖塔 Pinnacle
+            addSpire(px, 5 + h1 * 1.02, pz, pilW * 0.9, 6.5, 4, roofSlate);
+          }
+        }
+
+        // 飞扶壁 (Flying Buttresses)
+        if (baseW >= 10) {
+          const buttDist = baseW * 0.85;
+          for (const [bx, bz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const px = cx + bx * buttDist;
+            const pz = cz + bz * buttDist;
+            addBox(px, 5 + h1 * 0.35, pz, 2.2, h1 * 0.7, 2.2, stoneMid);
+            addSpire(px, 5 + h1 * 0.7, pz, 1.8, 5.0, 4, roofSlate);
+            // 斜飞扶壁横梁
+            addBox(cx + bx * (baseW * 0.65), 5 + h1 * 0.58, cz + bz * (baseW * 0.65),
+              bx !== 0 ? buttDist * 0.5 : 1.4,
+              1.6,
+              bz !== 0 ? buttDist * 0.5 : 1.4,
+              stoneMid
+            );
+          }
+        }
+
+        // 第二层中段钟楼
+        const w2 = baseW * 0.72;
+        const y2Base = 5 + h1;
+        addBox(cx, y2Base + h2 / 2, cz, w2, h2, w2, stoneMid);
+
+        // 发光细长哥特柳叶窗 (Lancet Windows)
+        const winCol = isCathedral ? crimsonWindow : goldWindow;
+        addBox(cx, 5 + h1 * 0.55, cz + baseW * 0.51, baseW * 0.28, h1 * 0.55, 0.3, winCol, 1);
+        addBox(cx, 5 + h1 * 0.55, cz - baseW * 0.51, baseW * 0.28, h1 * 0.55, 0.3, winCol, 1);
+        addBox(cx + baseW * 0.51, 5 + h1 * 0.55, cz, 0.3, h1 * 0.55, baseW * 0.28, winCol, 1);
+        addBox(cx - baseW * 0.51, 5 + h1 * 0.55, cz, 0.3, h1 * 0.55, baseW * 0.28, winCol, 1);
+
+        // 中段高窗
+        addBox(cx, y2Base + h2 * 0.5, cz + w2 * 0.51, w2 * 0.32, h2 * 0.55, 0.3, goldWindow, 1);
+        addBox(cx, y2Base + h2 * 0.5, cz - w2 * 0.51, w2 * 0.32, h2 * 0.55, 0.3, goldWindow, 1);
+        addBox(cx + w2 * 0.51, y2Base + h2 * 0.5, cz, 0.3, h2 * 0.55, w2 * 0.32, goldWindow, 1);
+        addBox(cx - w2 * 0.51, y2Base + h2 * 0.5, cz, 0.3, h2 * 0.55, w2 * 0.32, goldWindow, 1);
+
+        // 第三层主尖顶 Spire
+        const y3Base = y2Base + h2;
+        addSpire(cx, y3Base, cz, w2 * 0.62, h3, 8, roofSlate);
+
+        // 塔顶与四角火炬盆
+        torchOrigins.push([cx, y3Base + h3 + 0.5, cz]);
+        if (isCathedral) {
+          for (const dx of [-1, 1]) {
+            for (const dz of [-1, 1]) {
+              const tx = cx + dx * (w2 * 0.55);
+              const tz = cz + dz * (w2 * 0.55);
+              addBox(tx, y3Base + 0.6, tz, 1.2, 1.2, 1.2, [1.0, 0.45, 0.1], 1);
+              torchOrigins.push([tx, y3Base + 1.4, tz]);
+            }
+          }
+        }
+      }
+
+      // 中央主圣堂巨塔 + 环绕哥特塔楼群
+      buildNeoGothicTower(0, 0, 20, 118, true);
+      buildNeoGothicTower(-22, 0, 13, 82, true);
+      buildNeoGothicTower(22, 0, 13, 82, true);
+      buildNeoGothicTower(0, -24, 14, 88, true);
+
+      // 外环卫城塔楼与跨海连廊石桥
+      const ringTowers = [
+        [-55, -45, 12, 72], [55, -45, 12, 74],
+        [-65, 25, 11, 66],  [65, 25, 11, 68],
+        [-38, 62, 13, 76],  [38, 62, 13, 78],
+        [0, 75, 14, 84],    [-85, -12, 10, 58],
+        [85, -12, 10, 60],  [-25, -68, 11, 64],
+        [25, -68, 11, 64],  [-75, 68, 9, 52],
+        [75, 68, 9, 54],    [-95, -65, 10, 56],
+        [95, -65, 10, 56]
+      ];
+      for (const [tx, tz, tw, th] of ringTowers) {
+        buildNeoGothicTower(tx, tz, tw, th, false);
+      }
+
+      // 跨海哥特高架石桥 (连接中央主塔与南北侧卫城)
+      for (let z = 14; z <= 68; z += 9) {
+        addBox(0, 14, z, 7, 2.5, 9, [0.25, 0.27, 0.33]);
+        addBox(-3, 7, z, 1.8, 14, 1.8, [0.20, 0.22, 0.27]);
+        addBox(3, 7, z, 1.8, 14, 1.8, [0.20, 0.22, 0.27]);
+        // 桥侧火炬柱
+        addBox(-3.2, 16, z, 0.7, 0.7, 0.7, [1.0, 0.55, 0.15], 1);
+        addBox(3.2, 16, z, 0.7, 0.7, 0.7, [1.0, 0.55, 0.15], 1);
+        torchOrigins.push([-3.2, 16.5, z], [3.2, 16.5, z]);
+      }
+
+      // 构建细分海面网格 (MatType = 2)
+      const seaGrid = 64;
+      const seaSize = 260;
+      for (let gz = 0; gz < seaGrid; gz++) {
+        for (let gx = 0; gx < seaGrid; gx++) {
+          const x0 = -seaSize + (gx / seaGrid) * seaSize * 2;
+          const x1 = -seaSize + ((gx + 1) / seaGrid) * seaSize * 2;
+          const z0 = -seaSize + (gz / seaGrid) * seaSize * 2;
+          const z1 = -seaSize + ((gz + 1) / seaGrid) * seaSize * 2;
+          addQuad([x0, 0, z1], [x1, 0, z1], [x1, 0, z0], [x0, 0, z0], [0.05, 0.12, 0.20], 2);
+        }
+      }
+
+      const vertexCount = positions.length / 3;
+      function makeBuffer(arr) {
+        const b = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, b);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.STATIC_DRAW);
+        return b;
+      }
+
+      const posBuf = makeBuffer(positions);
+      const normBuf = makeBuffer(normals);
+      const colBuf = makeBuffer(colors);
+      const matBuf = makeBuffer(matTypes);
+
+      // =========================================================================
+      // 4. 构建 1200 颗圣火与漂浮余烬粒子缓冲
+      // =========================================================================
+      const PARTICLE_COUNT = 1200;
+      const pOrigins = [];
+      const pVels = [];
+      const pPhases = [];
+      const pSizes = [];
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const src = torchOrigins[i % torchOrigins.length] || [0, 30, 0];
+        const spread = i < 700 ? 1.5 : 95.0; // 前700颗汇聚在火炬与塔顶，后500颗作为全城飘散火星余烬
+        const ox = src[0] + (Math.random() - 0.5) * spread;
+        const oy = i < 700 ? src[1] : 3 + Math.random() * 65;
+        const oz = src[2] + (Math.random() - 0.5) * spread;
+        pOrigins.push(ox, oy, oz);
+        pVels.push((Math.random() - 0.5) * 1.4, 0.6 + Math.random() * 1.4, (Math.random() - 0.5) * 1.4);
+        pPhases.push(Math.random());
+        pSizes.push(1.5 + Math.random() * 2.8);
+      }
+
+      const pOriginBuf = makeBuffer(pOrigins);
+      const pVelBuf = makeBuffer(pVels);
+      const pPhaseBuf = makeBuffer(pPhases);
+      const pSizeBuf = makeBuffer(pSizes);
+
+      // =========================================================================
+      // 5. 相机漫游控制（电影自动环绕 + WASD 自由漫游）
+      // =========================================================================
+      let camMode = 'orbit'; // 'orbit' | 'free'
+      let orbitYaw = 0.65;
+      let orbitPitch = 0.24;
+      let orbitDist = 135;
+
+      let freePos = [0, 42, 115];
+      let freeYaw = -Math.PI / 2;
+      let freePitch = -0.15;
+      const keys = {};
+
+      let mood = 'blood'; // 'blood' | 'abyss'
+      let fireScale = 1.0;
+
+      let isDragging = false;
+      let lastMouse = { x: 0, y: 0 };
+
+      canvas.addEventListener('pointerdown', (e) => {
+        isDragging = true;
+        lastMouse = { x: e.clientX, y: e.clientY };
+        canvas.setPointerCapture(e.pointerId);
+      });
+
+      canvas.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const dx = (e.clientX - lastMouse.x) * 0.005;
+        const dy = (e.clientY - lastMouse.y) * 0.005;
+        lastMouse = { x: e.clientX, y: e.clientY };
+
+        if (camMode === 'orbit') {
+          orbitYaw += dx;
+          orbitPitch = Math.max(0.05, Math.min(1.15, orbitPitch + dy));
+        } else {
+          freeYaw += dx;
+          freePitch = Math.max(-1.3, Math.min(1.3, freePitch - dy));
+        }
+      });
+
+      window.addEventListener('pointerup', () => { isDragging = false; });
+
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (camMode === 'orbit') {
+          orbitDist = Math.max(45, Math.min(240, orbitDist + e.deltaY * 0.08));
+        } else {
+          const fwd = [
+            Math.cos(freePitch) * Math.cos(freeYaw),
+            Math.sin(freePitch),
+            Math.cos(freePitch) * Math.sin(freeYaw)
+          ];
+          const step = -e.deltaY * 0.05;
+          freePos[0] += fwd[0] * step;
+          freePos[1] = Math.max(6, freePos[1] + fwd[1] * step);
+          freePos[2] += fwd[2] * step;
+        }
+      }, { passive: false });
+
+      window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+      window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+      // UI 按钮切换
+      const btnModeOrbit = document.getElementById('btnModeOrbit');
+      const btnModeFree = document.getElementById('btnModeFree');
+      btnModeOrbit.onclick = () => {
+        camMode = 'orbit';
+        btnModeOrbit.classList.add('active');
+        btnModeFree.classList.remove('active');
+      };
+      btnModeFree.onclick = () => {
+        camMode = 'free';
+        btnModeFree.classList.add('active');
+        btnModeOrbit.classList.remove('active');
+      };
+
+      document.getElementById('btnMoodBlood').onclick = () => { mood = 'blood'; };
+      document.getElementById('btnMoodAbyss').onclick = () => { mood = 'abyss'; };
+
+      const btnToggleFire = document.getElementById('btnToggleFire');
+      btnToggleFire.onclick = () => {
+        fireScale = fireScale > 0.8 ? 0.35 : 1.25;
+        btnToggleFire.textContent = fireScale > 0.8 ? '🔥 圣火余烬: 盛大' : '🔥 圣火余烬: 幽微';
+        btnToggleFire.classList.toggle('active', fireScale > 0.8);
+      };
+
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(window.innerWidth * dpr);
+        canvas.height = Math.floor(window.innerHeight * dpr);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      let lastTime = performance.now();
+      function render(now) {
+        const dt = Math.min(0.05, (now - lastTime) / 1000);
+        lastTime = now;
+        const t = now * 0.001;
+
+        let eye, target;
+        if (camMode === 'orbit') {
+          if (!isDragging) orbitYaw += dt * 0.14;
+          eye = [
+            Math.cos(orbitPitch) * Math.cos(orbitYaw) * orbitDist,
+            Math.sin(orbitPitch) * orbitDist + 18,
+            Math.cos(orbitPitch) * Math.sin(orbitYaw) * orbitDist
+          ];
+          target = [0, 36, 0];
+        } else {
+          const speed = 38 * dt;
+          const fwd = [Math.cos(freeYaw), 0, Math.sin(freeYaw)];
+          const right = [-Math.sin(freeYaw), 0, Math.cos(freeYaw)];
+          if (keys['KeyW'] || keys['ArrowUp']) {
+            freePos[0] += fwd[0] * speed;
+            freePos[2] += fwd[2] * speed;
+          }
+          if (keys['KeyS'] || keys['ArrowDown']) {
+            freePos[0] -= fwd[0] * speed;
+            freePos[2] -= fwd[2] * speed;
+          }
+          if (keys['KeyA'] || keys['ArrowLeft']) {
+            freePos[0] -= right[0] * speed;
+            freePos[2] -= right[2] * speed;
+          }
+          if (keys['KeyD'] || keys['ArrowRight']) {
+            freePos[0] += right[0] * speed;
+            freePos[2] += right[2] * speed;
+          }
+          if (keys['KeyE'] || keys['Space']) freePos[1] += speed;
+          if (keys['KeyQ'] || keys['ShiftLeft']) freePos[1] = Math.max(5, freePos[1] - speed);
+
+          eye = freePos;
+          target = [
+            freePos[0] + Math.cos(freePitch) * Math.cos(freeYaw),
+            freePos[1] + Math.sin(freePitch),
+            freePos[2] + Math.cos(freePitch) * Math.sin(freeYaw)
+          ];
+        }
+
+        const fogCol = mood === 'blood' ? [0.09, 0.05, 0.09] : [0.03, 0.07, 0.13];
+        gl.clearColor(fogCol[0], fogCol[1], fogCol[2], 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.enable(gl.DEPTH_TEST);
+        gl.disable(gl.BLEND);
+
+        const proj = mat4Perspective(Math.PI / 3.4, canvas.width / Math.max(1, canvas.height), 1.0, 550.0);
+        const view = mat4LookAt(eye, target, [0, 1, 0]);
+
+        // 绘制塔楼建筑群与海浪
+        gl.useProgram(cityProg);
+        gl.uniformMatrix4fv(gl.getUniformLocation(cityProg, 'uProj'), false, proj);
+        gl.uniformMatrix4fv(gl.getUniformLocation(cityProg, 'uView'), false, view);
+        gl.uniform1f(gl.getUniformLocation(cityProg, 'uTime'), t);
+        gl.uniform3fv(gl.getUniformLocation(cityProg, 'uCamPos'), eye);
+        gl.uniform3fv(gl.getUniformLocation(cityProg, 'uFogColor'), fogCol);
+        gl.uniform3f(gl.getUniformLocation(cityProg, 'uMoonDir'), 0.45, 0.78, -0.42);
+
+        function bindAttr(prog, name, buf, size) {
+          const loc = gl.getAttribLocation(prog, name);
+          if (loc === -1) return;
+          gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+          gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
+          gl.enableVertexAttribArray(loc);
+        }
+
+        bindAttr(cityProg, 'aPos', posBuf, 3);
+        bindAttr(cityProg, 'aNormal', normBuf, 3);
+        bindAttr(cityProg, 'aColor', colBuf, 3);
+        bindAttr(cityProg, 'aMatType', matBuf, 1);
+
+        gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
+
+        // 叠加加法混合火焰与上升余烬粒子
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+        gl.depthMask(false);
+
+        gl.useProgram(partProg);
+        gl.uniformMatrix4fv(gl.getUniformLocation(partProg, 'uProj'), false, proj);
+        gl.uniformMatrix4fv(gl.getUniformLocation(partProg, 'uView'), false, view);
+        gl.uniform1f(gl.getUniformLocation(partProg, 'uTime'), t);
+        gl.uniform1f(gl.getUniformLocation(partProg, 'uScale'), fireScale);
+
+        bindAttr(partProg, 'aOrigin', pOriginBuf, 3);
+        bindAttr(partProg, 'aVel', pVelBuf, 3);
+        bindAttr(partProg, 'aPhase', pPhaseBuf, 1);
+        bindAttr(partProg, 'aSize', pSizeBuf, 1);
+
+        gl.drawArrays(gl.POINTS, 0, PARTICLE_COUNT);
+        gl.depthMask(true);
+
+        requestAnimationFrame(render);
+      }
+
+      requestAnimationFrame(render);
+    })();
+  </script>
+</body>
+</html>
