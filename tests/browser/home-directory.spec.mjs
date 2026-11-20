@@ -355,6 +355,8 @@ test("active topic grouping shows a screenshot for every active topic", async ({
 test("run grouping shows registered screenshots on their own experiment cards", async ({
   page,
 }) => {
+  // 逐页加载并请求全部缩略图，耗时随目录增长。
+  test.slow();
   const expected = data.runs.filter((run) => {
     const topic = data.topics.find((item) => item.id === run.topicId);
     return topic?.testingStatus !== "archived" && run.screenshot;
@@ -369,7 +371,17 @@ test("run grouping shows registered screenshots on their own experiment cards", 
     .locator(".run-card-screenshot img")
     .evaluateAll((images) => images.map((image) => image.getAttribute("src")));
   expect(new Set(urls).size).toBe(expected.length);
-  for (const url of urls) expect((await page.request.get(url)).ok()).toBe(true);
+  const batchSize = 12;
+  for (let index = 0; index < urls.length; index += batchSize) {
+    await Promise.all(
+      urls.slice(index, index + batchSize).map(async (url) => {
+        const response = await page.request.get(url);
+        const ok = response.ok();
+        await response.dispose();
+        expect(ok, url).toBe(true);
+      }),
+    );
+  }
 });
 test("homepage grid and list keep preview controls within a mobile viewport", async ({
   page,

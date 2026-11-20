@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>3D 新哥特式塔楼城市漫游</title>
+  <style>
+    :root {
+      --bg: #070910;
+      --glass: rgba(13, 18, 30, 0.72);
+      --border: rgba(212, 175, 110, 0.28);
+      --gold: #e7c27d;
+      --text: #f3efe6;
+      --muted: #b6b1a4;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    canvas#gl {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    .hud-top {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .panel {
+      pointer-events: auto;
+      background: var(--glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 13px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    }
+    .title-box h1 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: 0.8px;
+      color: var(--gold);
+    }
+    .title-box p {
+      margin: 3px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-width: 560px;
+      justify-content: flex-end;
+    }
+    button {
+      background: rgba(30, 39, 58, 0.85);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button:hover { background: rgba(52, 66, 95, 0.95); }
+    button.active {
+      background: rgba(231, 194, 125, 0.22);
+      border-color: var(--gold);
+      color: #ffebc2;
+    }
+    .hud-bottom {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .help-chip {
+      pointer-events: auto;
+      font-size: 11.5px;
+      color: var(--muted);
+      line-height: 1.5;
+      max-width: 560px;
+    }
+    .help-chip strong { color: var(--gold); }
+    .touch-pad {
+      pointer-events: auto;
+      display: grid;
+      grid-template-columns: repeat(3, 38px);
+      grid-template-rows: repeat(2, 34px);
+      gap: 4px;
+    }
+    .touch-pad button {
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+    .note-tag {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(231, 194, 125, 0.14);
+      border: 1px solid rgba(231, 194, 125, 0.3);
+      color: #f6dcab;
+      font-size: 11px;
+    }
+    .fallback {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: #070910;
+      z-index: 50;
+      text-align: center;
+    }
+    .fallback.show { display: flex; }
+    @media (max-width: 640px) {
+      .title-box { max-width: 100%; }
+      .controls { justify-content: flex-start; }
+      .help-chip { display: none; }
+    }
+  </style>
+  <script defer src="../../../../assets/analytics.js"></script>
+</head>
+<body>
+  <canvas id="gl" aria-label="3D 新哥特式塔楼城市画布"></canvas>
+
+  <div class="hud-top">
+    <div class="panel title-box">
+      <h1>新哥特式海港塔楼城 · 真实比例 3D 漫游</h1>
+      <p id="cam-status">模式：电影巡航 · 高度 22.0m · 主尖塔高 116m</p>
+      <span class="note-tag">待确认：未依赖外部 3D/音频库 CDN，已使用纯原生 WebGL 着色器离线重建</span>
+    </div>
+    <div class="panel controls">
+      <button type="button" id="mode-tour" class="active">电影巡航</button>
+      <button type="button" id="mode-walk">步行漫游</button>
+      <button type="button" id="mode-fly">高空飞行</button>
+      <button type="button" id="preset-bridge">海港大桥</button>
+      <button type="button" id="preset-plaza">教堂广场</button>
+      <button type="button" id="preset-spire">尖塔俯瞰</button>
+      <button type="button" id="toggle-atmo">切换天色：月夜</button>
+    </div>
+  </div>
+
+  <div class="hud-bottom">
+    <div class="panel help-chip">
+      <strong>漫游操作</strong>：点击<strong>步行漫游 / 高空飞行</strong>后，使用 <strong>W A S D</strong> 移动、<strong>Shift</strong> 加速、<strong>鼠标/单指拖拽</strong>环视视角，<strong>滚轮</strong>调节前进速度或视野；也可使用右下角方向键在移动端漫游。
+    </div>
+    <div class="panel touch-pad" aria-label="方向控制">
+      <span></span>
+      <button type="button" data-move="fwd">▲</button>
+      <span></span>
+      <button type="button" data-move="left">◀</button>
+      <button type="button" data-move="back">▼</button>
+      <button type="button" data-move="right">▶</button>
+    </div>
+  </div>
+
+  <div id="webgl-fallback" class="fallback">
+    <div class="panel" style="max-width:420px;">
+      <h2 style="margin:0 0 8px;color:#f87171;">无法启用 WebGL 渲染</h2>
+      <p style="margin:0;font-size:13px;color:var(--muted);">当前浏览器未启用 WebGL，无法展示 3D 新哥特式塔楼城市。</p>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const canvas = document.getElementById("gl");
+      const gl = canvas.getContext("webgl", { antialias: true, alpha: false });
+      if (!gl) {
+        document.getElementById("webgl-fallback").classList.add("show");
+        return;
+      }
+
+      // 4x4 矩阵工具
+      const Mat4 = {
+        perspective(fovRad, aspect, near, far) {
+          const f = 1 / Math.tan(fovRad / 2);
+          const nf = 1 / (near - far);
+          return new Float32Array([
+            f / aspect, 0, 0, 0,
+            0, f, 0, 0,
+            0, 0, (far + near) * nf, -1,
+            0, 0, 2 * far * near * nf, 0,
+          ]);
+        },
+        lookAt(eye, target, up) {
+          let zx = eye[0] - target[0], zy = eye[1] - target[1], zz = eye[2] - target[2];
+          let len = Math.hypot(zx, zy, zz) || 1;
+          zx /= len; zy /= len; zz /= len;
+          let xx = up[1] * zz - up[2] * zy;
+          let xy = up[2] * zx - up[0] * zz;
+          let xz = up[0] * zy - up[1] * zx;
+          len = Math.hypot(xx, xy, xz) || 1;
+          xx /= len; xy /= len; xz /= len;
+          const yx = zy * xz - zz * xy;
+          const yy = zz * xx - zx * xz;
+          const yz = zx * xy - zy * xx;
+          return new Float32Array([
+            xx, yx, zx, 0,
+            xy, yy, zy, 0,
+            xz, yz, zz, 0,
+            -(xx * eye[0] + xy * eye[1] + xz * eye[2]),
+            -(yx * eye[0] + yy * eye[1] + yz * eye[2]),
+            -(zx * eye[0] + zy * eye[1] + zz * eye[2]),
+            1,
+          ]);
+        },
+        multiply(a, b) {
+          const out = new Float32Array(16);
+          for (let c = 0; c < 4; c++) {
+            for (let r = 0; r < 4; r++) {
+              out[c * 4 + r] =
+                a[r] * b[c * 4] +
+                a[4 + r] * b[c * 4 + 1] +
+                a[8 + r] * b[c * 4 + 2] +
+                a[12 + r] * b[c * 4 + 3];
+            }
+          }
+          return out;
+        },
+      };
+
+      function createProgram(vsSrc, fsSrc) {
+        const compile = (type, src) => {
+          const s = gl.createShader(type);
+          gl.shaderSource(s, src);
+          gl.compileShader(s);
+          if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(s));
+          return s;
+        };
+        const p = gl.createProgram();
+        gl.attachShader(p, compile(gl.VERTEX_SHADER, vsSrc));
+        gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc));
+        gl.linkProgram(p);
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(p));
+        return p;
+      }
+
+      // 构建新哥特式建筑网格集合（每顶点：pos(3), normal(3), color(3), matKind(1)）
+      const verts = [];
+      const indices = [];
+      let vCount = 0;
+
+      function pushTri(a, b, c) {
+        indices.push(a, b, c);
+      }
+
+      function addQuad(p0, p1, p2, p3, n, col, kind) {
+        const base = vCount;
+        for (const p of [p0, p1, p2, p3]) {
+          verts.push(p[0], p[1], p[2], n[0], n[1], n[2], col[0], col[1], col[2], kind);
+        }
+        vCount += 4;
+        pushTri(base, base + 1, base + 2);
+        pushTri(base, base + 2, base + 3);
+      }
+
+      // kind: 0=石墙, 1=深色石板屋顶, 2=玻璃/发光窗, 3=火盆金属, 4=路面石板
+      function addBox(cx, y0, cz, sx, sy, sz, col, kind = 0) {
+        const x0 = cx - sx / 2, x1 = cx + sx / 2;
+        const y1 = y0 + sy;
+        const z0 = cz - sz / 2, z1 = cz + sz / 2;
+        addQuad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1], col, kind);
+        addQuad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1], col, kind);
+        addQuad([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0], col, kind);
+        addQuad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0], col, kind);
+        addQuad([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0], col, kind);
+        addQuad([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [0, -1, 0], col, kind);
+      }
+
+      function addPyramid(cx, y0, cz, baseW, h, sides, col, kind = 1) {
+        const apex = [cx, y0 + h, cz];
+        const ring = [];
+        for (let i = 0; i < sides; i++) {
+          const a = (i / sides) * Math.PI * 2 + Math.PI / sides;
+          ring.push([cx + Math.cos(a) * baseW, y0, cz + Math.sin(a) * baseW]);
+        }
+        for (let i = 0; i < sides; i++) {
+          const p1 = ring[i];
+          const p2 = ring[(i + 1) % sides];
+          const ux = p2[0] - p1[0], uy = p2[1] - p1[1], uz = p2[2] - p1[2];
+          const vx = apex[0] - p1[0], vy = apex[1] - p1[1], vz = apex[2] - p1[2];
+          let nx = uy * vz - uz * vy;
+          let ny = uz * vx - ux * vz;
+          let nz = ux * vy - uy * vx;
+          const l = Math.hypot(nx, ny, nz) || 1;
+          nx /= l; ny /= l; nz /= l;
+          if (nx * (p1[0] - cx) + nz * (p1[2] - cz) < 0) {
+            nx = -nx; ny = -ny; nz = -nz;
+          }
+          const b = vCount;
+          for (const p of [p1, p2, apex]) {
+            verts.push(p[0], p[1], p[2], nx, ny, nz, col[0], col[1], col[2], kind);
+          }
+          vCount += 3;
+          pushTri(b, b + 1, b + 2);
+        }
+      }
+
+      const torches = [];
+
+      function addBrazier(x, y, z) {
+        addBox(x, y, z, 0.9, 1.4, 0.9, [0.24, 0.25, 0.28], 3);
+        addBox(x, y + 1.4, z, 1.35, 0.45, 1.35, [0.18, 0.17, 0.19], 3);
+        torches.push([x, y + 2.0, z]);
+      }
+
+      function addGothicTower(cx, baseY, cz, width, height, spireH, tone = 0) {
+        const stone = [0.36 + tone * 0.05, 0.35 + tone * 0.04, 0.39 + tone * 0.04];
+        const trim = [0.28, 0.27, 0.32];
+        const roof = [0.16, 0.20, 0.26];
+        const glow = [1.0, 0.72, 0.32];
+
+        // 基座与逐层收分主塔身
+        addBox(cx, baseY, cz, width * 1.18, height * 0.14, width * 1.18, trim, 0);
+        const tier1H = height * 0.48;
+        addBox(cx, baseY + height * 0.14, cz, width, tier1H, width, stone, 0);
+
+        // 四角飞扶壁与棱肋支柱
+        const cornerOff = width * 0.52;
+        for (const sx of [-1, 1]) {
+          for (const sz of [-1, 1]) {
+            addBox(
+              cx + sx * cornerOff, baseY, cz + sz * cornerOff,
+              width * 0.19, height * 0.78, width * 0.19, trim, 0
+            );
+            addPyramid(
+              cx + sx * cornerOff, baseY + height * 0.78, cz + sz * cornerOff,
+              width * 0.14, width * 0.55, 4, roof, 1
+            );
+          }
+        }
+
+        // 高窗发光花格
+        const wSpan = width * 0.34;
+        const wH = tier1H * 0.65;
+        const wY = baseY + height * 0.22;
+        addBox(cx, wY, cz, width + 0.16, wH, wSpan, glow, 2);
+        addBox(cx, wY, cz, wSpan, wH, width + 0.16, glow, 2);
+
+        // 上层钟楼灯笼亭
+        const y2 = baseY + height * 0.62;
+        const tier2H = height * 0.38;
+        addBox(cx, y2, cz, width * 0.78, tier2H, width * 0.78, stone, 0);
+        addBox(cx, y2 + tier2H * 0.2, cz, width * 0.80, tier2H * 0.55, width * 0.26, glow, 2);
+        addBox(cx, y2 + tier2H * 0.2, cz, width * 0.26, tier2H * 0.55, width * 0.80, glow, 2);
+
+        // 八角肋拱高耸尖顶
+        const topY = baseY + height;
+        addPyramid(cx, topY, cz, width * 0.48, spireH, 8, roof, 1);
+        addBox(cx, topY + spireH - 1.2, cz, 0.35, 3.6, 0.35, [0.85, 0.72, 0.42], 3);
+      }
+
+      // 构建海岛基座、拱桥、海港码头与高耸新哥特城市
+      // 1. 中心高台（教堂主岛）
+      addBox(0, -4, 0, 74, 15, 74, [0.22, 0.22, 0.25], 4);
+      addBox(0, 11, 0, 68, 0.6, 68, [0.29, 0.28, 0.30], 4);
+      // 四周城墙垛口
+      for (let i = -30; i <= 30; i += 6) {
+        if (Math.abs(i) > 7) {
+          addBox(i, 11.6, 33, 2.8, 2.2, 1.4, [0.33, 0.32, 0.35], 0);
+          addBox(i, 11.6, -33, 2.8, 2.2, 1.4, [0.33, 0.32, 0.35], 0);
+        }
+        addBox(33, 11.6, i, 1.4, 2.2, 2.8, [0.33, 0.32, 0.35], 0);
+        addBox(-33, 11.6, i, 1.4, 2.2, 2.8, [0.33, 0.32, 0.35], 0);
+      }
+
+      // 2. 南侧海港前桥与下层码头广场 (z = +37 .. +105)
+      addBox(0, -3, 98, 44, 6.2, 26, [0.24, 0.23, 0.26], 4); // 码头广场 y=3.2
+      // 坡道桥连接码头(y=3.2)与上层教堂广场(y=11.6)
+      for (let s = 0; s < 22; s++) {
+        const t = s / 21;
+        const z = 85 - t * 50;
+        const y = 3.2 + t * 8.4;
+        addBox(0, -3, z, 11.5, y + 3, 2.6, [0.26, 0.25, 0.28], 4);
+        if (s % 4 === 0) {
+          addBrazier(-5.2, y, z);
+          addBrazier(5.2, y, z);
+        }
+      }
+      // 广场火盆与码头灯火
+      for (const [bx, by, bz] of [
+        [-14, 11.6, 24], [14, 11.6, 24], [-14, 11.6, -16], [14, 11.6, -16],
+        [-17, 3.2, 108], [17, 3.2, 108], [-17, 3.2, 90], [17, 3.2, 90],
+      ]) {
+        addBrazier(bx, by, bz);
+      }
+
+      // 3. 宏伟主大教堂塔楼 (总高约 116m)
+      addGothicTower(0, 11.6, -8, 17, 68, 36, 0.2);
+      // 东西双侧辅尖塔
+      addGothicTower(-21, 11.6, -6, 10.5, 48, 25, -0.3);
+      addGothicTower(21, 11.6, -6, 10.5, 48, 25, -0.3);
+      // 教堂中殿与玫瑰花窗立面
+      addBox(0, 11.6, 11, 20, 26, 26, [0.35, 0.34, 0.38], 0);
+      addBox(0, 26, 24.1, 7.5, 7.5, 0.6, [1.0, 0.65, 0.25], 2);
+
+      // 4. 外围东/西/北卫星塔楼区与栈桥
+      const satelliteTowers = [
+        [-58, 4.5, -18, 12, 42, 20, 0.1],
+        [-54, 4.5, 22, 10, 34, 17, -0.2],
+        [58, 4.5, -16, 12, 45, 22, 0.15],
+        [54, 4.5, 24, 10.5, 36, 18, -0.1],
+        [-26, 4.5, -58, 11.5, 44, 21, 0.0],
+        [26, 4.5, -58, 11.5, 40, 19, 0.25],
+      ];
+      for (const [tx, ty, tz, tw, th, ts, tn] of satelliteTowers) {
+        addBox(tx, -4, tz, tw * 2.2, ty + 4, tw * 2.2, [0.22, 0.22, 0.25], 4);
+        addGothicTower(tx, ty, tz, tw, th, ts, tn);
+        addBrazier(tx - tw * 0.7, ty, tz + tw * 0.7);
+        addBrazier(tx + tw * 0.7, ty, tz + tw * 0.7);
+      }
+      // 连接东西岛的拱桥
+      addBox(-43, 5.2, 0, 26, 2.2, 8.5, [0.27, 0.26, 0.29], 4);
+      addBox(43, 5.2, 0, 26, 2.2, 8.5, [0.27, 0.26, 0.29], 4);
+      addBox(0, 5.2, -45, 10, 2.2, 24, [0.27, 0.26, 0.29], 4);
+
+      const cityProg = createProgram(
+        `
+        attribute vec3 aPos;
+        attribute vec3 aNormal;
+        attribute vec3 aColor;
+        attribute float aKind;
+        uniform mat4 uVP;
+        varying vec3 vWorldPos;
+        varying vec3 vNormal;
+        varying vec3 vColor;
+        varying float vKind;
+        void main() {
+          vWorldPos = aPos;
+          vNormal = aNormal;
+          vColor = aColor;
+          vKind = aKind;
+          gl_Position = uVP * vec4(aPos, 1.0);
+        }
+        `,
+        `
+        precision highp float;
+        varying vec3 vWorldPos;
+        varying vec3 vNormal;
+        varying vec3 vColor;
+        varying float vKind;
+        uniform vec3 uCamPos;
+        uniform vec3 uSunDir;
+        uniform vec3 uSunColor;
+        uniform vec3 uSkyHorizon;
+        uniform vec3 uSkyZenith;
+        uniform float uTime;
+        uniform float uNightFactor;
+
+        void main() {
+          vec3 N = normalize(vNormal);
+          vec3 V = normalize(uCamPos - vWorldPos);
+          vec3 L = normalize(uSunDir);
+
+          // 程序化哥特石砖纹理与窗格图案
+          vec3 base = vColor;
+          if (vKind < 0.5) {
+            float brickY = step(0.12, fract(vWorldPos.y * 0.65));
+            float brickX = step(0.08, fract((vWorldPos.x + vWorldPos.z) * 0.35 + floor(vWorldPos.y * 0.65) * 0.5));
+            float mortar = mix(0.76, 1.04, brickX * brickY);
+            base *= mortar;
+          } else if (abs(vKind - 2.0) < 0.3) {
+            // 彩绘尖拱窗格纹样与暖灯明暗
+            float gx = smoothstep(0.15, 0.25, abs(fract(vWorldPos.x * 0.9 + vWorldPos.z * 0.9) - 0.5));
+            float gy = smoothstep(0.10, 0.20, abs(fract(vWorldPos.y * 0.45) - 0.5));
+            float flicker = 0.88 + 0.12 * sin(uTime * 2.5 + vWorldPos.x * 0.7);
+            vec3 windowGlow = base * (1.2 + 0.8 * uNightFactor) * flicker * (0.35 + 0.65 * gx * gy);
+            float dist = length(uCamPos - vWorldPos);
+            float fog = 1.0 - exp(-dist * 0.0042);
+            gl_FragColor = vec4(mix(windowGlow, uSkyHorizon, fog), 1.0);
+            return;
+          }
+
+          float diff = max(dot(N, L), 0.0);
+          vec3 H = normalize(L + V);
+          float spec = pow(max(dot(N, H), 0.0), 28.0) * (abs(vKind - 1.0) < 0.3 ? 0.35 : 0.08);
+          float hemi = 0.5 + 0.5 * N.y;
+          vec3 ambient = mix(vec3(0.08, 0.10, 0.16), uSkyZenith * 0.55, hemi);
+
+          // 近处火炬暖光补光
+          float torchWarm = exp(-abs(vWorldPos.y - 10.0) * 0.09) * 0.25 * (0.4 + 0.6 * uNightFactor);
+          vec3 lit = base * (ambient + uSunColor * diff * 0.95) + vec3(1.0, 0.62, 0.24) * torchWarm * base + uSunColor * spec;
+
+          float dist = length(uCamPos - vWorldPos);
+          float fog = 1.0 - exp(-dist * 0.0042);
+          vec3 col = mix(lit, uSkyHorizon, clamp(fog, 0.0, 1.0));
+          gl_FragColor = vec4(col, 1.0);
+        }
+        `
+      );
+
+      const cityVBO = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, cityVBO);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+      const cityIBO = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cityIBO);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+      // 海洋 Gerstner 波浪网格
+      const seaSize = 520;
+      const seaSeg = 110;
+      const seaVerts = [];
+      const seaIdx = [];
+      for (let z = 0; z <= seaSeg; z++) {
+        for (let x = 0; x <= seaSeg; x++) {
+          seaVerts.push((x / seaSeg - 0.5) * seaSize, (z / seaSeg - 0.5) * seaSize);
+        }
+      }
+      for (let z = 0; z < seaSeg; z++) {
+        for (let x = 0; x < seaSeg; x++) {
+          const i = z * (seaSeg + 1) + x;
+          seaIdx.push(i, i + seaSeg + 1, i + 1, i + 1, i + seaSeg + 1, i + seaSeg + 2);
+        }
+      }
+
+      const seaProg = createProgram(
+        `
+        attribute vec2 aXZ;
+        uniform mat4 uVP;
+        uniform float uTime;
+        varying vec3 vWorldPos;
+        varying vec3 vNormal;
+        varying float vCrest;
+
+        void gerstner(vec2 pos, vec2 dir, float steep, float wl, float spd, inout vec3 p, inout vec3 tangent, inout vec3 binormal) {
+          float k = 6.28318 / wl;
+          float c = sqrt(9.8 / k) * spd;
+          vec2 d = normalize(dir);
+          float f = k * (dot(d, pos) - c * uTime);
+          float a = steep / k;
+          p.x += d.x * (a * cos(f));
+          p.y += a * sin(f);
+          p.z += d.y * (a * cos(f));
+          float wa = k * a;
+          tangent += vec3(-d.x * d.x * wa * sin(f), d.x * wa * cos(f), -d.x * d.y * wa * sin(f));
+          binormal += vec3(-d.x * d.y * wa * sin(f), d.y * wa * cos(f), -d.y * d.y * wa * sin(f));
+        }
+
+        void main() {
+          vec3 p = vec3(aXZ.x, 0.0, aXZ.y);
+          vec3 tangent = vec3(1.0, 0.0, 0.0);
+          vec3 binormal = vec3(0.0, 0.0, 1.0);
+          gerstner(aXZ, vec2(1.0, 0.35), 0.18, 22.0, 1.1, p, tangent, binormal);
+          gerstner(aXZ, vec2(0.4, 0.9), 0.14, 13.5, 1.25, p, tangent, binormal);
+          gerstner(aXZ, vec2(-0.7, 0.6), 0.10, 8.2, 1.35, p, tangent, binormal);
+          vNormal = normalize(cross(binormal, tangent));
+          vWorldPos = p;
+          vCrest = smoothstep(0.35, 1.1, p.y);
+          gl_Position = uVP * vec4(p, 1.0);
+        }
+        `,
+        `
+        precision highp float;
+        varying vec3 vWorldPos;
+        varying vec3 vNormal;
+        varying float vCrest;
+        uniform vec3 uCamPos;
+        uniform vec3 uSunDir;
+        uniform vec3 uSunColor;
+        uniform vec3 uSkyHorizon;
+        uniform vec3 uSkyZenith;
+
+        void main() {
+          vec3 N = normalize(vNormal);
+          vec3 V = normalize(uCamPos - vWorldPos);
+          vec3 L = normalize(uSunDir);
+          float fresnel = pow(1.0 - max(dot(N, V), 0.0), 4.0);
+          vec3 R = reflect(-V, N);
+          vec3 skyRefl = mix(uSkyHorizon, uSkyZenith, clamp(R.y * 1.5, 0.0, 1.0));
+          vec3 deepWater = vec3(0.03, 0.08, 0.14);
+          vec3 col = mix(deepWater, skyRefl, 0.25 + 0.7 * fresnel);
+
+          vec3 H = normalize(L + V);
+          float spec = pow(max(dot(N, H), 0.0), 96.0);
+          col += uSunColor * spec * 1.4;
+
+          // 海岸与浪尖白沫
+          float islandDist = max(abs(vWorldPos.x), abs(vWorldPos.z));
+          float shoreFoam = smoothstep(41.0, 36.0, islandDist) * 0.45;
+          col = mix(col, vec3(0.82, 0.88, 0.94), clamp(vCrest * 0.28 + shoreFoam, 0.0, 0.65));
+
+          float dist = length(uCamPos - vWorldPos);
+          float fog = 1.0 - exp(-dist * 0.0042);
+          col = mix(col, uSkyHorizon, clamp(fog, 0.0, 1.0));
+          gl_FragColor = vec4(col, 1.0);
+        }
+        `
+      );
+
+      const seaVBO = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, seaVBO);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(seaVerts), gl.STATIC_DRAW);
+      const seaIBO = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, seaIBO);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(seaIdx), gl.STATIC_DRAW);
+
+      // 天空盒大球壳
+      const skyProg = createProgram(
+        `
+        attribute vec2 aPos;
+        varying vec2 vNDC;
+        void main() { vNDC = aPos; gl_Position = vec4(aPos, 0.999, 1.0); }
+        `,
+        `
+        precision highp float;
+        varying vec2 vNDC;
+        uniform vec3 uCamDir;
+        uniform vec3 uCamRight;
+        uniform vec3 uCamUp;
+        uniform float uAspect;
+        uniform float uTanHalfFov;
+        uniform vec3 uSunDir;
+        uniform vec3 uSunColor;
+        uniform vec3 uSkyHorizon;
+        uniform vec3 uSkyZenith;
+        uniform float uNightFactor;
+
+        void main() {
+          vec3 rd = normalize(uCamDir + vNDC.x * uAspect * uTanHalfFov * uCamRight + vNDC.y * uTanHalfFov * uCamUp);
+          float h = clamp(rd.y, 0.0, 1.0);
+          vec3 sky = mix(uSkyHorizon, uSkyZenith, pow(h, 0.55));
+          float sunAmt = max(dot(rd, normalize(uSunDir)), 0.0);
+          sky += uSunColor * pow(sunAmt, 36.0) * 0.6 + uSunColor * smoothstep(0.9985, 0.9996, sunAmt) * 2.0;
+          // 夜晚星空闪烁
+          vec3 cell = floor(rd * 260.0);
+          float star = fract(sin(dot(cell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+          if (star > 0.994 && rd.y > 0.05) {
+            sky += vec3(0.85, 0.9, 1.0) * uNightFactor * smoothstep(0.05, 0.35, rd.y);
+          }
+          gl_FragColor = vec4(sky, 1.0);
+        }
+        `
+      );
+      const skyVBO = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, skyVBO);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+
+      // 火焰与余烬 GPU 粒子系统
+      const PARTICLE_COUNT = torches.length * 16 + 180;
+      const pSeeds = new Float32Array(PARTICLE_COUNT * 4);
+      let pi = 0;
+      for (const t of torches) {
+        for (let k = 0; k < 16; k++) {
+          pSeeds[pi * 4] = t[0];
+          pSeeds[pi * 4 + 1] = t[1];
+          pSeeds[pi * 4 + 2] = t[2];
+          pSeeds[pi * 4 + 3] = (k / 16) + Math.random() * 0.2;
+          pi++;
+        }
+      }
+      while (pi < PARTICLE_COUNT) {
+        pSeeds[pi * 4] = (Math.random() - 0.5) * 140;
+        pSeeds[pi * 4 + 1] = 2 + Math.random() * 55;
+        pSeeds[pi * 4 + 2] = (Math.random() - 0.5) * 140;
+        pSeeds[pi * 4 + 3] = -1.0 - Math.random() * 10; // 负数标记环境余烬/星尘
+        pi++;
+      }
+
+      const partProg = createProgram(
+        `
+        attribute vec4 aSeed;
+        uniform mat4 uVP;
+        uniform float uTime;
+        varying float vLife;
+        varying float vType;
+        void main() {
+          vec3 pos = aSeed.xyz;
+          if (aSeed.w >= 0.0) {
+            vType = 1.0;
+            float life = fract(uTime * 0.95 + aSeed.w);
+            vLife = life;
+            pos.x += sin(uTime * 4.5 + aSeed.w * 24.0) * (0.28 + life * 0.35);
+            pos.z += cos(uTime * 3.8 + aSeed.w * 19.0) * (0.28 + life * 0.35);
+            pos.y += life * 3.4;
+            gl_Position = uVP * vec4(pos, 1.0);
+            gl_PointSize = max(2.0, (1.0 - life) * 280.0 / max(1.0, gl_Position.w));
+          } else {
+            vType = 0.0;
+            float ph = -aSeed.w;
+            vLife = 0.5 + 0.5 * sin(uTime + ph);
+            pos.x += sin(uTime * 0.4 + ph) * 3.0;
+            pos.y += mod(uTime * 1.6 + ph * 5.0, 48.0) * 0.3;
+            gl_Position = uVP * vec4(pos, 1.0);
+            gl_PointSize = max(1.5, 110.0 / max(1.0, gl_Position.w));
+          }
+        }
+        `,
+        `
+        precision mediump float;
+        varying float vLife;
+        varying float vType;
+        void main() {
+          vec2 d = gl_PointCoord - 0.5;
+          float r = length(d);
+          if (r > 0.5) discard;
+          float soft = pow(1.0 - r * 2.0, 1.8);
+          if (vType > 0.5) {
+            vec3 c = mix(vec3(1.0, 0.92, 0.55), vec3(0.95, 0.25, 0.05), vLife);
+            gl_FragColor = vec4(c, soft * (1.0 - vLife) * 0.92);
+          } else {
+            gl_FragColor = vec4(1.0, 0.72, 0.38, soft * vLife * 0.55);
+          }
+        }
+        `
+      );
+      const partVBO = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, partVBO);
+      gl.bufferData(gl.ARRAY_BUFFER, pSeeds, gl.STATIC_DRAW);
+
+      // 相机与交互状态
+      const cam = {
+        mode: "tour", // tour | walk | fly
+        pos: [0, 16, 118],
+        yaw: 0,
+        pitch: -0.1,
+        speed: 22,
+        atmoIdx: 0,
+      };
+      const ATMO = [
+        { name: "月夜", sunDir: [-0.4, 0.35, -0.8], sunCol: [0.68, 0.78, 0.98], hor: [0.06, 0.09, 0.16], zen: [0.02, 0.04, 0.09], night: 1.0 },
+        { name: "血色黄昏", sunDir: [0.7, 0.16, -0.68], sunCol: [1.0, 0.56, 0.30], hor: [0.36, 0.20, 0.22], zen: [0.09, 0.09, 0.20], night: 0.45 },
+        { name: "晨雾破晓", sunDir: [-0.65, 0.42, 0.55], sunCol: [1.0, 0.88, 0.74], hor: [0.46, 0.54, 0.64], zen: [0.18, 0.30, 0.48], night: 0.1 },
+      ];
+
+      const keys = new Set();
+      const touchMoves = new Set();
+      const camStatus = document.getElementById("cam-status");
+
+      function setMode(m) {
+        cam.mode = m;
+        document.querySelectorAll("#mode-tour, #mode-walk, #mode-fly").forEach((b) => b.classList.remove("active"));
+        document.getElementById("mode-" + m).classList.add("active");
+        if (m === "walk") {
+          cam.pos[1] = sampleGroundHeight(cam.pos[0], cam.pos[2]) + 1.75;
+        }
+      }
+
+      // 步行地面高度映射，使人眼高度(1.75m)真实踩在码头/拱桥/教堂广场石板上
+      function sampleGroundHeight(x, z) {
+        if (Math.abs(x) <= 34 && Math.abs(z) <= 34) return 11.6; // 教堂广场
+        if (Math.abs(x) <= 6.5 && z > 34 && z <= 86) {
+          const t = (85 - z) / 50;
+          return 3.2 + Math.max(0, Math.min(1, t)) * 8.4; // 坡道桥
+        }
+        if (Math.abs(x) <= 22 && z > 85 && z <= 112) return 3.2; // 码头广场
+        if (Math.abs(z) <= 4.5 && Math.abs(x) >= 34 && Math.abs(x) <= 58) return 7.4; // 东西拱桥
+        return 3.2;
+      }
+
+      document.getElementById("mode-tour").onclick = () => setMode("tour");
+      document.getElementById("mode-walk").onclick = () => setMode("walk");
+      document.getElementById("mode-fly").onclick = () => setMode("fly");
+
+      document.getElementById("preset-bridge").onclick = () => {
+        cam.pos = [0, 5.2, 102];
+        cam.yaw = 0;
+        cam.pitch = 0.14;
+        setMode("walk");
+      };
+      document.getElementById("preset-plaza").onclick = () => {
+        cam.pos = [0, 13.35, 29];
+        cam.yaw = 0;
+        cam.pitch = 0.42;
+        setMode("walk");
+      };
+      document.getElementById("preset-spire").onclick = () => {
+        cam.pos = [-48, 72, 66];
+        cam.yaw = -0.62;
+        cam.pitch = -0.35;
+        setMode("fly");
+      };
+      document.getElementById("toggle-atmo").onclick = (e) => {
+        cam.atmoIdx = (cam.atmoIdx + 1) % ATMO.length;
+        e.target.textContent = "切换天色：" + ATMO[cam.atmoIdx].name;
+      };
+
+      window.addEventListener("keydown", (e) => keys.add(e.code));
+      window.addEventListener("keyup", (e) => keys.delete(e.code));
+
+      document.querySelectorAll("[data-move]").forEach((btn) => {
+        const dir = btn.getAttribute("data-move");
+        const on = (e) => {
+          e.preventDefault();
+          touchMoves.add(dir);
+          if (cam.mode === "tour") setMode("walk");
+        };
+        const off = () => touchMoves.delete(dir);
+        btn.addEventListener("pointerdown", on);
+        btn.addEventListener("pointerup", off);
+        btn.addEventListener("pointercancel", off);
+        btn.addEventListener("pointerleave", off);
+      });
+
+      let dragLook = null;
+      canvas.addEventListener("pointerdown", (e) => {
+        dragLook = { id: e.pointerId, x: e.clientX, y: e.clientY };
+        canvas.setPointerCapture(e.pointerId);
+        if (cam.mode === "tour") setMode("fly");
+      });
+      canvas.addEventListener("pointermove", (e) => {
+        if (!dragLook || dragLook.id !== e.pointerId) return;
+        const dx = e.clientX - dragLook.x;
+        const dy = e.clientY - dragLook.y;
+        dragLook.x = e.clientX;
+        dragLook.y = e.clientY;
+        cam.yaw -= dx * 0.0045;
+        cam.pitch = Math.max(-1.35, Math.min(1.35, cam.pitch - dy * 0.0045));
+      });
+      const endLook = (e) => {
+        if (dragLook && dragLook.id === e.pointerId) {
+          dragLook = null;
+          try { canvas.releasePointerCapture(e.pointerId); } catch {}
+        }
+      };
+      canvas.addEventListener("pointerup", endLook);
+      canvas.addEventListener("pointercancel", endLook);
+
+      canvas.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        if (cam.mode === "tour") setMode("fly");
+        const fwd = [-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw)];
+        const step = e.deltaY < 0 ? 5 : -5;
+        cam.pos[0] += fwd[0] * step;
+        cam.pos[2] += fwd[2] * step;
+      }, { passive: false });
+
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = Math.floor(window.innerWidth * dpr);
+        const h = Math.floor(window.innerHeight * dpr);
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      let last = performance.now();
+      function tick(now) {
+        const dt = Math.min((now - last) / 1000, 0.05);
+        last = now;
+        const t = now * 0.001;
+        resize();
+
+        if (cam.mode === "tour") {
+          const ang = t * 0.16;
+          const rad = 82 + Math.sin(t * 0.25) * 28;
+          cam.pos = [
+            Math.sin(ang) * rad,
+            18 + Math.sin(t * 0.35) * 14 + Math.max(0, Math.cos(t * 0.18)) * 22,
+            Math.cos(ang) * rad,
+          ];
+          const lookY = 26 + Math.sin(t * 0.22) * 10;
+          const dx = -cam.pos[0];
+          const dy = lookY - cam.pos[1];
+          const dz = -6 - cam.pos[2];
+          cam.yaw = Math.atan2(-dx, -dz);
+          cam.pitch = Math.atan2(dy, Math.hypot(dx, dz));
+        } else {
+          const boost = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 2.4 : 1;
+          const spd = (cam.mode === "walk" ? 12 : cam.speed) * boost * dt;
+          const cp = Math.cos(cam.pitch);
+          const fwd = cam.mode === "walk"
+            ? [-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw)]
+            : [-Math.sin(cam.yaw) * cp, Math.sin(cam.pitch), -Math.cos(cam.yaw) * cp];
+          const right = [Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)];
+
+          let mf = 0, mr = 0;
+          if (keys.has("KeyW") || keys.has("ArrowUp") || touchMoves.has("fwd")) mf += 1;
+          if (keys.has("KeyS") || keys.has("ArrowDown") || touchMoves.has("back")) mf -= 1;
+          if (keys.has("KeyD") || keys.has("ArrowRight") || touchMoves.has("right")) mr += 1;
+          if (keys.has("KeyA") || keys.has("ArrowLeft") || touchMoves.has("left")) mr -= 1;
+
+          cam.pos[0] += (fwd[0] * mf + right[0] * mr) * spd;
+          cam.pos[1] += fwd[1] * mf * spd;
+          cam.pos[2] += (fwd[2] * mf + right[2] * mr) * spd;
+          if (cam.mode === "fly") {
+            if (keys.has("KeyE") || keys.has("Space")) cam.pos[1] += spd;
+            if (keys.has("KeyQ")) cam.pos[1] -= spd;
+          }
+          cam.pos[0] = Math.max(-180, Math.min(180, cam.pos[0]));
+          cam.pos[2] = Math.max(-180, Math.min(180, cam.pos[2]));
+          if (cam.mode === "walk") {
+            cam.pos[1] = sampleGroundHeight(cam.pos[0], cam.pos[2]) + 1.75;
+          } else {
+            cam.pos[1] = Math.max(2.5, Math.min(180, cam.pos[1]));
+          }
+        }
+
+        const modeName = { tour: "电影巡航", walk: "步行漫游", fly: "高空飞行" }[cam.mode];
+        camStatus.textContent = `模式：${modeName} · 海拔 ${cam.pos[1].toFixed(1)}m · 主尖塔高 116m`;
+
+        const aspect = canvas.width / Math.max(1, canvas.height);
+        const fov = 55 * Math.PI / 180;
+        const cp = Math.cos(cam.pitch);
+        const dir = [-Math.sin(cam.yaw) * cp, Math.sin(cam.pitch), -Math.cos(cam.yaw) * cp];
+        const target = [cam.pos[0] + dir[0], cam.pos[1] + dir[1], cam.pos[2] + dir[2]];
+        const right = [Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)];
+        const up = [
+          right[1] * dir[2] - right[2] * dir[1],
+          right[2] * dir[0] - right[0] * dir[2],
+          right[0] * dir[1] - right[1] * dir[0],
+        ];
+        const proj = Mat4.perspective(fov, aspect, 0.5, 650);
+        const view = Mat4.lookAt(cam.pos, target, [0, 1, 0]);
+        const vp = Mat4.multiply(proj, view);
+        const atmo = ATMO[cam.atmoIdx];
+
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        // 1. 天空背景
+        gl.disable(gl.DEPTH_TEST);
+        gl.disable(gl.BLEND);
+        gl.useProgram(skyProg);
+        gl.bindBuffer(gl.ARRAY_BUFFER, skyVBO);
+        const skyLoc = gl.getAttribLocation(skyProg, "aPos");
+        gl.enableVertexAttribArray(skyLoc);
+        gl.vertexAttribPointer(skyLoc, 2, gl.FLOAT, false, 0, 0);
+        gl.uniform3fv(gl.getUniformLocation(skyProg, "uCamDir"), dir);
+        gl.uniform3fv(gl.getUniformLocation(skyProg, "uCamRight"), right);
+        gl.uniform3fv(gl.getUniformLocation(skyProg, "uCamUp"), up);
+        gl.uniform1f(gl.getUniformLocation(skyProg, "uAspect"), aspect);
+        gl.uniform1f(gl.getUniformLocation(skyProg, "uTanHalfFov"), Math.tan(fov / 2));
+        gl.uniform3fv(gl.getUniformLocation(skyProg, "uSunDir"), atmo.sunDir);
+        gl.uniform3fv(gl.getUniformLocation(skyProg, "uSunColor"), atmo.sunCol);
+        gl.uniform3fv(gl.getUniformLocation(skyProg, "uSkyHorizon"), atmo.hor);
+        gl.uniform3fv(gl.getUniformLocation(skyProg, "uSkyZenith"), atmo.zen);
+        gl.uniform1f(gl.getUniformLocation(skyProg, "uNightFactor"), atmo.night);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        // 2. 3D 哥特式塔楼城市
+        gl.enable(gl.DEPTH_TEST);
+        gl.useProgram(cityProg);
+        gl.bindBuffer(gl.ARRAY_BUFFER, cityVBO);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cityIBO);
+        const stride = 40;
+        const aP = gl.getAttribLocation(cityProg, "aPos");
+        const aN = gl.getAttribLocation(cityProg, "aNormal");
+        const aC = gl.getAttribLocation(cityProg, "aColor");
+        const aK = gl.getAttribLocation(cityProg, "aKind");
+        gl.enableVertexAttribArray(aP); gl.vertexAttribPointer(aP, 3, gl.FLOAT, false, stride, 0);
+        gl.enableVertexAttribArray(aN); gl.vertexAttribPointer(aN, 3, gl.FLOAT, false, stride, 12);
+        gl.enableVertexAttribArray(aC); gl.vertexAttribPointer(aC, 3, gl.FLOAT, false, stride, 24);
+        gl.enableVertexAttribArray(aK); gl.vertexAttribPointer(aK, 1, gl.FLOAT, false, stride, 36);
+        gl.uniformMatrix4fv(gl.getUniformLocation(cityProg, "uVP"), false, vp);
+        gl.uniform3fv(gl.getUniformLocation(cityProg, "uCamPos"), cam.pos);
+        gl.uniform3fv(gl.getUniformLocation(cityProg, "uSunDir"), atmo.sunDir);
+        gl.uniform3fv(gl.getUniformLocation(cityProg, "uSunColor"), atmo.sunCol);
+        gl.uniform3fv(gl.getUniformLocation(cityProg, "uSkyHorizon"), atmo.hor);
+        gl.uniform3fv(gl.getUniformLocation(cityProg, "uSkyZenith"), atmo.zen);
+        gl.uniform1f(gl.getUniformLocation(cityProg, "uTime"), t);
+        gl.uniform1f(gl.getUniformLocation(cityProg, "uNightFactor"), atmo.night);
+        gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+
+        // 3. 动态海浪
+        gl.useProgram(seaProg);
+        gl.bindBuffer(gl.ARRAY_BUFFER, seaVBO);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, seaIBO);
+        const sXZ = gl.getAttribLocation(seaProg, "aXZ");
+        gl.enableVertexAttribArray(sXZ);
+        gl.vertexAttribPointer(sXZ, 2, gl.FLOAT, false, 0, 0);
+        gl.uniformMatrix4fv(gl.getUniformLocation(seaProg, "uVP"), false, vp);
+        gl.uniform1f(gl.getUniformLocation(seaProg, "uTime"), t);
+        gl.uniform3fv(gl.getUniformLocation(seaProg, "uCamPos"), cam.pos);
+        gl.uniform3fv(gl.getUniformLocation(seaProg, "uSunDir"), atmo.sunDir);
+        gl.uniform3fv(gl.getUniformLocation(seaProg, "uSunColor"), atmo.sunCol);
+        gl.uniform3fv(gl.getUniformLocation(seaProg, "uSkyHorizon"), atmo.hor);
+        gl.uniform3fv(gl.getUniformLocation(seaProg, "uSkyZenith"), atmo.zen);
+        gl.drawElements(gl.TRIANGLES, seaIdx.length, gl.UNSIGNED_SHORT, 0);
+
+        // 4. 火焰与余烬粒子
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+        gl.depthMask(false);
+        gl.useProgram(partProg);
+        gl.bindBuffer(gl.ARRAY_BUFFER, partVBO);
+        const pLoc = gl.getAttribLocation(partProg, "aSeed");
+        gl.enableVertexAttribArray(pLoc);
+        gl.vertexAttribPointer(pLoc, 4, gl.FLOAT, false, 0, 0);
+        gl.uniformMatrix4fv(gl.getUniformLocation(partProg, "uVP"), false, vp);
+        gl.uniform1f(gl.getUniformLocation(partProg, "uTime"), t);
+        gl.drawArrays(gl.POINTS, 0, PARTICLE_COUNT);
+        gl.depthMask(true);
+
+        requestAnimationFrame(tick);
+      }
+
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>
