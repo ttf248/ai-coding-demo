@@ -54,8 +54,10 @@
 
 | 顺序 | 模型 | 代际 | 同代能力优先级 | 发布日期 | 状态 | 查证日期 |
 |---|---|---|---|---|---|---|
-| 1 | Gemini 3.8 Flash | 3.8 | 未比较 | 2026-09-02 | 已核实 | 2026-10-19 |
+| 1 | Gemini 4 Neon | 4 | 未比较 | 2026-11-18 | 已核实 | 2026-11-20 |
+| 2 | Gemini 3.8 Flash | 3.8 | 未比较 | 2026-09-02 | 已核实 | 2026-10-19 |
 
+- **Gemini 4 Neon**（`gemini-4-neon`）：Google 官方公告于 2026-11-18 发布，并开始在 Gemini API 和 Google Antigravity 等渠道推出。 Google 将 Neon 定位于复杂编码和分析工作。当前仅登记一款 Gemini 4 型号，同代能力优先级留空。 [官方来源 1](https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-neon/) · [官方来源 2](https://antigravity.google/blog/gemini-4-neon-in-google-antigravity/)
 - **Gemini 3.8 Flash**（`gemini-3-8-flash`）：Google 官方发布公告日期 2026-09-02。 该厂商当前仅登记此型号，无需比较能力。 [官方来源 1](https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber/)
 
 ## Meituan

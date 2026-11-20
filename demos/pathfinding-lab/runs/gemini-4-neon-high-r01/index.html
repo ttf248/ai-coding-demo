@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script src="../../../../assets/analytics.js" defer></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>寻路算法实验室</title>
+<style>
+  :root {
+    --bg: #0b1120;
+    --panel: #151e32;
+    --panel-2: #1e293b;
+    --border: #334155;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-dark: #0284c7;
+    --green: #22c55e;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --swamp: #7c4a1a;
+    --frontier: #38bdf8;
+    --visited: #1e3a5f;
+    --path: #facc15;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    margin: 0;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pill {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.16);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .preset-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  button, select {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: background 0.14s, border-color 0.14s;
+  }
+  button:hover { background: #2c3b52; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.primary { background: var(--accent-dark); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover:not(:disabled) { background: #0369a1; }
+  button.warn { background: rgba(245, 158, 11, 0.16); border-color: rgba(245, 158, 11, 0.55); color: #fef3c7; }
+  button.danger { background: rgba(239, 68, 68, 0.16); border-color: rgba(239, 68, 68, 0.55); color: #fecaca; }
+  button.active { background: rgba(56, 189, 248, 0.22); border-color: var(--accent); color: #e0f2fe; font-weight: 600; }
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 10px;
+    padding: 10px;
+    max-width: 1480px;
+    margin: 0 auto;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+  .sec-title {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+  }
+  .algo-group {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .brush-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .ctrl-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .ctrl-row button { flex: 1; min-width: 72px; }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 13px;
+  }
+  input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .algo-desc {
+    font-size: 12px;
+    color: #cbd5e1;
+    background: rgba(56, 189, 248, 0.08);
+    border-left: 3px solid var(--accent);
+    padding: 7px 9px;
+    border-radius: 4px;
+  }
+  .main-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    min-width: 0;
+  }
+  .stat-card .k { font-size: 11px; color: var(--muted); }
+  .stat-card .v {
+    font-size: 16px;
+    font-weight: 700;
+    font-family: ui-monospace, Consolas, monospace;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .status-bar {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    font-size: 13px;
+  }
+  .status-bar.found { border-color: rgba(34, 197, 94, 0.6); background: rgba(34, 197, 94, 0.14); color: #dcfce7; }
+  .status-bar.unreachable { border-color: rgba(239, 68, 68, 0.7); background: rgba(239, 68, 68, 0.16); color: #fee2e2; }
+  .status-bar.running { border-color: rgba(56, 189, 248, 0.6); background: rgba(56, 189, 248, 0.12); color: #e0f2fe; }
+  .canvas-wrap {
+    background: #070d19;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+  }
+  canvas#gridCanvas {
+    width: 100%;
+    max-width: 900px;
+    aspect-ratio: 28 / 18;
+    display: block;
+    border-radius: 6px;
+    touch-action: none;
+    cursor: crosshair;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    padding: 8px 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .lg-item { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.2);
+    display: inline-block;
+  }
+  .notes {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 480px) {
+    header { padding: 8px 10px; }
+    header h1 { font-size: 15px; }
+    .layout { padding: 8px; gap: 8px; }
+    .panel { padding: 10px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    button { padding: 6px 8px; font-size: 12.5px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>
+    <span>🧭 寻路算法实验室</span>
+    <span class="pill">四方向 · 实时可视化</span>
+  </h1>
+  <div class="preset-bar">
+    <button data-preset="empty">空白网格</button>
+    <button data-preset="swamp">加权沼泽对比</button>
+    <button data-preset="maze">迷宫通道</button>
+    <button data-preset="blocked">封闭不可达</button>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="panel">
+    <div>
+      <div class="sec-title">选择算法</div>
+      <div class="algo-group">
+        <button id="algoBfs" data-algo="bfs">BFS</button>
+        <button id="algoDijkstra" data-algo="dijkstra">Dijkstra</button>
+        <button id="algoAstar" data-algo="astar" class="active">A*</button>
+      </div>
+    </div>
+
+    <div id="algoDesc" class="algo-desc"></div>
+
+    <div>
+      <div class="sec-title">运行控制</div>
+      <div class="ctrl-row">
+        <button id="btnRun" class="primary">▶ 运行</button>
+        <button id="btnPause" class="warn" disabled>⏸ 暂停</button>
+        <button id="btnStep">⏭ 单步</button>
+      </div>
+      <div class="ctrl-row" style="margin-top:6px;">
+        <button id="btnClearSearch">清除搜索</button>
+        <button id="btnResetMap" class="danger">重置地图</button>
+      </div>
+      <div class="slider-row" style="margin-top:8px;">
+        <span>速度</span>
+        <input id="speedSlider" type="range" min="1" max="100" value="65">
+        <span id="speedVal" style="min-width:46px;text-align:right;">中快</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-title">地图编辑画笔</div>
+      <div class="brush-group">
+        <button class="active" data-brush="wall">🧱 障碍墙</button>
+        <button data-brush="weight">🟤 高代价 (5)</button>
+        <button data-brush="erase">🧹 擦除 (1)</button>
+        <button data-brush="move">🎯 拖动起/终点</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-title">计价与规则说明</div>
+      <ul class="notes">
+        <li>仅允许上下左右四方向移动，A* 启发式使用曼哈顿距离 <code>|Δx|+|Δy|</code>。</li>
+        <li><strong>代价规则：</strong>起点不计代价（0），进入普通格代价为 <strong>1</strong>，进入高代价格（沼泽）代价为 <strong>5</strong>。</li>
+        <li><strong>算法差异：</strong>BFS 仅按<strong>步数最少</strong>搜索（忽略地形代价）；Dijkstra 与 A* 按<strong>最小累计代价</strong>搜索。</li>
+        <li>直接拖移绿色起点或红色终点可重新定位，起终点不会被障碍覆盖；搜索期间修改地图会自动停止并清除旧搜索。</li>
+      </ul>
+    </div>
+  </aside>
+
+  <section class="main-col">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="k">当前算法</div><div class="v" id="stAlgo">A*</div></div>
+      <div class="stat-card"><div class="k">搜索前沿</div><div class="v" id="stFrontier" style="color:var(--frontier)">0</div></div>
+      <div class="stat-card"><div class="k">已访问节点</div><div class="v" id="stVisited" style="color:#93c5fd">0</div></div>
+      <div class="stat-card"><div class="k">路径步数</div><div class="v" id="stSteps">-</div></div>
+      <div class="stat-card"><div class="k">路径总代价</div><div class="v" id="stCost" style="color:var(--path)">-</div></div>
+    </div>
+
+    <div id="statusBar" class="status-bar">就绪：点击「运行」或「单步」开始寻路，或在网格上绘制障碍与高代价地形。</div>
+
+    <div class="canvas-wrap">
+      <canvas id="gridCanvas" width="840" height="540"></canvas>
+    </div>
+
+    <div class="legend">
+      <span class="lg-item"><span class="swatch" style="background:#22c55e;"></span>起点 S (代价 0)</span>
+      <span class="lg-item"><span class="swatch" style="background:#ef4444;"></span>终点 E</span>
+      <span class="lg-item"><span class="swatch" style="background:#475569;"></span>障碍墙</span>
+      <span class="lg-item"><span class="swatch" style="background:#7c4a1a;"></span>高代价地形 (代价 5)</span>
+      <span class="lg-item"><span class="swatch" style="background:#38bdf8;"></span>搜索前沿 (Open)</span>
+      <span class="lg-item"><span class="swatch" style="background:#1d4ed8;"></span>已访问 (Closed)</span>
+      <span class="lg-item"><span class="swatch" style="background:#facc15;"></span>最终路径</span>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const COLS = 28;
+  const ROWS = 18;
+  const CELL_NORMAL = 0;
+  const CELL_WALL = 1;
+  const CELL_WEIGHT = 2; // enter cost = 5
+
+  const ALGO_INFO = {
+    bfs: {
+      name: "BFS",
+      desc: "<strong>广度优先搜索 (BFS)：</strong>按层扩展，保证找到<strong>步数最少</strong>的路径，但<strong>忽略地形代价</strong>（仍会如实统计最终路径经过高代价地形的总代价）。"
+    },
+    dijkstra: {
+      name: "Dijkstra",
+      desc: "<strong>Dijkstra 算法：</strong>每次扩展当前累计代价 g(n) 最小的节点，保证在加权地图上找到<strong>总代价最小</strong>的最优路径。"
+    },
+    astar: {
+      name: "A*",
+      desc: "<strong>A* 算法：</strong>按 f(n) = g(n) + h(n) 扩展，其中 h(n) 为曼哈顿距离（由于普通格代价 ≥ 1，曼哈顿距离是可采纳且一致的），保证与 Dijkstra 得到<strong>相同的最小总代价</strong>且通常访问更少节点。"
+    }
+  };
+
+  const state = {
+    grid: new Uint8Array(COLS * ROWS),
+    start: { c: 3, r: 9 },
+    end: { c: 24, r: 9 },
+    algo: "astar",
+    brush: "wall",
+    speed: 65,
+    // Search state
+    phase: "idle", // 'idle' | 'running' | 'paused' | 'found' | 'unreachable'
+    solver: null,
+    timerId: null,
+    // Pointer editing
+    pointerDown: false,
+    draggingEndpoint: null, // 'start' | 'end' | null
+    lastPaintedIdx: -1
+  };
+
+  const canvas = document.getElementById("gridCanvas");
+  const ctx = canvas.getContext("2d");
+
+  const els = {
+    algoDesc: document.getElementById("algoDesc"),
+    stAlgo: document.getElementById("stAlgo"),
+    stFrontier: document.getElementById("stFrontier"),
+    stVisited: document.getElementById("stVisited"),
+    stSteps: document.getElementById("stSteps"),
+    stCost: document.getElementById("stCost"),
+    statusBar: document.getElementById("statusBar"),
+    btnRun: document.getElementById("btnRun"),
+    btnPause: document.getElementById("btnPause"),
+    btnStep: document.getElementById("btnStep"),
+    btnClearSearch: document.getElementById("btnClearSearch"),
+    btnResetMap: document.getElementById("btnResetMap"),
+    speedSlider: document.getElementById("speedSlider"),
+    speedVal: document.getElementById("speedVal")
+  };
+
+  function idxOf(c, r) { return r * COLS + c; }
+  function inBounds(c, r) { return c >= 0 && c < COLS && r >= 0 && r < ROWS; }
+  function cellCost(c, r) {
+    return state.grid[idxOf(c, r)] === CELL_WEIGHT ? 5 : 1;
+  }
+  function manhattan(c1, r1, c2, r2) {
+    return Math.abs(c1 - c2) + Math.abs(r1 - r2);
+  }
+
+  // Min-Heap for Dijkstra / A*
+  class MinHeap {
+    constructor() { this.items = []; }
+    get size() { return this.items.length; }
+    push(node) {
+      this.items.push(node);
+      let i = this.items.length - 1;
+      while (i > 0) {
+        const p = (i - 1) >> 1;
+        if (this.compare(this.items[i], this.items[p]) < 0) {
+          [this.items[i], this.items[p]] = [this.items[p], this.items[i]];
+          i = p;
+        } else break;
+      }
+    }
+    pop() {
+      const top = this.items[0];
+      const last = this.items.pop();
+      if (this.items.length > 0) {
+        this.items[0] = last;
+        let i = 0;
+        const n = this.items.length;
+        while (true) {
+          let l = i * 2 + 1, r = i * 2 + 2, best = i;
+          if (l < n && this.compare(this.items[l], this.items[best]) < 0) best = l;
+          if (r < n && this.compare(this.items[r], this.items[best]) < 0) best = r;
+          if (best !== i) {
+            [this.items[i], this.items[best]] = [this.items[best], this.items[i]];
+            i = best;
+          } else break;
+        }
+      }
+      return top;
+    }
+    compare(a, b) {
+      if (a.f !== b.f) return a.f - b.f;
+      if (a.h !== b.h) return a.h - b.h;
+      return a.order - b.order;
+    }
+  }
+
+  function createSolver() {
+    const startIdx = idxOf(state.start.c, state.start.r);
+    const endIdx = idxOf(state.end.c, state.end.r);
+    const s = {
+      algo: state.algo,
+      startIdx,
+      endIdx,
+      visited: new Uint8Array(COLS * ROWS),
+      inFrontier: new Uint8Array(COLS * ROWS),
+      parent: new Int32Array(COLS * ROWS).fill(-1),
+      dist: new Float64Array(COLS * ROWS).fill(Infinity),
+      queue: [],
+      qHead: 0,
+      heap: new MinHeap(),
+      order: 0,
+      visitedCount: 0,
+      frontierCount: 0,
+      path: [],
+      pathSteps: null,
+      pathCost: null,
+      currentIdx: -1
+    };
+
+    s.dist[startIdx] = 0;
+    s.inFrontier[startIdx] = 1;
+    s.frontierCount = 1;
+
+    if (state.algo === "bfs") {
+      s.queue.push(startIdx);
+    } else {
+      const h = state.algo === "astar"
+        ? manhattan(state.start.c, state.start.r, state.end.c, state.end.r)
+        : 0;
+      s.heap.push({ idx: startIdx, g: 0, h, f: h, order: s.order++ });
+    }
+    return s;
+  }
+
+  function reconstructPath(s) {
+    const path = [];
+    let cur = s.endIdx;
+    let totalCost = 0;
+    while (cur !== -1) {
+      path.push(cur);
+      if (cur !== s.startIdx) {
+        const c = cur % COLS;
+        const r = Math.floor(cur / COLS);
+        totalCost += cellCost(c, r);
+      }
+      cur = s.parent[cur];
+    }
+    path.reverse();
+    s.path = path;
+    s.pathSteps = path.length - 1;
+    s.pathCost = totalCost;
+  }
+
+  const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+
+  function stepSolver() {
+    if (!state.solver) {
+      state.solver = createSolver();
+    }
+    const s = state.solver;
+
+    if (s.algo === "bfs") {
+      if (s.qHead >= s.queue.length) {
+        finishSearch("unreachable");
+        return;
+      }
+      const cur = s.queue[s.qHead++];
+      s.currentIdx = cur;
+      if (s.inFrontier[cur]) {
+        s.inFrontier[cur] = 0;
+        s.frontierCount--;
+      }
+      if (!s.visited[cur]) {
+        s.visited[cur] = 1;
+        s.visitedCount++;
+      }
+      if (cur === s.endIdx) {
+        reconstructPath(s);
+        finishSearch("found");
+        return;
+      }
+      const cc = cur % COLS, cr = Math.floor(cur / COLS);
+      for (const [dc, dr] of DIRS) {
+        const nc = cc + dc, nr = cr + dr;
+        if (!inBounds(nc, nr)) continue;
+        const nIdx = idxOf(nc, nr);
+        if (state.grid[nIdx] === CELL_WALL) continue;
+        if (s.visited[nIdx] || s.inFrontier[nIdx]) continue;
+        s.parent[nIdx] = cur;
+        s.dist[nIdx] = s.dist[cur] + 1;
+        s.inFrontier[nIdx] = 1;
+        s.frontierCount++;
+        s.queue.push(nIdx);
+      }
+    } else {
+      // Dijkstra / A*
+      let item = null;
+      while (s.heap.size > 0) {
+        const cand = s.heap.pop();
+        if (s.visited[cand.idx]) continue;
+        if (cand.g > s.dist[cand.idx]) continue;
+        item = cand;
+        break;
+      }
+      if (!item) {
+        finishSearch("unreachable");
+        return;
+      }
+      const cur = item.idx;
+      s.currentIdx = cur;
+      if (s.inFrontier[cur]) {
+        s.inFrontier[cur] = 0;
+        s.frontierCount--;
+      }
+      s.visited[cur] = 1;
+      s.visitedCount++;
+
+      if (cur === s.endIdx) {
+        reconstructPath(s);
+        finishSearch("found");
+        return;
+      }
+
+      const cc = cur % COLS, cr = Math.floor(cur / COLS);
+      for (const [dc, dr] of DIRS) {
+        const nc = cc + dc, nr = cr + dr;
+        if (!inBounds(nc, nr)) continue;
+        const nIdx = idxOf(nc, nr);
+        if (state.grid[nIdx] === CELL_WALL || s.visited[nIdx]) continue;
+        const stepCost = cellCost(nc, nr);
+        const tentativeG = s.dist[cur] + stepCost;
+        if (tentativeG < s.dist[nIdx]) {
+          s.dist[nIdx] = tentativeG;
+          s.parent[nIdx] = cur;
+          if (!s.inFrontier[nIdx]) {
+            s.inFrontier[nIdx] = 1;
+            s.frontierCount++;
+          }
+          const h = s.algo === "astar"
+            ? manhattan(nc, nr, state.end.c, state.end.r)
+            : 0;
+          s.heap.push({ idx: nIdx, g: tentativeG, h, f: tentativeG + h, order: s.order++ });
+        }
+      }
+    }
+    updateUI();
+    draw();
+  }
+
+  function finishSearch(outcome) {
+    stopLoop();
+    state.phase = outcome;
+    updateUI();
+    draw();
+  }
+
+  function stopLoop() {
+    if (state.timerId !== null) {
+      clearTimeout(state.timerId);
+      state.timerId = null;
+    }
+  }
+
+  function scheduleNextTick() {
+    if (state.phase !== "running") return;
+    // Map speed 1..100 to delay 260ms..4ms (and batch multiple steps at top speed)
+    const sp = state.speed;
+    let delay = 20;
+    let batch = 1;
+    if (sp >= 95) { delay = 4; batch = 24; }
+    else if (sp >= 85) { delay = 8; batch = 8; }
+    else if (sp >= 70) { delay = 14; batch = 2; }
+    else { delay = Math.round(250 - sp * 3.2); batch = 1; }
+
+    state.timerId = setTimeout(() => {
+      if (state.phase !== "running") return;
+      for (let i = 0; i < batch; i++) {
+        if (state.phase !== "running") break;
+        stepSolver();
+      }
+      if (state.phase === "running") scheduleNextTick();
+    }, Math.max(4, delay));
+  }
+
+  function startRun() {
+    if (state.phase === "found" || state.phase === "unreachable") {
+      clearSearchOnly();
+    }
+    if (!state.solver) state.solver = createSolver();
+    state.phase = "running";
+    updateUI();
+    scheduleNextTick();
+  }
+
+  function pauseRun() {
+    stopLoop();
+    if (state.phase === "running") {
+      state.phase = "paused";
+      updateUI();
+    }
+  }
+
+  function singleStep() {
+    stopLoop();
+    if (state.phase === "found" || state.phase === "unreachable") {
+      clearSearchOnly();
+    }
+    state.phase = "paused";
+    stepSolver();
+  }
+
+  function clearSearchOnly() {
+    stopLoop();
+    state.solver = null;
+    state.phase = "idle";
+    updateUI();
+    draw();
+  }
+
+  // ---------- DRAWING ----------
+  function draw() {
+    const W = canvas.width;
+    const H = canvas.height;
+    const cw = W / COLS;
+    const ch = H / ROWS;
+    const s = state.solver;
+
+    ctx.fillStyle = "#0b1220";
+    ctx.fillRect(0, 0, W, H);
+
+    const pathSet = new Set(s ? s.path : []);
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const i = idxOf(c, r);
+        const x = c * cw;
+        const y = r * ch;
+        const cell = state.grid[i];
+
+        let fill = "#0f172a";
+        if (cell === CELL_WALL) {
+          fill = "#475569";
+        } else if (cell === CELL_WEIGHT) {
+          fill = "#6b3f16";
+        }
+
+        if (s && cell !== CELL_WALL) {
+          if (pathSet.has(i)) {
+            fill = cell === CELL_WEIGHT ? "#ca8a04" : "#facc15";
+          } else if (s.inFrontier[i]) {
+            fill = cell === CELL_WEIGHT ? "#0284c7" : "#38bdf8";
+          } else if (s.visited[i]) {
+            fill = cell === CELL_WEIGHT ? "#4c3659" : "#1e3a8a";
+          }
+        }
+
+        ctx.fillStyle = fill;
+        ctx.fillRect(x + 1, y + 1, cw - 2, ch - 2);
+
+        // Subtle texture indicator for high-cost terrain
+        if (cell === CELL_WEIGHT) {
+          ctx.fillStyle = pathSet.has(i) ? "rgba(15,23,42,0.75)" : "rgba(254, 215, 170, 0.72)";
+          ctx.font = "bold 10px ui-monospace, Consolas, monospace";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("5", x + cw / 2, y + ch / 2 + 0.5);
+        }
+
+        // Highlight current expanding node
+        if (s && s.currentIdx === i && state.phase !== "found") {
+          ctx.strokeStyle = "#f8fafc";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x + 2, y + 2, cw - 4, ch - 4);
+        }
+      }
+    }
+
+    // Draw smooth polyline through final path
+    if (s && s.path.length > 1) {
+      ctx.beginPath();
+      s.path.forEach((pIdx, k) => {
+        const pc = pIdx % COLS, pr = Math.floor(pIdx / COLS);
+        const px = pc * cw + cw / 2;
+        const py = pr * ch + ch / 2;
+        if (k === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.strokeStyle = "#fef08a";
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.stroke();
+    }
+
+    // Draw Start and End markers
+    drawEndpoint(state.start.c, state.start.r, "#22c55e", "S", cw, ch);
+    drawEndpoint(state.end.c, state.end.r, "#ef4444", "E", cw, ch);
+  }
+
+  function drawEndpoint(c, r, color, letter, cw, ch) {
+    const cx = c * cw + cw / 2;
+    const cy = r * ch + ch / 2;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.min(cw, ch) * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 13px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(letter, cx, cy + 0.5);
+  }
+
+  // ---------- UI UPDATES ----------
+  function updateUI() {
+    const info = ALGO_INFO[state.algo];
+    els.algoDesc.innerHTML = info.desc;
+    els.stAlgo.textContent = info.name;
+
+    const s = state.solver;
+    els.stFrontier.textContent = s ? String(s.frontierCount) : "0";
+    els.stVisited.textContent = s ? String(s.visitedCount) : "0";
+    els.stSteps.textContent = s && s.pathSteps !== null ? `${s.pathSteps} 步` : "-";
+    els.stCost.textContent = s && s.pathCost !== null ? String(s.pathCost) : "-";
+
+    els.btnRun.disabled = state.phase === "running";
+    els.btnPause.disabled = state.phase !== "running";
+    els.btnStep.disabled = state.phase === "running";
+
+    els.statusBar.className = "status-bar";
+    if (state.phase === "idle") {
+      els.statusBar.textContent = "就绪：点击「运行」或「单步」开始寻路；可在网格直接绘制障碍、高代价地形或拖动起终点。";
+    } else if (state.phase === "running") {
+      els.statusBar.classList.add("running");
+      els.statusBar.textContent = `正在执行 ${info.name} 搜索...（编辑地图将自动停止并清除当前搜索）`;
+    } else if (state.phase === "paused") {
+      els.statusBar.classList.add("running");
+      els.statusBar.textContent = `已暂停 ${info.name} 搜索：可继续「运行」或点击「单步」逐格观察前沿扩展。`;
+    } else if (state.phase === "found") {
+      els.statusBar.classList.add("found");
+      els.statusBar.textContent = `✅ 找到路径！${info.name} 步数：${s.pathSteps} 步，总代价：${s.pathCost}（已访问 ${s.visitedCount} 格）。`;
+    } else if (state.phase === "unreachable") {
+      els.statusBar.classList.add("unreachable");
+      els.statusBar.textContent = `🚫 目标不可达！起点到终点之间被障碍完全封闭，无可行路径（已访问 ${s.visitedCount} 格）。`;
+    }
+
+    const sp = state.speed;
+    els.speedVal.textContent = sp >= 92 ? "极速" : sp >= 70 ? "很快" : sp >= 40 ? "中速" : "慢速";
+  }
+
+  // ---------- POINTER / TOUCH EDITING ----------
+  function cellFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    const c = Math.floor(x / (canvas.width / COLS));
+    const r = Math.floor(y / (canvas.height / ROWS));
+    if (!inBounds(c, r)) return null;
+    return { c, r };
+  }
+
+  function applyEdit(cell) {
+    if (!cell) return;
+    const isStart = cell.c === state.start.c && cell.r === state.start.r;
+    const isEnd = cell.c === state.end.c && cell.r === state.end.r;
+    const idx = idxOf(cell.c, cell.r);
+
+    // If search has started, editing immediately stops and clears old search!
+    if (state.solver || state.phase !== "idle") {
+      clearSearchOnly();
+    }
+
+    if (state.draggingEndpoint === "start") {
+      if (!isEnd && state.grid[idx] !== CELL_WALL) {
+        state.start = { c: cell.c, r: cell.r };
+        draw();
+      }
+      return;
+    }
+    if (state.draggingEndpoint === "end") {
+      if (!isStart && state.grid[idx] !== CELL_WALL) {
+        state.end = { c: cell.c, r: cell.r };
+        draw();
+      }
+      return;
+    }
+
+    if (state.brush === "move") return;
+    // Start and End can never be overwritten by obstacles
+    if (isStart || isEnd) return;
+    if (idx === state.lastPaintedIdx) return;
+    state.lastPaintedIdx = idx;
+
+    if (state.brush === "wall") state.grid[idx] = CELL_WALL;
+    else if (state.brush === "weight") state.grid[idx] = CELL_WEIGHT;
+    else if (state.brush === "erase") state.grid[idx] = CELL_NORMAL;
+    draw();
+  }
+
+  canvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const cell = cellFromEvent(e);
+    if (!cell) return;
+    canvas.setPointerCapture(e.pointerId);
+    state.pointerDown = true;
+    state.lastPaintedIdx = -1;
+
+    if (cell.c === state.start.c && cell.r === state.start.r) {
+      state.draggingEndpoint = "start";
+      return;
+    }
+    if (cell.c === state.end.c && cell.r === state.end.r) {
+      state.draggingEndpoint = "end";
+      return;
+    }
+    state.draggingEndpoint = null;
+    applyEdit(cell);
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (!state.pointerDown) return;
+    e.preventDefault();
+    applyEdit(cellFromEvent(e));
+  });
+
+  function endPointer(e) {
+    state.pointerDown = false;
+    state.draggingEndpoint = null;
+    state.lastPaintedIdx = -1;
+    try { canvas.releasePointerCapture(e.pointerId); } catch {}
+  }
+  canvas.addEventListener("pointerup", endPointer);
+  canvas.addEventListener("pointercancel", endPointer);
+
+  // ---------- PRESETS ----------
+  function loadPreset(name) {
+    stopLoop();
+    state.solver = null;
+    state.phase = "idle";
+    state.grid.fill(CELL_NORMAL);
+    state.start = { c: 3, r: 9 };
+    state.end = { c: 24, r: 9 };
+
+    if (name === "swamp") {
+      // Direct path crosses heavy swamp (cost 5 each), while detour around top/bottom is much cheaper!
+      // BFS goes straight through swamp (fewer steps, high cost); Dijkstra & A* go around (lower cost)!
+      for (let r = 4; r <= 13; r++) {
+        for (let c = 9; c <= 18; c++) {
+          state.grid[idxOf(c, r)] = CELL_WEIGHT;
+        }
+      }
+      // Small walls to guide interesting comparison
+      for (let r = 5; r <= 12; r++) {
+        state.grid[idxOf(7, r)] = CELL_WALL;
+      }
+      state.grid[idxOf(7, 9)] = CELL_NORMAL; // narrow direct gap into swamp
+      state.grid[idxOf(7, 8)] = CELL_NORMAL;
+    } else if (name === "maze") {
+      // Deterministic repeatable maze walls
+      state.start = { c: 1, r: 1 };
+      state.end = { c: 26, r: 16 };
+      const walls = [
+        [5,0,5,14], [10,3,10,17], [15,0,15,13], [20,4,20,17],
+        [5,14,13,14], [15,5,23,5], [20,11,26,11]
+      ];
+      for (const [c1, r1, c2, r2] of walls) {
+        for (let c = c1; c <= c2; c++) {
+          for (let r = r1; r <= r2; r++) {
+            state.grid[idxOf(c, r)] = CELL_WALL;
+          }
+        }
+      }
+      // Add openings & swamp patches
+      state.grid[idxOf(5, 7)] = CELL_NORMAL;
+      state.grid[idxOf(10, 10)] = CELL_NORMAL;
+      state.grid[idxOf(15, 9)] = CELL_NORMAL;
+      state.grid[idxOf(20, 8)] = CELL_NORMAL;
+      state.grid[idxOf(23, 11)] = CELL_NORMAL;
+      for (let r = 6; r <= 10; r++) {
+        for (let c = 11; c <= 14; c++) state.grid[idxOf(c, r)] = CELL_WEIGHT;
+      }
+    } else if (name === "blocked") {
+      // Completely enclose end point
+      state.start = { c: 4, r: 9 };
+      state.end = { c: 22, r: 9 };
+      for (let c = 19; c <= 25; c++) {
+        state.grid[idxOf(c, 6)] = CELL_WALL;
+        state.grid[idxOf(c, 12)] = CELL_WALL;
+      }
+      for (let r = 6; r <= 12; r++) {
+        state.grid[idxOf(19, r)] = CELL_WALL;
+        state.grid[idxOf(25, r)] = CELL_WALL;
+      }
+    }
+    updateUI();
+    draw();
+  }
+
+  // ---------- EVENTS ----------
+  document.querySelectorAll("[data-algo]").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll("[data-algo]").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      state.algo = btn.getAttribute("data-algo");
+      clearSearchOnly();
+    };
+  });
+
+  document.querySelectorAll("[data-brush]").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll("[data-brush]").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      state.brush = btn.getAttribute("data-brush");
+    };
+  });
+
+  document.querySelectorAll("[data-preset]").forEach(btn => {
+    btn.onclick = () => loadPreset(btn.getAttribute("data-preset"));
+  });
+
+  els.btnRun.onclick = startRun;
+  els.btnPause.onclick = pauseRun;
+  els.btnStep.onclick = singleStep;
+  els.btnClearSearch.onclick = clearSearchOnly;
+  els.btnResetMap.onclick = () => loadPreset("swamp");
+  els.speedSlider.addEventListener("input", () => {
+    state.speed = Number(els.speedSlider.value);
+    updateUI();
+  });
+
+  // Boot with weighted swamp preset so users immediately see the difference between BFS vs Dijkstra/A*
+  loadPreset("swamp");
+})();
+</script>
+</body>
+</html>

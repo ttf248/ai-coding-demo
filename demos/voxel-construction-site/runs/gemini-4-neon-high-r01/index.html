@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script src="../../../../assets/analytics.js" defer></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>体素微缩建筑工地沙盘 · Three.js r160</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #141210;
+    color: #f4efe6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  #stage { position: fixed; inset: 0; width: 100%; height: 100%; }
+  .hud {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .card {
+    pointer-events: auto;
+    background: rgba(24, 19, 15, 0.78);
+    border: 1px solid rgba(245, 192, 76, 0.35);
+    backdrop-filter: blur(8px);
+    padding: 9px 13px;
+    border-radius: 10px;
+  }
+  .card h1 { font-size: 15.5px; color: #ffd670; letter-spacing: 0.4px; }
+  .card p { font-size: 11.5px; color: #d6ccc2; margin-top: 3px; }
+  .status-pills {
+    pointer-events: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    background: rgba(24, 19, 15, 0.78);
+    border: 1px solid rgba(245, 192, 76, 0.3);
+    backdrop-filter: blur(8px);
+    padding: 7px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  .pill {
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #f3ece1;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.14s, border-color 0.14s;
+  }
+  .pill:hover { background: rgba(245, 192, 76, 0.22); border-color: #f5c04c; }
+  .pill.on { background: rgba(245, 192, 76, 0.28); border-color: #ffd670; color: #fff8e6; font-weight: 600; }
+  .footer-hint {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .hint {
+    pointer-events: auto;
+    background: rgba(24, 19, 15, 0.76);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(6px);
+    padding: 6px 11px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #e2d9ce;
+  }
+  #fallback {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #141210;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 30;
+    text-align: center;
+  }
+  #fallback .box {
+    max-width: 440px;
+    background: #221c17;
+    border: 1px solid #f59e0b;
+    border-radius: 12px;
+    padding: 18px;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div class="hud">
+  <div class="card">
+    <h1>🏗️ 体素微缩建筑工地沙盘</h1>
+    <p>点击桌面前方实体控制旋钮调节速度/昼夜/尘土 · 按 <strong>空格键</strong> 触发模拟暴雨</p>
+  </div>
+  <div class="status-pills">
+    <span class="pill" id="pSpeed" title="也可直接点击桌前实体旋钮">⚙️ 速度: 1.0×</span>
+    <span class="pill on" id="pCycle" title="也可直接点击桌前实体开关">☀️ 昼夜: 正午 (循环开)</span>
+    <span class="pill" id="pDust" title="也可直接点击桌前实体旋钮">🌫️ 尘土: 中</span>
+    <span class="pill" id="pRain" title="快捷键 Space">🌧️ 暴雨: 关 (Space)</span>
+    <span class="pill" id="pFps" style="cursor:default;">60 FPS</span>
+  </div>
+</div>
+
+<div class="footer-hint">
+  <div class="hint">🖱️ 拖拽环视（闲置自动缓转）· 滚轮缩放 · 点击桌前 3 个实体控制旋钮交互 · 空格键切换暴雨</div>
+</div>
+
+<div id="fallback">
+  <div class="box">
+    <h2 style="color:#ffd670;margin-bottom:8px;">无法加载 Three.js r160</h2>
+    <p id="fallbackMsg" style="font-size:13px;color:#d6ccc2;">请确保网络可访问 Three.js r160 CDN 且浏览器支持 WebGL。</p>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+let THREE;
+try {
+  THREE = await import("three");
+} catch (err) {
+  document.getElementById("fallback").style.display = "flex";
+  document.getElementById("fallbackMsg").textContent = "加载 Three.js r160 失败：" + err.message;
+  throw err;
+}
+
+const stage = document.getElementById("stage");
+const pSpeed = document.getElementById("pSpeed");
+const pCycle = document.getElementById("pCycle");
+const pDust = document.getElementById("pDust");
+const pRain = document.getElementById("pRain");
+const pFps = document.getElementById("pFps");
+
+// ---------- RENDERER & SCENE ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x231d19);
+scene.fog = new THREE.FogExp2(0x231d19, 0.0085);
+
+// Eye-level third-person diorama camera
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.2, 260);
+
+// ---------- PROCEDURAL TEXTURES (ALL CODE-GENERATED) ----------
+function makeWoodTexture() {
+  const c = document.createElement("canvas");
+  c.width = 512; c.height = 512;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#3a2214";
+  ctx.fillRect(0, 0, 512, 512);
+  for (let y = 0; y < 512; y++) {
+    const wave = Math.sin(y * 0.07) * 14 + Math.sin(y * 0.23) * 6;
+    const tone = 44 + Math.floor(Math.sin((y + wave) * 0.14) * 11);
+    ctx.fillStyle = `rgb(${tone + 18}, ${Math.floor(tone * 0.68)}, ${Math.floor(tone * 0.42)})`;
+    ctx.fillRect(0, y, 512, 1);
+  }
+  // Subtle wood plank seams
+  ctx.strokeStyle = "rgba(18, 9, 4, 0.55)";
+  ctx.lineWidth = 2;
+  for (let i = 1; i < 6; i++) {
+    ctx.beginPath(); ctx.moveTo(0, i * 85); ctx.lineTo(512, i * 85); ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 2);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeBlueprintTexture() {
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 192;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#164e87";
+  ctx.fillRect(0, 0, 256, 192);
+  ctx.strokeStyle = "rgba(186, 230, 253, 0.25)";
+  ctx.lineWidth = 1;
+  for (let x = 0; x < 256; x += 16) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 192); ctx.stroke(); }
+  for (let y = 0; y < 192; y += 16) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(256, y); ctx.stroke(); }
+  ctx.strokeStyle = "#e0f2fe";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(12, 12, 232, 168);
+  // Schematic floorplan lines
+  ctx.strokeRect(28, 28, 110, 96);
+  ctx.strokeRect(46, 46, 74, 60);
+  ctx.beginPath(); ctx.arc(190, 74, 32, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(154, 134); ctx.lineTo(226, 134); ctx.moveTo(154, 150); ctx.lineTo(212, 150); ctx.stroke();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeKnobLabelTexture(title, sub) {
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 96;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#1c1917";
+  ctx.fillRect(0, 0, 256, 96);
+  ctx.strokeStyle = "#d97706";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(4, 4, 248, 88);
+  ctx.fillStyle = "#fef3c7";
+  ctx.font = "bold 28px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(title, 128, 42);
+  ctx.fillStyle = "#fbbf24";
+  ctx.font = "20px monospace";
+  ctx.fillText(sub, 128, 74);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeWarningStripeTexture() {
+  const c = document.createElement("canvas");
+  c.width = 128; c.height = 32;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#facc15";
+  ctx.fillRect(0, 0, 128, 32);
+  ctx.fillStyle = "#18181b";
+  for (let x = -32; x < 160; x += 24) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0); ctx.lineTo(x + 12, 0);
+    ctx.lineTo(x - 4, 32); ctx.lineTo(x - 16, 32);
+    ctx.closePath(); ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.repeat.set(4, 1);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// ---------- SHARED MATERIALS ----------
+const matWood = new THREE.MeshStandardMaterial({ map: makeWoodTexture(), roughness: 0.58, metalness: 0.08 });
+const matDioramaSoil = new THREE.MeshStandardMaterial({ color: 0x9b7a56, roughness: 0.92, metalness: 0.04 });
+const matRoad = new THREE.MeshStandardMaterial({ color: 0x57534e, roughness: 0.85, metalness: 0.06 });
+const matConcrete = new THREE.MeshStandardMaterial({ color: 0xb6b9be, roughness: 0.84, metalness: 0.05 });
+const matSteel = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.4, metalness: 0.72 });
+const matYellow = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.42, metalness: 0.18 });
+const matOrange = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.45, metalness: 0.15 });
+const matBlueCabin = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5, metalness: 0.12 });
+const matWhiteCabin = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.55, metalness: 0.08 });
+const matStripe = new THREE.MeshStandardMaterial({ map: makeWarningStripeTexture(), roughness: 0.55 });
+const matWindowGlow = new THREE.MeshStandardMaterial({ color: 0x334155, emissive: 0xffb347, emissiveIntensity: 0.05, roughness: 0.2 });
+
+// ---------- LIGHTING & DAY/NIGHT SYSTEM ----------
+const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x3b2f26, 0.72);
+scene.add(hemiLight);
+
+const sunLight = new THREE.DirectionalLight(0xfff5e0, 1.85);
+sunLight.position.set(22, 34, 18);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(2048, 2048);
+sunLight.shadow.camera.left = -28;
+sunLight.shadow.camera.right = 28;
+sunLight.shadow.camera.top = 28;
+sunLight.shadow.camera.bottom = -28;
+sunLight.shadow.camera.near = 2;
+sunLight.shadow.camera.far = 90;
+sunLight.shadow.bias = -0.0008;
+scene.add(sunLight);
+
+// Site floodlights (glow warmly at dusk/night and boost during rainstorm!)
+const siteLights = [];
+function addSiteLight(x, y, z, color = 0xffbe6b) {
+  const pl = new THREE.PointLight(color, 0, 18, 1.7);
+  pl.position.set(x, y, z);
+  scene.add(pl);
+  siteLights.push(pl);
+  return pl;
+}
+
+// ---------- INDOOR DARK SOLID WOOD WORKBENCH & DESK PROPS ----------
+// Workbench slab: 56 x 2.2 x 38 (centered at y = -1.1)
+const desk = new THREE.Mesh(new THREE.BoxGeometry(58, 2.4, 40), matWood);
+desk.position.set(0, -1.2, 0);
+desk.receiveShadow = true;
+scene.add(desk);
+
+// Diorama recessed wooden frame (strictly bounds the construction site: X in [-17, 17], Z in [-12.5, 12.5])
+const SITE_W = 34;
+const SITE_D = 25;
+const trayFrame = new THREE.Mesh(
+  new THREE.BoxGeometry(SITE_W + 1.2, 0.75, SITE_D + 1.2),
+  new THREE.MeshStandardMaterial({ color: 0x24160d, roughness: 0.5 })
+);
+trayFrame.position.set(0, 0.35, -0.8);
+trayFrame.receiveShadow = true;
+trayFrame.castShadow = true;
+scene.add(trayFrame);
+
+// Ground slab inside diorama (y = 0.75 surface)
+const GROUND_Y = 0.75;
+const ground = new THREE.Mesh(new THREE.BoxGeometry(SITE_W, 0.2, SITE_D), matDioramaSoil);
+ground.position.set(0, GROUND_Y - 0.1, -0.8);
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Desk Corner Props (outside diorama tray, on wooden workbench!)
+// 1. Blueprint drawings (right-front & left-back corners)
+const bp1 = new THREE.Mesh(
+  new THREE.PlaneGeometry(7.2, 5.2),
+  new THREE.MeshStandardMaterial({ map: makeBlueprintTexture(), roughness: 0.85 })
+);
+bp1.rotation.x = -Math.PI / 2;
+bp1.rotation.z = -0.18;
+bp1.position.set(22.4, 0.03, 9.2);
+bp1.receiveShadow = true;
+scene.add(bp1);
+
+const bpRoll = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.45, 0.45, 6.4, 14),
+  new THREE.MeshStandardMaterial({ color: 0xe0f2fe, roughness: 0.75 })
+);
+bpRoll.rotation.z = Math.PI / 2;
+bpRoll.rotation.y = 0.32;
+bpRoll.position.set(22.6, 0.45, 4.2);
+bpRoll.castShadow = true;
+scene.add(bpRoll);
+
+// 2. Steel tape measure (left-front corner)
+const tapeGroup = new THREE.Group();
+tapeGroup.position.set(-22.2, 0, 8.6);
+tapeGroup.rotation.y = 0.45;
+const tapeBody = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.3, 2.6), matYellow);
+tapeBody.position.y = 0.65; tapeBody.castShadow = true;
+tapeGroup.add(tapeBody);
+const tapeGrip = new THREE.Mesh(new THREE.BoxGeometry(2.75, 0.9, 1.4), new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.8 }));
+tapeGrip.position.y = 0.65;
+tapeGroup.add(tapeGrip);
+const tapeBlade = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.06, 0.7), new THREE.MeshStandardMaterial({ color: 0xfde047, metalness: 0.5, roughness: 0.3 }));
+tapeBlade.position.set(4.0, 0.05, 0.5);
+tapeGroup.add(tapeBlade);
+scene.add(tapeGroup);
+
+// 3. Miniature Yellow Safety Helmet ornament (left-back corner)
+const hatGroup = new THREE.Group();
+hatGroup.position.set(-22.8, 0, -7.8);
+hatGroup.rotation.y = 0.6;
+const hatDome = new THREE.Mesh(new THREE.SphereGeometry(2.2, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), matYellow);
+hatDome.castShadow = true;
+hatGroup.add(hatDome);
+const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(2.55, 2.65, 0.25, 18), matYellow);
+hatBrim.position.y = 0.12;
+hatGroup.add(hatBrim);
+const hatRidge = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.45, 3.8), matYellow);
+hatRidge.position.y = 2.05;
+hatGroup.add(hatRidge);
+scene.add(hatGroup);
+
+// 4. Metallic Spirit Level (right-back corner)
+const levelGroup = new THREE.Group();
+levelGroup.position.set(22.6, 0.45, -7.2);
+levelGroup.rotation.y = 1.25;
+const levelBar = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.9, 1.3), new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.85, roughness: 0.25 }));
+levelBar.castShadow = true;
+levelGroup.add(levelBar);
+const levelVial = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.94, 0.7), new THREE.MeshStandardMaterial({ color: 0x4ade80, emissive: 0x22c55e, emissiveIntensity: 0.35, roughness: 0.15 }));
+levelGroup.add(levelVial);
+scene.add(levelGroup);
+
+// ---------- PHYSICAL 3D INTERACTIVE CONTROL KNOBS ON WORKBENCH FRONT EDGE ----------
+const interactiveKnobs = [];
+const knobStates = {
+  speedIdx: 1, // 0: 0.0 (暂停), 1: 1.0x, 2: 1.8x, 3: 0.5x
+  speedValues: [0, 1.0, 1.8, 0.45],
+  speedLabels: ["暂停", "1.0×", "1.8×", "0.45×"],
+  dayCycle: true,
+  timeOfDay: 0.36, // 0..1 (0.12 dawn, 0.36 noon, 0.65 dusk, 0.88 night)
+  dustIdx: 1, // 0: 低, 1: 中, 2: 高
+  dustValues: [0.35, 1.0, 2.2],
+  dustLabels: ["低", "中", "高"],
+  raining: false
+};
+
+const consoleBase = new THREE.Mesh(
+  new THREE.BoxGeometry(16.8, 1.2, 4.2),
+  new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.45, metalness: 0.45 })
+);
+consoleBase.position.set(0, 0.6, 15.6);
+consoleBase.castShadow = true;
+consoleBase.receiveShadow = true;
+scene.add(consoleBase);
+
+function createControlKnob(id, xPos, title, subText, accentHex) {
+  const g = new THREE.Group();
+  g.position.set(xPos, 1.22, 15.2);
+
+  const bezel = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.5, 0.35, 20), matSteel);
+  bezel.position.y = 0.18;
+  g.add(bezel);
+
+  const dial = new THREE.Group();
+  dial.position.y = 0.52;
+  const cap = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.05, 1.12, 0.65, 20),
+    new THREE.MeshStandardMaterial({ color: 0x292524, roughness: 0.35, metalness: 0.55 })
+  );
+  cap.castShadow = true;
+  dial.add(cap);
+
+  const indicator = new THREE.Mesh(
+    new THREE.BoxGeometry(0.18, 0.16, 0.72),
+    new THREE.MeshStandardMaterial({ color: accentHex, emissive: accentHex, emissiveIntensity: 0.7 })
+  );
+  indicator.position.set(0, 0.35, -0.35);
+  dial.add(indicator);
+  g.add(dial);
+
+  // Hit cylinder for easy raycast clicking
+  const hit = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.65, 1.65, 1.4, 12),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  hit.position.y = 0.6;
+  hit.userData.knobId = id;
+  g.add(hit);
+
+  // Label plate in front of knob
+  const labelTex = makeKnobLabelTexture(title, subText);
+  const plate = new THREE.Mesh(
+    new THREE.PlaneGeometry(4.2, 1.4),
+    new THREE.MeshBasicMaterial({ map: labelTex })
+  );
+  plate.rotation.x = -Math.PI / 2.4;
+  plate.position.set(0, 0.14, 1.75);
+  g.add(plate);
+
+  scene.add(g);
+  interactiveKnobs.push({ id, hit, dial, plate, title });
+}
+
+createControlKnob("speed", -5.2, "机械速度", "1.0×", 0xf59e0b);
+createControlKnob("cycle", 0.0, "昼夜循环", "开启", 0x38bdf8);
+createControlKnob("dust", 5.2, "尘土强度", "中", 0xa8a29e);
+
+// ---------- CONSTRUCTION SITE ZONES (ALL STRICTLY INSIDE [-16.5..16.5, -13..11.5]) ----------
+const site = new THREE.Group();
+site.position.set(0, GROUND_Y, -0.8); // Local site space: X in [-17,17], Z in [-12.5,12.5]
+scene.add(site);
+
+// 1. Temporary Construction Road Loop (clean rectangular ring so dump trucks never clip anything!)
+// Road loop centerline: X = ±12.8, Z = ±8.6 (width = 2.6)
+function addRoadSegment(x, z, w, d) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, d), matRoad);
+  m.position.set(x, 0.04, z);
+  m.receiveShadow = true;
+  site.add(m);
+}
+addRoadSegment(0, 8.6, 28.2, 2.5);   // South main road
+addRoadSegment(0, -8.6, 28.2, 2.5);  // North road
+addRoadSegment(-12.8, 0, 2.5, 19.6); // West road
+addRoadSegment(12.8, 0, 2.5, 19.6);  // East road
+addRoadSegment(0, 0, 2.2, 15.0);     // Center cross road for concrete mixer
+
+// 2. Excavation Pit Zone (West-Center: X in [-10.5..-3.5], Z in [-5.8..4.8])
+const pitMat = new THREE.MeshStandardMaterial({ color: 0x6b4c32, roughness: 0.96 });
+const pitFloor = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.14, 9.6), new THREE.MeshStandardMaterial({ color: 0x4a3320, roughness: 0.98 }));
+pitFloor.position.set(-7.0, 0.07, -0.4);
+pitFloor.receiveShadow = true;
+site.add(pitFloor);
+// Retaining soil steps around excavation pit
+for (const [x, z, w, d, h] of [
+  [-7.0, -5.4, 7.4, 0.9, 0.55],
+  [-7.0, 4.6, 7.4, 0.9, 0.55],
+  [-10.4, -0.4, 0.9, 9.6, 0.55],
+  [-3.6, -0.4, 0.9, 9.6, 0.55]
+]) {
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), pitMat);
+  wall.position.set(x, h * 0.5, z);
+  wall.castShadow = true; wall.receiveShadow = true;
+  site.add(wall);
+}
+
+// 3. High-Rise Building Core Under Construction (East-Center: X in [3.2..9.6], Z in [-5.8..1.2])
+const bldg = new THREE.Group();
+bldg.position.set(6.4, 0, -2.3);
+// Foundation pad
+const pad = new THREE.Mesh(new THREE.BoxGeometry(7.0, 0.35, 7.0), matConcrete);
+pad.position.y = 0.18; pad.receiveShadow = true;
+bldg.add(pad);
+// 4 Floor slabs + columns + safety mesh + scaffolding
+for (let f = 0; f < 4; f++) {
+  const fy = 0.35 + f * 2.1;
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.28, 6.2), matConcrete);
+  slab.position.y = fy + 2.0; slab.castShadow = true; slab.receiveShadow = true;
+  bldg.add(slab);
+  // Concrete columns (3x3 grid)
+  for (let cx = -2.6; cx <= 2.6; cx += 2.6) {
+    for (let cz = -2.6; cz <= 2.6; cz += 2.6) {
+      const col = new THREE.Mesh(new THREE.BoxGeometry(0.45, 2.0, 0.45), matConcrete);
+      col.position.set(cx, fy + 1.0, cz);
+      col.castShadow = true;
+      bldg.add(col);
+    }
+  }
+  // Core elevator shaft
+  const core = new THREE.Mesh(new THREE.BoxGeometry(1.7, 2.0, 1.7), new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.85 }));
+  core.position.set(0, fy + 1.0, 0);
+  bldg.add(core);
+  // Green safety mesh on lower 2 floors
+  if (f < 2) {
+    const meshMat = new THREE.MeshStandardMaterial({ color: 0x15803d, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
+    const meshBox = new THREE.Mesh(new THREE.BoxGeometry(6.55, 1.9, 6.55), meshMat);
+    meshBox.position.y = fy + 1.0;
+    bldg.add(meshBox);
+  }
+}
+// Exposed top floor rebar rods
+for (let cx = -2.6; cx <= 2.6; cx += 2.6) {
+  for (let cz = -2.6; cz <= 2.6; cz += 2.6) {
+    const rod = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.1, 0.14), matSteel);
+    rod.position.set(cx, 9.2, cz);
+    bldg.add(rod);
+  }
+}
+site.add(bldg);
+
+// Instanced Yellow Scaffolding around building
+const scafPoleGeo = new THREE.BoxGeometry(0.12, 8.6, 0.12);
+const scafPoles = new THREE.InstancedMesh(scafPoleGeo, matYellow, 24);
+const dummy = new THREE.Object3D();
+let si = 0;
+for (let i = 0; i < 6; i++) {
+  const off = -3.4 + i * 1.36;
+  for (const [px, pz] of [[6.4 + off, -2.3 + 3.55], [6.4 + off, -2.3 - 3.55], [6.4 + 3.55, -2.3 + off], [6.4 - 3.55, -2.3 + off]]) {
+    dummy.position.set(px, 4.3, pz);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(1, 1, 1);
+    dummy.updateMatrix();
+    scafPoles.setMatrixAt(si++, dummy.matrix);
+  }
+}
+scafPoles.castShadow = true;
+site.add(scafPoles);
+
+// 4. Prefab Office Cabins (2-story blue/white modular office, South-East: X in [3.2..9.8], Z in [3.4..6.4])
+const office = new THREE.Group();
+office.position.set(6.5, 0, 4.9);
+for (let floor = 0; floor < 2; floor++) {
+  const fy = floor * 1.65;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(6.2, 1.55, 2.5), matWhiteCabin);
+  body.position.y = fy + 0.78; body.castShadow = true; body.receiveShadow = true;
+  office.add(body);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.18, 2.8), matBlueCabin);
+  roof.position.y = fy + 1.6;
+  office.add(roof);
+  // Glowing windows
+  for (let wx = -2.1; wx <= 2.1; wx += 1.4) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.65, 2.56), matWindowGlow);
+    win.position.set(wx, fy + 0.85, 0);
+    office.add(win);
+  }
+}
+// Exterior staircase
+const stair = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.7, 1.8), matSteel);
+stair.position.set(-3.4, 0.85, 0.2); stair.rotation.x = 0.55;
+office.add(stair);
+site.add(office);
+addSiteLight(6.5, 3.6, 4.9 - 0.8, 0xffc670);
+
+// 5. Rebar Processing Shed (North-West inside road: X = -7.0, Z = -6.7? Keep clear of road at -8.6 & pit at -5.4 -> place North-Center X = -0.8, Z = -10.8? Better: X = -14.8.. no, keep inside fence! Let's place Rebar Shed at South-West inside fence X = -7.0, Z = 6.2 & Material Yard at North-Center X = -0.5, Z = -5.6)
+// Wait: let's verify exact coordinates so ZERO zones overlap!
+// Road loop: X = -12.8, X = +12.8, Z = -8.6, Z = +8.6 (road occupies [-14.05..-11.55], [11.55..14.05], [-9.85..-7.35], [7.35..9.85])
+// Inside road loop: X in [-11.4 .. +11.4], Z in [-7.2 .. +7.2]. Center cross road X in [-1.1..+1.1].
+// Left inner half: X in [-11.4 .. -1.4]:
+//   - Excavation pit: X in [-10.8..-3.2], Z in [-5.8..3.8] (pit centered at -7.0, -1.0 -> let's adjust!)
+//   - Rebar Shed: X in [-10.6..-4.8], Z in [4.5..7.0] -> clean, clear of pit (ends at 4.6 -> move pit north slightly!)
+// Let's keep Spoil Mound at North-East outside inner building? Wait: North of road (Z in [-12.0..-10.1]) has a nice strip!
+// Even cleaner: Spoil Earth Mound at X = -15.2.. no, site X is [-17..17], Z is [-12.5..12.5].
+// Let's place:
+//   - Spoil Earth Mound (渣土堆放区): North strip X in [-10.5..-4.5], Z in [-11.8..-10.1] (right beside North road for trucks to dump!)
+//   - Rebar Processing Shed (钢筋加工棚): North strip X in [2.5..9.5], Z in [-11.9..-10.1]
+//   - Material Storage Yard (物料堆放区): West strip X in [-16.2..-14.4], Z in [-5.5..5.5] (stacked rebar, cement bags, sand/gravel!)
+//   - Utility Poles & Floodlights + Fence Perimeter at X = ±16.6, Z = ±12.1!
+// Let's double check: ZERO overlap with roads, buildings, pit, or offices!
+
+// Spoil Earth Mound (Voxel stepped earth pyramid at North strip: X = -7.5, Z = -11.0)
+const voxelGeo = new THREE.BoxGeometry(0.62, 0.62, 0.62);
+const spoilVoxels = [];
+for (let y = 0; y < 4; y++) {
+  const rx = 4 - y, rz = 2 - Math.floor(y * 0.5);
+  for (let gx = -rx; gx <= rx; gx++) {
+    for (let gz = -rz; gz <= rz; gz++) {
+      spoilVoxels.push([-7.5 + gx * 0.6, 0.31 + y * 0.56, -11.0 + gz * 0.58]);
+    }
+  }
+}
+const spoilMesh = new THREE.InstancedMesh(voxelGeo, new THREE.MeshStandardMaterial({ color: 0x785536, roughness: 0.96 }), spoilVoxels.length);
+spoilVoxels.forEach((v, i) => {
+  dummy.position.set(v[0], v[1], v[2]);
+  dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1);
+  dummy.updateMatrix(); spoilMesh.setMatrixAt(i, dummy.matrix);
+});
+spoilMesh.castShadow = true; spoilMesh.receiveShadow = true;
+site.add(spoilMesh);
+
+// Rebar Processing Shed (X = 6.0, Z = -11.0)
+const shed = new THREE.Group();
+shed.position.set(6.0, 0, -11.0);
+const shedRoof = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.22, 2.2), matBlueCabin);
+shedRoof.position.y = 2.05; shedRoof.castShadow = true;
+shed.add(shedRoof);
+for (const px of [-2.9, 0, 2.9]) {
+  for (const pz of [-0.9, 0.9]) {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.0, 0.16), matYellow);
+    p.position.set(px, 1.0, pz); shed.add(p);
+  }
+}
+// Rebar worktable & stacked rebar inside shed
+const rebarBench = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.55, 0.9), matSteel);
+rebarBench.position.set(0, 0.28, 0);
+shed.add(rebarBench);
+for (let r = 0; r < 6; r++) {
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.09, 0.09), new THREE.MeshStandardMaterial({ color: 0x7c2d12, metalness: 0.6, roughness: 0.5 }));
+  bar.position.set(0, 0.64, -0.3 + r * 0.12);
+  shed.add(bar);
+}
+site.add(shed);
+
+// Material Storage Yard (West strip X = -15.3, Z in [-6.5..6.5])
+// Stacked cement bags (Instanced)
+const bagGeo = new THREE.BoxGeometry(0.65, 0.26, 0.45);
+const cementBags = new THREE.InstancedMesh(bagGeo, new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.9 }), 24);
+let bi = 0;
+for (let y = 0; y < 3; y++) {
+  for (let x = 0; x < 2; x++) {
+    for (let z = 0; z < 4; z++) {
+      dummy.position.set(-15.6 + x * 0.72, 0.13 + y * 0.27, -4.8 + z * 0.55);
+      dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix(); cementBags.setMatrixAt(bi++, dummy.matrix);
+    }
+  }
+}
+cementBags.castShadow = true;
+site.add(cementBags);
+
+// Sand & Gravel mounds (East-side & West-side piles)
+for (const [mx, mz, col] of [[-15.3, 0.8, 0xd4a359], [-15.3, 4.6, 0x9ca3af]]) {
+  for (let y = 0; y < 3; y++) {
+    const s = 1.8 - y * 0.52;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(s, 0.48, s * 1.25), new THREE.MeshStandardMaterial({ color: col, roughness: 0.95 }));
+    m.position.set(mx, 0.24 + y * 0.46, mz);
+    m.castShadow = true; m.receiveShadow = true;
+    site.add(m);
+  }
+}
+
+// Perimeter Construction Fence, Main Gate, Warning Flags & Floodlight Poles
+const fenceMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.65 });
+const fencePositions = [];
+for (let x = -15.8; x <= 15.8; x += 2.2) {
+  fencePositions.push([x, -12.2, 0]);
+  if (Math.abs(x) > 2.6) fencePositions.push([x, 12.2, 0]); // Leave main gate at South center (X in [-2.6..2.6])
+}
+for (let z = -10.8; z <= 10.8; z += 2.2) {
+  fencePositions.push([-16.6, z, Math.PI / 2]);
+  fencePositions.push([16.6, z, Math.PI / 2]);
+}
+const fenceMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(2.05, 1.15, 0.14), fenceMat, fencePositions.length);
+fencePositions.forEach(([fx, fz, rot], idx) => {
+  dummy.position.set(fx, 0.58, fz);
+  dummy.rotation.set(0, rot, 0); dummy.scale.set(1, 1, 1);
+  dummy.updateMatrix(); fenceMesh.setMatrixAt(idx, dummy.matrix);
+});
+fenceMesh.castShadow = true;
+site.add(fenceMesh);
+
+// Main Construction Gate Arch (South Center Z = 12.2)
+const gateL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.8, 0.4), matYellow); gateL.position.set(-2.5, 1.4, 12.2);
+const gateR = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.8, 0.4), matYellow); gateR.position.set(2.5, 1.4, 12.2);
+const gateTop = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.65, 0.48), matStripe); gateTop.position.set(0, 2.7, 12.2);
+site.add(gateL, gateR, gateTop);
+
+// Warning Pennant Flags along fence top (Instanced triangles/boxes)
+const flagColors = [0xef4444, 0xfacc15, 0x3b82f6, 0x22c55e];
+const flagGeo = new THREE.BoxGeometry(0.32, 0.32, 0.06);
+const flagMeshes = new THREE.InstancedMesh(flagGeo, new THREE.MeshStandardMaterial({ roughness: 0.6 }), 36);
+for (let i = 0; i < 36; i++) {
+  const fx = -15.5 + i * 0.88;
+  dummy.position.set(fx, 1.45, -12.15);
+  dummy.rotation.set(0, 0, Math.PI / 4);
+  dummy.scale.set(1, 1, 1);
+  dummy.updateMatrix();
+  flagMeshes.setMatrixAt(i, dummy.matrix);
+  flagMeshes.setColorAt(i, new THREE.Color(flagColors[i % 4]));
+}
+site.add(flagMeshes);
+
+// Temporary Floodlight & Utility Poles + Custom Glow Halos!
+const glowPositions = [];
+const poleCoords = [[-15.6, -11.4], [15.6, -11.4], [-15.6, 11.4], [15.6, 11.4]];
+for (const [px, pz] of poleCoords) {
+  const pole = new THREE.Mesh(new THREE.BoxGeometry(0.24, 6.2, 0.24), matSteel);
+  pole.position.set(px, 3.1, pz); pole.castShadow = true;
+  site.add(pole);
+  const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.35, 0.5), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffe099, emissiveIntensity: 1.5 }));
+  lamp.position.set(px, 6.1, pz);
+  site.add(lamp);
+  addSiteLight(px * 0.85, 6.5, pz * 0.85 - 0.8, 0xffd280);
+  glowPositions.push(new THREE.Vector3(px, GROUND_Y + 6.1, pz - 0.8));
+}
+
+// ---------- DYNAMIC MACHINERY (COLLISION-FREE ROUTES & ARTICULATED ANIMATIONS) ----------
+
+// 1. TWO VOXEL EXCAVATORS (parked at Excavation Pit East & South edges)
+function createExcavator(x, z, baseRot) {
+  const root = new THREE.Group();
+  root.position.set(x, 0, z);
+  root.rotation.y = baseRot;
+
+  // Tracks
+  const trackMat = new THREE.MeshStandardMaterial({ color: 0x262626, roughness: 0.88 });
+  const tL = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.45, 0.52), trackMat); tL.position.set(0, 0.22, -0.68); tL.castShadow = true;
+  const tR = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.45, 0.52), trackMat); tR.position.set(0, 0.22, 0.68); tR.castShadow = true;
+  const chas = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.32, 1.1), matSteel); chas.position.y = 0.45;
+  root.add(tL, tR, chas);
+
+  // Rotating Upper Cab
+  const turret = new THREE.Group();
+  turret.position.y = 0.65;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.9, 1.45), matYellow);
+  body.position.set(-0.2, 0.45, 0); body.castShadow = true;
+  turret.add(body);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.72), new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2, metalness: 0.2 }));
+  cab.position.set(0.28, 0.95, 0.34);
+  turret.add(cab);
+
+  // Articulated Boom -> Stick -> Bucket
+  const boomPivot = new THREE.Group();
+  boomPivot.position.set(0.62, 0.55, -0.2);
+  const boom = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.34, 0.32), matYellow);
+  boom.position.set(1.0, 0.25, 0); boom.rotation.z = 0.26; boom.castShadow = true;
+  boomPivot.add(boom);
+
+  const stickPivot = new THREE.Group();
+  stickPivot.position.set(1.95, 0.55, 0);
+  const stick = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.65, 0.28), matOrange);
+  stick.position.set(0.22, -0.75, 0); stick.rotation.z = 0.22; stick.castShadow = true;
+  stickPivot.add(stick);
+
+  const bucketPivot = new THREE.Group();
+  bucketPivot.position.set(0.38, -1.52, 0);
+  const bucket = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.52, 0.62), matSteel);
+  bucket.position.set(-0.15, -0.2, 0); bucket.castShadow = true;
+  bucketPivot.add(bucket);
+
+  stickPivot.add(bucketPivot);
+  boomPivot.add(stickPivot);
+  turret.add(boomPivot);
+  root.add(turret);
+  site.add(root);
+
+  return { root, turret, boomPivot, stickPivot, bucketPivot };
+}
+
+const exc1 = createExcavator(-2.6, -2.5, Math.PI);       // Facing pit from East
+const exc2 = createExcavator(-7.2, 5.4, -Math.PI / 2);   // Facing pit from South
+
+// 2. TWO TOWER CRANES (rotating jibs + trolley + hook lifting rebar & concrete hopper!)
+function createTowerCrane(x, z, mastH, jibLen, payloadType) {
+  const root = new THREE.Group();
+  root.position.set(x, 0, z);
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.6, 2.1), matConcrete);
+  base.position.y = 0.3; root.add(base);
+  // Mast
+  const mast = new THREE.Mesh(new THREE.BoxGeometry(0.9, mastH, 0.9), matYellow);
+  mast.position.y = mastH * 0.5 + 0.5; mast.castShadow = true;
+  root.add(mast);
+
+  // Rotating Jib Assembly
+  const jibGroup = new THREE.Group();
+  jibGroup.position.y = mastH + 0.5;
+
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), matWhiteCabin);
+  cab.position.set(0.55, -0.3, 0.55); jibGroup.add(cab);
+
+  const apex = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.4, 4), matYellow);
+  apex.position.y = 1.6; jibGroup.add(apex);
+
+  const jib = new THREE.Mesh(new THREE.BoxGeometry(jibLen, 0.55, 0.65), matYellow);
+  jib.position.set(jibLen * 0.32, 0.4, 0); jib.castShadow = true;
+  jibGroup.add(jib);
+
+  const counterWeight = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.9, 1.1), matConcrete);
+  counterWeight.position.set(-jibLen * 0.22, 0.25, 0);
+  jibGroup.add(counterWeight);
+
+  // Red aircraft warning beacon on crane peak
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+  beacon.position.y = 2.9; jibGroup.add(beacon);
+  glowPositions.push(new THREE.Vector3(x, GROUND_Y + mastH + 3.4, z - 0.8));
+
+  // Sliding Trolley + Cable + Load
+  const trolley = new THREE.Group();
+  trolley.position.set(jibLen * 0.5, 0.05, 0);
+  const trolleyBox = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.35, 0.8), matOrange);
+  trolley.add(trolleyBox);
+
+  const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1, 6), matSteel);
+  trolley.add(cable);
+
+  const load = new THREE.Group();
+  if (payloadType === "rebar") {
+    for (let i = 0; i < 4; i++) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.12, 0.12), new THREE.MeshStandardMaterial({ color: 0x9a3412, metalness: 0.6 }));
+      b.position.set(0, -0.1, -0.22 + i * 0.15);
+      load.add(b);
+    }
+  } else {
+    const hopper = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.28, 1.1, 8), matOrange);
+    hopper.position.y = -0.5;
+    load.add(hopper);
+  }
+  trolley.add(load);
+  jibGroup.add(trolley);
+  root.add(jibGroup);
+  site.add(root);
+
+  return { jibGroup, trolley, cable, load, jibLen };
+}
+
+const crane1 = createTowerCrane(10.8, -5.8, 13.5, 11.5, "rebar");
+const crane2 = createTowerCrane(2.1, -6.2, 11.5, 9.5, "hopper");
+
+// 3. TWO WHEELED DUMP TRUCKS looping along outer road (loading near excavator -> dumping at spoil mound)
+function createDumpTruck(cabColor) {
+  const g = new THREE.Group();
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.35), new THREE.MeshStandardMaterial({ color: cabColor, roughness: 0.42 }));
+  cab.position.set(1.05, 0.85, 0); cab.castShadow = true;
+  g.add(cab);
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.45, 1.15), new THREE.MeshStandardMaterial({ color: 0xbae6fd, roughness: 0.15 }));
+  windshield.position.set(1.56, 1.05, 0); g.add(windshield);
+  const chassis = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.3, 1.25), matSteel);
+  chassis.position.set(0, 0.35, 0); g.add(chassis);
+
+  // Tilting dump bed
+  const bedPivot = new THREE.Group();
+  bedPivot.position.set(-1.35, 0.55, 0);
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.82, 1.42), matYellow);
+  bed.position.set(0.92, 0.42, 0); bed.castShadow = true;
+  bedPivot.add(bed);
+  const dirt = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.45, 1.2), new THREE.MeshStandardMaterial({ color: 0x785536, roughness: 0.95 }));
+  dirt.position.set(0.92, 0.78, 0);
+  bedPivot.add(dirt);
+  g.add(bedPivot);
+
+  // Headlights
+  const hlMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+  const hl1 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, 0.22), hlMat); hl1.position.set(1.62, 0.62, -0.45);
+  const hl2 = hl1.clone(); hl2.position.z = 0.45;
+  g.add(hl1, hl2);
+
+  // 6 Wheels
+  const wGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.26, 10);
+  wGeo.rotateX(Math.PI / 2);
+  const wMat = new THREE.MeshStandardMaterial({ color: 0x171717, roughness: 0.9 });
+  for (const wx of [1.05, -0.45, -1.15]) {
+    for (const wz of [-0.68, 0.68]) {
+      const w = new THREE.Mesh(wGeo, wMat);
+      w.position.set(wx, 0.32, wz);
+      g.add(w);
+    }
+  }
+  site.add(g);
+  return { group: g, bedPivot, dirt };
+}
+
+const truckRoute = [
+  new THREE.Vector3(-12.8, 0, 8.6),   // SW corner
+  new THREE.Vector3(-12.8, 0, -2.0),  // West excavator loading zone
+  new THREE.Vector3(-12.8, 0, -8.6),  // NW corner
+  new THREE.Vector3(-7.5, 0, -8.6),   // North spoil mound dump point!
+  new THREE.Vector3(12.8, 0, -8.6),   // NE corner
+  new THREE.Vector3(12.8, 0, 8.6)     // SE corner
+];
+const dumpTrucks = [
+  { ...createDumpTruck(0xdc2626), progress: 0.05 },
+  { ...createDumpTruck(0x2563eb), progress: 0.55 }
+];
+
+// 4. CONCRETE MIXER TRUCK (slowly patrolling center cross road Z in [-6.4..6.4] at X = 0)
+const mixerGroup = new THREE.Group();
+const mCab = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.15, 1.1), matWhiteCabin);
+mCab.position.set(0, 0.85, 1.1); mCab.castShadow = true; mixerGroup.add(mCab);
+const mChassis = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.3, 3.0), matSteel);
+mChassis.position.set(0, 0.36, 0); mixerGroup.add(mChassis);
+const drumPivot = new THREE.Group();
+drumPivot.position.set(0, 1.15, -0.45);
+drumPivot.rotation.x = 0.25;
+const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.56, 2.0, 12), matStripe);
+drum.rotation.x = Math.PI / 2; drum.castShadow = true;
+drumPivot.add(drum);
+mixerGroup.add(drumPivot);
+site.add(mixerGroup);
+
+// 5. COMPACT SKID-STEER LOADER (grading flat yard South of pit: X in [-10.0..-3.2], Z = 6.5)
+const loader = new THREE.Group();
+loader.position.set(-6.5, 0, 6.5);
+const lBody = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.85, 0.95), matOrange);
+lBody.position.y = 0.65; lBody.castShadow = true; loader.add(lBody);
+const lBlade = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.55, 1.25), matSteel);
+lBlade.position.set(0.95, 0.32, 0); lBlade.castShadow = true; loader.add(lBlade);
+site.add(loader);
+
+// ---------- VOXEL WORKERS (DISTINCT ROLES & ANIMATIONS) ----------
+const workers = [];
+const helmetPalette = [0xfacc15, 0xef4444, 0xf8fafc, 0x38bdf8];
+const vestPalette = [0xf97316, 0x84cc16, 0x2563eb];
+
+function spawnWorker(x, z, role, hatIdx, vestIdx) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.45, 0.22), new THREE.MeshStandardMaterial({ color: 0x1e3a8a }));
+  legs.position.y = 0.225; g.add(legs);
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.48, 0.26), new THREE.MeshStandardMaterial({ color: vestPalette[vestIdx % 3] }));
+  torso.position.y = 0.68; torso.castShadow = true; g.add(torso);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 0.28), new THREE.MeshStandardMaterial({ color: 0xfdba74 }));
+  head.position.y = 1.06; g.add(head);
+  const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.34), new THREE.MeshStandardMaterial({ color: helmetPalette[hatIdx % 4] }));
+  helmet.position.y = 1.24; g.add(helmet);
+
+  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), new THREE.MeshStandardMaterial({ color: vestPalette[vestIdx % 3] }));
+  armL.position.set(-0.26, 0.72, 0); g.add(armL);
+  const armR = armL.clone(); armR.position.x = 0.26; g.add(armR);
+
+  site.add(g);
+  workers.push({ g, armL, armR, role, baseX: x, baseZ: z, phase: Math.random() * 6.28 });
+}
+
+// Rebar tying workers at shed
+spawnWorker(4.8, -10.3, "tie", 0, 0);
+spawnWorker(7.2, -10.3, "tie", 0, 1);
+// Carrying materials near west yard & building
+spawnWorker(-14.6, -2.0, "carry", 2, 0);
+spawnWorker(2.6, 1.5, "carry", 0, 1);
+// Crane signalers
+spawnWorker(9.4, -3.5, "signal", 1, 0);
+spawnWorker(2.2, -3.2, "signal", 1, 1);
+// Tool operators near building & pit
+spawnWorker(4.4, 1.6, "tool", 0, 0);
+spawnWorker(-2.2, 2.2, "tool", 3, 1);
+// Security guard patrolling main South gate!
+spawnWorker(0.0, 11.4, "patrol", 3, 2);
+spawnWorker(4.2, 6.6, "walk", 2, 1);
+spawnWorker(-4.0, 7.1, "walk", 0, 0);
+
+// ---------- CUSTOM SHADER: FLOATING DUST PARTICLES ----------
+const dustCount = 420;
+const dustPos = new Float32Array(dustCount * 3);
+const dustSeed = new Float32Array(dustCount * 3);
+for (let i = 0; i < dustCount; i++) {
+  dustPos[i * 3] = (Math.random() - 0.5) * (SITE_W - 2);
+  dustPos[i * 3 + 1] = GROUND_Y + 0.4 + Math.random() * 7.5;
+  dustPos[i * 3 + 2] = -0.8 + (Math.random() - 0.5) * (SITE_D - 2);
+  dustSeed[i * 3] = Math.random() * 10;
+  dustSeed[i * 3 + 1] = 0.4 + Math.random() * 0.9;
+  dustSeed[i * 3 + 2] = 0.6 + Math.random() * 1.4;
+}
+const dustGeo = new THREE.BufferGeometry();
+dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPos, 3));
+dustGeo.setAttribute("aSeed", new THREE.BufferAttribute(dustSeed, 3));
+const dustUniforms = {
+  uTime: { value: 0 },
+  uDensity: { value: 1.0 },
+  uPixelRatio: { value: renderer.getPixelRatio() }
+};
+const dustMat = new THREE.ShaderMaterial({
+  uniforms: dustUniforms,
+  transparent: true,
+  depthWrite: false,
+  vertexShader: `
+    attribute vec3 aSeed;
+    uniform float uTime;
+    uniform float uDensity;
+    uniform float uPixelRatio;
+    varying float vAlpha;
+    void main() {
+      vec3 p = position;
+      p.x += sin(uTime * 0.45 * aSeed.y + aSeed.x) * 1.6;
+      p.y += mod(uTime * 0.35 * aSeed.y + aSeed.x, 5.5) * 0.45;
+      p.z += cos(uTime * 0.38 * aSeed.y + aSeed.x) * 1.4;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      gl_Position = projectionMatrix * mv;
+      gl_PointSize = clamp((16.0 * aSeed.z * uPixelRatio * (0.7 + uDensity * 0.35)) / max(1.0, -mv.z), 2.0, 28.0);
+      vAlpha = clamp(0.18 * uDensity, 0.05, 0.48);
+    }
+  `,
+  fragmentShader: `
+    varying float vAlpha;
+    void main() {
+      float d = length(gl_PointCoord - 0.5);
+      if (d > 0.5) discard;
+      float soft = smoothstep(0.5, 0.0, d);
+      gl_FragColor = vec4(0.85, 0.75, 0.58, soft * vAlpha);
+    }
+  `
+});
+scene.add(new THREE.Points(dustGeo, dustMat));
+
+// ---------- CUSTOM SHADER: WARM LIGHT GLOW HALOS ----------
+const glowGeo = new THREE.BufferGeometry();
+glowGeo.setAttribute("position", new THREE.Float32BufferAttribute(glowPositions.flatMap(v => [v.x, v.y, v.z]), 3));
+const glowUniforms = { uStrength: { value: 0.15 }, uPixelRatio: { value: renderer.getPixelRatio() } };
+const glowMat = new THREE.ShaderMaterial({
+  uniforms: glowUniforms,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  vertexShader: `
+    uniform float uPixelRatio;
+    uniform float uStrength;
+    void main() {
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      gl_Position = projectionMatrix * mv;
+      gl_PointSize = clamp((115.0 * uPixelRatio * (0.5 + uStrength * 0.7)) / max(1.0, -mv.z), 4.0, 140.0);
+    }
+  `,
+  fragmentShader: `
+    uniform float uStrength;
+    void main() {
+      float d = length(gl_PointCoord - 0.5);
+      if (d > 0.5) discard;
+      float g = pow(1.0 - d * 2.0, 2.2);
+      gl_FragColor = vec4(1.0, 0.76, 0.36, g * uStrength);
+    }
+  `
+});
+scene.add(new THREE.Points(glowGeo, glowMat));
+
+// ---------- CUSTOM SHADER: RAINSTORM PARTICLES (SPACEBAR TOGGLE) ----------
+const rainCount = 1600;
+const rainPos = new Float32Array(rainCount * 3);
+const rainSeed = new Float32Array(rainCount);
+for (let i = 0; i < rainCount; i++) {
+  rainPos[i * 3] = (Math.random() - 0.5) * SITE_W;
+  rainPos[i * 3 + 1] = Math.random() * 20;
+  rainPos[i * 3 + 2] = -0.8 + (Math.random() - 0.5) * SITE_D;
+  rainSeed[i] = Math.random();
+}
+const rainGeo = new THREE.BufferGeometry();
+rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPos, 3));
+rainGeo.setAttribute("aSeed", new THREE.BufferAttribute(rainSeed, 1));
+const rainUniforms = { uTime: { value: 0 }, uRain: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() } };
+const rainMat = new THREE.ShaderMaterial({
+  uniforms: rainUniforms,
+  transparent: true,
+  depthWrite: false,
+  vertexShader: `
+    attribute float aSeed;
+    uniform float uTime;
+    uniform float uPixelRatio;
+    void main() {
+      vec3 p = position;
+      float fall = fract(aSeed - uTime * 1.45);
+      p.y = 0.8 + fall * 20.0;
+      p.x += (1.0 - fall) * 1.6;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      gl_Position = projectionMatrix * mv;
+      gl_PointSize = clamp((12.0 * uPixelRatio) / max(1.0, -mv.z), 1.5, 14.0);
+    }
+  `,
+  fragmentShader: `
+    uniform float uRain;
+    void main() {
+      vec2 uv = gl_PointCoord - 0.5;
+      if (abs(uv.x) > 0.14) discard;
+      gl_FragColor = vec4(0.72, 0.86, 1.0, uRain * 0.65);
+    }
+  `
+});
+const rainPoints = new THREE.Points(rainGeo, rainMat);
+scene.add(rainPoints);
+
+// ---------- INTERACTION: ORBIT + IDLE AUTO-ROTATE + 3D KNOB RAYCAST + SPACEBAR RAIN ----------
+const camOrbit = { yaw: 0.35, pitch: 0.42, radius: 44, target: new THREE.Vector3(0, 3.2, 0.5) };
+let dragging = false, moved = false, lastX = 0, lastY = 0, idleTimer = 0;
+
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
+
+function triggerKnob(id) {
+  if (id === "speed") {
+    knobStates.speedIdx = (knobStates.speedIdx + 1) % knobStates.speedValues.length;
+  } else if (id === "cycle") {
+    knobStates.dayCycle = !knobStates.dayCycle;
+  } else if (id === "dust") {
+    knobStates.dustIdx = (knobStates.dustIdx + 1) % knobStates.dustValues.length;
+  }
+  syncKnobVisuals();
+}
+
+function toggleRain() {
+  knobStates.raining = !knobStates.raining;
+  syncKnobVisuals();
+}
+
+function syncKnobVisuals() {
+  const spLabel = knobStates.speedLabels[knobStates.speedIdx];
+  const duLabel = knobStates.dustLabels[knobStates.dustIdx];
+  pSpeed.textContent = `⚙️ 速度: ${spLabel}`;
+  pDust.textContent = `🌫️ 尘土: ${duLabel}`;
+  pRain.textContent = `🌧️ 暴雨: ${knobStates.raining ? "开 (Space)" : "关 (Space)"}`;
+  pRain.classList.toggle("on", knobStates.raining);
+  pCycle.classList.toggle("on", knobStates.dayCycle);
+
+  dustUniforms.uDensity.value = knobStates.dustValues[knobStates.dustIdx] * (knobStates.raining ? 0.25 : 1.0);
+  // Wet reflective ground during rainstorm
+  matDioramaSoil.roughness = knobStates.raining ? 0.22 : 0.92;
+  matRoad.roughness = knobStates.raining ? 0.16 : 0.85;
+  matRoad.metalness = knobStates.raining ? 0.38 : 0.06;
+
+  // Rotate physical 3D knob dials & update label textures
+  for (const k of interactiveKnobs) {
+    if (k.id === "speed") {
+      k.dial.rotation.y = -0.9 + knobStates.speedIdx * 0.65;
+      k.plate.material.map = makeKnobLabelTexture("机械速度", spLabel);
+    } else if (k.id === "cycle") {
+      k.dial.rotation.y = knobStates.dayCycle ? 0.55 : -0.55;
+      k.plate.material.map = makeKnobLabelTexture("昼夜循环", knobStates.dayCycle ? "开启" : "暂停");
+    } else if (k.id === "dust") {
+      k.dial.rotation.y = -0.75 + knobStates.dustIdx * 0.75;
+      k.plate.material.map = makeKnobLabelTexture("尘土强度", duLabel);
+    }
+    k.plate.material.needsUpdate = true;
+  }
+}
+
+pSpeed.onclick = () => triggerKnob("speed");
+pCycle.onclick = () => triggerKnob("cycle");
+pDust.onclick = () => triggerKnob("dust");
+pRain.onclick = toggleRain;
+
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space") {
+    e.preventDefault();
+    toggleRain();
+  }
+});
+
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  dragging = true;
+  moved = false;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  idleTimer = 0;
+});
+
+window.addEventListener("pointermove", (e) => {
+  if (!dragging) return;
+  const dx = e.clientX - lastX;
+  const dy = e.clientY - lastY;
+  if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  camOrbit.yaw -= dx * 0.006;
+  camOrbit.pitch = Math.max(0.14, Math.min(1.25, camOrbit.pitch + dy * 0.005));
+  idleTimer = 0;
+});
+
+window.addEventListener("pointerup", (e) => {
+  if (dragging && !moved) {
+    // Check raycast hit on physical workbench knobs!
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointerNDC, camera);
+    const hits = raycaster.intersectObjects(interactiveKnobs.map(k => k.hit));
+    if (hits.length > 0) {
+      triggerKnob(hits[0].object.userData.knobId);
+    }
+  }
+  dragging = false;
+});
+
+renderer.domElement.addEventListener("wheel", (e) => {
+  camOrbit.radius = Math.max(18, Math.min(72, camOrbit.radius + e.deltaY * 0.03));
+  idleTimer = 0;
+}, { passive: true });
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ---------- DAY/NIGHT 4-PHASE PALETTE INTERPOLATION ----------
+const phases = [
+  { t: 0.00, name: "夜晚", bg: new THREE.Color(0x0b1020), sun: new THREE.Color(0x7c9ad4), sunI: 0.32, hemi: 0.25, night: 1.0 },
+  { t: 0.22, name: "黎明", bg: new THREE.Color(0x4b3446), sun: new THREE.Color(0xff9e68), sunI: 1.15, hemi: 0.55, night: 0.45 },
+  { t: 0.45, name: "正午", bg: new THREE.Color(0x2d3a4b), sun: new THREE.Color(0xfff6e5), sunI: 2.05, hemi: 0.85, night: 0.0 },
+  { t: 0.72, name: "黄昏", bg: new THREE.Color(0x4a2924), sun: new THREE.Color(0xff773b), sunI: 1.25, hemi: 0.5, night: 0.55 },
+  { t: 1.00, name: "夜晚", bg: new THREE.Color(0x0b1020), sun: new THREE.Color(0x7c9ad4), sunI: 0.32, hemi: 0.25, night: 1.0 }
+];
+const tmpBg = new THREE.Color();
+const tmpSun = new THREE.Color();
+
+function updateEnvironment(dt) {
+  if (knobStates.dayCycle) {
+    knobStates.timeOfDay = (knobStates.timeOfDay + dt * 0.025) % 1.0;
+  }
+  const t = knobStates.timeOfDay;
+  let a = phases[0], b = phases[1];
+  for (let i = 0; i < phases.length - 1; i++) {
+    if (t >= phases[i].t && t <= phases[i + 1].t) {
+      a = phases[i]; b = phases[i + 1]; break;
+    }
+  }
+  const f = (t - a.t) / Math.max(0.0001, b.t - a.t);
+  tmpBg.lerpColors(a.bg, b.bg, f);
+  tmpSun.lerpColors(a.sun, b.sun, f);
+  const rainDim = knobStates.raining ? 0.52 : 1.0;
+  if (knobStates.raining) tmpBg.multiplyScalar(0.55);
+
+  scene.background.copy(tmpBg);
+  scene.fog.color.copy(tmpBg);
+  sunLight.color.copy(tmpSun);
+  sunLight.intensity = THREE.MathUtils.lerp(a.sunI, b.sunI, f) * rainDim;
+  hemiLight.intensity = THREE.MathUtils.lerp(a.hemi, b.hemi, f) * (knobStates.raining ? 0.75 : 1.0);
+
+  const sunAng = t * Math.PI * 2 - Math.PI * 0.5;
+  sunLight.position.set(Math.cos(sunAng) * 34, Math.max(8, Math.sin(sunAng) * 34 + 12), 18);
+
+  const nightFactor = Math.min(1.35, THREE.MathUtils.lerp(a.night, b.night, f) + (knobStates.raining ? 0.55 : 0));
+  for (const pl of siteLights) {
+    pl.intensity = nightFactor * 26;
+  }
+  matWindowGlow.emissiveIntensity = 0.08 + nightFactor * 1.45;
+  glowUniforms.uStrength.value = 0.08 + nightFactor * 0.85;
+  rainUniforms.uRain.value = THREE.MathUtils.lerp(rainUniforms.uRain.value, knobStates.raining ? 1.0 : 0.0, dt * 6);
+
+  const phaseName = t < 0.14 || t > 0.85 ? "夜晚" : (t < 0.32 ? "黎明" : (t < 0.62 ? "正午" : "黄昏"));
+  pCycle.textContent = `${phaseName === "夜晚" ? "🌙" : phaseName === "正午" ? "☀️" : "🌅"} 昼夜: ${phaseName} (${knobStates.dayCycle ? "循环开" : "已停"})`;
+}
+
+// ---------- MACHINERY & WORKER ANIMATION ----------
+let simTime = 0;
+const routeLengths = [];
+let totalRouteLen = 0;
+for (let i = 0; i < truckRoute.length; i++) {
+  const len = truckRoute[i].distanceTo(truckRoute[(i + 1) % truckRoute.length]);
+  routeLengths.push(len);
+  totalRouteLen += len;
+}
+
+function sampleRoute(u) {
+  let dist = ((u % 1) + 1) % 1 * totalRouteLen;
+  for (let i = 0; i < truckRoute.length; i++) {
+    const len = routeLengths[i];
+    if (dist <= len) {
+      const p0 = truckRoute[i];
+      const p1 = truckRoute[(i + 1) % truckRoute.length];
+      const pos = new THREE.Vector3().lerpVectors(p0, p1, dist / len);
+      const dir = new THREE.Vector3().subVectors(p1, p0).normalize();
+      return { pos, angle: Math.atan2(-dir.z, dir.x), seg: i, segT: dist / len };
+    }
+    dist -= len;
+  }
+  return { pos: truckRoute[0].clone(), angle: 0, seg: 0, segT: 0 };
+}
+
+function updateMachinery(dt) {
+  const spd = knobStates.speedValues[knobStates.speedIdx];
+  simTime += dt * spd;
+  dustUniforms.uTime.value = simTime;
+  rainUniforms.uTime.value += dt;
+
+  // Excavators digging rhythm
+  const dig1 = Math.sin(simTime * 1.6);
+  exc1.turret.rotation.y = Math.sin(simTime * 0.7) * 0.55;
+  exc1.boomPivot.rotation.z = -0.15 + dig1 * 0.22;
+  exc1.stickPivot.rotation.z = 0.25 - dig1 * 0.42;
+  exc1.bucketPivot.rotation.z = -0.2 + dig1 * 0.55;
+
+  const dig2 = Math.sin(simTime * 1.45 + 1.8);
+  exc2.turret.rotation.y = Math.sin(simTime * 0.65 + 1.2) * 0.48;
+  exc2.boomPivot.rotation.z = -0.1 + dig2 * 0.24;
+  exc2.stickPivot.rotation.z = 0.2 - dig2 * 0.38;
+  exc2.bucketPivot.rotation.z = -0.2 + dig2 * 0.5;
+
+  // Tower cranes rotating & hoisting loads
+  crane1.jibGroup.rotation.y = -0.6 + Math.sin(simTime * 0.32) * 1.05;
+  const tr1 = 0.35 + (Math.sin(simTime * 0.5) * 0.5 + 0.5) * 0.45;
+  crane1.trolley.position.x = crane1.jibLen * tr1;
+  const cLen1 = 2.6 + (Math.sin(simTime * 0.75) * 0.5 + 0.5) * 4.5;
+  crane1.cable.scale.y = cLen1;
+  crane1.cable.position.y = -cLen1 * 0.5;
+  crane1.load.position.y = -cLen1;
+
+  crane2.jibGroup.rotation.y = 1.4 + Math.cos(simTime * 0.28) * 0.9;
+  const tr2 = 0.32 + (Math.cos(simTime * 0.45) * 0.5 + 0.5) * 0.42;
+  crane2.trolley.position.x = crane2.jibLen * tr2;
+  const cLen2 = 2.4 + (Math.cos(simTime * 0.65) * 0.5 + 0.5) * 4.0;
+  crane2.cable.scale.y = cLen2;
+  crane2.cable.position.y = -cLen2 * 0.5;
+  crane2.load.position.y = -cLen2;
+
+  // Dump trucks looping & tilting bed at spoil mound (seg === 2 -> seg === 3)
+  for (const tr of dumpTrucks) {
+    tr.progress = (tr.progress + dt * spd * 0.045) % 1;
+    const sample = sampleRoute(tr.progress);
+    tr.group.position.copy(sample.pos);
+    tr.group.rotation.y = sample.angle;
+
+    // Show dirt load between excavator (seg 1) and spoil mound (seg 3)
+    const loaded = sample.seg === 1 || sample.seg === 2;
+    const dumping = sample.seg === 3 && sample.segT < 0.22;
+    tr.dirt.visible = loaded || dumping;
+    tr.bedPivot.rotation.z = dumping ? Math.sin((sample.segT / 0.22) * Math.PI) * 0.58 : 0;
+  }
+
+  // Concrete mixer patrolling center cross road
+  const mixZ = Math.sin(simTime * 0.35) * 5.6;
+  mixerGroup.position.set(0, 0, mixZ);
+  mixerGroup.rotation.y = Math.cos(simTime * 0.35) >= 0 ? 0 : Math.PI;
+  drum.rotation.y = simTime * 2.4;
+
+  // Compact loader grading yard back & forth
+  loader.position.x = -6.6 + Math.sin(simTime * 0.65) * 2.5;
+  loader.rotation.y = Math.cos(simTime * 0.65) >= 0 ? 0 : Math.PI;
+
+  // Voxel workers
+  for (const w of workers) {
+    const t = simTime * 3.0 + w.phase;
+    if (w.role === "patrol") {
+      w.g.position.x = Math.sin(simTime * 0.55) * 2.1;
+      w.g.rotation.y = Math.cos(simTime * 0.55) >= 0 ? Math.PI / 2 : -Math.PI / 2;
+      w.armL.rotation.x = Math.sin(t) * 0.5;
+      w.armR.rotation.x = -Math.sin(t) * 0.5;
+    } else if (w.role === "signal") {
+      w.armL.rotation.z = -2.2 + Math.sin(t * 1.4) * 0.45;
+      w.armR.rotation.z = 2.2 - Math.sin(t * 1.4) * 0.45;
+    } else if (w.role === "tool") {
+      w.g.position.y = Math.abs(Math.sin(t * 3.5)) * 0.08;
+      w.armL.rotation.x = -0.9 + Math.sin(t * 3.5) * 0.25;
+      w.armR.rotation.x = -0.9 + Math.sin(t * 3.5) * 0.25;
+    } else if (w.role === "walk" || w.role === "carry") {
+      w.g.position.x = w.baseX + Math.sin(simTime * 0.6 + w.phase) * 1.0;
+      w.armL.rotation.x = w.role === "carry" ? -1.1 : Math.sin(t) * 0.45;
+      w.armR.rotation.x = w.role === "carry" ? -1.1 : -Math.sin(t) * 0.45;
+    } else {
+      // Tying rebar
+      w.armL.rotation.x = -0.8 + Math.sin(t * 1.6) * 0.3;
+      w.armR.rotation.x = -0.8 + Math.cos(t * 1.6) * 0.3;
+    }
+  }
+}
+
+// ---------- MAIN LOOP ----------
+syncKnobVisuals();
+const clock = new THREE.Clock();
+let frames = 0, fpsAcc = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, clock.getDelta());
+
+  if (!dragging) {
+    idleTimer += dt;
+    if (idleTimer > 2.5) {
+      camOrbit.yaw += dt * 0.09;
+    }
+  }
+
+  updateEnvironment(dt);
+  updateMachinery(dt);
+
+  camera.position.set(
+    camOrbit.target.x + camOrbit.radius * Math.cos(camOrbit.pitch) * Math.sin(camOrbit.yaw),
+    camOrbit.target.y + camOrbit.radius * Math.sin(camOrbit.pitch),
+    camOrbit.target.z + camOrbit.radius * Math.cos(camOrbit.pitch) * Math.cos(camOrbit.yaw)
+  );
+  camera.lookAt(camOrbit.target);
+
+  renderer.render(scene, camera);
+
+  frames++; fpsAcc += dt;
+  if (fpsAcc >= 0.5) {
+    pFps.textContent = `${Math.round(frames / fpsAcc)} FPS`;
+    frames = 0; fpsAcc = 0;
+  }
+}
+
+animate();
+</script>
+</body>
+</html>
